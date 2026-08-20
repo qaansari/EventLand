@@ -1,122 +1,346 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import React, { useState, useEffect } from 'react';
+import Navbar from './components/Navbar';
+import HeroSlider from './components/HeroSlider';
+import EventCard from './components/EventCard';
+import EventFilterBar from './components/EventFilterBar';
+import EventDetailModal from './components/EventDetailModal';
+import InteractiveSeatPicker from './components/InteractiveSeatPicker';
+import CheckoutModal from './components/CheckoutModal';
+import DigitalTicketModal from './components/DigitalTicketModal';
+import ArtistBookings from './components/ArtistBookings';
+import EventOrganizerWizard from './components/EventOrganizerWizard';
+import AiEventAssistant from './components/AiEventAssistant';
+import Footer from './components/Footer';
+import { MOCK_EVENTS } from './data/mockEvents';
+import { Ticket, MapPin } from 'lucide-react';
+import './App.css';
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [events, setEvents] = useState(() => {
+    const local = localStorage.getItem('eventland_custom_events');
+    if (local) {
+      try {
+        return [...JSON.parse(local), ...MOCK_EVENTS];
+      } catch (err) {
+        return MOCK_EVENTS;
+      }
+    }
+    return MOCK_EVENTS;
+  });
+
+  const [activeView, setActiveView] = useState('explore'); // explore, artists, ai-assistant, organizer-wizard, my-tickets
+  const [selectedCity, setSelectedCity] = useState('All Cities');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('featured');
+
+  // Saved / Favorite Events
+  const [savedEventIds, setSavedEventIds] = useState(() => {
+    const saved = localStorage.getItem('eventland_saved_events');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // User Purchased Tickets
+  const [purchasedTickets, setPurchasedTickets] = useState(() => {
+    const tickets = localStorage.getItem('eventland_purchased_tickets');
+    return tickets ? JSON.parse(tickets) : [];
+  });
+
+  // Active Modals
+  const [activeDetailEvent, setActiveDetailEvent] = useState(null);
+  const [activeSeatPickerEvent, setActiveSeatPickerEvent] = useState(null);
+  const [checkoutData, setCheckoutData] = useState(null); // { event, seats }
+  const [activeTicketView, setActiveTicketView] = useState(null);
+
+  useEffect(() => {
+    localStorage.setItem('eventland_saved_events', JSON.stringify(savedEventIds));
+  }, [savedEventIds]);
+
+  useEffect(() => {
+    localStorage.setItem('eventland_purchased_tickets', JSON.stringify(purchasedTickets));
+  }, [purchasedTickets]);
+
+  const handleToggleSave = (eventId) => {
+    if (savedEventIds.includes(eventId)) {
+      setSavedEventIds(savedEventIds.filter((id) => id !== eventId));
+    } else {
+      setSavedEventIds([...savedEventIds, eventId]);
+    }
+  };
+
+  // Open Detail Modal when event card is clicked
+  const handleSelectEventForDetail = (event) => {
+    setActiveDetailEvent(event);
+  };
+
+  // Handle Action from EventDetailModal
+  const handleProceedFromDetail = (event, targetFlow, seats) => {
+    setActiveDetailEvent(null);
+    if (targetFlow === 'seat-picker') {
+      setActiveSeatPickerEvent(event);
+    } else if (targetFlow === 'checkout') {
+      setCheckoutData({ event, seats });
+    }
+  };
+
+  const handleProceedFromSeatPicker = (selectedSeats) => {
+    const event = activeSeatPickerEvent;
+    setActiveSeatPickerEvent(null);
+    setCheckoutData({ event, seats: selectedSeats });
+  };
+
+  const handleBookingSuccess = (newTicket) => {
+    setCheckoutData(null);
+    setPurchasedTickets([newTicket, ...purchasedTickets]);
+    setActiveTicketView(newTicket);
+  };
+
+  const handlePublishNewEvent = (newEvent) => {
+    const existingCustom = localStorage.getItem('eventland_custom_events');
+    let customList = [];
+    if (existingCustom) {
+      try {
+        customList = JSON.parse(existingCustom);
+      } catch (e) {}
+    }
+    customList = [newEvent, ...customList];
+    localStorage.setItem('eventland_custom_events', JSON.stringify(customList));
+
+    setEvents([newEvent, ...events]);
+    setActiveView('explore');
+    alert(`🎉 Event "${newEvent.title}" published successfully! It is now live on EventLand.`);
+  };
+
+  // Filter & Sort Events
+  const filteredEvents = events.filter((ev) => {
+    const matchCity = selectedCity === 'All Cities' || ev.city.toLowerCase() === selectedCity.toLowerCase();
+    const matchCategory = selectedCategory === 'All' || ev.category.toLowerCase() === selectedCategory.toLowerCase();
+    const matchSearch =
+      !searchQuery ||
+      ev.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ev.venue.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ev.city.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchCity && matchCategory && matchSearch;
+  });
+
+  const sortedEvents = [...filteredEvents].sort((a, b) => {
+    if (sortBy === 'price-asc') return a.startingPrice - b.startingPrice;
+    if (sortBy === 'price-desc') return b.startingPrice - a.startingPrice;
+    return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
+  });
+
+  const featuredEvents = events.filter((e) => e.isFeatured);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="app">
+      {/* Top Navbar */}
+      <Navbar
+        selectedCity={selectedCity}
+        onSelectCity={setSelectedCity}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        activeView={activeView}
+        onNavigate={setActiveView}
+        savedTicketsCount={purchasedTickets.length}
+      />
 
-      <div className="ticks"></div>
+      {/* Main View Router */}
+      <main style={{ flexGrow: 1 }}>
+        {activeView === 'explore' && (
+          <div className="container" style={{ padding: '2rem 1.5rem' }}>
+            {/* Hero Slider */}
+            <HeroSlider
+              featuredEvents={featuredEvents}
+              onSelectEvent={handleSelectEventForDetail}
+            />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+            {/* Filter Bar */}
+            <EventFilterBar
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
+              selectedCity={selectedCity}
+              onSelectCity={setSelectedCity}
+              sortBy={sortBy}
+              onSortChange={setSortBy}
+            />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+            {/* Events Grid Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff' }}>
+                  {selectedCategory === 'All' ? 'Upcoming Events' : `${selectedCategory} Events`}
+                  {selectedCity !== 'All Cities' && ` in ${selectedCity}`}
+                </h2>
+                <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                  Showing {sortedEvents.length} events found
+                </span>
+              </div>
+            </div>
+
+            {/* Event Cards Grid */}
+            {sortedEvents.length === 0 ? (
+              <div className="glass-card" style={{ padding: '4rem 2rem', textAlign: 'center' }}>
+                <Ticket size={48} color="#94a3b8" style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+                <h3 style={{ fontSize: '1.3rem', color: '#fff', marginBottom: '0.5rem' }}>No events found</h3>
+                <p style={{ color: '#94a3b8', marginBottom: '1.5rem' }}>
+                  Try adjusting your city filter or search query.
+                </p>
+                <button
+                  onClick={() => {
+                    setSelectedCity('All Cities');
+                    setSelectedCategory('All');
+                    setSearchQuery('');
+                  }}
+                  className="btn btn-primary"
+                >
+                  Reset Filters
+                </button>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                gap: '1.75rem'
+              }}>
+                {sortedEvents.map((ev) => (
+                  <EventCard
+                    key={ev.id}
+                    event={ev}
+                    onSelect={handleSelectEventForDetail}
+                    isSaved={savedEventIds.includes(ev.id)}
+                    onToggleSave={handleToggleSave}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* View: Artist Bookings */}
+        {activeView === 'artists' && <ArtistBookings />}
+
+        {/* View: AI Event Matchmaker Assistant */}
+        {activeView === 'ai-assistant' && (
+          <AiEventAssistant onSelectEvent={handleSelectEventForDetail} />
+        )}
+
+        {/* View: List Your Event Wizard */}
+        {activeView === 'organizer-wizard' && (
+          <EventOrganizerWizard
+            onPublishEvent={handlePublishNewEvent}
+            onCancel={() => setActiveView('explore')}
+          />
+        )}
+
+        {/* View: My Tickets Dashboard */}
+        {activeView === 'my-tickets' && (
+          <div className="container" style={{ padding: '2rem 1.5rem' }}>
+            <div style={{ marginBottom: '2rem' }}>
+              <span className="badge badge-live" style={{ marginBottom: '0.5rem' }}>MY PURCHASES & SAVED PASSES</span>
+              <h1 style={{ fontSize: '2.2rem', fontWeight: 800, color: '#fff' }}>My Digital Tickets</h1>
+              <p style={{ color: '#94a3b8' }}>
+                Access all your purchased E-Tickets, QR pass codes, and gatekeeper verification receipts.
+              </p>
+            </div>
+
+            {purchasedTickets.length === 0 ? (
+              <div className="glass-card" style={{ padding: '4rem 2rem', textAlign: 'center' }}>
+                <Ticket size={48} color="#3b82f6" style={{ margin: '0 auto 1rem' }} />
+                <h3 style={{ fontSize: '1.3rem', color: '#fff', marginBottom: '0.5rem' }}>No active tickets purchased yet</h3>
+                <p style={{ color: '#94a3b8', marginBottom: '1.5rem' }}>
+                  Explore Pakistan's top concerts, comedy nights, and festivals to get your passes!
+                </p>
+                <button onClick={() => setActiveView('explore')} className="btn btn-primary">
+                  Browse Upcoming Events
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
+                {purchasedTickets.map((t) => (
+                  <div key={t.ticketId} className="glass-card" style={{ padding: '1.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+                      <span className="badge badge-live">CONFIRMED PASS</span>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{t.ticketId}</span>
+                    </div>
+
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', marginBottom: '0.35rem' }}>
+                      {t.eventTitle}
+                    </h3>
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1rem' }}>
+                      <MapPin size={14} color="#3b82f6" style={{ display: 'inline', marginRight: '4px' }} />
+                      {t.venue}
+                    </div>
+
+                    <div style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '0.75rem', borderRadius: '10px', fontSize: '0.82rem', marginBottom: '1.25rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1', marginBottom: '0.25rem' }}>
+                        <span>Pass Holder:</span>
+                        <strong style={{ color: '#fff' }}>{t.attendeeName}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1', marginBottom: '0.25rem' }}>
+                        <span>Seats/Tiers:</span>
+                        <strong style={{ color: '#60a5fa' }}>{t.seats.map((s) => s.id.split('-').pop()).join(', ')}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1' }}>
+                        <span>Amount Paid:</span>
+                        <strong style={{ color: '#fff' }}>PKR {t.totalPaid.toLocaleString()}</strong>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setActiveTicketView(t)}
+                      className="btn btn-primary"
+                      style={{ width: '100%', fontSize: '0.88rem' }}
+                    >
+                      <Ticket size={16} /> View E-Ticket & QR Pass
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* Active Modals */}
+      {activeDetailEvent && (
+        <EventDetailModal
+          event={activeDetailEvent}
+          onClose={() => setActiveDetailEvent(null)}
+          onProceedToBooking={handleProceedFromDetail}
+        />
+      )}
+
+      {activeSeatPickerEvent && (
+        <InteractiveSeatPicker
+          event={activeSeatPickerEvent}
+          onClose={() => setActiveSeatPickerEvent(null)}
+          onProceedToCheckout={handleProceedFromSeatPicker}
+        />
+      )}
+
+      {checkoutData && (
+        <CheckoutModal
+          event={checkoutData.event}
+          selectedSeats={checkoutData.seats}
+          onClose={() => setCheckoutData(null)}
+          onBookingSuccess={handleBookingSuccess}
+        />
+      )}
+
+      {activeTicketView && (
+        <DigitalTicketModal
+          ticket={activeTicketView}
+          onClose={() => setActiveTicketView(null)}
+        />
+      )}
+
+      {/* Footer */}
+      <Footer onSelectCity={(city) => {
+        setSelectedCity(city);
+        setActiveView('explore');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }} />
+    </div>
+  );
 }
-
-export default App
