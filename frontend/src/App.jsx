@@ -12,7 +12,7 @@ import EventOrganizerWizard from './components/EventOrganizerWizard';
 import AiEventAssistant from './components/AiEventAssistant';
 import Footer from './components/Footer';
 import { MOCK_EVENTS } from './data/mockEvents';
-import { Ticket, MapPin } from 'lucide-react';
+import { Ticket, MapPin, Trash2 } from 'lucide-react';
 import './App.css';
 
 export default function App() {
@@ -46,6 +46,17 @@ export default function App() {
     return tickets ? JSON.parse(tickets) : [];
   });
 
+  const handleRemoveTicket = (ticketId) => {
+    const updated = purchasedTickets.filter((t) => t.ticketId !== ticketId);
+    setPurchasedTickets(updated);
+    localStorage.setItem('eventland_purchased_tickets', JSON.stringify(updated));
+  };
+
+  const handleClearAllTickets = () => {
+    setPurchasedTickets([]);
+    localStorage.removeItem('eventland_purchased_tickets');
+  };
+
   // Active Modals
   const [activeDetailEvent, setActiveDetailEvent] = useState(null);
   const [activeSeatPickerEvent, setActiveSeatPickerEvent] = useState(null);
@@ -59,6 +70,49 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('eventland_purchased_tickets', JSON.stringify(purchasedTickets));
   }, [purchasedTickets]);
+
+  // Dynamic Document Title based on Active View, Search Filters, & Active Modals
+  useEffect(() => {
+    if (activeTicketView) {
+      document.title = `E-Ticket Pass (${activeTicketView.ticketId}) | Event Land`;
+    } else if (checkoutData) {
+      document.title = `Checkout: ${checkoutData.event?.title || 'Tickets'} | Event Land`;
+    } else if (activeSeatPickerEvent) {
+      document.title = `Select Seats: ${activeSeatPickerEvent.title} | Event Land`;
+    } else if (activeDetailEvent) {
+      document.title = `${activeDetailEvent.title} (${activeDetailEvent.city}) | Event Land`;
+    } else if (activeView === 'artists') {
+      document.title = `Artist Bookings & Live Talent | Event Land`;
+    } else if (activeView === 'ai-assistant') {
+      document.title = `EventVibe AI Matchmaker & Concierge | Event Land`;
+    } else if (activeView === 'organizer-wizard') {
+      document.title = `List & Host Your Event | Event Land`;
+    } else if (activeView === 'my-tickets') {
+      document.title = `My Digital Tickets & Passes | Event Land`;
+    } else {
+      // Explore View
+      if (searchQuery.trim()) {
+        document.title = `Search: "${searchQuery}" | Event Land`;
+      } else if (selectedCategory !== 'All' && selectedCity !== 'All Cities') {
+        document.title = `${selectedCategory} Events in ${selectedCity} | Event Land`;
+      } else if (selectedCategory !== 'All') {
+        document.title = `${selectedCategory} Events | Event Land`;
+      } else if (selectedCity !== 'All Cities') {
+        document.title = `Events in ${selectedCity} | Event Land`;
+      } else {
+        document.title = `Event Land - Discover Concerts, Festivals & Live Events`;
+      }
+    }
+  }, [
+    activeView,
+    selectedCity,
+    selectedCategory,
+    searchQuery,
+    activeDetailEvent,
+    activeSeatPickerEvent,
+    checkoutData,
+    activeTicketView
+  ]);
 
   const handleToggleSave = (eventId) => {
     if (savedEventIds.includes(eventId)) {
@@ -236,12 +290,30 @@ export default function App() {
         {/* View: My Tickets Dashboard */}
         {activeView === 'my-tickets' && (
           <div className="container" style={{ padding: '2rem 1.5rem' }}>
-            <div style={{ marginBottom: '2rem' }}>
-              <span className="badge badge-live" style={{ marginBottom: '0.5rem' }}>MY PURCHASES & SAVED PASSES</span>
-              <h1 style={{ fontSize: '2.2rem', fontWeight: 800, color: '#fff' }}>My Digital Tickets</h1>
-              <p style={{ color: '#94a3b8' }}>
-                Access all your purchased E-Tickets, QR pass codes, and gatekeeper verification receipts.
-              </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
+              <div>
+                <span className="badge badge-live" style={{ marginBottom: '0.5rem' }}>MY PURCHASES & SAVED PASSES</span>
+                <h1 style={{ fontSize: '2.2rem', fontWeight: 800, color: '#fff' }}>My Digital Tickets</h1>
+                <p style={{ color: '#94a3b8' }}>
+                  Access all your purchased E-Tickets, QR pass codes, and gatekeeper verification receipts.
+                </p>
+              </div>
+
+              {purchasedTickets.length > 0 && (
+                <button
+                  onClick={handleClearAllTickets}
+                  className="btn"
+                  style={{
+                    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                    color: '#f87171',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    padding: '0.6rem 1.2rem',
+                    fontSize: '0.88rem'
+                  }}
+                >
+                  <Trash2 size={16} /> Remove All Tickets ({purchasedTickets.length})
+                </button>
+              )}
             </div>
 
             {purchasedTickets.length === 0 ? (
@@ -261,7 +333,27 @@ export default function App() {
                   <div key={t.ticketId} className="glass-card" style={{ padding: '1.5rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
                       <span className="badge badge-live">CONFIRMED PASS</span>
-                      <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{t.ticketId}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{t.ticketId}</span>
+                        <button
+                          onClick={() => handleRemoveTicket(t.ticketId)}
+                          title="Delete ticket pass"
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            border: 'none',
+                            color: '#f87171',
+                            borderRadius: '6px',
+                            padding: '4px 8px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '0.75rem'
+                          }}
+                        >
+                          <Trash2 size={13} /> Delete
+                        </button>
+                      </div>
                     </div>
 
                     <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', marginBottom: '0.35rem' }}>
