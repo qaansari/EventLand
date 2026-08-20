@@ -79,10 +79,17 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
         <span className="badge badge-live" style={{ marginBottom: '0.5rem' }}>
           ORGANIZER SELF-SERVICE PORTAL
         </span>
-        <h1 style={{ fontSize: '2.2rem', fontWeight: 800, color: '#fff' }}>
+        <h1 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 'clamp(1.8rem, 4vw, 2.5rem)',
+          fontWeight: 800,
+          letterSpacing: '-0.025em',
+          color: '#fff',
+          marginBottom: '0.4rem'
+        }}>
           List Your Event & Sell Tickets Across Pakistan
         </h1>
-        <p style={{ color: '#94a3b8' }}>
+        <p style={{ color: '#94a3b8', fontSize: '1rem' }}>
           Publish your event in minutes. Choose between Categorized Passes or Mapped Seat Picker layout.
         </p>
       </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MapPin, Search, PlusCircle, User, Sparkles, Music, Calendar, Menu, X } from 'lucide-react';
+import { MapPin, Search, PlusCircle, User, Sparkles, Music, Calendar, Menu, X, ShieldCheck, Building2, LogIn, LogOut } from 'lucide-react';
 import { CITIES } from '../data/mockEvents';
 
 export default function Navbar({ 
@@ -9,7 +9,12 @@ export default function Navbar({
   onSearchChange,
   activeView,
   onNavigate,
-  savedTicketsCount
+  savedTicketsCount,
+  currentRole = 'customer',
+  onSelectRole,
+  currentUser = null,
+  onOpenAuthModal,
+  onLogout
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -39,7 +44,11 @@ export default function Navbar({
       }}>
         {/* Brand Logo & Tagline */}
         <div 
-          onClick={() => handleNavClick('explore')}
+          onClick={() => {
+            if (currentRole === 'organizer') handleNavClick('organizer');
+            else if (currentRole === 'admin') handleNavClick('admin');
+            else handleNavClick('explore');
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -62,7 +71,8 @@ export default function Navbar({
           />
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <div style={{
-              fontSize: '1.35rem',
+              fontFamily: 'var(--font-display)',
+              fontSize: '1.4rem',
               fontWeight: 800,
               letterSpacing: '-0.02em',
               color: '#fff',
@@ -72,10 +82,11 @@ export default function Navbar({
               EVENT <span style={{ color: '#3b82f6' }}>LAND</span>
             </div>
             <div style={{
+              fontFamily: 'var(--font-body)',
               fontSize: '0.58rem',
               color: '#94a3b8',
               fontWeight: 700,
-              letterSpacing: '0.1em',
+              letterSpacing: '0.12em',
               textTransform: 'uppercase',
               whiteSpace: 'nowrap',
               marginTop: '2px'
@@ -119,11 +130,11 @@ export default function Navbar({
             </select>
           </div>
 
-          <div style={{ position: 'relative', width: '210px', flexShrink: 1 }}>
+          <div style={{ position: 'relative', width: '190px', flexShrink: 1 }}>
             <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
-              placeholder="Search concerts, shows..."
+              placeholder="Search events..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               style={{
@@ -156,7 +167,7 @@ export default function Navbar({
               background: activeView === 'explore' ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
               color: activeView === 'explore' ? '#60a5fa' : '#cbd5e1',
               fontSize: '0.88rem',
-              padding: '0.55rem 1rem'
+              padding: '0.55rem 0.9rem'
             }}
           >
             <Calendar size={15} /> Explore
@@ -169,7 +180,7 @@ export default function Navbar({
               background: activeView === 'artists' ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
               color: activeView === 'artists' ? '#60a5fa' : '#cbd5e1',
               fontSize: '0.88rem',
-              padding: '0.55rem 1rem'
+              padding: '0.55rem 0.9rem'
             }}
           >
             <Music size={15} /> Artists
@@ -183,10 +194,10 @@ export default function Navbar({
               color: activeView === 'ai-assistant' ? '#c084fc' : '#cbd5e1',
               fontSize: '0.88rem',
               border: activeView === 'ai-assistant' ? '1px solid rgba(139, 92, 246, 0.4)' : 'none',
-              padding: '0.55rem 1rem'
+              padding: '0.55rem 0.9rem'
             }}
           >
-            <Sparkles size={15} color="#c084fc" /> EventVibe AI
+            <Sparkles size={15} color="#c084fc" /> AI Match
           </button>
 
           <button
@@ -197,7 +208,7 @@ export default function Navbar({
               background: activeView === 'my-tickets' ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
               color: activeView === 'my-tickets' ? '#60a5fa' : '#cbd5e1',
               fontSize: '0.88rem',
-              padding: '0.55rem 1rem'
+              padding: '0.55rem 0.9rem'
             }}
           >
             <User size={15} /> My Tickets
@@ -222,13 +233,110 @@ export default function Navbar({
             )}
           </button>
 
+          {/* Special Console Button for Organizers */}
+          {currentUser && currentUser.role === 'organizer' && (
+            <button
+              onClick={() => handleNavClick('organizer')}
+              className="btn"
+              style={{
+                background: activeView === 'organizer' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.15)',
+                color: '#34d399',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                fontSize: '0.85rem',
+                padding: '0.5rem 0.9rem',
+                fontWeight: 700
+              }}
+            >
+              <Building2 size={15} color="#34d399" /> Organizer Portal
+            </button>
+          )}
+
+          {/* Special Console Button for Super Admin */}
+          {currentUser && currentUser.role === 'admin' && (
+            <button
+              onClick={() => handleNavClick('admin')}
+              className="btn"
+              style={{
+                background: activeView === 'admin' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(139, 92, 246, 0.15)',
+                color: '#c084fc',
+                border: '1px solid rgba(139, 92, 246, 0.4)',
+                fontSize: '0.85rem',
+                padding: '0.5rem 0.9rem',
+                fontWeight: 700
+              }}
+            >
+              <ShieldCheck size={15} color="#c084fc" /> Admin Console
+            </button>
+          )}
+
           <button
             onClick={() => handleNavClick('organizer-wizard')}
             className="btn btn-primary"
-            style={{ fontSize: '0.88rem', padding: '0.55rem 1.15rem' }}
+            style={{ fontSize: '0.85rem', padding: '0.5rem 1.05rem' }}
           >
-            <PlusCircle size={16} /> List Your Event
+            <PlusCircle size={15} /> List Event
           </button>
+
+          {/* User Auth Profile Badge / Sign In Button */}
+          {currentUser ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginLeft: '0.3rem' }}>
+              <span style={{
+                backgroundColor: currentUser.role === 'admin' 
+                  ? 'rgba(139, 92, 246, 0.15)' 
+                  : currentUser.role === 'organizer' 
+                  ? 'rgba(16, 185, 129, 0.15)' 
+                  : 'rgba(59, 130, 246, 0.15)',
+                border: currentUser.role === 'admin' 
+                  ? '1px solid rgba(139, 92, 246, 0.35)' 
+                  : currentUser.role === 'organizer' 
+                  ? '1px solid rgba(16, 185, 129, 0.35)' 
+                  : '1px solid rgba(59, 130, 246, 0.35)',
+                color: '#fff',
+                borderRadius: '9999px',
+                padding: '0.45rem 0.85rem',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}>
+                {currentUser.role === 'admin' ? (
+                  <ShieldCheck size={13} color="#c084fc" />
+                ) : currentUser.role === 'organizer' ? (
+                  <Building2 size={13} color="#34d399" />
+                ) : (
+                  <User size={13} color="#60a5fa" />
+                )}
+                {currentUser.name.split(' ')[0]}
+              </span>
+              <button
+                onClick={onLogout}
+                title="Sign Out"
+                style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                  color: '#f87171',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '50%',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => onOpenAuthModal && onOpenAuthModal()}
+              className="btn btn-primary"
+              style={{ fontSize: '0.82rem', padding: '0.45rem 0.95rem', marginLeft: '0.3rem' }}
+            >
+              <LogIn size={15} /> Sign In
+            </button>
+          )}
         </nav>
 
         {/* Mobile Hamburger Menu Toggle Button */}
@@ -338,6 +446,22 @@ export default function Navbar({
               style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
             >
               <User size={18} color="#3b82f6" /> My Digital Tickets ({savedTicketsCount})
+            </button>
+
+            <button
+              onClick={() => handleNavClick('organizer')}
+              className="btn btn-secondary"
+              style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
+            >
+              <Building2 size={18} color="#3b82f6" /> Organizer Portal
+            </button>
+
+            <button
+              onClick={() => handleNavClick('admin')}
+              className="btn btn-secondary"
+              style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
+            >
+              <ShieldCheck size={18} color="#3b82f6" /> Admin Console
             </button>
 
             <button

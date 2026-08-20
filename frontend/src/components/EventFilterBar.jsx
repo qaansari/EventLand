@@ -32,18 +32,21 @@ export default function EventFilterBar({
               key={cat}
               onClick={() => onSelectCategory(cat)}
               style={{
-                backgroundColor: isActive ? '#3b82f6' : 'rgba(255, 255, 255, 0.06)',
-                background: isActive ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' : 'rgba(255, 255, 255, 0.06)',
+                fontFamily: 'var(--font-display)',
+                background: isActive 
+                  ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%)' 
+                  : 'rgba(255, 255, 255, 0.05)',
                 color: isActive ? '#ffffff' : '#cbd5e1',
-                border: isActive ? '1px solid #60a5fa' : '1px solid rgba(255, 255, 255, 0.1)',
-                padding: '0.5rem 1.25rem',
+                border: isActive ? '1px solid rgba(147, 197, 253, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
+                padding: '0.55rem 1.3rem',
                 borderRadius: '9999px',
                 fontWeight: isActive ? 700 : 500,
                 fontSize: '0.88rem',
+                letterSpacing: '0.01em',
                 whiteSpace: 'nowrap',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: isActive ? '0 4px 14px rgba(59, 130, 246, 0.4)' : 'none'
+                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                boxShadow: isActive ? '0 4px 18px rgba(59, 130, 246, 0.45)' : 'none'
               }}
             >
               {cat}

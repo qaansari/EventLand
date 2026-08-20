@@ -33,8 +33,8 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <span className={`badge ${event.status === 'LIVE' ? 'badge-live' : 'badge-fast'}`}>
-            {event.status}
+          <span className={`badge ${event.status === 'LIVE' ? 'badge-live' : 'badge-fast'}`} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <span className="pulse-dot"></span> {event.status}
           </span>
           <div style={{ display: 'flex', gap: '0.4rem' }}>
             <button
@@ -80,17 +80,19 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
       </div>
 
       {/* Content Body */}
-      <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#94a3b8', fontSize: '0.8rem', marginBottom: '0.35rem' }}>
+      <div style={{ padding: '1.35rem', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#94a3b8', fontSize: '0.82rem', marginBottom: '0.4rem', fontWeight: 500 }}>
           <MapPin size={14} color="#3b82f6" />
           <span>{event.city} • {event.venue.split(',')[0]}</span>
         </div>
 
         <h3 style={{
-          fontSize: '1.15rem',
+          fontFamily: 'var(--font-display)',
+          fontSize: '1.2rem',
           fontWeight: 700,
+          letterSpacing: '-0.02em',
           color: '#ffffff',
-          marginBottom: '0.6rem',
+          marginBottom: '0.65rem',
           lineHeight: 1.3,
           display: '-webkit-box',
           WebkitLineClamp: 2,
@@ -100,7 +102,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
           {event.title}
         </h3>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#cbd5e1', fontSize: '0.85rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#cbd5e1', fontSize: '0.86rem', marginBottom: '0.85rem' }}>
           <Calendar size={15} color="#3b82f6" />
           <span>{event.date}</span>
         </div>
@@ -109,20 +111,21 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
         <div style={{
           fontSize: '0.75rem',
           color: '#94a3b8',
-          marginBottom: '1rem',
+          marginBottom: '1.1rem',
           display: 'flex',
           alignItems: 'center',
-          gap: '0.35rem'
+          gap: '0.4rem',
+          fontWeight: 500
         }}>
-          {event.ticketingType === 'mapped' ? <Grid size={13} color="#3b82f6" /> : <Layers size={13} color="#3b82f6" />}
-          <span>{event.ticketingType === 'mapped' ? 'Mapped Seat Map' : 'Categorized Passes'}</span>
+          {event.ticketingType === 'mapped' ? <Grid size={13} color="#60a5fa" /> : <Layers size={13} color="#60a5fa" />}
+          <span>{event.ticketingType === 'mapped' ? 'Mapped Seat Selection' : 'Tiered Ticket Passes'}</span>
         </div>
 
         {/* Bottom Pricing & View Details Action */}
-        <div style={{ marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ marginTop: 'auto', paddingTop: '0.85rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>From</span>
-            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#3b82f6' }}>
+            <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Starting From</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 800, color: '#60a5fa' }}>
               PKR {event.startingPrice.toLocaleString()}
             </span>
           </div>
@@ -132,10 +135,10 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
               e.stopPropagation();
               onSelect(event);
             }}
-            className="btn btn-secondary"
-            style={{ padding: '0.5rem 1.1rem', fontSize: '0.85rem', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.3)' }}
+            className="btn btn-primary"
+            style={{ padding: '0.52rem 1.15rem', fontSize: '0.85rem' }}
           >
-            <Info size={15} /> View Details
+            <Info size={15} /> View Pass
           </button>
         </div>
       </div>

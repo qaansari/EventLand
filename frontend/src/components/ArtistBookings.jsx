@@ -29,13 +29,20 @@ export default function ArtistBookings() {
     <div className="container" style={{ padding: '2rem 1.5rem' }}>
       {/* Title Header */}
       <div style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
-        <span className="badge badge-live" style={{ marginBottom: '0.5rem' }}>
+        <span className="badge badge-live" style={{ marginBottom: '0.6rem' }}>
           EXCLUSIVE ARTIST MANAGEMENT & BOOKINGS
         </span>
-        <h1 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#fff', marginBottom: '0.75rem' }}>
+        <h1 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 'clamp(2rem, 4vw, 2.7rem)',
+          fontWeight: 800,
+          letterSpacing: '-0.02em',
+          color: '#fff',
+          marginBottom: '0.75rem'
+        }}>
           Book Top Pakistani Talent for Your Events
         </h1>
-        <p style={{ color: '#9ca3af', maxWidth: '650px', margin: '0 auto', fontSize: '1.05rem' }}>
+        <p style={{ color: '#94a3b8', maxWidth: '650px', margin: '0 auto', fontSize: '1.05rem' }}>
           Direct official booking access to singers, bands, stand-up comedians, and DJs with guaranteed contract fulfillment.
         </p>
       </div>
@@ -48,7 +55,7 @@ export default function ArtistBookings() {
       }}>
         {MOCK_ARTISTS.map((artist) => (
           <div key={artist.id} className="glass-card" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ position: 'relative', height: '260px' }}>
+            <div className="card-img-container" style={{ position: 'relative', height: '260px' }}>
               <img
                 src={artist.image}
                 alt={artist.name}
@@ -59,45 +66,54 @@ export default function ArtistBookings() {
                 top: '12px',
                 right: '12px',
                 backgroundColor: 'rgba(9, 13, 22, 0.85)',
+                backdropFilter: 'blur(6px)',
                 color: '#f59e0b',
-                padding: '0.25rem 0.6rem',
+                padding: '0.25rem 0.65rem',
                 borderRadius: '8px',
                 fontSize: '0.8rem',
                 fontWeight: 700,
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.25rem'
+                gap: '0.25rem',
+                border: '1px solid rgba(245, 158, 11, 0.3)'
               }}>
                 <Star size={14} fill="#f59e0b" /> {artist.rating} ({artist.showsDone}+ shows)
               </div>
             </div>
 
-            <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', marginBottom: '0.25rem' }}>
+            <div style={{ padding: '1.35rem', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+              <h3 style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: '1.3rem',
+                fontWeight: 800,
+                letterSpacing: '-0.02em',
+                color: '#fff',
+                marginBottom: '0.25rem'
+              }}>
                 {artist.name}
               </h3>
-              <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600, marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: '0.82rem', color: '#60a5fa', fontWeight: 600, marginBottom: '0.75rem' }}>
                 {artist.genre}
               </span>
-              <p style={{ fontSize: '0.85rem', color: '#9ca3af', marginBottom: '1rem', lineHeight: 1.4 }}>
+              <p style={{ fontSize: '0.86rem', color: '#94a3b8', marginBottom: '1.1rem', lineHeight: 1.5 }}>
                 {artist.bio}
               </p>
 
-              <div style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '0.75rem', borderRadius: '10px', marginBottom: '1.25rem' }}>
-                <span style={{ fontSize: '0.72rem', color: '#9ca3af', display: 'block', marginBottom: '0.25rem' }}>TOP TRACKS</span>
+              <div style={{ backgroundColor: 'rgba(0,0,0,0.35)', padding: '0.8rem', borderRadius: '10px', marginBottom: '1.25rem', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginBottom: '0.35rem', fontWeight: 600, letterSpacing: '0.05em' }}>TOP TRACKS</span>
                 <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                   {artist.topTracks.map((t) => (
-                    <span key={t} style={{ fontSize: '0.75rem', backgroundColor: 'rgba(255,255,255,0.08)', color: '#d1d5db', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
+                    <span key={t} style={{ fontSize: '0.75rem', backgroundColor: 'rgba(255,255,255,0.07)', color: '#e2e8f0', padding: '0.2rem 0.55rem', borderRadius: '6px' }}>
                       🎵 {t}
                     </span>
                   ))}
                 </div>
               </div>
 
-              <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
                 <div>
-                  <span style={{ fontSize: '0.7rem', color: '#9ca3af', display: 'block' }}>Starting Rate</span>
-                  <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fff' }}>
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Starting Rate</span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 800, color: '#60a5fa' }}>
                     {artist.startingRate}
                   </span>
                 </div>

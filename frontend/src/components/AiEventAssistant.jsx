@@ -77,10 +77,17 @@ export default function AiEventAssistant({ onSelectEvent }) {
         }}>
           <Sparkles size={16} /> POWERED BY EVENTVIBE AI
         </div>
-        <h1 style={{ fontSize: '2.2rem', fontWeight: 800, color: '#fff' }}>
+        <h1 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: 'clamp(1.8rem, 4vw, 2.5rem)',
+          fontWeight: 800,
+          letterSpacing: '-0.025em',
+          color: '#fff',
+          marginBottom: '0.5rem'
+        }}>
           Personalized Event Matchmaker
         </h1>
-        <p style={{ color: '#9ca3af' }}>
+        <p style={{ color: '#94a3b8', fontSize: '1rem' }}>
           Not sure what to attend? Ask EventVibe AI to find the perfect concerts, bazaars, and shows tailored to your mood.
         </p>
       </div>

@@ -94,8 +94,8 @@ export default function EventDetailModal({ event, onClose, onProceedToBooking })
             gap: '0.6rem',
             flexWrap: 'wrap'
           }}>
-            <span className={`badge ${event.status === 'LIVE' ? 'badge-live' : 'badge-fast'}`}>
-              {event.status}
+            <span className={`badge ${event.status === 'LIVE' ? 'badge-live' : 'badge-fast'}`} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span className="pulse-dot"></span> {event.status}
             </span>
             <span className="badge badge-city">
               <MapPin size={12} style={{ display: 'inline', marginRight: '3px' }} /> {event.city}

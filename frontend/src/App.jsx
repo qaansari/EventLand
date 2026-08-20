@@ -10,6 +10,9 @@ import DigitalTicketModal from './components/DigitalTicketModal';
 import ArtistBookings from './components/ArtistBookings';
 import EventOrganizerWizard from './components/EventOrganizerWizard';
 import AiEventAssistant from './components/AiEventAssistant';
+import AdminDashboard from './components/AdminDashboard';
+import OrganizerDashboard from './components/OrganizerDashboard';
+import AuthModal from './components/AuthModal';
 import Footer from './components/Footer';
 import { MOCK_EVENTS } from './data/mockEvents';
 import { Ticket, MapPin, Trash2 } from 'lucide-react';
@@ -28,11 +31,90 @@ export default function App() {
     return MOCK_EVENTS;
   });
 
-  const [activeView, setActiveView] = useState('explore'); // explore, artists, ai-assistant, organizer-wizard, my-tickets
+  const [activeView, setActiveView] = useState('explore'); // explore, artists, ai-assistant, organizer-wizard, my-tickets, organizer, admin
+  const [userRole, setUserRole] = useState('customer'); // customer, organizer, admin
   const [selectedCity, setSelectedCity] = useState('All Cities');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('featured');
+
+  // User Authentication State
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('eventland_logged_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalRole, setAuthModalRole] = useState('customer');
+  const [pendingBookingData, setPendingBookingData] = useState(null); // { event, targetFlow, seats }
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('eventland_logged_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('eventland_logged_user');
+    }
+  }, [currentUser]);
+
+  const handleOpenAuthModal = (roleToOpen = 'customer') => {
+    setAuthModalRole(roleToOpen);
+    setIsAuthModalOpen(true);
+  };
+
+  const handleLoginSuccess = (userData) => {
+    setCurrentUser(userData);
+    setUserRole(userData.role);
+    setIsAuthModalOpen(false);
+
+    // Redirect to dashboard if logging into admin or organizer role
+    if (userData.role === 'admin') {
+      setActiveView('admin');
+    } else if (userData.role === 'organizer') {
+      setActiveView('organizer');
+    }
+
+    // Resume pending booking if user was booking a ticket
+    if (pendingBookingData) {
+      const { event, targetFlow, seats } = pendingBookingData;
+      setPendingBookingData(null);
+      if (targetFlow === 'seat-picker') {
+        setActiveSeatPickerEvent(event);
+      } else if (targetFlow === 'checkout') {
+        setCheckoutData({ event, seats });
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setUserRole('customer');
+    setActiveView('explore');
+    localStorage.removeItem('eventland_logged_user');
+  };
+
+  const handleRoleChange = (newRole) => {
+    // Require proper login authentication for Admin and Organizer roles
+    if (newRole === 'admin') {
+      if (!currentUser || currentUser.role !== 'admin') {
+        setAuthModalRole('admin');
+        setIsAuthModalOpen(true);
+        return;
+      }
+      setUserRole('admin');
+      setActiveView('admin');
+    } else if (newRole === 'organizer') {
+      if (!currentUser || (currentUser.role !== 'organizer' && currentUser.role !== 'admin')) {
+        setAuthModalRole('organizer');
+        setIsAuthModalOpen(true);
+        return;
+      }
+      setUserRole('organizer');
+      setActiveView('organizer');
+    } else {
+      setUserRole('customer');
+      setActiveView('explore');
+    }
+  };
 
   // Saved / Favorite Events
   const [savedEventIds, setSavedEventIds] = useState(() => {
@@ -89,6 +171,10 @@ export default function App() {
       document.title = `List & Host Your Event | Event Land`;
     } else if (activeView === 'my-tickets') {
       document.title = `My Digital Tickets & Passes | Event Land`;
+    } else if (activeView === 'admin') {
+      document.title = `Admin Console & Operations | Event Land`;
+    } else if (activeView === 'organizer') {
+      document.title = `Organizer Command Center | Event Land`;
     } else {
       // Explore View
       if (searchQuery.trim()) {
@@ -130,6 +216,14 @@ export default function App() {
   // Handle Action from EventDetailModal
   const handleProceedFromDetail = (event, targetFlow, seats) => {
     setActiveDetailEvent(null);
+
+    if (!currentUser) {
+      setPendingBookingData({ event, targetFlow, seats });
+      setAuthModalRole('customer');
+      setIsAuthModalOpen(true);
+      return;
+    }
+
     if (targetFlow === 'seat-picker') {
       setActiveSeatPickerEvent(event);
     } else if (targetFlow === 'checkout') {
@@ -140,6 +234,14 @@ export default function App() {
   const handleProceedFromSeatPicker = (selectedSeats) => {
     const event = activeSeatPickerEvent;
     setActiveSeatPickerEvent(null);
+
+    if (!currentUser) {
+      setPendingBookingData({ event, targetFlow: 'checkout', seats: selectedSeats });
+      setAuthModalRole('customer');
+      setIsAuthModalOpen(true);
+      return;
+    }
+
     setCheckoutData({ event, seats: selectedSeats });
   };
 
@@ -163,6 +265,16 @@ export default function App() {
     setEvents([newEvent, ...events]);
     setActiveView('explore');
     alert(`🎉 Event "${newEvent.title}" published successfully! It is now live on EventLand.`);
+  };
+
+  const handleToggleFeature = (eventId) => {
+    setEvents(events.map(ev => ev.id === eventId ? { ...ev, isFeatured: !ev.isFeatured } : ev));
+  };
+
+  const handleDeleteEvent = (eventId) => {
+    if (window.confirm("Are you sure you want to delete this event listing?")) {
+      setEvents(events.filter(ev => ev.id !== eventId));
+    }
   };
 
   // Filter & Sort Events
@@ -197,6 +309,11 @@ export default function App() {
         activeView={activeView}
         onNavigate={setActiveView}
         savedTicketsCount={purchasedTickets.length}
+        currentRole={userRole}
+        onSelectRole={handleRoleChange}
+        currentUser={currentUser}
+        onOpenAuthModal={handleOpenAuthModal}
+        onLogout={handleLogout}
       />
 
       {/* Main View Router */}
@@ -392,6 +509,24 @@ export default function App() {
             )}
           </div>
         )}
+        {/* View: Admin Console Dashboard */}
+        {activeView === 'admin' && (
+          <AdminDashboard
+            events={events}
+            onToggleFeature={handleToggleFeature}
+            onDeleteEvent={handleDeleteEvent}
+            onSelectEvent={handleSelectEventForDetail}
+          />
+        )}
+
+        {/* View: Organizer Command Center */}
+        {activeView === 'organizer' && (
+          <OrganizerDashboard
+            events={events}
+            onNavigateToCreate={() => setActiveView('organizer-wizard')}
+            onSelectEvent={handleSelectEventForDetail}
+          />
+        )}
       </main>
 
       {/* Active Modals */}
@@ -424,6 +559,14 @@ export default function App() {
         <DigitalTicketModal
           ticket={activeTicketView}
           onClose={() => setActiveTicketView(null)}
+        />
+      )}
+
+      {isAuthModalOpen && (
+        <AuthModal
+          initialRole={authModalRole}
+          onClose={() => setIsAuthModalOpen(false)}
+          onLoginSuccess={handleLoginSuccess}
         />
       )}
 
