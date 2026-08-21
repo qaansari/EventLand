@@ -16,20 +16,26 @@ import AuthModal from './components/AuthModal';
 import Footer from './components/Footer';
 import { MOCK_EVENTS } from './data/mockEvents';
 import { Ticket, MapPin, Trash2 } from 'lucide-react';
+import { eventsApi } from './services/api';
 import './App.css';
 
 export default function App() {
-  const [events, setEvents] = useState(() => {
-    const local = localStorage.getItem('eventland_custom_events');
-    if (local) {
-      try {
-        return [...JSON.parse(local), ...MOCK_EVENTS];
-      } catch (err) {
-        return MOCK_EVENTS;
-      }
-    }
-    return MOCK_EVENTS;
-  });
+  const [events, setEvents] = useState([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+
+  // Fetch live events from .NET Backend API on mount
+  useEffect(() => {
+    setLoadingEvents(true);
+    eventsApi.getEvents({ pageSize: 100 })
+      .then(res => {
+        setEvents(res.items || []);
+      })
+      .catch(err => {
+        console.error('Could not connect to backend events API:', err);
+        setEvents([]);
+      })
+      .finally(() => setLoadingEvents(false));
+  }, []);
 
   const [activeView, setActiveView] = useState('explore'); // explore, artists, ai-assistant, organizer-wizard, my-tickets, organizer, admin
   const [userRole, setUserRole] = useState('customer'); // customer, organizer, admin

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
   TrendingUp, 
@@ -12,702 +12,423 @@ import {
   Search, 
   Download, 
   Settings, 
-  PieChart, 
-  BarChart3, 
   Building2, 
   AlertCircle,
-  Eye
+  Plus,
+  RefreshCw,
+  Tag,
+  Layers,
+  MapPin,
+  Calendar
 } from 'lucide-react';
+import { adminApi } from '../services/api';
 
-export default function AdminDashboard({ events, onToggleFeature, onDeleteEvent, onApproveEvent, onSelectEvent }) {
-  const [activeAdminTab, setActiveAdminTab] = useState('overview'); // 'overview', 'events', 'payouts', 'settings'
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState('All');
-  
-  // Platform Commission Setting State
-  const [platformFee, setPlatformFee] = useState(5.0);
-  const [isAiEnabled, setIsAiEnabled] = useState(true);
-  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
+export default function AdminDashboard({ onSelectEvent }) {
+  const [activeAdminTab, setActiveAdminTab] = useState('events'); // 'events', 'organizers', 'bookings', 'users', 'roles', 'ticket-tiers'
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
 
-  // Mock Payout Requests
-  const [payoutRequests, setPayoutRequests] = useState([
-    { id: 'PO-9941', organizer: 'Rangrez Events & PR', eventTitle: 'Rangrez Bazaar 2026', amount: 850000, account: 'Meezan Bank **** 4812', status: 'PENDING', date: '20th Aug 2026' },
-    { id: 'PO-9942', organizer: 'Surrender Live Ent.', eventTitle: 'THE SURRENDER TOUR - Ali Noor Live', amount: 1420000, account: 'JazzCash 0321****667', status: 'PENDING', date: '19th Aug 2026' },
-    { id: 'PO-9939', organizer: 'BlackBox Theatre Co.', eventTitle: 'The Great Pakistani Comedy Show', amount: 310000, account: 'EasyPaisa 0333****112', status: 'PAID', date: '15th Aug 2026' }
-  ]);
+  // Loaded Data States
+  const [eventsList, setEventsList] = useState([]);
+  const [organizersList, setOrganizersList] = useState([]);
+  const [bookingsList, setBookingsList] = useState([]);
+  const [usersList, setUsersList] = useState([]);
+  const [rolesList, setRolesList] = useState([]);
 
-  // Users & Organizers Allocation State
-  const [usersList, setUsersList] = useState([
-    { id: 'USR-01', name: 'Super Admin', email: 'admin@eventland.pk', role: 'admin', org: 'EventLand HQ', status: 'Active' },
-    { id: 'USR-02', name: 'Rangrez Events & PR', email: 'organizer@eventland.pk', role: 'organizer', org: 'Rangrez Ent.', status: 'Active' },
-    { id: 'USR-03', name: 'Surrender Live Ent.', email: 'surrender@eventland.pk', role: 'organizer', org: 'Surrender Inc.', status: 'Active' },
-    { id: 'USR-04', name: 'Qamar Ansari', email: 'qamar@example.com', role: 'customer', org: 'General Attendee', status: 'Active' }
-  ]);
+  // Form Modal States
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [showOrgModal, setShowOrgModal] = useState(false);
+  const [showTierModal, setShowTierModal] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
 
-  const [newOrgForm, setNewOrgForm] = useState({ name: '', email: '', org: '' });
-
-  const handleCreateOrganizer = (e) => {
-    e.preventDefault();
-    if (!newOrgForm.email) return;
-    const newAccount = {
-      id: 'USR-' + Math.floor(10 + Math.random() * 90),
-      name: newOrgForm.name || 'New Organizer',
-      email: newOrgForm.email.toLowerCase(),
-      role: 'organizer',
-      org: newOrgForm.org || 'Independent Organizer',
-      status: 'Active'
-    };
-    setUsersList([...usersList, newAccount]);
-    setNewOrgForm({ name: '', email: '', org: '' });
-    alert(`🎉 Organizer Account for "${newAccount.name}" (${newAccount.email}) provisioned! Role allocated: ORGANIZER.`);
-  };
-
-  const handlePromoteToOrganizer = (userId) => {
-    setUsersList(usersList.map(u => u.id === userId ? { ...u, role: 'organizer', org: 'Promoted Partner' } : u));
-    alert(`✅ Role updated! Account now has Organizer privileges.`);
-  };
-
-  // Stats Calculations
-  const totalEvents = events.length;
-  const featuredCount = events.filter(e => e.isFeatured).length;
-  const totalRevenue = events.reduce((acc, ev) => acc + (ev.startingPrice * 180), 0);
-  const platformCommission = totalRevenue * (platformFee / 100);
-
-  const filteredEventsList = events.filter(ev => {
-    const matchesSearch = ev.title.toLowerCase().includes(searchQuery.toLowerCase()) || ev.city.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = filterStatus === 'All' || (filterStatus === 'Featured' && ev.isFeatured) || (filterStatus === 'LIVE' && ev.status === 'LIVE');
-    return matchesSearch && matchesStatus;
+  // New Event Form State
+  const [eventForm, setEventForm] = useState({
+    title: '',
+    category: 'Concerts',
+    city: 'Karachi',
+    venue: '',
+    startDateUtc: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
+    endDateUtc: new Date(Date.now() + 172800000).toISOString().slice(0, 16),
+    startingPrice: 1500,
+    ticketingType: 'categorized',
+    banner: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800',
+    description: '',
+    organizerId: ''
   });
 
+  // New Organizer Form State
+  const [orgForm, setOrgForm] = useState({
+    name: '',
+    email: '',
+    phone: '+92 300 0000000',
+    logoUrl: '',
+    websiteUrl: ''
+  });
+
+  // New Ticket Tier Form State
+  const [tierForm, setTierForm] = useState({
+    eventId: '',
+    name: 'General Pass',
+    description: 'Standard Entry',
+    price: 1500,
+    availableQuantity: 100,
+    maxPerOrder: 5,
+    sortOrder: 1
+  });
+
+  // New User Form State
+  const [userForm, setUserForm] = useState({
+    email: '',
+    password: '',
+    fullName: '',
+    roleId: '',
+    phoneNumber: ''
+  });
+
+  // Load Data from Backend API
+  const fetchBackendData = async () => {
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      // 1. Fetch Organizers
+      const orgs = await adminApi.organizers.getAll();
+      setOrganizersList(orgs || []);
+
+      // 2. Fetch Events
+      const evs = await adminApi.events.getAll(1, 50);
+      setEventsList(evs.items || []);
+
+      // 3. Fetch Bookings
+      const bks = await adminApi.bookings.getAll(1, 50);
+      setBookingsList(bks.items || []);
+
+      // 4. Fetch Roles
+      const rls = await adminApi.roles.getAll();
+      setRolesList(rls || []);
+
+      // 5. Fetch Users
+      const usrs = await adminApi.users.getAll(1, 50);
+      setUsersList(usrs.items || []);
+
+    } catch (err) {
+      console.error('Error fetching admin data:', err);
+      setErrorMsg(err.message || 'Failed to load backend data.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBackendData();
+  }, []);
+
+  // Handlers for Creating Entities
+  const handleCreateOrganizer = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      await adminApi.organizers.create(orgForm);
+      setSuccessMsg('Organizer created successfully!');
+      setShowOrgModal(false);
+      setOrgForm({ name: '', email: '', phone: '+92 300 0000000', logoUrl: '', websiteUrl: '' });
+      fetchBackendData();
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to create organizer.');
+    }
+  };
+
+  const handleCreateEvent = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (!eventForm.organizerId) {
+      setErrorMsg('Please select an organizer.');
+      return;
+    }
+
+    try {
+      const payload = {
+        ...eventForm,
+        organizerId: parseInt(eventForm.organizerId, 10),
+        startingPrice: parseFloat(eventForm.startingPrice),
+        startDateUtc: new Date(eventForm.startDateUtc).toISOString(),
+        endDateUtc: new Date(eventForm.endDateUtc).toISOString()
+      };
+
+      await adminApi.events.create(payload);
+      setSuccessMsg('Event created successfully with 4-digit ID!');
+      setShowEventModal(false);
+      fetchBackendData();
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to create event.');
+    }
+  };
+
+  const handleCreateTicketTier = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (!tierForm.eventId) {
+      setErrorMsg('Please select an event.');
+      return;
+    }
+
+    try {
+      const payload = {
+        ...tierForm,
+        eventId: parseInt(tierForm.eventId, 10),
+        price: parseFloat(tierForm.price),
+        availableQuantity: parseInt(tierForm.availableQuantity, 10),
+        maxPerOrder: parseInt(tierForm.maxPerOrder, 10)
+      };
+
+      await adminApi.ticketTiers.create(payload);
+      setSuccessMsg('Ticket tier created successfully!');
+      setShowTierModal(false);
+      fetchBackendData();
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to create ticket tier.');
+    }
+  };
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (!userForm.roleId) {
+      setErrorMsg('Please select a role.');
+      return;
+    }
+
+    try {
+      const payload = {
+        ...userForm,
+        roleId: parseInt(userForm.roleId, 10)
+      };
+
+      await adminApi.users.create(payload);
+      setSuccessMsg('User account created successfully!');
+      setShowUserModal(false);
+      setUserForm({ email: '', password: '', fullName: '', roleId: '', phoneNumber: '' });
+      fetchBackendData();
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to create user.');
+    }
+  };
+
+  const handleDeleteEvent = async (id) => {
+    if (!window.confirm(`Are you sure you want to delete Event #${id}?`)) return;
+    try {
+      await adminApi.events.delete(id);
+      setSuccessMsg(`Event #${id} deleted.`);
+      fetchBackendData();
+    } catch (err) {
+      setErrorMsg(err.message || 'Delete failed.');
+    }
+  };
+
+  const handleDeleteOrganizer = async (id) => {
+    if (!window.confirm(`Delete Organizer #${id}?`)) return;
+    try {
+      await adminApi.organizers.delete(id);
+      setSuccessMsg(`Organizer #${id} deleted.`);
+      fetchBackendData();
+    } catch (err) {
+      setErrorMsg(err.message || 'Delete failed.');
+    }
+  };
+
   return (
-    <div className="container" style={{ padding: '2rem 1.5rem' }}>
-      {/* Admin Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        marginBottom: '2rem'
-      }}>
+    <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1rem' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            backgroundColor: 'rgba(59, 130, 246, 0.15)',
-            color: '#60a5fa',
-            border: '1px solid rgba(59, 130, 246, 0.35)',
-            padding: '0.3rem 0.8rem',
-            borderRadius: '9999px',
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            marginBottom: '0.5rem'
-          }}>
-            <ShieldCheck size={14} /> PLATFORM SUPER ADMIN COMMAND CENTER
-          </div>
-          <h1 style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(1.8rem, 4vw, 2.5rem)',
-            fontWeight: 800,
-            color: '#fff',
-            letterSpacing: '-0.02em'
-          }}>
-            Platform Overview & Operations
+          <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <ShieldCheck size={32} color="#3b82f6" /> Super Admin Control Hub
           </h1>
-          <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
-            Monitor nationwide ticket revenue, moderate event listings, manage organizer payouts, and configure platform settings.
+          <p style={{ color: '#94a3b8', marginTop: '0.25rem' }}>
+            Manage Events, Bookings, Organizers, Ticket Tiers, Users & Roles connected to live SQL Server & Redis
           </p>
         </div>
 
-        {/* Tab Selector Buttons */}
-        <div style={{
-          display: 'flex',
-          gap: '0.5rem',
-          backgroundColor: 'rgba(15, 24, 44, 0.8)',
-          padding: '0.35rem',
-          borderRadius: '12px',
-          border: '1px solid rgba(255, 255, 255, 0.1)'
-        }}>
-          <button
-            onClick={() => setActiveAdminTab('overview')}
-            className={`btn ${activeAdminTab === 'overview' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}
-          >
-            <BarChart3 size={15} /> Overview & KPIs
-          </button>
-          <button
-            onClick={() => setActiveAdminTab('events')}
-            className={`btn ${activeAdminTab === 'events' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}
-          >
-            <Ticket size={15} /> Events ({totalEvents})
-          </button>
-          <button
-            onClick={() => setActiveAdminTab('users')}
-            className={`btn ${activeAdminTab === 'users' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}
-          >
-            <Users size={15} /> Organizers & Users
-          </button>
-          <button
-            onClick={() => setActiveAdminTab('payouts')}
-            className={`btn ${activeAdminTab === 'payouts' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}
-          >
-            <DollarSign size={15} /> Payouts ({payoutRequests.filter(p => p.status === 'PENDING').length})
-          </button>
-          <button
-            onClick={() => setActiveAdminTab('settings')}
-            className={`btn ${activeAdminTab === 'settings' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ padding: '0.5rem 0.9rem', fontSize: '0.85rem' }}
-          >
-            <Settings size={15} /> System Config
-          </button>
-        </div>
+        <button
+          onClick={fetchBackendData}
+          disabled={loading}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.75rem 1.25rem',
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '10px',
+            color: '#f8fafc',
+            cursor: 'pointer',
+            fontWeight: 600
+          }}
+        >
+          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh Data
+        </button>
       </div>
 
-      {/* Overview & Analytics Tab */}
-      {activeAdminTab === 'overview' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {/* Top KPI Metrics Cards Grid */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-            gap: '1.25rem'
-          }}>
-            <div className="glass-card" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
-                <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontWeight: 600 }}>GROSS TICKET SALES</span>
-                <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
-                  <TrendingUp size={18} color="#60a5fa" />
-                </div>
-              </div>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 800, color: '#fff', marginBottom: '0.2rem' }}>
-                PKR {(totalRevenue / 1000000).toFixed(2)}M
-              </h2>
-              <span style={{ fontSize: '0.78rem', color: '#34d399', fontWeight: 600 }}>
-                ↑ +18.4% vs last month
-              </span>
-            </div>
-
-            <div className="glass-card" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
-                <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontWeight: 600 }}>PLATFORM REVENUE ({platformFee}%)</span>
-                <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
-                  <DollarSign size={18} color="#34d399" />
-                </div>
-              </div>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 800, color: '#34d399', marginBottom: '0.2rem' }}>
-                PKR {Math.round(platformCommission).toLocaleString()}
-              </h2>
-              <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                Net platform fee collected
-              </span>
-            </div>
-
-            <div className="glass-card" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
-                <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontWeight: 600 }}>ACTIVE EVENT LISTINGS</span>
-                <div style={{ backgroundColor: 'rgba(139, 92, 246, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
-                  <Ticket size={18} color="#c084fc" />
-                </div>
-              </div>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 800, color: '#fff', marginBottom: '0.2rem' }}>
-                {totalEvents} Events
-              </h2>
-              <span style={{ fontSize: '0.78rem', color: '#c084fc', fontWeight: 600 }}>
-                {featuredCount} Featured on Hero
-              </span>
-            </div>
-
-            <div className="glass-card" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
-                <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontWeight: 600 }}>REGISTERED ORGANIZERS</span>
-                <div style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
-                  <Building2 size={18} color="#fbbf24" />
-                </div>
-              </div>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 800, color: '#fff', marginBottom: '0.2rem' }}>
-                142 Partners
-              </h2>
-              <span style={{ fontSize: '0.78rem', color: '#fbbf24', fontWeight: 600 }}>
-                100% KYC Verified
-              </span>
-            </div>
-          </div>
-
-          {/* Regional Sales Breakdown & Top Categories */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-            gap: '1.5rem'
-          }}>
-            {/* Sales by City */}
-            <div className="glass-card" style={{ padding: '1.5rem' }}>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#fff', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <PieChart size={18} color="#60a5fa" /> Ticket Sales Volume by City
-              </h3>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '0.35rem' }}>
-                    <span>Karachi</span>
-                    <strong style={{ color: '#fff' }}>14,250 Passes (41%)</strong>
-                  </div>
-                  <div style={{ height: '8px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ width: '41%', height: '100%', backgroundColor: '#3b82f6', borderRadius: '4px' }} />
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '0.35rem' }}>
-                    <span>Lahore</span>
-                    <strong style={{ color: '#fff' }}>11,800 Passes (34%)</strong>
-                  </div>
-                  <div style={{ height: '8px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ width: '34%', height: '100%', backgroundColor: '#6366f1', borderRadius: '4px' }} />
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '0.35rem' }}>
-                    <span>Islamabad & Rawalpindi</span>
-                    <strong style={{ color: '#fff' }}>6,700 Passes (19%)</strong>
-                  </div>
-                  <div style={{ height: '8px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ width: '19%', height: '100%', backgroundColor: '#8b5cf6', borderRadius: '4px' }} />
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '0.35rem' }}>
-                    <span>Other Cities (Multan, Faisalabad, Hyd)</span>
-                    <strong style={{ color: '#fff' }}>2,070 Passes (6%)</strong>
-                  </div>
-                  <div style={{ height: '8px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ width: '6%', height: '100%', backgroundColor: '#38bdf8', borderRadius: '4px' }} />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Sales by Category */}
-            <div className="glass-card" style={{ padding: '1.5rem' }}>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', color: '#fff', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <BarChart3 size={18} color="#c084fc" /> Revenue Distribution by Category
-              </h3>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '0.35rem' }}>
-                    <span>Concerts & Live Music</span>
-                    <strong style={{ color: '#60a5fa' }}>PKR 24,500,000</strong>
-                  </div>
-                  <div style={{ height: '8px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ width: '51%', height: '100%', backgroundColor: '#3b82f6', borderRadius: '4px' }} />
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '0.35rem' }}>
-                    <span>Cultural & Fashion Bazaars</span>
-                    <strong style={{ color: '#fbbf24' }}>PKR 14,200,000</strong>
-                  </div>
-                  <div style={{ height: '8px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ width: '29%', height: '100%', backgroundColor: '#fbbf24', borderRadius: '4px' }} />
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '0.35rem' }}>
-                    <span>Theatre & Comedy Shows</span>
-                    <strong style={{ color: '#34d399' }}>PKR 6,800,000</strong>
-                  </div>
-                  <div style={{ height: '8px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ width: '14%', height: '100%', backgroundColor: '#34d399', borderRadius: '4px' }} />
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '0.35rem' }}>
-                    <span>Sports & Esports Arenas</span>
-                    <strong style={{ color: '#c084fc' }}>PKR 3,000,000</strong>
-                  </div>
-                  <div style={{ height: '8px', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ width: '6%', height: '100%', backgroundColor: '#c084fc', borderRadius: '4px' }} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+      {/* Notifications */}
+      {errorMsg && (
+        <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '12px', color: '#f87171', marginBottom: '1.5rem' }}>
+          {errorMsg}
+        </div>
+      )}
+      {successMsg && (
+        <div style={{ padding: '1rem', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '12px', color: '#4ade80', marginBottom: '1.5rem' }}>
+          {successMsg}
         </div>
       )}
 
-      {/* Event Moderation & Management Tab */}
-      {activeAdminTab === 'events' && (
-        <div className="glass-card" style={{ padding: '1.5rem' }}>
-          {/* Controls Bar */}
-          <div style={{
+      {/* Navigation Tabs */}
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '2rem', flexWrap: 'wrap', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '1rem' }}>
+        <button
+          onClick={() => setActiveAdminTab('events')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'events' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
             display: 'flex',
-            justifyContent: 'space-between',
             alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '1rem',
-            marginBottom: '1.5rem'
-          }}>
-            <div style={{ position: 'relative', width: '300px' }}>
-              <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-              <input
-                type="text"
-                placeholder="Search events by title or city..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  backgroundColor: '#16233f',
-                  color: '#fff',
-                  border: '1px solid rgba(59, 130, 246, 0.25)',
-                  borderRadius: '8px',
-                  padding: '0.5rem 1rem 0.5rem 2.2rem',
-                  fontSize: '0.85rem',
-                  outline: 'none'
-                }}
-              />
-            </div>
+            gap: '0.5rem'
+          }}
+        >
+          <Ticket size={18} /> Events ({eventsList.length})
+        </button>
 
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              {['All', 'LIVE', 'Featured'].map((st) => (
-                <button
-                  key={st}
-                  onClick={() => setFilterStatus(st)}
-                  style={{
-                    backgroundColor: filterStatus === st ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-                    color: filterStatus === st ? '#60a5fa' : '#94a3b8',
-                    border: filterStatus === st ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid transparent',
-                    padding: '0.35rem 0.85rem',
-                    borderRadius: '8px',
-                    fontSize: '0.8rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {st}
-                </button>
-              ))}
-            </div>
-          </div>
+        <button
+          onClick={() => setActiveAdminTab('organizers')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'organizers' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Building2 size={18} /> Organizers ({organizersList.length})
+        </button>
 
-          {/* Events Table */}
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94a3b8' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>Event Title & Organizer</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>City & Date</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Starting Price</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Status</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Featured</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredEventsList.map((ev) => (
-                  <tr key={ev.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                    <td style={{ padding: '1rem' }}>
-                      <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.95rem' }}>{ev.title}</div>
-                      <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Organizer: {ev.organizer || 'Verified Partner'}</div>
-                    </td>
+        <button
+          onClick={() => setActiveAdminTab('bookings')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'bookings' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <DollarSign size={18} /> Bookings ({bookingsList.length})
+        </button>
 
-                    <td style={{ padding: '1rem', color: '#cbd5e1' }}>
-                      <div>{ev.city}</div>
-                      <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>{ev.date}</div>
-                    </td>
+        <button
+          onClick={() => setActiveAdminTab('users')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'users' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Users size={18} /> Users ({usersList.length})
+        </button>
 
-                    <td style={{ padding: '1rem', fontWeight: 700, color: '#60a5fa' }}>
-                      PKR {ev.startingPrice.toLocaleString()}
-                    </td>
+        <button
+          onClick={() => setActiveAdminTab('roles')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'roles' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <ShieldCheck size={18} /> Roles ({rolesList.length})
+        </button>
+      </div>
 
-                    <td style={{ padding: '1rem' }}>
-                      <span className={`badge ${ev.status === 'LIVE' ? 'badge-live' : 'badge-fast'}`}>
-                        {ev.status}
-                      </span>
-                    </td>
-
-                    <td style={{ padding: '1rem' }}>
-                      <button
-                        onClick={() => onToggleFeature(ev.id)}
-                        style={{
-                          backgroundColor: ev.isFeatured ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                          color: ev.isFeatured ? '#c084fc' : '#94a3b8',
-                          border: ev.isFeatured ? '1px solid rgba(139, 92, 246, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
-                          padding: '0.3rem 0.75rem',
-                          borderRadius: '6px',
-                          fontSize: '0.78rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.3rem'
-                        }}
-                      >
-                        <Star size={13} fill={ev.isFeatured ? '#c084fc' : 'none'} /> {ev.isFeatured ? 'Featured' : 'Make Featured'}
-                      </button>
-                    </td>
-
-                    <td style={{ padding: '1rem', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                        <button
-                          onClick={() => onSelectEvent(ev)}
-                          title="Preview Event Details"
-                          style={{
-                            background: 'rgba(59, 130, 246, 0.15)',
-                            color: '#60a5fa',
-                            border: '1px solid rgba(59, 130, 246, 0.3)',
-                            padding: '0.4rem 0.7rem',
-                            borderRadius: '6px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <Eye size={15} />
-                        </button>
-                        <button
-                          onClick={() => onDeleteEvent(ev.id)}
-                          title="Delete Event"
-                          style={{
-                            background: 'rgba(239, 68, 68, 0.15)',
-                            color: '#f87171',
-                            border: '1px solid rgba(239, 68, 68, 0.3)',
-                            padding: '0.4rem 0.7rem',
-                            borderRadius: '6px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Payouts Tab */}
-      {activeAdminTab === 'payouts' && (
-        <div className="glass-card" style={{ padding: '1.5rem' }}>
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: '#fff', marginBottom: '1.25rem' }}>
-            Organizer Settlement & Payout Approvals
-          </h3>
-
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', color: '#94a3b8' }}>
-                <th style={{ padding: '0.75rem 1rem' }}>Payout ID & Date</th>
-                <th style={{ padding: '0.75rem 1rem' }}>Organizer & Event</th>
-                <th style={{ padding: '0.75rem 1rem' }}>Payout Amount</th>
-                <th style={{ padding: '0.75rem 1rem' }}>Bank / Account</th>
-                <th style={{ padding: '0.75rem 1rem' }}>Status</th>
-                <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {payoutRequests.map((p) => (
-                <tr key={p.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                  <td style={{ padding: '1rem', color: '#fff', fontWeight: 600 }}>
-                    <div>{p.id}</div>
-                    <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>{p.date}</div>
-                  </td>
-
-                  <td style={{ padding: '1rem' }}>
-                    <div style={{ color: '#fff', fontWeight: 700 }}>{p.organizer}</div>
-                    <div style={{ fontSize: '0.78rem', color: '#60a5fa' }}>{p.eventTitle}</div>
-                  </td>
-
-                  <td style={{ padding: '1rem', fontWeight: 800, color: '#34d399', fontSize: '1rem' }}>
-                    PKR {p.amount.toLocaleString()}
-                  </td>
-
-                  <td style={{ padding: '1rem', color: '#cbd5e1', fontSize: '0.85rem' }}>
-                    {p.account}
-                  </td>
-
-                  <td style={{ padding: '1rem' }}>
-                    <span style={{
-                      backgroundColor: p.status === 'PAID' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-                      color: p.status === 'PAID' ? '#34d399' : '#fbbf24',
-                      border: p.status === 'PAID' ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
-                      padding: '0.25rem 0.65rem',
-                      borderRadius: '6px',
-                      fontSize: '0.75rem',
-                      fontWeight: 700
-                    }}>
-                      {p.status}
-                    </span>
-                  </td>
-
-                  <td style={{ padding: '1rem', textAlign: 'right' }}>
-                    {p.status === 'PENDING' ? (
-                      <button
-                        onClick={() => handleApprovePayout(p.id)}
-                        className="btn btn-primary"
-                        style={{ padding: '0.4rem 0.9rem', fontSize: '0.8rem' }}
-                      >
-                        <CheckCircle size={14} /> Release Payment
-                      </button>
-                    ) : (
-                      <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Settled ✓</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Users & Organizers Allocation Management Tab */}
-      {activeAdminTab === 'users' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-          {/* Create Organizer Form */}
-          <div className="glass-card" style={{ padding: '1.75rem' }}>
-            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: '#fff', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Building2 size={20} color="#34d399" /> Provision New Event Organizer Account
-            </h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-              As Super Admin, allocate Organizer privileges to a brand or individual. Self-registrations defaults to General Attendee.
-            </p>
-
-            <form onSubmit={handleCreateOrganizer} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'end' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '0.35rem' }}>
-                  Full Name *
-                </label>
-                <input
-                  required
-                  type="text"
-                  placeholder="e.g. Salt Arts Ent."
-                  value={newOrgForm.name}
-                  onChange={(e) => setNewOrgForm({ ...newOrgForm, name: e.target.value })}
-                  style={{
-                    width: '100%',
-                    backgroundColor: '#16233f',
-                    color: '#fff',
-                    border: '1px solid rgba(59, 130, 246, 0.3)',
-                    borderRadius: '8px',
-                    padding: '0.6rem 0.85rem',
-                    fontSize: '0.88rem',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '0.35rem' }}>
-                  Organizer Email *
-                </label>
-                <input
-                  required
-                  type="email"
-                  placeholder="saltarts@eventland.pk"
-                  value={newOrgForm.email}
-                  onChange={(e) => setNewOrgForm({ ...newOrgForm, email: e.target.value })}
-                  style={{
-                    width: '100%',
-                    backgroundColor: '#16233f',
-                    color: '#fff',
-                    border: '1px solid rgba(59, 130, 246, 0.3)',
-                    borderRadius: '8px',
-                    padding: '0.6rem 0.85rem',
-                    fontSize: '0.88rem',
-                    outline: 'none'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '0.35rem' }}>
-                  Allocated Role
-                </label>
-                <div style={{
-                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                  color: '#34d399',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  borderRadius: '8px',
-                  padding: '0.6rem 0.85rem',
-                  fontSize: '0.88rem',
-                  fontWeight: 700
-                }}>
-                  ORGANIZER + ATTENDEE
-                </div>
-              </div>
-
-              <button type="submit" className="btn btn-primary" style={{ padding: '0.65rem 1rem' }}>
-                <CheckCircle size={16} /> Allocate Organizer
+      {/* --- TAB 1: EVENTS MANAGEMENT --- */}
+      {activeAdminTab === 'events' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>Live Events (SQL Server)</h3>
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                onClick={() => setShowTierModal(true)}
+                style={{ padding: '0.6rem 1rem', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', color: '#60a5fa', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Plus size={16} /> Add Ticket Tier
               </button>
-            </form>
+              <button
+                onClick={() => setShowEventModal(true)}
+                style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Plus size={16} /> Create Event
+              </button>
+            </div>
           </div>
 
-          {/* User Table */}
-          <div className="glass-card" style={{ padding: '1.5rem', overflowX: 'auto' }}>
-            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: '#fff', marginBottom: '1rem' }}>
-              System Registered Accounts & Roles
-            </h3>
-
+          <div className="glass-card" style={{ overflowX: 'auto', borderRadius: '16px' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', fontSize: '0.8rem' }}>
-                  <th style={{ padding: '0.75rem 1rem' }}>User ID / Name</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Email Address</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Allocated Role</th>
-                  <th style={{ padding: '0.75rem 1rem' }}>Status</th>
-                  <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Admin Actions</th>
+                <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <th style={{ padding: '1rem' }}>4-Digit ID</th>
+                  <th style={{ padding: '1rem' }}>Title</th>
+                  <th style={{ padding: '1rem' }}>Organizer</th>
+                  <th style={{ padding: '1rem' }}>City</th>
+                  <th style={{ padding: '1rem' }}>Starting Price</th>
+                  <th style={{ padding: '1rem' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {usersList.map((u) => (
-                  <tr key={u.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <td style={{ padding: '0.9rem 1rem' }}>
-                      <div style={{ color: '#fff', fontWeight: 700 }}>{u.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{u.id} • {u.org}</div>
-                    </td>
-                    <td style={{ padding: '0.9rem 1rem', color: '#60a5fa', fontSize: '0.88rem' }}>
-                      {u.email}
-                    </td>
-                    <td style={{ padding: '0.9rem 1rem' }}>
-                      <span style={{
-                        backgroundColor: u.role === 'admin' ? 'rgba(139, 92, 246, 0.2)' : u.role === 'organizer' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(59, 130, 246, 0.15)',
-                        color: u.role === 'admin' ? '#c084fc' : u.role === 'organizer' ? '#34d399' : '#60a5fa',
-                        border: u.role === 'admin' ? '1px solid rgba(139, 92, 246, 0.4)' : u.role === 'organizer' ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid rgba(59, 130, 246, 0.3)',
-                        padding: '0.25rem 0.65rem',
-                        borderRadius: '9999px',
-                        fontSize: '0.75rem',
-                        fontWeight: 700
-                      }}>
-                        {u.role === 'admin' ? '🛡️ SUPER ADMIN' : u.role === 'organizer' ? '🏢 ORGANIZER + ATTENDEE' : '👤 GENERAL ATTENDEE'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '0.9rem 1rem', color: '#34d399', fontSize: '0.82rem', fontWeight: 600 }}>
-                      ✓ {u.status}
-                    </td>
-                    <td style={{ padding: '0.9rem 1rem', textAlign: 'right' }}>
-                      {u.role === 'customer' && (
-                        <button
-                          onClick={() => handlePromoteToOrganizer(u.id)}
-                          className="btn btn-secondary"
-                          style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
-                        >
-                          Promote to Organizer
-                        </button>
-                      )}
-                      {u.role === 'organizer' && (
-                        <span style={{ fontSize: '0.78rem', color: '#34d399' }}>Organizing Granted ✓</span>
-                      )}
-                      {u.role === 'admin' && (
-                        <span style={{ fontSize: '0.78rem', color: '#c084fc' }}>System Admin</span>
-                      )}
+                {eventsList.map(ev => (
+                  <tr key={ev.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <td style={{ padding: '1rem', fontWeight: 700, color: '#3b82f6' }}>#{ev.id}</td>
+                    <td style={{ padding: '1rem', fontWeight: 600, color: '#f8fafc' }}>{ev.title}</td>
+                    <td style={{ padding: '1rem', color: '#94a3b8' }}>{ev.organizerName}</td>
+                    <td style={{ padding: '1rem', color: '#94a3b8' }}>{ev.city}</td>
+                    <td style={{ padding: '1rem', color: '#4ade80', fontWeight: 600 }}>PKR {ev.startingPrice}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <button
+                        onClick={() => handleDeleteEvent(ev.id)}
+                        style={{ padding: '0.4rem 0.75rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer' }}
+                      >
+                        <Trash2 size={14} /> Delete
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -717,72 +438,312 @@ export default function AdminDashboard({ events, onToggleFeature, onDeleteEvent,
         </div>
       )}
 
-      {/* System Settings Tab */}
-      {activeAdminTab === 'settings' && (
-        <div className="glass-card" style={{ padding: '2rem', maxWidth: '650px' }}>
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: '#fff', marginBottom: '1.5rem' }}>
-            Platform Global Configuration
-          </h3>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div>
-              <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.88rem', fontWeight: 600, marginBottom: '0.5rem' }}>
-                Platform Ticket Service Fee (%)
-              </label>
-              <input
-                type="number"
-                step="0.5"
-                value={platformFee}
-                onChange={(e) => setPlatformFee(Number(e.target.value))}
-                style={{
-                  width: '100%',
-                  backgroundColor: '#16233f',
-                  color: '#fff',
-                  border: '1px solid rgba(59, 130, 246, 0.3)',
-                  borderRadius: '8px',
-                  padding: '0.65rem 1rem',
-                  fontSize: '0.9rem',
-                  outline: 'none'
-                }}
-              />
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px', display: 'block' }}>
-                Applied automatically on all online ticket sales during checkout.
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '10px' }}>
-              <div>
-                <div style={{ fontWeight: 700, color: '#fff' }}>Enable EventVibe AI Engine</div>
-                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Allow AI event recommendations on home page</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={isAiEnabled}
-                onChange={(e) => setIsAiEnabled(e.target.checked)}
-                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '10px' }}>
-              <div>
-                <div style={{ fontWeight: 700, color: '#fff' }}>Maintenance Mode</div>
-                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Restrict new ticket checkouts temporarily</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={isMaintenanceMode}
-                onChange={(e) => setIsMaintenanceMode(e.target.checked)}
-                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-              />
-            </div>
-
+      {/* --- TAB 2: ORGANIZERS MANAGEMENT --- */}
+      {activeAdminTab === 'organizers' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>Organizers Directory</h3>
             <button
-              onClick={() => alert("✅ Platform configuration updated successfully!")}
-              className="btn btn-primary"
-              style={{ marginTop: '1rem', width: '100%' }}
+              onClick={() => setShowOrgModal(true)}
+              style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
-              Save Configuration Settings
+              <Plus size={16} /> Add Organizer
             </button>
+          </div>
+
+          <div className="glass-card" style={{ overflowX: 'auto', borderRadius: '16px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <th style={{ padding: '1rem' }}>ID</th>
+                  <th style={{ padding: '1rem' }}>Name</th>
+                  <th style={{ padding: '1rem' }}>Email</th>
+                  <th style={{ padding: '1rem' }}>Phone</th>
+                  <th style={{ padding: '1rem' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {organizersList.map(org => (
+                  <tr key={org.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <td style={{ padding: '1rem', fontWeight: 700, color: '#c084fc' }}>#{org.id}</td>
+                    <td style={{ padding: '1rem', fontWeight: 600, color: '#f8fafc' }}>{org.name}</td>
+                    <td style={{ padding: '1rem', color: '#94a3b8' }}>{org.email}</td>
+                    <td style={{ padding: '1rem', color: '#94a3b8' }}>{org.phone}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <button
+                        onClick={() => handleDeleteOrganizer(org.id)}
+                        style={{ padding: '0.4rem 0.75rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer' }}
+                      >
+                        <Trash2 size={14} /> Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* --- TAB 3: BOOKINGS MANAGEMENT --- */}
+      {activeAdminTab === 'bookings' && (
+        <div>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1.5rem' }}>Customer Bookings</h3>
+          <div className="glass-card" style={{ overflowX: 'auto', borderRadius: '16px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <th style={{ padding: '1rem' }}>Ref #</th>
+                  <th style={{ padding: '1rem' }}>Customer</th>
+                  <th style={{ padding: '1rem' }}>Event</th>
+                  <th style={{ padding: '1rem' }}>Amount</th>
+                  <th style={{ padding: '1rem' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bookingsList.map(b => (
+                  <tr key={b.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <td style={{ padding: '1rem', fontWeight: 700, color: '#f472b6' }}>{b.bookingRef}</td>
+                    <td style={{ padding: '1rem', color: '#f8fafc' }}>
+                      <div>{b.customerName}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{b.customerEmail}</div>
+                    </td>
+                    <td style={{ padding: '1rem', color: '#94a3b8' }}>{b.eventTitle}</td>
+                    <td style={{ padding: '1rem', color: '#4ade80', fontWeight: 600 }}>PKR {b.totalAmount}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <span style={{ padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80' }}>
+                        {b.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* --- TAB 4: USERS MANAGEMENT --- */}
+      {activeAdminTab === 'users' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>User Accounts</h3>
+            <button
+              onClick={() => setShowUserModal(true)}
+              style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <Plus size={16} /> Create User Account
+            </button>
+          </div>
+
+          <div className="glass-card" style={{ overflowX: 'auto', borderRadius: '16px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <th style={{ padding: '1rem' }}>ID</th>
+                  <th style={{ padding: '1rem' }}>Full Name</th>
+                  <th style={{ padding: '1rem' }}>Email</th>
+                  <th style={{ padding: '1rem' }}>Role</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usersList.map(u => (
+                  <tr key={u.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <td style={{ padding: '1rem', fontWeight: 700, color: '#ec4899' }}>#{u.id}</td>
+                    <td style={{ padding: '1rem', fontWeight: 600, color: '#f8fafc' }}>{u.fullName}</td>
+                    <td style={{ padding: '1rem', color: '#94a3b8' }}>{u.email}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <span style={{ padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', fontWeight: 600 }}>
+                        {u.role}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* --- TAB 5: ROLES TABLE --- */}
+      {activeAdminTab === 'roles' && (
+        <div>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1.5rem' }}>Database Roles Table</h3>
+          <div className="glass-card" style={{ overflowX: 'auto', borderRadius: '16px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <th style={{ padding: '1rem' }}>Role ID</th>
+                  <th style={{ padding: '1rem' }}>Role Name</th>
+                  <th style={{ padding: '1rem' }}>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rolesList.map(r => (
+                  <tr key={r.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                    <td style={{ padding: '1rem', fontWeight: 700, color: '#ec4899' }}>#{r.id}</td>
+                    <td style={{ padding: '1rem', fontWeight: 700, color: '#f8fafc' }}>{r.name}</td>
+                    <td style={{ padding: '1rem', color: '#94a3b8' }}>{r.description}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 1: CREATE EVENT --- */}
+      {showEventModal && (
+        <div className="modal-overlay" onClick={() => setShowEventModal(false)}>
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', padding: '2rem' }}>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>Create Event (4-Digit ID)</h3>
+            <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Event Title</label>
+                <input type="text" required value={eventForm.title} onChange={e => setEventForm({ ...eventForm, title: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Organizer</label>
+                  <select required value={eventForm.organizerId} onChange={e => setEventForm({ ...eventForm, organizerId: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}>
+                    <option value="">Select Organizer...</option>
+                    {organizersList.map(o => (
+                      <option key={o.id} value={o.id}>#{o.id} - {o.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Category</label>
+                  <input type="text" value={eventForm.category} onChange={e => setEventForm({ ...eventForm, category: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>City</label>
+                  <input type="text" value={eventForm.city} onChange={e => setEventForm({ ...eventForm, city: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Venue</label>
+                  <input type="text" required value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Starting Price (PKR)</label>
+                <input type="number" value={eventForm.startingPrice} onChange={e => setEventForm({ ...eventForm, startingPrice: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button type="button" onClick={() => setShowEventModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Create Event</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 2: CREATE ORGANIZER --- */}
+      {showOrgModal && (
+        <div className="modal-overlay" onClick={() => setShowOrgModal(false)}>
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px', padding: '2rem' }}>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>Add New Organizer</h3>
+            <form onSubmit={handleCreateOrganizer} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Company / Organizer Name</label>
+                <input type="text" required value={orgForm.name} onChange={e => setOrgForm({ ...orgForm, name: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Email</label>
+                <input type="email" required value={orgForm.email} onChange={e => setOrgForm({ ...orgForm, email: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Phone</label>
+                <input type="text" required value={orgForm.phone} onChange={e => setOrgForm({ ...orgForm, phone: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button type="button" onClick={() => setShowOrgModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Create Organizer</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 3: CREATE TICKET TIER --- */}
+      {showTierModal && (
+        <div className="modal-overlay" onClick={() => setShowTierModal(false)}>
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px', padding: '2rem' }}>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>Add Ticket Tier</h3>
+            <form onSubmit={handleCreateTicketTier} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Select Event</label>
+                <select required value={tierForm.eventId} onChange={e => setTierForm({ ...tierForm, eventId: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}>
+                  <option value="">Select Event...</option>
+                  {eventsList.map(ev => (
+                    <option key={ev.id} value={ev.id}>#{ev.id} - {ev.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Tier Name</label>
+                <input type="text" required value={tierForm.name} onChange={e => setTierForm({ ...tierForm, name: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Price (PKR)</label>
+                <input type="number" required value={tierForm.price} onChange={e => setTierForm({ ...tierForm, price: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Available Quantity</label>
+                <input type="number" required value={tierForm.availableQuantity} onChange={e => setTierForm({ ...tierForm, availableQuantity: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button type="button" onClick={() => setShowTierModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Create Tier</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 4: CREATE USER ACCOUNT --- */}
+      {showUserModal && (
+        <div className="modal-overlay" onClick={() => setShowUserModal(false)}>
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px', padding: '2rem' }}>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>Create User Account</h3>
+            <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Full Name</label>
+                <input type="text" required value={userForm.fullName} onChange={e => setUserForm({ ...userForm, fullName: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Email</label>
+                <input type="email" required value={userForm.email} onChange={e => setUserForm({ ...userForm, email: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Password</label>
+                <input type="password" required value={userForm.password} onChange={e => setUserForm({ ...userForm, password: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Assign Role</label>
+                <select required value={userForm.roleId} onChange={e => setUserForm({ ...userForm, roleId: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}>
+                  <option value="">Select Role...</option>
+                  {rolesList.map(r => (
+                    <option key={r.id} value={r.id}>#{r.id} - {r.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button type="button" onClick={() => setShowUserModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Create User</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

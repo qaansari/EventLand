@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { User, Lock, Mail, X, LogIn, UserPlus, ShieldCheck, Building2, Sparkles } from 'lucide-react';
+import { User, Lock, Mail, X, LogIn, UserPlus } from 'lucide-react';
+import { authApi } from '../services/api';
 
 export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'login' }) {
   const [isSignUp, setIsSignUp] = useState(initialMode === 'signup');
@@ -7,32 +8,9 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  // One-click demo credential helper to demonstrate role auto-detection
-  const handleQuickLogin = (demoType) => {
-    setErrorMsg('');
-    if (demoType === 'admin') {
-      onLoginSuccess({
-        name: 'Super Admin',
-        email: 'admin@eventland.pk',
-        role: 'admin'
-      });
-    } else if (demoType === 'organizer') {
-      onLoginSuccess({
-        name: 'Rangrez Events & PR',
-        email: 'organizer@eventland.pk',
-        role: 'organizer'
-      });
-    } else {
-      onLoginSuccess({
-        name: 'Qamar Ansari',
-        email: 'qamar@example.com',
-        role: 'customer'
-      });
-    }
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
@@ -41,34 +19,43 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
       return;
     }
 
-    if (isSignUp) {
-      if (!name.trim()) {
-        setErrorMsg('Please enter your full name to register.');
-        return;
-      }
-      // Self registration ALWAYS creates a General User (Attendee) role
-      onLoginSuccess({
-        name: name.trim(),
-        email: email.trim(),
-        role: 'customer' // Automatically allocated as Attendee
-      });
-    } else {
-      // Automatic Role Allocation based on Account Database Record / Email
-      const lowerEmail = email.trim().toLowerCase();
-      let allocatedRole = 'customer';
+    setLoading(true);
 
-      // Check registered system credentials
-      if (lowerEmail.includes('admin@eventland.pk') || lowerEmail.includes('admin')) {
-        allocatedRole = 'admin';
-      } else if (lowerEmail.includes('organizer@eventland.pk') || lowerEmail.includes('organizer') || lowerEmail.includes('rangrez')) {
-        allocatedRole = 'organizer';
-      }
+    try {
+      if (isSignUp) {
+        if (!name.trim()) {
+          setErrorMsg('Please enter your full name to register.');
+          setLoading(false);
+          return;
+        }
+        // General customer registration simulation
+        onLoginSuccess({
+          name: name.trim(),
+          email: email.trim(),
+          role: 'customer'
+        });
+      } else {
+        // Authenticate with live .NET Backend API
+        const authData = await authApi.login(email.trim(), password);
 
-      onLoginSuccess({
-        name: name.trim() || lowerEmail.split('@')[0].toUpperCase(),
-        email: lowerEmail,
-        role: allocatedRole
-      });
+        const backendRole = (authData.user?.role || '').toLowerCase();
+        let userRole = 'customer';
+        if (backendRole.includes('admin')) userRole = 'admin';
+        else if (backendRole.includes('organizer')) userRole = 'organizer';
+
+        onLoginSuccess({
+          id: authData.user?.id,
+          name: authData.user?.fullName || authData.user?.email,
+          email: authData.user?.email,
+          role: userRole,
+          token: authData.token
+        });
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setErrorMsg(err.message || 'Authentication failed. Check your credentials.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -101,70 +88,72 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
           <X size={18} />
         </button>
 
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <div style={{
-            width: '52px',
-            height: '52px',
-            borderRadius: '50%',
-            backgroundColor: 'rgba(59, 130, 246, 0.2)',
-            border: '1px solid rgba(59, 130, 246, 0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 0.75rem'
-          }}>
-            {isSignUp ? <UserPlus size={26} color="#60a5fa" /> : <LogIn size={26} color="#60a5fa" />}
+        {/* Header with Logo Royal Blue Scheme */}
+        <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+          <div 
+            style={{
+              width: '52px',
+              height: '52px',
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.25))',
+              border: '1px solid rgba(59, 130, 246, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1rem',
+              color: '#3b82f6',
+              boxShadow: '0 0 20px rgba(59, 130, 246, 0.25)'
+            }}
+          >
+            {isSignUp ? <UserPlus size={24} /> : <LogIn size={24} />}
           </div>
-
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', fontWeight: 800, color: '#fff', marginBottom: '0.35rem' }}>
-            {isSignUp ? 'Create Attendee Account' : 'Sign In to Event Land'}
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.25rem' }}>
+            {isSignUp ? 'Create an Account' : 'Welcome Back'}
           </h2>
-          <p style={{ color: '#94a3b8', fontSize: '0.86rem' }}>
+          <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
             {isSignUp 
-              ? 'Register as an attendee to book passes & manage digital tickets.' 
-              : 'Enter your credentials. Your account role will be detected automatically.'}
+              ? 'Join EventLand to book tickets and manage events' 
+              : 'Sign in to access your dashboard and tickets'}
           </p>
         </div>
 
-        {/* Error Alert */}
         {errorMsg && (
-          <div style={{
-            backgroundColor: 'rgba(239, 68, 68, 0.15)',
-            border: '1px solid rgba(239, 68, 68, 0.35)',
-            color: '#f87171',
-            padding: '0.65rem 0.85rem',
-            borderRadius: '8px',
-            fontSize: '0.82rem',
-            marginBottom: '1.2rem'
-          }}>
+          <div 
+            style={{
+              padding: '0.75rem 1rem',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              borderRadius: '10px',
+              color: '#f87171',
+              fontSize: '0.8125rem',
+              marginBottom: '1.25rem'
+            }}
+          >
             {errorMsg}
           </div>
         )}
 
-        {/* Auth Form */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {isSignUp && (
             <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '0.35rem' }}>
-                Full Name *
+              <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.375rem' }}>
+                Full Name
               </label>
               <div style={{ position: 'relative' }}>
-                <User size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <User size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
                 <input
-                  required
                   type="text"
                   placeholder="e.g. Qamar Ansari"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   style={{
                     width: '100%',
-                    backgroundColor: '#16233f',
-                    color: '#fff',
-                    border: '1px solid rgba(59, 130, 246, 0.3)',
-                    borderRadius: '8px',
-                    padding: '0.65rem 1rem 0.65rem 2.3rem',
-                    fontSize: '0.9rem',
+                    padding: '0.75rem 1rem 0.75rem 2.75rem',
+                    background: 'rgba(12, 23, 54, 0.6)',
+                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                    borderRadius: '10px',
+                    color: '#f8fafc',
+                    fontSize: '0.875rem',
                     outline: 'none'
                   }}
                 />
@@ -173,25 +162,25 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
           )}
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '0.35rem' }}>
-              Email Address *
+            <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.375rem' }}>
+              Email Address
             </label>
             <div style={{ position: 'relative' }}>
-              <Mail size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+              <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
               <input
-                required
                 type="email"
-                placeholder="name@example.com"
+                placeholder="admin@eventland.pk"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                required
                 style={{
                   width: '100%',
-                  backgroundColor: '#16233f',
-                  color: '#fff',
-                  border: '1px solid rgba(59, 130, 246, 0.3)',
-                  borderRadius: '8px',
-                  padding: '0.65rem 1rem 0.65rem 2.3rem',
-                  fontSize: '0.9rem',
+                  padding: '0.75rem 1rem 0.75rem 2.75rem',
+                  background: 'rgba(12, 23, 54, 0.6)',
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  borderRadius: '10px',
+                  color: '#f8fafc',
+                  fontSize: '0.875rem',
                   outline: 'none'
                 }}
               />
@@ -199,25 +188,25 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '0.35rem' }}>
-              Password *
+            <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.375rem' }}>
+              Password
             </label>
             <div style={{ position: 'relative' }}>
-              <Lock size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+              <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
               <input
-                required
                 type="password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                required
                 style={{
                   width: '100%',
-                  backgroundColor: '#16233f',
-                  color: '#fff',
-                  border: '1px solid rgba(59, 130, 246, 0.3)',
-                  borderRadius: '8px',
-                  padding: '0.65rem 1rem 0.65rem 2.3rem',
-                  fontSize: '0.9rem',
+                  padding: '0.75rem 1rem 0.75rem 2.75rem',
+                  background: 'rgba(12, 23, 54, 0.6)',
+                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  borderRadius: '10px',
+                  color: '#f8fafc',
+                  fontSize: '0.875rem',
                   outline: 'none'
                 }}
               />
@@ -226,80 +215,47 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
 
           <button
             type="submit"
-            className="btn btn-primary"
-            style={{ padding: '0.8rem', marginTop: '0.4rem', fontSize: '0.92rem' }}
+            disabled={loading}
+            style={{
+              marginTop: '0.5rem',
+              padding: '0.875rem',
+              background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+              border: 'none',
+              borderRadius: '10px',
+              color: '#ffffff',
+              fontWeight: 600,
+              fontSize: '0.9375rem',
+              cursor: loading ? 'wait' : 'pointer',
+              opacity: loading ? 0.7 : 1,
+              boxShadow: '0 4px 16px rgba(59, 130, 246, 0.4)'
+            }}
           >
-            {isSignUp ? <UserPlus size={18} /> : <LogIn size={18} />} {isSignUp ? 'Create Account & Sign In' : 'Sign In'}
+            {loading ? 'Authenticating...' : (isSignUp ? 'Create Account' : 'Sign In')}
           </button>
         </form>
 
-        {/* Toggle Login vs Sign Up */}
-        <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.84rem', color: '#94a3b8' }}>
-          {isSignUp ? 'Already have an account?' : "Don't have an account yet?"}{' '}
-          <button
-            type="button"
-            onClick={() => setIsSignUp(!isSignUp)}
-            style={{ background: 'none', border: 'none', color: '#60a5fa', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
-          >
-            {isSignUp ? 'Sign In' : 'Register as Attendee'}
-          </button>
-        </div>
-
-        {/* One-Click Quick Logins for Testing */}
-        <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', textAlign: 'center', marginBottom: '0.6rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            ⚡ Demo Accounts (Role Auto-Detected)
-          </span>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.4rem' }}>
-            <button
-              onClick={() => handleQuickLogin('customer')}
-              title="Sign in as General Attendee"
-              style={{
-                backgroundColor: 'rgba(59, 130, 246, 0.15)',
-                color: '#60a5fa',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                padding: '0.4rem 0.2rem',
-                borderRadius: '6px',
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              👤 Attendee
-            </button>
-            <button
-              onClick={() => handleQuickLogin('organizer')}
-              title="Sign in as Admin-Allocated Organizer"
-              style={{
-                backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                color: '#34d399',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                padding: '0.4rem 0.2rem',
-                borderRadius: '6px',
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              🏢 Organizer
-            </button>
-            <button
-              onClick={() => handleQuickLogin('admin')}
-              title="Sign in as Super Admin"
-              style={{
-                backgroundColor: 'rgba(139, 92, 246, 0.15)',
-                color: '#c084fc',
-                border: '1px solid rgba(139, 92, 246, 0.3)',
-                padding: '0.4rem 0.2rem',
-                borderRadius: '6px',
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              🛡️ Super Admin
-            </button>
-          </div>
+        <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.8125rem', color: '#94a3b8' }}>
+          {isSignUp ? (
+            <span>
+              Already have an account?{' '}
+              <button 
+                onClick={() => { setIsSignUp(false); setErrorMsg(''); }}
+                style={{ background: 'none', border: 'none', color: '#60a5fa', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Sign In
+              </button>
+            </span>
+          ) : (
+            <span>
+              Don't have an account?{' '}
+              <button 
+                onClick={() => { setIsSignUp(true); setErrorMsg(''); }}
+                style={{ background: 'none', border: 'none', color: '#60a5fa', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Sign Up
+              </button>
+            </span>
+          )}
         </div>
       </div>
     </div>

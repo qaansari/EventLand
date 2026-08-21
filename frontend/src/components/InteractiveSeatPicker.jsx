@@ -1,27 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Ticket } from 'lucide-react';
+import { seatHoldApi } from '../services/api';
 
 export default function InteractiveSeatPicker({ event, onClose, onProceedToCheckout }) {
   const defaultZone = event.seatingZones?.[0] || { zone: 'VIP Stage Front', rows: 4, cols: 8, price: event.startingPrice };
   const [selectedZoneIndex, setSelectedZoneIndex] = useState(0);
   const [selectedSeats, setSelectedSeats] = useState([]);
+  const [redisHeldSeats, setRedisHeldSeats] = useState([]);
 
   const currentZone = event.seatingZones?.[selectedZoneIndex] || defaultZone;
 
-  // Mock occupied seats deterministically
-  const isOccupied = (r, c) => {
+  // Load active seat locks from Redis
+  useEffect(() => {
+    if (typeof event.id === 'number') {
+      seatHoldApi.getHeldSeats(event.id)
+        .then(seatIds => setRedisHeldSeats(seatIds || []))
+        .catch(err => console.warn('Could not load Redis seat locks:', err));
+    }
+  }, [event.id]);
+
+  const isOccupied = (r, c, seatId) => {
+    if (seatId && redisHeldSeats.includes(seatId)) return true;
     return (r * 3 + c * 7) % 5 === 0;
   };
 
-  const handleSeatClick = (seatId, price) => {
+  const handleSeatClick = async (seatId, price) => {
     if (selectedSeats.some((s) => s.id === seatId)) {
-      setSelectedSeats(selectedSeats.filter((s) => s.id !== seatId));
+      const remaining = selectedSeats.filter((s) => s.id !== seatId);
+      setSelectedSeats(remaining);
+      if (typeof event.id === 'number' && typeof seatId === 'number') {
+        try {
+          await seatHoldApi.releaseSeats(event.id, [seatId]);
+        } catch (err) { console.warn('Seat release error:', err); }
+      }
     } else {
-      setSelectedSeats([...selectedSeats, { id: seatId, zone: currentZone.zone, price }]);
+      const newSeats = [...selectedSeats, { id: seatId, zone: currentZone.zone, price }];
+      setSelectedSeats(newSeats);
+      if (typeof event.id === 'number' && typeof seatId === 'number') {
+        try {
+          await seatHoldApi.holdSeats(event.id, [seatId], 'buyer@eventland.com');
+        } catch (err) { console.warn('Seat hold error:', err); }
+      }
     }
   };
 
-  const totalPrice = selectedSeats.reduce((sum, s) => sum + s.price, 0);
+  const totalPrice = selectedSeats.reduce((sum, s) => sum + (s.price || 1500), 0);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
