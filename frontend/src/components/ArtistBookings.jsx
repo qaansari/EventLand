@@ -133,7 +133,7 @@ export default function ArtistBookings() {
 
       {/* Inquiry Form Modal */}
       {selectedArtist && (
-        <div className="modal-overlay" onClick={() => setSelectedArtist(null)}>
+        <div className="modal-overlay">
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px' }}>
             <div style={{
               padding: '1.25rem 1.5rem',

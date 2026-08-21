@@ -45,7 +45,7 @@ export default function EventDetailModal({ event, onClose, onProceedToBooking })
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '780px' }}>
         {/* Banner Header */}
         <div style={{ position: 'relative', height: '280px', overflow: 'hidden' }}>

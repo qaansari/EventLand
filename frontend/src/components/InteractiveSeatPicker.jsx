@@ -47,7 +47,7 @@ export default function InteractiveSeatPicker({ event, onClose, onProceedToCheck
   const totalPrice = selectedSeats.reduce((sum, s) => sum + (s.price || 1500), 0);
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '820px' }}>
         {/* Modal Header */}
         <div style={{

@@ -7,6 +7,7 @@ import {
   DollarSign, 
   CheckCircle, 
   XCircle, 
+  X,
   Star, 
   Trash2, 
   Search, 
@@ -594,8 +595,28 @@ export default function AdminDashboard({ onSelectEvent }) {
 
       {/* --- MODAL 1: CREATE EVENT --- */}
       {showEventModal && (
-        <div className="modal-overlay" onClick={() => setShowEventModal(false)}>
-          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', padding: '2rem' }}>
+        <div className="modal-overlay">
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', padding: '2rem', position: 'relative' }}>
+            <button
+              onClick={() => setShowEventModal(false)}
+              style={{
+                position: 'absolute',
+                top: '1.25rem',
+                right: '1.25rem',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: 'none',
+                color: '#94a3b8',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={18} />
+            </button>
             <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>Create Event (4-Digit ID)</h3>
             <form onSubmit={handleCreateEvent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
@@ -647,8 +668,28 @@ export default function AdminDashboard({ onSelectEvent }) {
 
       {/* --- MODAL 2: CREATE ORGANIZER --- */}
       {showOrgModal && (
-        <div className="modal-overlay" onClick={() => setShowOrgModal(false)}>
-          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px', padding: '2rem' }}>
+        <div className="modal-overlay">
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px', padding: '2rem', position: 'relative' }}>
+            <button
+              onClick={() => setShowOrgModal(false)}
+              style={{
+                position: 'absolute',
+                top: '1.25rem',
+                right: '1.25rem',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: 'none',
+                color: '#94a3b8',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={18} />
+            </button>
             <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>Add New Organizer</h3>
             <form onSubmit={handleCreateOrganizer} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
@@ -674,8 +715,28 @@ export default function AdminDashboard({ onSelectEvent }) {
 
       {/* --- MODAL 3: CREATE TICKET TIER --- */}
       {showTierModal && (
-        <div className="modal-overlay" onClick={() => setShowTierModal(false)}>
-          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px', padding: '2rem' }}>
+        <div className="modal-overlay">
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px', padding: '2rem', position: 'relative' }}>
+            <button
+              onClick={() => setShowTierModal(false)}
+              style={{
+                position: 'absolute',
+                top: '1.25rem',
+                right: '1.25rem',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: 'none',
+                color: '#94a3b8',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={18} />
+            </button>
             <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>Add Ticket Tier</h3>
             <form onSubmit={handleCreateTicketTier} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
@@ -714,8 +775,28 @@ export default function AdminDashboard({ onSelectEvent }) {
 
       {/* --- MODAL 4: CREATE USER ACCOUNT --- */}
       {showUserModal && (
-        <div className="modal-overlay" onClick={() => setShowUserModal(false)}>
-          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px', padding: '2rem' }}>
+        <div className="modal-overlay">
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px', padding: '2rem', position: 'relative' }}>
+            <button
+              onClick={() => setShowUserModal(false)}
+              style={{
+                position: 'absolute',
+                top: '1.25rem',
+                right: '1.25rem',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: 'none',
+                color: '#94a3b8',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              <X size={18} />
+            </button>
             <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>Create User Account</h3>
             <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>

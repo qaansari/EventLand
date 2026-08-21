@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { User, Lock, Mail, X, LogIn, UserPlus } from 'lucide-react';
+import { User, Lock, Mail, X, LogIn, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { authApi } from '../services/api';
 
 export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'login' }) {
   const [isSignUp, setIsSignUp] = useState(initialMode === 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -60,7 +61,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div 
         className="modal-content glass-card" 
         onClick={(e) => e.stopPropagation()}
@@ -194,14 +195,14 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
             <div style={{ position: 'relative' }}>
               <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 style={{
                   width: '100%',
-                  padding: '0.75rem 1rem 0.75rem 2.75rem',
+                  padding: '0.75rem 2.75rem 0.75rem 2.75rem',
                   background: 'rgba(12, 23, 54, 0.6)',
                   border: '1px solid rgba(59, 130, 246, 0.2)',
                   borderRadius: '10px',
@@ -210,6 +211,31 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
                   outline: 'none'
                 }}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0.25rem',
+                  borderRadius: '6px',
+                  transition: 'color 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.color = '#94a3b8'}
+                onMouseLeave={(e) => e.currentTarget.style.color = '#64748b'}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
 
