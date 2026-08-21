@@ -177,3 +177,4 @@ D:\EventLand\backend\src\EventLand.Api\bin\Debug\net10.0\EventLand.Api.pdb
 D:\EventLand\backend\src\EventLand.Api\obj\Debug\net10.0\EventLan.FB27011D.Up2Date
 D:\EventLand\backend\src\EventLand.Api\obj\Debug\net10.0\EventLand.Api.genruntimeconfig.cache
 D:\EventLand\backend\src\EventLand.Api\obj\Debug\net10.0\ref\EventLand.Api.dll
+D:\EventLand\backend\src\EventLand.Api\bin\Debug\net10.0\EventLand.Api.staticwebassets.runtime.json

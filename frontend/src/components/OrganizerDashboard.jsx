@@ -39,7 +39,7 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
     if (scanTicketInput.toUpperCase().includes('FAIL') || scanTicketInput.length < 5) {
       setScanResult({
         valid: false,
-        message: '❌ INVALID / EXPIRED PASS - Ticket ID not found in roster!'
+        message: '❌ INVALID / EXPIRED PASS - Ticket not found in roster!'
       });
     } else {
       setScanResult({
@@ -277,14 +277,14 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
               Gatekeeper Ticket QR Check-in Tool
             </h3>
             <p style={{ color: '#94a3b8', fontSize: '0.88rem' }}>
-              Simulate entry validation for attendees arriving at your venue. Type any valid Ticket ID (e.g. <code>TK-PK-8841</code>).
+              Simulate entry validation for attendees arriving at your venue.
             </p>
           </div>
 
           <form onSubmit={handleScanTicket} style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
             <input
               type="text"
-              placeholder="Scan or enter Ticket ID (e.g. TK-PK-8841)..."
+              placeholder="Scan QR or enter ticket code..."
               value={scanTicketInput}
               onChange={(e) => setScanTicketInput(e.target.value)}
               style={{
@@ -318,7 +318,7 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.85rem', color: '#cbd5e1' }}>
                     <div>Attendee: <strong style={{ color: '#fff' }}>{scanResult.attendee}</strong></div>
-                    <div>Ticket ID: <strong style={{ color: '#60a5fa' }}>{scanResult.ticketId}</strong></div>
+                    <div>Status: <strong style={{ color: '#34d399' }}>Verified</strong></div>
                     <div>Event: <strong style={{ color: '#fff' }}>{scanResult.eventTitle}</strong></div>
                     <div>Pass Tier: <strong style={{ color: '#fbbf24' }}>{scanResult.tier}</strong></div>
                     <div style={{ gridColumn: 'span 2' }}>Assigned Seats: <strong style={{ color: '#fff' }}>{scanResult.seats}</strong></div>

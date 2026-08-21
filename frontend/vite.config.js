@@ -7,6 +7,24 @@ export default defineConfig({
   plugins: [react(), basicSsl()],
   server: {
     https: true,
-    port: 5174
+    port: 5174,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5062',
+        changeOrigin: true,
+        secure: false
+      },
+      '/hubs': {
+        target: 'http://localhost:5062',
+        ws: true,
+        changeOrigin: true,
+        secure: false
+      },
+      '/uploads': {
+        target: 'http://localhost:5062',
+        changeOrigin: true,
+        secure: false
+      }
+    }
   }
 })

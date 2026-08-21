@@ -1,4 +1,4 @@
-const BASE_URL = 'https://localhost:7257/api';
+const BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 async function request(endpoint, options = {}) {
   const token = localStorage.getItem('eventland_jwt_token');
@@ -170,3 +170,31 @@ export const adminApi = {
     delete: async (id) => request(`/admin/roles/${id}`, { method: 'DELETE' })
   }
 };
+
+// --- File & Image Upload API ---
+export const uploadApi = {
+  uploadFile: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('eventland_jwt_token');
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      headers,
+      body: formData
+    });
+
+    if (!response.ok) {
+      let errText = 'Upload failed';
+      try {
+        const json = await response.json();
+        errText = json.message || errText;
+      } catch {}
+      throw new Error(errText);
+    }
+    return await response.json();
+  }
+};
+

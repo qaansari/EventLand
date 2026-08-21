@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { Sparkles, Grid, Layers } from 'lucide-react';
 import EventCard from './EventCard';
+import { uploadApi, adminApi } from '../services/api';
 
 export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
+  const [tagsList, setTagsList] = useState([]);
   const [eventForm, setEventForm] = useState({
     title: '',
+    selectedTagId: '',
     category: 'Concerts',
     city: 'Karachi',
     venue: '',
@@ -16,17 +19,30 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
     description: '',
     organizer: '',
     organizerContact: '',
-    // For Categorized option
     tier1Name: 'Standard Entry',
     tier1Price: 2000,
     tier2Name: 'VIP Pass',
     tier2Price: 4500,
-    // For Mapped option
     zone1Name: 'VIP Front Row',
     zone1Price: 5000,
     zone2Name: 'General Lawn',
     zone2Price: 2000
   });
+
+  React.useEffect(() => {
+    adminApi.tags.getAll()
+      .then(tags => setTagsList(tags || []))
+      .catch(() => setTagsList([
+        { id: 1, name: 'Concerts' },
+        { id: 2, name: 'Festivals' },
+        { id: 3, name: 'Qawwali' },
+        { id: 4, name: 'Theatre' },
+        { id: 5, name: 'Comedy' },
+        { id: 6, name: 'Food' },
+        { id: 7, name: 'Workshops' },
+        { id: 8, name: 'Corporate' }
+      ]));
+  }, []);
 
   const [publishedSuccess, setPublishedSuccess] = useState(false);
 
@@ -181,11 +197,20 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                    Category *
+                    Select Event Tag *
                   </label>
                   <select
-                    value={eventForm.category}
-                    onChange={(e) => setEventForm({ ...eventForm, category: e.target.value })}
+                    required
+                    value={eventForm.selectedTagId}
+                    onChange={(e) => {
+                      const tagId = e.target.value;
+                      const selectedTag = tagsList.find(t => String(t.id) === String(tagId));
+                      setEventForm({
+                        ...eventForm,
+                        selectedTagId: tagId,
+                        category: selectedTag ? selectedTag.name : 'Concerts'
+                      });
+                    }}
                     style={{
                       width: '100%',
                       backgroundColor: '#1e293b',
@@ -196,12 +221,10 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
                       outline: 'none'
                     }}
                   >
-                    <option value="Concerts">Concerts</option>
-                    <option value="Bazaars">Bazaars</option>
-                    <option value="Theatre">Theatre</option>
-                    <option value="Comedy">Comedy</option>
-                    <option value="Food">Food</option>
-                    <option value="Workshops">Workshops</option>
+                    <option value="">Select Tag...</option>
+                    {tagsList.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -299,23 +322,52 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                  Banner Image URL
+                  Banner Image (File Upload or URL)
                 </label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/..."
-                  value={eventForm.banner}
-                  onChange={(e) => setEventForm({ ...eventForm, banner: e.target.value })}
-                  style={{
-                    width: '100%',
-                    backgroundColor: '#1e293b',
-                    border: '1px solid rgba(59, 130, 246, 0.25)',
-                    borderRadius: '10px',
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="https://images.unsplash.com/... or upload below"
+                    value={eventForm.banner}
+                    onChange={(e) => setEventForm({ ...eventForm, banner: e.target.value })}
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#1e293b',
+                      border: '1px solid rgba(59, 130, 246, 0.25)',
+                      borderRadius: '10px',
+                      padding: '0.75rem 1rem',
+                      color: '#fff',
+                      outline: 'none'
+                    }}
+                  />
+                  <label style={{
                     padding: '0.75rem 1rem',
+                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    borderRadius: '10px',
                     color: '#fff',
-                    outline: 'none'
-                  }}
-                />
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    Upload File
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const res = await uploadApi.uploadFile(file);
+                          setEventForm(prev => ({ ...prev, banner: res.url }));
+                        } catch (err) {
+                          alert(err.message || 'Upload failed');
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
               </div>
 
               <div>

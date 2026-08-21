@@ -57,6 +57,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseStaticFiles();
 app.UseCors("AllowFrontend");
 
 app.UseAuthentication();

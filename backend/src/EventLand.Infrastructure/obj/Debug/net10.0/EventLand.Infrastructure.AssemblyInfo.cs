@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("EventLand.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6386769ac3bf1e7e947dfe4a6e4aa095f98cbaa1")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bcd46f4d9bacdca831da83da4c48d566d26e154d")]
 [assembly: System.Reflection.AssemblyProductAttribute("EventLand.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("EventLand.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
