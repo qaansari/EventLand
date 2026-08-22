@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { Music, Star, Calendar, MapPin, Send, CheckCircle, X } from 'lucide-react';
+import { Music, Star, Calendar, MapPin, Send, X } from 'lucide-react';
+import SearchableSelect from './SearchableSelect';
+import { CITIES } from '../data/mockEvents';
 import { MOCK_ARTISTS } from '../data/mockArtists';
+import { useToast } from '../context/ToastContext';
 
 export default function ArtistBookings() {
+  const { showSuccess } = useToast();
   const [selectedArtist, setSelectedArtist] = useState(null);
   const [inquirySubmitted, setInquirySubmitted] = useState(false);
   const [inquiryForm, setInquiryForm] = useState({
@@ -19,9 +23,12 @@ export default function ArtistBookings() {
     e.preventDefault();
     setInquirySubmitted(true);
     setTimeout(() => {
+      showSuccess(
+        'Inquiry Transmitted 🎤',
+        `Booking request for ${selectedArtist.name} sent! Our agent will contact you within 2 hours.`
+      );
       setInquirySubmitted(false);
       setSelectedArtist(null);
-      alert(`Booking request for ${selectedArtist.name} successfully transmitted! Our artist relations agent will contact you within 2 hours.`);
     }, 1500);
   };
 
@@ -263,24 +270,12 @@ export default function ArtistBookings() {
                     <label style={{ display: 'block', fontSize: '0.82rem', color: '#9ca3af', marginBottom: '0.35rem' }}>
                       City Location *
                     </label>
-                    <select
+                    <SearchableSelect
                       value={inquiryForm.city}
                       onChange={(e) => setInquiryForm({ ...inquiryForm, city: e.target.value })}
-                      style={{
-                        width: '100%',
-                        backgroundColor: '#1f2937',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        borderRadius: '10px',
-                        padding: '0.75rem 1rem',
-                        color: '#fff',
-                        outline: 'none'
-                      }}
-                    >
-                      <option value="Karachi">Karachi</option>
-                      <option value="Lahore">Lahore</option>
-                      <option value="Islamabad">Islamabad</option>
-                      <option value="Rawalpindi">Rawalpindi</option>
-                    </select>
+                      options={CITIES.filter(c => c !== 'All Cities')}
+                      placeholder="Select City..."
+                    />
                   </div>
                 </div>
               </div>

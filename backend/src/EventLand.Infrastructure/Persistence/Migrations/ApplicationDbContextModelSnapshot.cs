@@ -207,7 +207,12 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     b.Property<int>("SeatId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("EventShowId")
+                        .HasColumnType("int");
+
                     b.HasKey("BookingId", "SeatId");
+
+                    b.HasIndex("EventShowId");
 
                     b.HasIndex("SeatId");
 
@@ -266,12 +271,6 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsPublished")
                         .HasColumnType("bit");
 
-                    b.Property<double?>("Latitude")
-                        .HasColumnType("float");
-
-                    b.Property<double?>("Longitude")
-                        .HasColumnType("float");
-
                     b.Property<int>("OrganizerId")
                         .HasColumnType("int");
 
@@ -293,10 +292,6 @@ namespace EventLand.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
-
-                    b.Property<string>("ThumbnailUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
 
                     b.Property<int>("TicketingType")
                         .HasColumnType("int");
@@ -340,6 +335,54 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("IX_Events_Published_Date");
 
                     b.ToTable("Events");
+                });
+
+            modelBuilder.Entity("EventLand.Domain.Entities.EventShow", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("EndTimeUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("EventId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ShowTitle")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset>("StartTimeUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId", "StartTimeUtc")
+                        .HasDatabaseName("IX_EventShows_EventId_StartTimeUtc");
+
+                    b.ToTable("EventShows");
                 });
 
             modelBuilder.Entity("EventLand.Domain.Entities.EventTag", b =>
@@ -544,6 +587,9 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
+                    b.Property<string>("LayoutJson")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<decimal>("Price")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -649,6 +695,9 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     b.Property<int>("EventId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("EventShowId")
+                        .HasColumnType("int");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -677,6 +726,8 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EventShowId");
 
                     b.HasIndex("EventId", "SortOrder")
                         .HasDatabaseName("IX_TicketTiers_EventId_SortOrder");
@@ -779,6 +830,11 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("EventLand.Domain.Entities.EventShow", "EventShow")
+                        .WithMany()
+                        .HasForeignKey("EventShowId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("EventLand.Domain.Entities.Seat", "Seat")
                         .WithMany("BookingSeats")
                         .HasForeignKey("SeatId")
@@ -786,6 +842,8 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Booking");
+
+                    b.Navigation("EventShow");
 
                     b.Navigation("Seat");
                 });
@@ -799,6 +857,17 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Organizer");
+                });
+
+            modelBuilder.Entity("EventLand.Domain.Entities.EventShow", b =>
+                {
+                    b.HasOne("EventLand.Domain.Entities.Event", "Event")
+                        .WithMany("Shows")
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Event");
                 });
 
             modelBuilder.Entity("EventLand.Domain.Entities.EventTag", b =>
@@ -850,7 +919,14 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("EventLand.Domain.Entities.EventShow", "EventShow")
+                        .WithMany("TicketTiers")
+                        .HasForeignKey("EventShowId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.Navigation("Event");
+
+                    b.Navigation("EventShow");
                 });
 
             modelBuilder.Entity("EventLand.Domain.Entities.User", b =>
@@ -877,6 +953,13 @@ namespace EventLand.Infrastructure.Persistence.Migrations
 
                     b.Navigation("SeatingZones");
 
+                    b.Navigation("Shows");
+
+                    b.Navigation("TicketTiers");
+                });
+
+            modelBuilder.Entity("EventLand.Domain.Entities.EventShow", b =>
+                {
                     b.Navigation("TicketTiers");
                 });
 

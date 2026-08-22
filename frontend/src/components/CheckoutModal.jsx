@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { X, CreditCard, Smartphone, ShieldCheck } from 'lucide-react';
 import { bookingsApi } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 export default function CheckoutModal({ event, selectedSeats, onClose, onBookingSuccess }) {
+  const { showSuccess, showError } = useToast();
   const [step, setStep] = useState(1); // 1: Info, 2: Payment & Review
   const [formData, setFormData] = useState({
     name: '',
@@ -21,18 +23,21 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
 
   const handleApplyPromo = () => {
     if (promoCode.trim().toUpperCase() === 'EVENTLAND10') {
-      setDiscount(Math.round(subtotal * 0.1));
+      const disc = Math.round(subtotal * 0.1);
+      setDiscount(disc);
+      showSuccess('Promo Applied! 🎉', `10% discount (-PKR ${disc.toLocaleString()}) applied.`);
     } else if (promoCode.trim().toUpperCase() === 'JAZZCASH500') {
       setDiscount(500);
+      showSuccess('Promo Applied! 🎉', 'Flat PKR 500 discount applied.');
     } else {
-      alert('Invalid promo code. Try "EVENTLAND10" or "JAZZCASH500"');
+      showError('Invalid Promo', 'Invalid promo code. Try "EVENTLAND10" or "JAZZCASH500"');
     }
   };
 
   const handleCompleteBooking = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.phone) {
-      alert('Please fill out all required attendee fields.');
+      showError('Validation Error', 'Please fill out all required attendee fields.');
       return;
     }
 
@@ -144,7 +149,9 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
           justifyContent: 'space-between'
         }}>
           <div>
-            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#fff', display: 'block' }}>{event.title}</span>
+            <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#fff', display: 'block' }}>
+              {event.title} {event.selectedShow ? `• ${event.selectedShow.showTitle}` : ''}
+            </span>
             <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>{selectedSeats.length} Ticket(s) selected</span>
           </div>
           <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#60a5fa' }}>

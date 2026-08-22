@@ -18,8 +18,6 @@ public class Event : BaseEntity
     public string  City           { get; set; } = string.Empty;
     public string  Venue          { get; set; } = string.Empty;
     public string? Address        { get; set; }
-    public double? Latitude       { get; set; }
-    public double? Longitude      { get; set; }
 
     // Structured dates
     public DateTimeOffset StartDateUtc { get; set; }
@@ -32,7 +30,6 @@ public class Event : BaseEntity
 
     // Media & display
     public string  Banner         { get; set; } = string.Empty;
-    public string? ThumbnailUrl   { get; set; }
     public string  Description    { get; set; } = string.Empty;
     public string? ScarcityText   { get; set; }
 
@@ -41,6 +38,7 @@ public class Event : BaseEntity
     public Organizer Organizer    { get; set; } = null!;
 
     // Navigation collections
+    public ICollection<EventShow>   Shows        { get; set; } = new List<EventShow>();
     public ICollection<TicketTier>  TicketTiers  { get; set; } = new List<TicketTier>();
     public ICollection<SeatingZone> SeatingZones { get; set; } = new List<SeatingZone>();
     public ICollection<Booking>     Bookings     { get; set; } = new List<Booking>();

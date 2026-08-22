@@ -41,9 +41,6 @@ public sealed class EventConfiguration : IEntityTypeConfiguration<Event>
         builder.Property(e => e.Banner)
                .HasMaxLength(500);
 
-        builder.Property(e => e.ThumbnailUrl)
-               .HasMaxLength(500);
-
         builder.Property(e => e.ScarcityText)
                .HasMaxLength(200);
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace EventLand.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class InitialSchema : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -118,15 +118,12 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     City = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     Venue = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: false),
                     Address = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
-                    Latitude = table.Column<double>(type: "float", nullable: true),
-                    Longitude = table.Column<double>(type: "float", nullable: true),
                     StartDateUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     EndDateUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     PriceRange = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     StartingPrice = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
                     TicketingType = table.Column<int>(type: "int", nullable: false),
                     Banner = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
-                    ThumbnailUrl = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     ScarcityText = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
                     OrganizerId = table.Column<int>(type: "int", nullable: false),
@@ -180,6 +177,34 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "EventShows",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1000, 1"),
+                    EventId = table.Column<int>(type: "int", nullable: false),
+                    ShowTitle = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    StartTimeUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    EndTimeUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_EventShows", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_EventShows_Events_EventId",
+                        column: x => x.EventId,
+                        principalTable: "Events",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "EventTags",
                 columns: table => new
                 {
@@ -216,6 +241,7 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     Price = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
                     TotalCapacity = table.Column<int>(type: "int", nullable: false),
                     SortOrder = table.Column<int>(type: "int", nullable: false),
+                    LayoutJson = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
@@ -241,6 +267,7 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1000, 1"),
                     EventId = table.Column<int>(type: "int", nullable: false),
+                    EventShowId = table.Column<int>(type: "int", nullable: true),
                     Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
                     Price = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
@@ -259,6 +286,11 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 {
                     table.PrimaryKey("PK_TicketTiers", x => x.Id);
                     table.CheckConstraint("CK_TicketTiers_SoldCount", "SoldCount >= 0 AND SoldCount <= AvailableQuantity");
+                    table.ForeignKey(
+                        name: "FK_TicketTiers_EventShows_EventShowId",
+                        column: x => x.EventShowId,
+                        principalTable: "EventShows",
+                        principalColumn: "Id");
                     table.ForeignKey(
                         name: "FK_TicketTiers_Events_EventId",
                         column: x => x.EventId,
@@ -344,7 +376,8 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 columns: table => new
                 {
                     BookingId = table.Column<int>(type: "int", nullable: false),
-                    SeatId = table.Column<int>(type: "int", nullable: false)
+                    SeatId = table.Column<int>(type: "int", nullable: false),
+                    EventShowId = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -359,6 +392,12 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                         name: "FK_BookingSeats_Seats_SeatId",
                         column: x => x.SeatId,
                         principalTable: "Seats",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_BookingSeats_EventShows_EventShowId",
+                        column: x => x.EventShowId,
+                        principalTable: "EventShows",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -435,6 +474,11 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 column: "Status");
 
             migrationBuilder.CreateIndex(
+                name: "IX_EventShows_EventId_StartTimeUtc",
+                table: "EventShows",
+                columns: new[] { "EventId", "StartTimeUtc" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_EventTags_TagId",
                 table: "EventTags",
                 column: "TagId");
@@ -477,6 +521,11 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 name: "IX_TicketTiers_EventId_SortOrder",
                 table: "TicketTiers",
                 columns: new[] { "EventId", "SortOrder" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TicketTiers_EventShowId",
+                table: "TicketTiers",
+                column: "EventShowId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_Email",
@@ -522,6 +571,9 @@ namespace EventLand.Infrastructure.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "SeatingZones");
+
+            migrationBuilder.DropTable(
+                name: "EventShows");
 
             migrationBuilder.DropTable(
                 name: "Events");

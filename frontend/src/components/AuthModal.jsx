@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { User, Lock, Mail, X, LogIn, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { authApi } from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'login' }) {
+  const { showError, showSuccess } = useToast();
   const [isSignUp, setIsSignUp] = useState(initialMode === 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,7 +18,9 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
     setErrorMsg('');
 
     if (!email.trim() || !password.trim()) {
-      setErrorMsg('Please enter a valid email and password.');
+      const msg = 'Please enter a valid email and password.';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
       return;
     }
 
@@ -25,7 +29,9 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
     try {
       if (isSignUp) {
         if (!name.trim()) {
-          setErrorMsg('Please enter your full name to register.');
+          const msg = 'Please enter your full name to register.';
+          setErrorMsg(msg);
+          showError('Registration Error', msg);
           setLoading(false);
           return;
         }
@@ -54,7 +60,9 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
       }
     } catch (err) {
       console.error('Login error:', err);
-      setErrorMsg(err.message || 'Authentication failed. Check your credentials.');
+      const msg = err.message || 'Authentication failed. Check your credentials.';
+      setErrorMsg(msg);
+      showError('Authentication Failed', msg);
     } finally {
       setLoading(false);
     }

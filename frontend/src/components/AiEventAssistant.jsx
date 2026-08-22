@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Sparkles, Send, Ticket, Bot, User, Flame } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Sparkles, Send, Bot, User, Ticket, Flame, Compass, RefreshCw } from 'lucide-react';
+import { getEventImageUrl } from '../services/api';
 import { MOCK_EVENTS } from '../data/mockEvents';
 
 export default function AiEventAssistant({ onSelectEvent }) {
@@ -162,7 +163,7 @@ export default function AiEventAssistant({ onSelectEvent }) {
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <img src={ev.banner} alt={ev.title} style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover' }} />
+                          <img src={getEventImageUrl(ev.banner)} alt={ev.title} style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover' }} />
                           <div>
                             <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#fff', display: 'block' }}>{ev.title}</span>
                             <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{ev.city} • {ev.date}</span>

@@ -15,8 +15,19 @@ public record EventSummaryDto(
     string TicketingType,
     string Banner,
     string? ScarcityText,
+    int OrganizerId,
     string OrganizerName,
-    List<TagDto> Tags
+    List<TagDto> Tags,
+    List<EventShowDto>? Shows = null
+);
+
+public record EventShowDto(
+    int Id,
+    int EventId,
+    string ShowTitle,
+    DateTimeOffset StartTimeUtc,
+    DateTimeOffset EndTimeUtc,
+    List<TicketTierDto> TicketTiers
 );
 
 public record EventDetailDto(
@@ -28,18 +39,16 @@ public record EventDetailDto(
     string City,
     string Venue,
     string? Address,
-    double? Latitude,
-    double? Longitude,
     DateTimeOffset StartDateUtc,
     DateTimeOffset EndDateUtc,
     string PriceRange,
     decimal StartingPrice,
     string TicketingType,
     string Banner,
-    string? ThumbnailUrl,
     string Description,
     string? ScarcityText,
     OrganizerDto Organizer,
+    List<EventShowDto> Shows,
     List<TicketTierDto> TicketTiers,
     List<SeatingZoneDto> SeatingZones,
     List<TagDto> Tags
@@ -48,6 +57,7 @@ public record EventDetailDto(
 public record TicketTierDto(
     int Id,
     int EventId,
+    int? EventShowId,
     string Name,
     string Description,
     decimal Price,
@@ -66,6 +76,7 @@ public record SeatingZoneDto(
     decimal Price,
     int TotalCapacity,
     int SortOrder,
+    string? LayoutJson,
     List<SeatDto> Seats
 );
 
@@ -90,5 +101,6 @@ public record OrganizerDto(
     string Email,
     string Phone,
     string? LogoUrl,
+    string? WebsiteUrl,
     bool IsVerified
 );

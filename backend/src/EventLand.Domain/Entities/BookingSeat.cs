@@ -11,4 +11,7 @@ public class BookingSeat
 
     public int     SeatId    { get; set; }
     public Seat    Seat      { get; set; } = null!;
+
+    public int?       EventShowId { get; set; }
+    public EventShow? EventShow   { get; set; }
 }

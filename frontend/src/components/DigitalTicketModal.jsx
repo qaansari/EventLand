@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { X, Download, CheckCircle2, ShieldCheck, ScanLine } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 export default function DigitalTicketModal({ ticket, onClose }) {
+  const { showSuccess } = useToast();
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scannerStatus, setScannerStatus] = useState('idle'); // idle, scanning, verified
 
@@ -148,7 +150,7 @@ export default function DigitalTicketModal({ ticket, onClose }) {
           {/* Action Buttons */}
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
             <button
-              onClick={() => alert(`Ticket #${ticket.ticketId} saved to downloads!`)}
+              onClick={() => showSuccess('Ticket Saved 📥', `Ticket #${ticket.ticketId} saved to downloads!`)}
               className="btn btn-primary"
               style={{ flexGrow: 1 }}
             >

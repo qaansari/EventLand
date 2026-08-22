@@ -30,6 +30,9 @@ public sealed class SeatingZoneConfiguration : IEntityTypeConfiguration<SeatingZ
         builder.Property(z => z.SortOrder)
                .IsRequired();
 
+        builder.Property(z => z.LayoutJson)
+               .HasColumnType("nvarchar(max)");
+
         builder.HasMany(z => z.Seats)
                .WithOne(s => s.Zone)
                .HasForeignKey(s => s.ZoneId)

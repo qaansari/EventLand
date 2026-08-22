@@ -40,6 +40,7 @@ public class EventService : IEventService
         var query = _context.Events
             .AsNoTracking()
             .Include(e => e.Organizer)
+            .Include(e => e.Shows.Where(s => !s.IsDeleted).OrderBy(s => s.StartTimeUtc))
             .Include(e => e.EventTags).ThenInclude(et => et.Tag)
             .Where(e => !e.IsDeleted && e.IsPublished);
 
@@ -74,10 +75,12 @@ public class EventService : IEventService
                 e.PriceRange,
                 e.StartingPrice,
                 e.TicketingType.ToString().ToLower(),
-                e.Banner,
+                FileUrlHelper.FormatEventBannerUrl(e.Banner),
                 e.ScarcityText,
+                e.OrganizerId,
                 e.Organizer.Name,
-                e.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList()
+                e.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList(),
+                e.Shows.Select(s => new EventShowDto(s.Id, s.EventId, s.ShowTitle, s.StartTimeUtc, s.EndTimeUtc, new List<TicketTierDto>())).ToList()
             ))
             .ToListAsync();
 
@@ -97,6 +100,8 @@ public class EventService : IEventService
         var ev = await _context.Events
             .AsNoTracking()
             .Include(e => e.Organizer)
+            .Include(e => e.Shows.Where(s => !s.IsDeleted).OrderBy(s => s.StartTimeUtc))
+                .ThenInclude(s => s.TicketTiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder))
             .Include(e => e.TicketTiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder))
             .Include(e => e.SeatingZones.Where(z => !z.IsDeleted).OrderBy(z => z.SortOrder))
                 .ThenInclude(z => z.Seats.Where(s => !s.IsDeleted).OrderBy(s => s.Row).ThenBy(s => s.Col))
@@ -120,21 +125,26 @@ public class EventService : IEventService
         e.City,
         e.Venue,
         e.Address,
-        e.Latitude,
-        e.Longitude,
         e.StartDateUtc,
         e.EndDateUtc,
         e.PriceRange,
         e.StartingPrice,
         e.TicketingType.ToString().ToLower(),
-        e.Banner,
-        e.ThumbnailUrl,
+        FileUrlHelper.FormatEventBannerUrl(e.Banner),
         e.Description,
         e.ScarcityText,
-        e.Organizer == null ? new OrganizerDto(0, "", "", "", null, false) : new OrganizerDto(
-            e.Organizer.Id, e.Organizer.Name, e.Organizer.Email, e.Organizer.Phone, e.Organizer.LogoUrl, e.Organizer.IsVerified),
-        e.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder)).ToList(),
-        e.SeatingZones.Select(z => new SeatingZoneDto(z.Id, z.EventId, z.Zone, z.Rows, z.Cols, z.Price, z.TotalCapacity, z.SortOrder, z.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString())).ToList())).ToList(),
+        e.Organizer == null ? new OrganizerDto(0, "", "", "", null, null, false) : new OrganizerDto(
+            e.Organizer.Id, e.Organizer.Name, e.Organizer.Email, e.Organizer.Phone, FileUrlHelper.FormatOrganizerLogoUrl(e.Organizer.LogoUrl), e.Organizer.WebsiteUrl, e.Organizer.IsVerified),
+        e.Shows.Select(s => new EventShowDto(
+            s.Id,
+            s.EventId,
+            s.ShowTitle,
+            s.StartTimeUtc,
+            s.EndTimeUtc,
+            s.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder)).ToList()
+        )).ToList(),
+        e.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder)).ToList(),
+        e.SeatingZones.Select(z => new SeatingZoneDto(z.Id, z.EventId, z.Zone, z.Rows, z.Cols, z.Price, z.TotalCapacity, z.SortOrder, z.LayoutJson, z.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString())).ToList())).ToList(),
         e.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList()
     );
 

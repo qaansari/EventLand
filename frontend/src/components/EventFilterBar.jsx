@@ -1,5 +1,6 @@
 import React from 'react';
 import { SlidersHorizontal } from 'lucide-react';
+import SearchableSelect from './SearchableSelect';
 import { CATEGORIES, CITIES } from '../data/mockEvents';
 
 export default function EventFilterBar({
@@ -94,24 +95,16 @@ export default function EventFilterBar({
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <SlidersHorizontal size={16} color="#94a3b8" />
           <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>Sort by:</span>
-          <select
+          <SearchableSelect
             value={sortBy}
             onChange={(e) => onSortChange(e.target.value)}
-            style={{
-              backgroundColor: '#0f172a',
-              color: '#f8fafc',
-              border: '1px solid rgba(59, 130, 246, 0.25)',
-              borderRadius: '8px',
-              padding: '0.35rem 0.8rem',
-              fontSize: '0.82rem',
-              cursor: 'pointer',
-              outline: 'none'
-            }}
-          >
-            <option value="featured">Featured First</option>
-            <option value="price-asc">Price: Low to High</option>
-            <option value="price-desc">Price: High to Low</option>
-          </select>
+            options={[
+              { value: 'featured', label: 'Featured First' },
+              { value: 'price-asc', label: 'Price: Low to High' },
+              { value: 'price-desc', label: 'Price: High to Low' }
+            ]}
+            style={{ width: '180px' }}
+          />
         </div>
       </div>
     </div>

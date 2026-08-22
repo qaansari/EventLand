@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, MapPin, Ticket, Sparkles, Flame } from 'lucide-react';
+import { getEventImageUrl } from '../services/api';
 
-export default function HeroSlider({ featuredEvents, onSelectEvent }) {
+export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
@@ -44,7 +45,7 @@ export default function HeroSlider({ featuredEvents, onSelectEvent }) {
         {/* Animated Ken Burns Background Image */}
         <img
           key={`bg-${currentIndex}`}
-          src={current.banner}
+          src={getEventImageUrl(current.banner)}
           alt={current.title}
           className="hero-slide-bg"
           style={{

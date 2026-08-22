@@ -24,12 +24,18 @@ import {
   Calendar,
   UploadCloud,
   Music,
-  UserCheck
+  UserCheck,
+  Sparkles
 } from 'lucide-react';
-import { adminApi, uploadApi } from '../services/api';
+import { adminApi, uploadApi, getEventImageUrl, getOrganizerImageUrl } from '../services/api';
+import { useToast } from '../context/ToastContext';
+import SearchableSelect from './SearchableSelect';
+import MultiSearchableSelect from './MultiSearchableSelect';
+import EventCard from './EventCard';
 
 // --- File Upload Component Helper ---
-function FileUploadField({ label, value, onChange, placeholder = "Image URL or upload file..." }) {
+function FileUploadField({ label, value, onChange, placeholder = "Image URL or upload file...", type = "events", entityName = null, entityId = null }) {
+  const { showSuccess, showError } = useToast();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
@@ -39,10 +45,13 @@ function FileUploadField({ label, value, onChange, placeholder = "Image URL or u
     setUploading(true);
     setError('');
     try {
-      const res = await uploadApi.uploadFile(file);
+      const res = await uploadApi.uploadFile(file, type, entityName, entityId);
       onChange(res.url);
+      showSuccess('File Uploaded', `Saved image as ${res.fileName || 'asset image'}`);
     } catch (err) {
-      setError(err.message || 'Upload failed');
+      const msg = err.message || 'Upload failed';
+      setError(msg);
+      showError('Upload Failed', msg);
     } finally {
       setUploading(false);
     }
@@ -75,7 +84,7 @@ function FileUploadField({ label, value, onChange, placeholder = "Image URL or u
           whiteSpace: 'nowrap'
         }}>
           <UploadCloud size={16} /> {uploading ? 'Uploading...' : 'Upload File'}
-          <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} disabled={uploading} />
+          <input type="file" accept=".webp,.jpg,.jpeg,.png" onChange={handleFileChange} style={{ display: 'none' }} disabled={uploading} />
         </label>
       </div>
       {error && <span style={{ fontSize: '0.75rem', color: '#f87171', marginTop: '0.25rem', display: 'block' }}>{error}</span>}
@@ -90,10 +99,23 @@ function FileUploadField({ label, value, onChange, placeholder = "Image URL or u
 }
 
 export default function AdminDashboard({ onSelectEvent }) {
+  const { showSuccess, showError } = useToast();
   const [activeAdminTab, setActiveAdminTab] = useState('events'); // 'events', 'organizers', 'artists', 'bookings', 'users', 'roles', 'ticket-tiers', 'tags'
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  useEffect(() => {
+    if (successMsg) {
+      showSuccess('Admin Operations', successMsg);
+    }
+  }, [successMsg]);
+
+  useEffect(() => {
+    if (errorMsg) {
+      showError('Admin Error', errorMsg);
+    }
+  }, [errorMsg]);
 
   // Loaded Data States
   const [eventsList, setEventsList] = useState([]);
@@ -117,21 +139,24 @@ export default function AdminDashboard({ onSelectEvent }) {
   const defaultEventForm = {
     id: null,
     title: '',
-    selectedTagId: '',
+    category: 'Concerts',
+    tagIds: [],
+    status: 'Live',
+    isFeatured: false,
+    isPublished: true,
     city: 'Karachi',
     venue: '',
     address: '',
     startDateUtc: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
     endDateUtc: new Date(Date.now() + 172800000).toISOString().slice(0, 16),
+    priceRange: 'PKR 1,500 - PKR 5,000',
     startingPrice: 1500,
     ticketingType: 'categorized',
-    banner: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800',
-    thumbnailUrl: '',
+    banner: '',
     description: 'Join us for an extraordinary live event experience featuring Pakistan top performers.',
     scarcityText: 'Selling Fast',
     organizerId: '',
-    isFeatured: false,
-    status: 'Live'
+    shows: []
   };
 
   const defaultOrgForm = {
@@ -215,7 +240,18 @@ export default function AdminDashboard({ onSelectEvent }) {
         adminApi.tags.getAll().catch(() => [])
       ]);
 
-      setOrganizersList(orgs || []);
+      const rawOrgs = Array.isArray(orgs) ? orgs : (orgs?.items || []);
+      const normalizedOrgs = rawOrgs.map(o => ({
+        id: o.id ?? o.Id,
+        name: o.name ?? o.Name ?? '',
+        email: o.email ?? o.Email ?? '',
+        phone: o.phone ?? o.Phone ?? '',
+        logoUrl: o.logoUrl ?? o.LogoUrl ?? '',
+        websiteUrl: o.websiteUrl ?? o.WebsiteUrl ?? o.website ?? o.Website ?? '',
+        isVerified: o.isVerified ?? o.IsVerified ?? true
+      }));
+
+      setOrganizersList(normalizedOrgs);
       setEventsList(evs.items || evs || []);
       setArtistsList(arts.items || arts || []);
       setBookingsList(bks.items || bks || []);
@@ -240,59 +276,89 @@ export default function AdminDashboard({ onSelectEvent }) {
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!eventForm.organizerId) {
-      setErrorMsg('Please select an organizer.');
+    const title = eventForm.title ? eventForm.title.trim() : '';
+    const venue = eventForm.venue ? eventForm.venue.trim() : '';
+    const orgId = parseInt(eventForm.organizerId, 10) || (organizersList[0]?.id || 1);
+
+    if (!title) {
+      const msg = 'Please enter an event title.';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
       return;
     }
-    if (!eventForm.title.trim()) {
-      setErrorMsg('Please enter an event title.');
-      return;
-    }
-    if (!eventForm.selectedTagId) {
-      setErrorMsg('Please select an event tag from the dropdown.');
-      return;
-    }
-    if (!eventForm.venue.trim()) {
-      setErrorMsg('Please enter a venue.');
+    if (!venue) {
+      const msg = 'Please enter a venue.';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
       return;
     }
 
     try {
-      const startDate = eventForm.startDateUtc ? new Date(eventForm.startDateUtc) : new Date(Date.now() + 86400000);
-      const endDate = eventForm.endDateUtc ? new Date(eventForm.endDateUtc) : new Date(Date.now() + 172800000);
+      const tagIds = Array.isArray(eventForm.tagIds) && eventForm.tagIds.length > 0 
+        ? eventForm.tagIds.map(id => parseInt(id, 10)) 
+        : [];
 
-      const selectedTag = tagsList.find(t => t.id === parseInt(eventForm.selectedTagId, 10));
-      const tagIds = eventForm.selectedTagId ? [parseInt(eventForm.selectedTagId, 10)] : [];
+      const startInputStr = eventForm.startDateUtc && !eventForm.startDateUtc.includes('+') && !eventForm.startDateUtc.includes('Z')
+        ? `${eventForm.startDateUtc}:00+05:00`
+        : eventForm.startDateUtc;
+
+      const endInputStr = eventForm.endDateUtc && !eventForm.endDateUtc.includes('+') && !eventForm.endDateUtc.includes('Z')
+        ? `${eventForm.endDateUtc}:00+05:00`
+        : eventForm.endDateUtc;
+
+      const startDate = new Date(startInputStr);
+      const endDate = new Date(endInputStr);
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        setErrorMsg('Invalid start or end date format.');
+        showError('Invalid Date', 'Please select valid start and end dates.');
+        return;
+      }
+
+      const statusStr = typeof eventForm.status === 'number'
+        ? (eventForm.status === 1 ? 'Live' : (eventForm.status === 2 ? 'Completed' : (eventForm.status === 3 ? 'Cancelled' : 'Draft')))
+        : (eventForm.status || 'Live');
+
+      const formattedShows = (eventForm.shows || []).map(s => ({
+        showTitle: s.showTitle || 'Show Slot',
+        startTimeUtc: s.startTimeUtc && !s.startTimeUtc.includes('+') && !s.startTimeUtc.includes('Z')
+          ? `${s.startTimeUtc}:00+05:00`
+          : (s.startTimeUtc || new Date().toISOString()),
+        endTimeUtc: s.endTimeUtc && !s.endTimeUtc.includes('+') && !s.endTimeUtc.includes('Z')
+          ? `${s.endTimeUtc}:00+05:00`
+          : (s.endTimeUtc || new Date().toISOString())
+      }));
 
       const payload = {
-        title: eventForm.title.trim(),
-        category: selectedTag ? selectedTag.name : 'General',
-        status: eventForm.status || 'Live',
+        title: title,
+        category: eventForm.category || 'Concerts',
+        status: statusStr,
         isFeatured: Boolean(eventForm.isFeatured),
-        isPublished: true,
+        isPublished: eventForm.isPublished !== false,
         city: eventForm.city || 'Karachi',
-        venue: eventForm.venue.trim(),
-        address: eventForm.address || eventForm.venue,
-        latitude: 24.8607,
-        longitude: 67.0011,
+        venue: venue,
+        address: eventForm.address || venue,
         startDateUtc: startDate.toISOString(),
         endDateUtc: endDate.toISOString(),
         startingPrice: parseFloat(eventForm.startingPrice) || 0,
         ticketingType: eventForm.ticketingType || 'categorized',
-        banner: eventForm.banner || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800',
-        thumbnailUrl: eventForm.thumbnailUrl || eventForm.banner || '',
-        description: eventForm.description || eventForm.title,
+        banner: eventForm.banner || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&h=500&fit=crop',
+        description: eventForm.description || title,
         scarcityText: eventForm.scarcityText || 'Selling Fast',
-        organizerId: parseInt(eventForm.organizerId, 10),
-        tagIds: tagIds
+        organizerId: orgId,
+        tagIds: tagIds,
+        shows: formattedShows
       };
 
       if (eventForm.id) {
         await adminApi.events.update(eventForm.id, payload);
-        setSuccessMsg('Event updated successfully!');
+        const msg = 'Event updated successfully!';
+        setSuccessMsg(msg);
+        showSuccess('Event Saved', msg);
       } else {
         await adminApi.events.create(payload);
-        setSuccessMsg('Event created successfully!');
+        const msg = 'Event created successfully!';
+        setSuccessMsg(msg);
+        showSuccess('Event Created', msg);
       }
 
       setShowEventModal(false);
@@ -300,30 +366,39 @@ export default function AdminDashboard({ onSelectEvent }) {
       fetchBackendData();
     } catch (err) {
       console.error('Save Event Error:', err);
-      setErrorMsg(err.message || 'Failed to save event. Check backend logs.');
+      const errMsg = err.message || 'Failed to save event.';
+      setErrorMsg(errMsg);
+      showError('Save Failed', errMsg);
     }
   };
 
   const handleEditEvent = (ev) => {
-    const existingTagId = ev.tags?.[0]?.id || ev.eventTags?.[0]?.tagId || (tagsList[0]?.id || '');
+    const existingTagIds = ev.tags?.map(t => t.id) || ev.eventTags?.map(et => et.tagId) || [];
     setEventForm({
       id: ev.id,
       title: ev.title || '',
-      selectedTagId: existingTagId,
+      category: ev.category || 'Concerts',
+      tagIds: existingTagIds,
+      status: ev.status || 'Live',
+      isFeatured: Boolean(ev.isFeatured),
+      isPublished: ev.isPublished !== false,
       city: ev.city || 'Karachi',
       venue: ev.venue || '',
       address: ev.address || '',
       startDateUtc: ev.startDateUtc ? ev.startDateUtc.slice(0, 16) : new Date().toISOString().slice(0, 16),
       endDateUtc: ev.endDateUtc ? ev.endDateUtc.slice(0, 16) : new Date().toISOString().slice(0, 16),
       startingPrice: ev.startingPrice || 1500,
-      ticketingType: ev.ticketingType || 'categorized',
+      ticketingType: (ev.ticketingType || 'categorized').toLowerCase(),
       banner: ev.banner || '',
-      thumbnailUrl: ev.thumbnailUrl || '',
       description: ev.description || '',
       scarcityText: ev.scarcityText || 'Selling Fast',
-      organizerId: ev.organizerId || (organizersList[0]?.id || ''),
-      isFeatured: ev.isFeatured || false,
-      status: ev.status || 'Live'
+      organizerId: ev.organizerId || ev.organizer?.id || (organizersList[0]?.id || ''),
+      shows: (ev.shows || []).map(s => ({
+        id: s.id,
+        showTitle: s.showTitle || '',
+        startTimeUtc: s.startTimeUtc ? s.startTimeUtc.slice(0, 16) : '',
+        endTimeUtc: s.endTimeUtc ? s.endTimeUtc.slice(0, 16) : ''
+      }))
     });
     setShowEventModal(true);
   };
@@ -370,14 +445,15 @@ export default function AdminDashboard({ onSelectEvent }) {
   };
 
   const handleEditOrganizer = (org) => {
+    const webUrl = org.websiteUrl || org.WebsiteUrl || org.website || org.Website || '';
     setOrgForm({
-      id: org.id,
-      name: org.name || '',
-      email: org.email || '',
-      phone: org.phone || '',
-      logoUrl: org.logoUrl || '',
-      websiteUrl: org.websiteUrl || '',
-      isVerified: org.isVerified ?? true
+      id: org.id ?? org.Id,
+      name: org.name ?? org.Name ?? '',
+      email: org.email ?? org.Email ?? '',
+      phone: org.phone ?? org.Phone ?? '',
+      logoUrl: org.logoUrl ?? org.LogoUrl ?? '',
+      websiteUrl: webUrl,
+      isVerified: org.isVerified ?? org.IsVerified ?? true
     });
     setShowOrgModal(true);
   };
@@ -600,13 +676,20 @@ export default function AdminDashboard({ onSelectEvent }) {
     setErrorMsg('');
     setSuccessMsg('');
     try {
-      const slug = tagForm.name.toLowerCase().replace(/\s+/g, '-');
+      const name = tagForm.name ? tagForm.name.trim() : '';
+      const slug = (tagForm.slug ? tagForm.slug.trim() : name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')).toLowerCase();
+      
+      if (!name) {
+        setErrorMsg('Please enter a tag name.');
+        return;
+      }
+
       if (tagForm.id) {
-        await adminApi.tags.update(tagForm.id, { name: tagForm.name, slug });
-        setSuccessMsg('Tag updated!');
+        await adminApi.tags.update(tagForm.id, { name, slug });
+        setSuccessMsg('Tag updated successfully!');
       } else {
-        await adminApi.tags.create({ name: tagForm.name, slug });
-        setSuccessMsg('Tag created!');
+        await adminApi.tags.create({ name, slug });
+        setSuccessMsg('Tag created successfully!');
       }
       setShowTagModal(false);
       setTagForm(defaultTagForm);
@@ -614,6 +697,15 @@ export default function AdminDashboard({ onSelectEvent }) {
     } catch (err) {
       setErrorMsg(err.message || 'Failed to save tag.');
     }
+  };
+
+  const handleEditTag = (t) => {
+    setTagForm({
+      id: t.id,
+      name: t.name || '',
+      slug: t.slug || ''
+    });
+    setShowTagModal(true);
   };
 
   const handleDeleteTag = async (id) => {
@@ -860,8 +952,15 @@ export default function AdminDashboard({ onSelectEvent }) {
                   <tr key={ev.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
                     <td style={{ padding: '1rem', fontWeight: 600, color: '#f8fafc' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        {ev.banner && <img src={ev.banner} alt="" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }} />}
-                        <div>{ev.title}</div>
+                        {ev.banner && <img src={getEventImageUrl(ev.banner)} alt="" style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }} />}
+                        <div>
+                          <div style={{ color: '#f8fafc', fontWeight: 600 }}>{ev.title}</div>
+                          {ev.shows && ev.shows.length > 0 && (
+                            <span style={{ fontSize: '0.7rem', color: '#60a5fa', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '0.1rem 0.4rem', borderRadius: '4px', marginTop: '0.2rem', display: 'inline-block', fontWeight: 600 }}>
+                              {ev.shows.length} Show{ev.shows.length > 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td style={{ padding: '1rem', color: '#94a3b8' }}>{ev.organizerName || ev.organizer}</td>
@@ -920,16 +1019,27 @@ export default function AdminDashboard({ onSelectEvent }) {
                   <tr key={org.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
                     <td style={{ padding: '1rem', fontWeight: 600, color: '#f8fafc' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        {org.logoUrl && <img src={org.logoUrl} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />}
+                        {org.logoUrl && (
+                          <img 
+                            src={getOrganizerImageUrl(org.logoUrl)} 
+                            alt="" 
+                            style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} 
+                          />
+                        )}
                         <div>{org.name}</div>
                       </div>
                     </td>
                     <td style={{ padding: '1rem', color: '#94a3b8' }}>{org.email}</td>
                     <td style={{ padding: '1rem', color: '#94a3b8' }}>{org.phone}</td>
                     <td style={{ padding: '1rem', color: '#60a5fa' }}>
-                      {org.websiteUrl ? (
-                        <a href={org.websiteUrl} target="_blank" rel="noreferrer" style={{ color: '#60a5fa', textDecoration: 'underline' }}>
-                          {org.websiteUrl.replace(/^https?:\/\//, '')}
+                      {(org.websiteUrl || org.WebsiteUrl) ? (
+                        <a 
+                          href={(org.websiteUrl || org.WebsiteUrl).startsWith('http') ? (org.websiteUrl || org.WebsiteUrl) : `https://${org.websiteUrl || org.WebsiteUrl}`} 
+                          target="_blank" 
+                          rel="noreferrer" 
+                          style={{ color: '#60a5fa', textDecoration: 'underline', fontWeight: 500 }}
+                        >
+                          {(org.websiteUrl || org.WebsiteUrl).replace(/^https?:\/\//, '')} ↗
                         </a>
                       ) : (
                         <span style={{ color: '#64748b' }}>—</span>
@@ -1044,16 +1154,12 @@ export default function AdminDashboard({ onSelectEvent }) {
                     <td style={{ padding: '1rem', color: '#94a3b8' }}>{b.eventTitle}</td>
                     <td style={{ padding: '1rem', color: '#4ade80', fontWeight: 600 }}>PKR {b.totalAmount}</td>
                     <td style={{ padding: '1rem' }}>
-                      <select
+                      <SearchableSelect
                         value={b.status || 'Confirmed'}
                         onChange={(e) => handleUpdateBookingStatus(b.id, e.target.value, 'Paid')}
-                        style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', background: '#1e293b', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.4)' }}
-                      >
-                        <option value="Confirmed">Confirmed</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Cancelled">Cancelled</option>
-                        <option value="Pending">Pending</option>
-                      </select>
+                        options={['Confirmed', 'Completed', 'Cancelled', 'Pending']}
+                        style={{ width: '130px' }}
+                      />
                     </td>
                     <td style={{ padding: '1rem' }}>
                       <button
@@ -1207,12 +1313,20 @@ export default function AdminDashboard({ onSelectEvent }) {
                     <td style={{ padding: '1rem', fontWeight: 700, color: '#34d399' }}>{t.name}</td>
                     <td style={{ padding: '1rem', color: '#94a3b8' }}>{t.slug}</td>
                     <td style={{ padding: '1rem' }}>
-                      <button
-                        onClick={() => handleDeleteTag(t.id)}
-                        style={{ padding: '0.4rem 0.75rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer' }}
-                      >
-                        <Trash2 size={14} /> Delete
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button
+                          onClick={() => handleEditTag(t)}
+                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '6px', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                        >
+                          <Edit3 size={14} /> Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTag(t.id)}
+                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                        >
+                          <Trash2 size={14} /> Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1223,103 +1337,283 @@ export default function AdminDashboard({ onSelectEvent }) {
       )}
 
       {/* --- MODAL 1: CREATE / EDIT EVENT --- */}
-      {showEventModal && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px', padding: '2rem', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
-            <button
-              onClick={() => setShowEventModal(false)}
-              style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255, 255, 255, 0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-            >
-              <X size={18} />
-            </button>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>
-              {eventForm.id ? 'Edit Event' : 'Create New Event'}
-            </h3>
-            <form onSubmit={handleSaveEvent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Event Title *</label>
-                <input type="text" required value={eventForm.title} onChange={e => setEventForm({ ...eventForm, title: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+      {showEventModal && (() => {
+        const previewEvent = {
+          id: eventForm.id || 'preview',
+          title: eventForm.title || 'Your Event Title Preview',
+          category: eventForm.category || 'Concerts',
+          city: eventForm.city || 'Karachi',
+          venue: eventForm.venue || 'Venue Location Name',
+          banner: eventForm.banner || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&h=500&fit=crop',
+          startingPrice: parseFloat(eventForm.startingPrice) || 1500,
+          ticketingType: eventForm.ticketingType || 'categorized',
+          status: (eventForm.status || 'Live').toUpperCase(),
+          startDateUtc: eventForm.startDateUtc,
+          endDateUtc: eventForm.endDateUtc
+        };
+
+        return (
+          <div className="modal-overlay">
+            <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '1060px', width: '95%', padding: '2rem', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+              <button
+                onClick={() => setShowEventModal(false)}
+                style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255, 255, 255, 0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10 }}
+              >
+                <X size={18} />
+              </button>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem' }}>
+                {/* Form Column */}
+                <div style={{ width: '100%' }}>
+                  <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>
+                    {eventForm.id ? 'Edit Event' : 'Create New Event'}
+                  </h3>
+                  <form onSubmit={handleSaveEvent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Event Title *</label>
+                      <input type="text" required value={eventForm.title} onChange={e => setEventForm({ ...eventForm, title: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Category *</label>
+                        <SearchableSelect
+                          required
+                          value={eventForm.category}
+                          onChange={e => setEventForm({ ...eventForm, category: e.target.value })}
+                          options={["Concerts", "Festivals", "Qawwali", "Theatre", "Comedy", "Food", "Workshops", "Corporate"]}
+                          placeholder="Select Category..."
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Organizer *</label>
+                        <SearchableSelect
+                          required
+                          value={eventForm.organizerId || (organizersList[0]?.id || '')}
+                          onChange={e => setEventForm({ ...eventForm, organizerId: e.target.value })}
+                          options={organizersList.map(o => ({ value: o.id, label: o.name }))}
+                          placeholder="Select Organizer..."
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Select Event Tags (Multiple Allowed)</label>
+                        <MultiSearchableSelect
+                          value={eventForm.tagIds || []}
+                          onChange={e => setEventForm({ ...eventForm, tagIds: e.target.value })}
+                          options={tagsList.map(t => ({ value: t.id, label: t.name }))}
+                          placeholder="Select one or multiple tags..."
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Status *</label>
+                        <SearchableSelect
+                          value={eventForm.status}
+                          onChange={e => setEventForm({ ...eventForm, status: Number(e.target.value) })}
+                          options={[
+                            { value: 0, label: 'Draft (0)' },
+                            { value: 1, label: 'Live / Published (1)' },
+                            { value: 2, label: 'Completed (2)' },
+                            { value: 3, label: 'Cancelled (3)' }
+                          ]}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>City *</label>
+                        <input type="text" required value={eventForm.city} onChange={e => setEventForm({ ...eventForm, city: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Venue *</label>
+                        <input type="text" required value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Full Street Address</label>
+                      <input type="text" placeholder="e.g. Beach Park, Block 4, Clifton, Karachi" value={eventForm.address || ''} onChange={e => setEventForm({ ...eventForm, address: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Start Date & Time</label>
+                        <input type="datetime-local" value={eventForm.startDateUtc} onChange={e => setEventForm({ ...eventForm, startDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>End Date & Time</label>
+                        <input type="datetime-local" value={eventForm.endDateUtc} onChange={e => setEventForm({ ...eventForm, endDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Starting Price (PKR)</label>
+                        <input type="number" value={eventForm.startingPrice} onChange={e => setEventForm({ ...eventForm, startingPrice: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Price Range Summary</label>
+                        <input type="text" placeholder="e.g. PKR 1,500 - PKR 5,000" value={eventForm.priceRange || ''} onChange={e => setEventForm({ ...eventForm, priceRange: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Ticketing Layout</label>
+                        <SearchableSelect
+                          value={eventForm.ticketingType}
+                          onChange={e => setEventForm({ ...eventForm, ticketingType: e.target.value })}
+                          options={[
+                            { value: 'categorized', label: 'Categorized Passes' },
+                            { value: 'mapped', label: 'Mapped Seat Picker' }
+                          ]}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Scarcity / Badge Text</label>
+                        <input type="text" placeholder="e.g. Selling Fast - 85% Sold" value={eventForm.scarcityText || ''} onChange={e => setEventForm({ ...eventForm, scarcityText: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                      </div>
+                    </div>
+
+                    {/* Integrated File Upload Field - Banner */}
+                    <FileUploadField
+                      label="Event Banner Image (Recommended: 1200x500px)"
+                      value={eventForm.banner}
+                      onChange={(url) => setEventForm({ ...eventForm, banner: url })}
+                      placeholder="Upload 1200x500px banner image or enter URL..."
+                      type="events"
+                      entityName={eventForm.title}
+                      entityId={eventForm.id}
+                    />
+
+                    {/* Multiple Show Slots Section */}
+                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                        <div>
+                          <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#f8fafc', display: 'block' }}>Event Shows & Timings (Multi-Show Support)</span>
+                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Add multiple show slots against this event</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newShows = [...(eventForm.shows || []), {
+                              showTitle: `Show ${(eventForm.shows?.length || 0) + 1}`,
+                              startTimeUtc: eventForm.startDateUtc || new Date().toISOString().slice(0, 16),
+                              endTimeUtc: eventForm.endDateUtc || new Date().toISOString().slice(0, 16)
+                            }];
+                            setEventForm({ ...eventForm, shows: newShows });
+                          }}
+                          style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', color: '#60a5fa', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                        >
+                          <Plus size={14} /> Add Show Slot
+                        </button>
+                      </div>
+
+                      {(eventForm.shows || []).length === 0 ? (
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', padding: '0.5rem 0' }}>
+                          No separate show slots added. The main event start/end dates will be used as the default show.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                          {eventForm.shows.map((s, sIdx) => (
+                            <div key={sIdx} style={{ background: 'rgba(30, 41, 59, 0.6)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Show Title (e.g. Matinee Show, Day 1)"
+                                  value={s.showTitle}
+                                  onChange={e => {
+                                    const updated = [...eventForm.shows];
+                                    updated[sIdx].showTitle = e.target.value;
+                                    setEventForm({ ...eventForm, shows: updated });
+                                  }}
+                                  style={{ flex: 1, padding: '0.5rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', color: '#fff', fontSize: '0.8125rem' }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = eventForm.shows.filter((_, idx) => idx !== sIdx);
+                                    setEventForm({ ...eventForm, shows: updated });
+                                  }}
+                                  style={{ padding: '0.4rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer' }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Start Time (PKT)</label>
+                                  <input
+                                    type="datetime-local"
+                                    value={s.startTimeUtc}
+                                    onChange={e => {
+                                      const updated = [...eventForm.shows];
+                                      updated[sIdx].startTimeUtc = e.target.value;
+                                      setEventForm({ ...eventForm, shows: updated });
+                                    }}
+                                    style={{ width: '100%', padding: '0.4rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', color: '#fff', fontSize: '0.75rem' }}
+                                  />
+                                </div>
+                                <div>
+                                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>End Time (PKT)</label>
+                                  <input
+                                    type="datetime-local"
+                                    value={s.endTimeUtc}
+                                    onChange={e => {
+                                      const updated = [...eventForm.shows];
+                                      updated[sIdx].endTimeUtc = e.target.value;
+                                      setEventForm({ ...eventForm, shows: updated });
+                                    }}
+                                    style={{ width: '100%', padding: '0.4rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', color: '#fff', fontSize: '0.75rem' }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '1.5rem', margin: '0.5rem 0' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f8fafc', fontSize: '0.875rem', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={eventForm.isFeatured} onChange={e => setEventForm({ ...eventForm, isFeatured: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: '#3b82f6' }} />
+                        Featured Event
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f8fafc', fontSize: '0.875rem', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={eventForm.isPublished} onChange={e => setEventForm({ ...eventForm, isPublished: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: '#10b981' }} />
+                        Published / Active
+                      </label>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Event Description</label>
+                      <textarea rows={3} value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                      <button type="button" onClick={() => setShowEventModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
+                      <button type="submit" style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Save Event</button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* Right Column: Live Event Card Preview */}
+                <div style={{ flex: '0 0 340px', minWidth: '300px', alignSelf: 'flex-start', position: 'sticky', top: '0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#60a5fa', fontWeight: 700, fontSize: '0.9rem' }}>
+                    <Sparkles size={16} /> LIVE CARD PREVIEW
+                  </div>
+                  <EventCard event={previewEvent} onSelect={() => {}} isSaved={false} onToggleSave={() => {}} />
+                </div>
               </div>
-
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Organizer *</label>
-                  <select required value={eventForm.organizerId} onChange={e => setEventForm({ ...eventForm, organizerId: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}>
-                    <option value="">Select Organizer...</option>
-                    {organizersList.map(o => (
-                      <option key={o.id} value={o.id}>{o.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Select Event Tag *</label>
-                  <select required value={eventForm.selectedTagId} onChange={e => setEventForm({ ...eventForm, selectedTagId: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}>
-                    <option value="">Select Tag...</option>
-                    {tagsList.map(t => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>City</label>
-                  <input type="text" value={eventForm.city} onChange={e => setEventForm({ ...eventForm, city: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Venue *</label>
-                  <input type="text" required value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Start Date & Time</label>
-                  <input type="datetime-local" value={eventForm.startDateUtc} onChange={e => setEventForm({ ...eventForm, startDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>End Date & Time</label>
-                  <input type="datetime-local" value={eventForm.endDateUtc} onChange={e => setEventForm({ ...eventForm, endDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Starting Price (PKR)</label>
-                  <input type="number" value={eventForm.startingPrice} onChange={e => setEventForm({ ...eventForm, startingPrice: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Ticketing Layout</label>
-                  <select value={eventForm.ticketingType} onChange={e => setEventForm({ ...eventForm, ticketingType: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}>
-                    <option value="categorized">Categorized Passes</option>
-                    <option value="mapped">Mapped Seat Picker</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Integrated File Upload Field */}
-              <FileUploadField
-                label="Event Banner Image (File Upload or URL)"
-                value={eventForm.banner}
-                onChange={(url) => setEventForm({ ...eventForm, banner: url })}
-                placeholder="Upload banner image file or enter URL..."
-              />
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Event Description</label>
-                <textarea rows={3} value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-              </div>
-
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setShowEventModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Save Event</button>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* --- MODAL 2: CREATE / EDIT ORGANIZER --- */}
       {showOrgModal && (
@@ -1353,10 +1647,13 @@ export default function AdminDashboard({ onSelectEvent }) {
               </div>
               
               <FileUploadField
-                label="Organizer Logo (File Upload or URL)"
+                label="Organizer Logo Image (Recommended: 500x500px)"
                 value={orgForm.logoUrl}
                 onChange={(url) => setOrgForm({ ...orgForm, logoUrl: url })}
-                placeholder="Upload logo file or enter URL..."
+                placeholder="Upload 500x500px logo file or enter URL..."
+                type="organizers"
+                entityName={orgForm.name}
+                entityId={orgForm.id}
               />
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
@@ -1437,12 +1734,13 @@ export default function AdminDashboard({ onSelectEvent }) {
             <form onSubmit={handleSaveTicketTier} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Select Event *</label>
-                <select required value={tierForm.eventId} onChange={e => setTierForm({ ...tierForm, eventId: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}>
-                  <option value="">Select Event...</option>
-                  {eventsList.map(ev => (
-                    <option key={ev.id} value={ev.id}>{ev.title}</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  required
+                  value={tierForm.eventId}
+                  onChange={e => setTierForm({ ...tierForm, eventId: e.target.value })}
+                  options={eventsList.map(ev => ({ value: ev.id, label: ev.title }))}
+                  placeholder="Select Event..."
+                />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Tier Name *</label>
@@ -1491,12 +1789,13 @@ export default function AdminDashboard({ onSelectEvent }) {
               )}
               <div>
                 <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Assign Role *</label>
-                <select required value={userForm.roleId} onChange={e => setUserForm({ ...userForm, roleId: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}>
-                  <option value="">Select Role...</option>
-                  {rolesList.map(r => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                  ))}
-                </select>
+                <SearchableSelect
+                  required
+                  value={userForm.roleId}
+                  onChange={e => setUserForm({ ...userForm, roleId: e.target.value })}
+                  options={rolesList.map(r => ({ value: r.id, label: r.name }))}
+                  placeholder="Select Role..."
+                />
               </div>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowUserModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
@@ -1548,11 +1847,44 @@ export default function AdminDashboard({ onSelectEvent }) {
             >
               <X size={18} />
             </button>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>Create Tag</h3>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>
+              {tagForm.id ? 'Edit Tag' : 'Create Tag'}
+            </h3>
             <form onSubmit={handleSaveTag} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Tag Name *</label>
-                <input type="text" required value={tagForm.name} onChange={e => setTagForm({ ...tagForm, name: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                <input 
+                  type="text" 
+                  required 
+                  value={tagForm.name} 
+                  onChange={e => {
+                    const nameVal = e.target.value;
+                    const autoSlug = nameVal.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+                    setTagForm(prev => ({
+                      ...prev,
+                      name: nameVal,
+                      slug: !prev.slug || prev.slug === (prev.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+                        ? autoSlug
+                        : prev.slug
+                    }));
+                  }} 
+                  placeholder="e.g. Qawwali Concerts"
+                  style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} 
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Tag Slug / URL Identifier *</label>
+                <input 
+                  type="text" 
+                  required 
+                  value={tagForm.slug} 
+                  onChange={e => setTagForm({ ...tagForm, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })} 
+                  placeholder="e.g. qawwali-concerts"
+                  style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#34d399', fontFamily: 'monospace' }} 
+                />
+                <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem', display: 'block' }}>
+                  URL-friendly slug (e.g. concerts, sufi-rock, tech-workshops)
+                </span>
               </div>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowTagModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>

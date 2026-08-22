@@ -8,6 +8,7 @@ public interface IApplicationDbContext
     DbSet<User>        Users        { get; }
     DbSet<Role>        Roles        { get; }
     DbSet<Event>       Events       { get; }
+    DbSet<EventShow>   EventShows   { get; }
     DbSet<Organizer>   Organizers   { get; }
     DbSet<TicketTier>  TicketTiers  { get; }
     DbSet<SeatingZone> SeatingZones { get; }

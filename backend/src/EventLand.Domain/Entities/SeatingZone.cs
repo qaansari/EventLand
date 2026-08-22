@@ -19,6 +19,11 @@ public class SeatingZone : BaseEntity
     public int TotalCapacity    { get; set; }
     public int SortOrder        { get; set; } = 0;
 
+    /// <summary>
+    /// Optional JSON template defining custom venue layout, row splits, and aisle gaps.
+    /// </summary>
+    public string? LayoutJson   { get; set; }
+
     // Navigation — one seat per cell in the grid
     public ICollection<Seat> Seats { get; set; } = new List<Seat>();
 }

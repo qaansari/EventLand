@@ -71,14 +71,16 @@ public class BookingService : IBookingService
                 _context.BookingSeats.Add(new BookingSeat
                 {
                     Booking = booking,
-                    Seat = seat
+                    Seat = seat,
+                    EventShowId = dto.EventShowId
                 });
             }
 
-            await _cacheService.ReleaseSeatsAsync(dto.EventId, dto.SelectedSeatIds);
+            await _cacheService.ReleaseSeatsAsync(dto.EventId, dto.SelectedSeatIds, dto.EventShowId);
         }
 
         await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync(dto.EventId);
 
         return await GetBookingByIdAsync(booking.Id)
             ?? throw new InvalidOperationException("Failed to load created booking.");

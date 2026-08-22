@@ -29,7 +29,7 @@ public class SeatHoldController : ControllerBase
             return BadRequest(new HoldSeatsResponseDto(false, "No seat IDs provided.", new List<int>(), null));
 
         var holdDuration = TimeSpan.FromMinutes(10);
-        var success = await _cacheService.HoldSeatsAsync(dto.EventId, dto.SeatIds, dto.CustomerEmail, holdDuration);
+        var success = await _cacheService.HoldSeatsAsync(dto.EventId, dto.SeatIds, dto.CustomerEmail, holdDuration, dto.EventShowId);
 
         if (!success)
         {
@@ -42,7 +42,8 @@ public class SeatHoldController : ControllerBase
         }
 
         // Broadcast live SignalR WebSocket notification
-        await _hubContext.Clients.Group($"event-{dto.EventId}")
+        var groupKey = dto.EventShowId.HasValue ? $"event-{dto.EventId}-show-{dto.EventShowId.Value}" : $"event-{dto.EventId}";
+        await _hubContext.Clients.Group(groupKey)
             .SeatsHeld(dto.EventId, dto.SeatIds, dto.CustomerEmail);
 
         return Ok(new HoldSeatsResponseDto(
@@ -59,20 +60,21 @@ public class SeatHoldController : ControllerBase
     {
         if (dto.SeatIds != null && dto.SeatIds.Any())
         {
-            await _cacheService.ReleaseSeatsAsync(dto.EventId, dto.SeatIds);
+            await _cacheService.ReleaseSeatsAsync(dto.EventId, dto.SeatIds, dto.EventShowId);
 
-            await _hubContext.Clients.Group($"event-{dto.EventId}")
+            var groupKey = dto.EventShowId.HasValue ? $"event-{dto.EventId}-show-{dto.EventShowId.Value}" : $"event-{dto.EventId}";
+            await _hubContext.Clients.Group(groupKey)
                 .SeatsReleased(dto.EventId, dto.SeatIds);
         }
 
         return NoContent();
     }
 
-    /// <summary>Get list of currently locked seat IDs for an event.</summary>
+    /// <summary>Get list of currently locked seat IDs for an event/show.</summary>
     [HttpGet("event/{eventId:int}")]
-    public async Task<ActionResult<List<int>>> GetHeldSeats(int eventId)
+    public async Task<ActionResult<List<int>>> GetHeldSeats(int eventId, [FromQuery] int? showId)
     {
-        var heldSeats = await _cacheService.GetHeldSeatIdsAsync(eventId);
+        var heldSeats = await _cacheService.GetHeldSeatIdsAsync(eventId, showId);
         return Ok(heldSeats);
     }
 }

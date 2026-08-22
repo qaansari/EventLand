@@ -1,9 +1,44 @@
-import React, { useState } from 'react';
-import { X, Calendar, MapPin, Sparkles, ShieldCheck, Ticket, Layers, Grid } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Calendar, MapPin, Sparkles, ShieldCheck, Ticket, Layers, Grid, Globe, Clock } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import { formatEventDateRange, formatEventStartTime } from '../utils/dateUtils';
+import { getEventImageUrl, eventsApi } from '../services/api';
 
-export default function EventDetailModal({ event, onClose, onProceedToBooking }) {
-  // State for categorized ticket tier selection
+export default function EventDetailModal({ event: initialEvent, onClose, onProceedToBooking }) {
+  const { showWarning } = useToast();
+  const [eventDetail, setEventDetail] = useState(initialEvent);
+  const [selectedShowId, setSelectedShowId] = useState(initialEvent?.shows?.[0]?.id || null);
   const [selectedTiers, setSelectedTiers] = useState({});
+
+  useEffect(() => {
+    if (initialEvent?.id) {
+      eventsApi.getEventById(initialEvent.id)
+        .then(data => {
+          if (data) {
+            setEventDetail(data);
+            if (data.shows && data.shows.length > 0) {
+              setSelectedShowId(prev => prev || data.shows[0].id);
+            }
+          }
+        })
+        .catch(err => console.error('Failed to load fresh event details:', err));
+    }
+  }, [initialEvent?.id]);
+
+  const event = eventDetail || initialEvent;
+  const effectiveShows = (event.shows && event.shows.length > 0)
+    ? event.shows
+    : [{
+        id: event.id,
+        showTitle: 'Standard Performance',
+        startTimeUtc: event.startDateUtc || event.startDate,
+        endTimeUtc: event.endDateUtc || event.endDate
+      }];
+
+  const activeShow = effectiveShows.find(s => s.id === selectedShowId) || effectiveShows[0];
+  const displayTiers = (activeShow?.ticketTiers && activeShow.ticketTiers.length > 0)
+    ? activeShow.ticketTiers
+    : (event.ticketTiers || []);
 
   const handleQuantityChange = (tierId, delta) => {
     const current = selectedTiers[tierId] || 0;
@@ -13,13 +48,14 @@ export default function EventDetailModal({ event, onClose, onProceedToBooking })
 
   const getCategorizedSeatsList = () => {
     const result = [];
-    event.ticketTiers?.forEach((tier) => {
+    displayTiers.forEach((tier) => {
       const qty = selectedTiers[tier.id] || 0;
       for (let i = 0; i < qty; i++) {
         result.push({
           id: `${tier.name} #${i + 1}`,
           zone: tier.name,
-          price: tier.price
+          price: tier.price,
+          showTitle: activeShow?.showTitle || null
         });
       }
     });
@@ -27,22 +63,37 @@ export default function EventDetailModal({ event, onClose, onProceedToBooking })
   };
 
   const selectedCategorizedCount = Object.values(selectedTiers).reduce((a, b) => a + b, 0);
-  const categorizedTotal = event.ticketTiers?.reduce((sum, tier) => {
+  const categorizedTotal = displayTiers.reduce((sum, tier) => {
     return sum + (selectedTiers[tier.id] || 0) * tier.price;
   }, 0) || 0;
 
   const handleCategorizedBookNow = () => {
     const seats = getCategorizedSeatsList();
     if (seats.length === 0) {
-      alert('Please select at least 1 ticket quantity.');
+      showWarning('Ticket Quantity Required', 'Please select at least 1 ticket quantity.');
       return;
     }
-    onProceedToBooking(event, 'checkout', seats);
+    const updatedEvent = activeShow ? { ...event, selectedShow: activeShow } : event;
+    onProceedToBooking(updatedEvent, 'checkout', seats);
   };
 
   const handleMappedBookNow = () => {
-    onProceedToBooking(event, 'seat-picker', []);
+    const updatedEvent = activeShow ? { ...event, selectedShow: activeShow } : event;
+    onProceedToBooking(updatedEvent, 'seat-picker', []);
   };
+
+  const organizerWebsiteUrl = typeof event.organizer === 'object' 
+    ? event.organizer?.websiteUrl 
+    : (event.organizerWebsite || event.websiteUrl);
+
+  const organizerDisplayName = typeof event.organizer === 'object'
+    ? event.organizer?.name
+    : (event.organizer || 'Official Event Organizer');
+
+  const rawLogo = typeof event.organizer === 'object' ? event.organizer?.logoUrl : null;
+  const organizerLogoUrl = rawLogo
+    ? (rawLogo.startsWith('/') || rawLogo.startsWith('http') ? rawLogo : `/assets/images/organizers/${rawLogo}`)
+    : null;
 
   return (
     <div className="modal-overlay">
@@ -50,7 +101,7 @@ export default function EventDetailModal({ event, onClose, onProceedToBooking })
         {/* Banner Header */}
         <div style={{ position: 'relative', height: '280px', overflow: 'hidden' }}>
           <img
-            src={event.banner}
+            src={getEventImageUrl(event.banner)}
             alt={event.title}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
@@ -124,14 +175,32 @@ export default function EventDetailModal({ event, onClose, onProceedToBooking })
             {event.title}
           </h1>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Calendar size={16} color="#3b82f6" />
-              <span>{event.date} ({event.time})</span>
+          {/* Date, Time & Location Bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap', color: '#cbd5e1', fontSize: '0.92rem', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#f8fafc', fontWeight: 600 }}>
+              <Calendar size={18} color="#3b82f6" />
+              <span>{formatEventDateRange(event.startDateUtc || event.startDate || event.date, event.endDateUtc || event.endDate)}</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <MapPin size={16} color="#3b82f6" />
-              <span>{event.venue}</span>
+
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              backgroundColor: 'rgba(59, 130, 246, 0.15)',
+              color: '#93c5fd',
+              padding: '0.25rem 0.65rem',
+              borderRadius: '6px',
+              fontSize: '0.825rem',
+              fontWeight: 600,
+              border: '1px solid rgba(59, 130, 246, 0.3)'
+            }}>
+              <Clock size={14} color="#60a5fa" />
+              <span>{formatEventStartTime(event.startDateUtc || event.startDate, event.time)}</span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#94a3b8' }}>
+              <MapPin size={18} color="#3b82f6" />
+              <span>{event.city ? `${event.city} • ${event.venue}` : event.venue}</span>
             </div>
           </div>
 
@@ -154,6 +223,44 @@ export default function EventDetailModal({ event, onClose, onProceedToBooking })
             </div>
           )}
 
+          {/* Multi-Show Quick Badges Banner */}
+          {effectiveShows && effectiveShows.length > 0 && (
+            <div style={{
+              backgroundColor: 'rgba(30, 41, 59, 0.8)',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              padding: '0.85rem 1.1rem',
+              borderRadius: '12px',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#60a5fa', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Clock size={15} color="#60a5fa" /> Available Event Shows ({effectiveShows.length} Slot{effectiveShows.length > 1 ? 's' : ''} - PKT):
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {effectiveShows.map(s => (
+                  <span key={s.id} style={{
+                    fontSize: '0.78rem',
+                    background: 'rgba(15, 23, 42, 0.8)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    color: '#e2e8f0',
+                    padding: '0.35rem 0.65rem',
+                    borderRadius: '6px',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
+                  }}>
+                    <strong style={{ color: '#38bdf8' }}>{s.showTitle}</strong>
+                    {s.startTimeUtc && (
+                      <span style={{ color: '#94a3b8' }}>
+                        ({new Date(s.startTimeUtc).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' })} PKT)
+                      </span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* About Event */}
           <div style={{ marginBottom: '2rem' }}>
             <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#fff', marginBottom: '0.5rem' }}>
@@ -162,9 +269,56 @@ export default function EventDetailModal({ event, onClose, onProceedToBooking })
             <p style={{ color: '#cbd5e1', fontSize: '0.92rem', lineHeight: 1.6 }}>
               {event.description}
             </p>
-            {event.organizer && (
-              <div style={{ marginTop: '0.75rem', fontSize: '0.82rem', color: '#94a3b8' }}>
-                Organized by: <strong style={{ color: '#fff' }}>{event.organizer}</strong>
+            {organizerDisplayName && (
+              <div style={{
+                marginTop: '1rem',
+                padding: '0.85rem 1.1rem',
+                background: 'rgba(30, 41, 59, 0.7)',
+                border: '1px solid rgba(59, 130, 246, 0.25)',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.75rem'
+              }}>
+                <div style={{ fontSize: '0.875rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  {organizerLogoUrl && (
+                    <img 
+                      src={organizerLogoUrl} 
+                      alt={organizerDisplayName} 
+                      style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.2)' }} 
+                    />
+                  )}
+                  <span>Organized by:</span>
+                  <strong style={{ color: '#f8fafc', fontSize: '0.925rem' }}>
+                    {organizerDisplayName}
+                  </strong>
+                </div>
+
+                {organizerWebsiteUrl && (
+                  <a
+                    href={organizerWebsiteUrl.startsWith('http') ? organizerWebsiteUrl : `https://${organizerWebsiteUrl}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      color: '#60a5fa',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                      padding: '0.4rem 0.85rem',
+                      background: 'rgba(59, 130, 246, 0.15)',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(59, 130, 246, 0.35)',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <Globe size={14} /> Visit Official Website ↗
+                  </a>
+                )}
               </div>
             )}
           </div>
@@ -180,10 +334,53 @@ export default function EventDetailModal({ event, onClose, onProceedToBooking })
               <Ticket size={18} color="#3b82f6" /> Select Ticket Options ({event.ticketingType === 'mapped' ? 'Mapped Seating' : 'Categorized Tiers'})
             </h3>
 
+            {/* Show Slot Selector */}
+            {effectiveShows && effectiveShows.length > 0 && (
+              <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'rgba(16, 25, 45, 0.8)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '12px' }}>
+                <label style={{ fontSize: '0.825rem', fontWeight: 600, color: '#94a3b8', display: 'block', marginBottom: '0.6rem' }}>
+                  Select Show Timing / Slot:
+                </label>
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  {effectiveShows.map((show) => {
+                    const isSelected = (selectedShowId === show.id || (!selectedShowId && show.id === effectiveShows[0]?.id));
+                    return (
+                      <button
+                        key={show.id}
+                        onClick={() => { setSelectedShowId(show.id); setSelectedTiers({}); }}
+                        style={{
+                          padding: '0.55rem 0.95rem',
+                          borderRadius: '10px',
+                          border: isSelected ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.1)',
+                          background: isSelected ? 'rgba(59, 130, 246, 0.25)' : 'rgba(15, 23, 42, 0.6)',
+                          color: isSelected ? '#fff' : '#cbd5e1',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          boxShadow: isSelected ? '0 0 12px rgba(59, 130, 246, 0.3)' : 'none',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <Clock size={14} color={isSelected ? '#60a5fa' : '#94a3b8'} />
+                        <span>{show.showTitle || `Show #${show.id}`}</span>
+                        {show.startTimeUtc && (
+                          <span style={{ fontSize: '0.75rem', color: isSelected ? '#38bdf8' : '#94a3b8', marginLeft: '0.25rem' }}>
+                            ({new Date(show.startTimeUtc).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' })} PKT)
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Option 1: Categorized Ticket Tiers */}
             {event.ticketingType === 'categorized' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {event.ticketTiers?.map((tier) => {
+                {displayTiers.map((tier) => {
                   const qty = selectedTiers[tier.id] || 0;
                   return (
                     <div

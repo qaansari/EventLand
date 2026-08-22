@@ -29,5 +29,6 @@ public record CreateBookingDto(
     string          CustomerPhone,
     int             Quantity,
     string          PaymentMethod,
-    List<int>?      SelectedSeatIds
+    List<int>?      SelectedSeatIds,
+    int?            EventShowId = null
 );

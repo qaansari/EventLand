@@ -16,6 +16,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<User>        Users        => Set<User>();
     public DbSet<Role>        Roles        => Set<Role>();
     public DbSet<Event>       Events       => Set<Event>();
+    public DbSet<EventShow>   EventShows   => Set<EventShow>();
     public DbSet<Organizer>   Organizers   => Set<Organizer>();
     public DbSet<TicketTier>  TicketTiers  => Set<TicketTier>();
     public DbSet<SeatingZone> SeatingZones => Set<SeatingZone>();

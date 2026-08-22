@@ -1763,6 +1763,14 @@
               "type": "integer",
               "format": "int32"
             }
+          },
+          {
+            "name": "showId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "responses": {
@@ -1787,6 +1795,31 @@
       "post": {
         "tags": [
           "Upload"
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "events"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
         ],
         "requestBody": {
           "content": {
@@ -2034,6 +2067,16 @@
             "type": "string",
             "nullable": true
           },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "isFeatured": {
+            "type": "boolean"
+          },
+          "isPublished": {
+            "type": "boolean"
+          },
           "city": {
             "type": "string",
             "nullable": true
@@ -2044,16 +2087,6 @@
           },
           "address": {
             "type": "string",
-            "nullable": true
-          },
-          "latitude": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "longitude": {
-            "type": "number",
-            "format": "double",
             "nullable": true
           },
           "startDateUtc": {
@@ -2076,10 +2109,6 @@
             "type": "string",
             "nullable": true
           },
-          "thumbnailUrl": {
-            "type": "string",
-            "nullable": true
-          },
           "description": {
             "type": "string",
             "nullable": true
@@ -2092,14 +2121,18 @@
             "type": "integer",
             "format": "int32"
           },
-          "isFeatured": {
-            "type": "boolean"
-          },
           "tagIds": {
             "type": "array",
             "items": {
               "type": "integer",
               "format": "int32"
+            },
+            "nullable": true
+          },
+          "shows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateEventShowInputDto"
             },
             "nullable": true
           }
@@ -2193,6 +2226,29 @@
               "format": "int32"
             },
             "nullable": true
+          },
+          "eventShowId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateEventShowInputDto": {
+        "type": "object",
+        "properties": {
+          "showTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "startTimeUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endTimeUtc": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "additionalProperties": false
@@ -2266,6 +2322,10 @@
           "sortOrder": {
             "type": "integer",
             "format": "int32"
+          },
+          "layoutJson": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -2290,6 +2350,11 @@
           "eventId": {
             "type": "integer",
             "format": "int32"
+          },
+          "eventShowId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           },
           "name": {
             "type": "string",
@@ -2378,16 +2443,6 @@
             "type": "string",
             "nullable": true
           },
-          "latitude": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "longitude": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
           "startDateUtc": {
             "type": "string",
             "format": "date-time"
@@ -2412,10 +2467,6 @@
             "type": "string",
             "nullable": true
           },
-          "thumbnailUrl": {
-            "type": "string",
-            "nullable": true
-          },
           "description": {
             "type": "string",
             "nullable": true
@@ -2426,6 +2477,13 @@
           },
           "organizer": {
             "$ref": "#/components/schemas/OrganizerDto"
+          },
+          "shows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventShowDto"
+            },
+            "nullable": true
           },
           "ticketTiers": {
             "type": "array",
@@ -2445,6 +2503,39 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/TagDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "EventShowDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "eventId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "showTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "startTimeUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endTimeUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ticketTiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketTierDto"
             },
             "nullable": true
           }
@@ -2509,6 +2600,10 @@
             "type": "string",
             "nullable": true
           },
+          "organizerId": {
+            "type": "integer",
+            "format": "int32"
+          },
           "organizerName": {
             "type": "string",
             "nullable": true
@@ -2517,6 +2612,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/TagDto"
+            },
+            "nullable": true
+          },
+          "shows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventShowDto"
             },
             "nullable": true
           }
@@ -2575,6 +2677,11 @@
           },
           "customerEmail": {
             "type": "string",
+            "nullable": true
+          },
+          "eventShowId": {
+            "type": "integer",
+            "format": "int32",
             "nullable": true
           }
         },
@@ -2657,6 +2764,10 @@
             "nullable": true
           },
           "logoUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "websiteUrl": {
             "type": "string",
             "nullable": true
           },
@@ -2749,6 +2860,10 @@
             "type": "integer",
             "format": "int32"
           },
+          "layoutJson": {
+            "type": "string",
+            "nullable": true
+          },
           "seats": {
             "type": "array",
             "items": {
@@ -2787,6 +2902,11 @@
           "eventId": {
             "type": "integer",
             "format": "int32"
+          },
+          "eventShowId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           },
           "name": {
             "type": "string",
@@ -2852,16 +2972,6 @@
             "type": "string",
             "nullable": true
           },
-          "latitude": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
-          "longitude": {
-            "type": "number",
-            "format": "double",
-            "nullable": true
-          },
           "startDateUtc": {
             "type": "string",
             "format": "date-time"
@@ -2882,10 +2992,6 @@
             "type": "string",
             "nullable": true
           },
-          "thumbnailUrl": {
-            "type": "string",
-            "nullable": true
-          },
           "description": {
             "type": "string",
             "nullable": true
@@ -2903,6 +3009,13 @@
             "items": {
               "type": "integer",
               "format": "int32"
+            },
+            "nullable": true
+          },
+          "shows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateEventShowInputDto"
             },
             "nullable": true
           }
@@ -3029,6 +3142,10 @@
           "sortOrder": {
             "type": "integer",
             "format": "int32"
+          },
+          "layoutJson": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -3050,6 +3167,11 @@
       "UpdateTicketTierDto": {
         "type": "object",
         "properties": {
+          "eventShowId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
           "name": {
             "type": "string",
             "nullable": true

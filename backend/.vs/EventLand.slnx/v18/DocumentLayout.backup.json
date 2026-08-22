@@ -1,12 +1,58 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "E:\\EventLand\\backend\\",
-  "Documents": [],
+  "WorkspaceRootPath": "D:\\EventLand\\backend\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{E73AE4C8-1B07-4C89-E549-A2EC0BC3BD26}|src\\EventLand.Api\\EventLand.Api.csproj|d:\\eventland\\backend\\src\\eventland.api\\properties\\launchsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
+      "RelativeMoniker": "D:0:0:{E73AE4C8-1B07-4C89-E549-A2EC0BC3BD26}|src\\EventLand.Api\\EventLand.Api.csproj|solutionrelative:src\\eventland.api\\properties\\launchsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{D90074EB-2803-7890-3008-4EE03D5BE76E}|src\\EventLand.Infrastructure\\EventLand.Infrastructure.csproj|d:\\eventland\\backend\\src\\eventland.infrastructure\\services\\adminservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{D90074EB-2803-7890-3008-4EE03D5BE76E}|src\\EventLand.Infrastructure\\EventLand.Infrastructure.csproj|solutionrelative:src\\eventland.infrastructure\\services\\adminservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
       "VerticalTabListWidth": 256,
-      "DocumentGroups": []
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 1,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "launchSettings.json",
+              "DocumentMoniker": "D:\\EventLand\\backend\\src\\EventLand.Api\\Properties\\launchSettings.json",
+              "RelativeDocumentMoniker": "src\\EventLand.Api\\Properties\\launchSettings.json",
+              "ToolTip": "D:\\EventLand\\backend\\src\\EventLand.Api\\Properties\\launchSettings.json",
+              "RelativeToolTip": "src\\EventLand.Api\\Properties\\launchSettings.json",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABIAAABGAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
+              "WhenOpened": "2026-08-22T10:53:05.207Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "AdminService.cs",
+              "DocumentMoniker": "D:\\EventLand\\backend\\src\\EventLand.Infrastructure\\Services\\AdminService.cs",
+              "RelativeDocumentMoniker": "src\\EventLand.Infrastructure\\Services\\AdminService.cs",
+              "ToolTip": "D:\\EventLand\\backend\\src\\EventLand.Infrastructure\\Services\\AdminService.cs",
+              "RelativeToolTip": "src\\EventLand.Infrastructure\\Services\\AdminService.cs",
+              "ViewState": "AgIAAJ4BAAAAAAAAAAAiwKwBAAAIAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-08-22T10:41:39.641Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
     }
   ]
 }

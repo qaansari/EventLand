@@ -10,18 +10,23 @@ export default defineConfig({
     port: 5174,
     proxy: {
       '/api': {
-        target: 'http://localhost:5062',
+        target: 'http://localhost:4257',
         changeOrigin: true,
         secure: false
       },
       '/hubs': {
-        target: 'http://localhost:5062',
+        target: 'http://localhost:4257',
         ws: true,
         changeOrigin: true,
         secure: false
       },
       '/uploads': {
-        target: 'http://localhost:5062',
+        target: 'http://localhost:4257',
+        changeOrigin: true,
+        secure: false
+      },
+      '/assets': {
+        target: 'http://localhost:4257',
         changeOrigin: true,
         secure: false
       }

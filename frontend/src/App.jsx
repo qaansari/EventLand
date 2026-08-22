@@ -14,13 +14,15 @@ import AdminDashboard from './components/AdminDashboard';
 import OrganizerDashboard from './components/OrganizerDashboard';
 import AuthModal from './components/AuthModal';
 import Footer from './components/Footer';
-import { MOCK_EVENTS } from './data/mockEvents';
 import { Ticket, MapPin, Trash2 } from 'lucide-react';
 import { eventsApi } from './services/api';
+import { useToast } from './context/ToastContext';
 import './App.css';
 
 export default function App() {
+  const { showSuccess, showInfo, showError, showWarning } = useToast();
   const [events, setEvents] = useState([]);
+
   const [loadingEvents, setLoadingEvents] = useState(true);
 
   // Fetch live events from .NET Backend API on mount
@@ -72,6 +74,11 @@ export default function App() {
     setUserRole(userData.role);
     setIsAuthModalOpen(false);
 
+    showSuccess(
+      'Welcome Back! 🎉',
+      `Logged in as ${userData.name || userData.email} (${userData.role.toUpperCase()})`
+    );
+
     // Redirect to dashboard if logging into admin or organizer role
     if (userData.role === 'admin') {
       setActiveView('admin');
@@ -96,6 +103,7 @@ export default function App() {
     setUserRole('customer');
     setActiveView('explore');
     localStorage.removeItem('eventland_logged_user');
+    showInfo('Logged Out', 'You have been logged out successfully.');
   };
 
   const handleRoleChange = (newRole) => {
@@ -209,8 +217,10 @@ export default function App() {
   const handleToggleSave = (eventId) => {
     if (savedEventIds.includes(eventId)) {
       setSavedEventIds(savedEventIds.filter((id) => id !== eventId));
+      showInfo('Saved Events', 'Event removed from your favorites.');
     } else {
       setSavedEventIds([...savedEventIds, eventId]);
+      showSuccess('Saved Events ❤️', 'Event added to your favorites!');
     }
   };
 
@@ -227,6 +237,7 @@ export default function App() {
       setPendingBookingData({ event, targetFlow, seats });
       setAuthModalRole('customer');
       setIsAuthModalOpen(true);
+      showWarning('Authentication Required', 'Please sign in or create an account to proceed with booking.');
       return;
     }
 
@@ -245,6 +256,7 @@ export default function App() {
       setPendingBookingData({ event, targetFlow: 'checkout', seats: selectedSeats });
       setAuthModalRole('customer');
       setIsAuthModalOpen(true);
+      showWarning('Authentication Required', 'Please sign in or create an account to finalize your seats.');
       return;
     }
 
@@ -255,6 +267,7 @@ export default function App() {
     setCheckoutData(null);
     setPurchasedTickets([newTicket, ...purchasedTickets]);
     setActiveTicketView(newTicket);
+    showSuccess('Booking Confirmed! 🎟️', `Pass #${newTicket.ticketId} issued successfully for ${newTicket.eventTitle}.`);
   };
 
   const handlePublishNewEvent = (newEvent) => {
@@ -270,16 +283,25 @@ export default function App() {
 
     setEvents([newEvent, ...events]);
     setActiveView('explore');
-    alert(`🎉 Event "${newEvent.title}" published successfully! It is now live on EventLand.`);
+    showSuccess('Event Live! 🎉', `"${newEvent.title}" published successfully and is now live on EventLand.`);
   };
 
   const handleToggleFeature = (eventId) => {
-    setEvents(events.map(ev => ev.id === eventId ? { ...ev, isFeatured: !ev.isFeatured } : ev));
+    setEvents(events.map(ev => {
+      if (ev.id === eventId) {
+        const nextState = !ev.isFeatured;
+        showInfo('Event Updated', `Featured status set to ${nextState ? 'Featured' : 'Standard'}.`);
+        return { ...ev, isFeatured: nextState };
+      }
+      return ev;
+    }));
   };
 
   const handleDeleteEvent = (eventId) => {
+    const evToDelete = events.find(e => e.id === eventId);
     if (window.confirm("Are you sure you want to delete this event listing?")) {
       setEvents(events.filter(ev => ev.id !== eventId));
+      showSuccess('Event Listing Deleted', `"${evToDelete?.title || 'Event'}" removed from EventLand.`);
     }
   };
 
@@ -376,9 +398,12 @@ export default function App() {
               </div>
             ) : (
               <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                gap: '1.75rem'
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2rem',
+                maxWidth: '1200px',
+                width: '100%',
+                margin: '0 auto'
               }}>
                 {sortedEvents.map((ev) => (
                   <EventCard

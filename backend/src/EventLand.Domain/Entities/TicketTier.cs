@@ -11,6 +11,9 @@ public class TicketTier : BaseEntity
     public int    EventId           { get; set; }
     public Event  Event             { get; set; } = null!;
 
+    public int?       EventShowId   { get; set; }
+    public EventShow? EventShow     { get; set; }
+
     public string Name              { get; set; } = string.Empty;
     public string Description       { get; set; } = string.Empty;
     public decimal Price            { get; set; }

@@ -1,24 +1,30 @@
 namespace EventLand.Application.Dtos;
 
+public record CreateEventShowInputDto(
+    string ShowTitle,
+    DateTimeOffset StartTimeUtc,
+    DateTimeOffset EndTimeUtc
+);
+
 public record CreateAdminEventDto(
     string Title,
     string Category,
+    string? Status,
+    bool IsFeatured,
+    bool IsPublished,
     string City,
     string Venue,
     string? Address,
-    double? Latitude,
-    double? Longitude,
     DateTimeOffset StartDateUtc,
     DateTimeOffset EndDateUtc,
     decimal StartingPrice,
     string TicketingType,
     string Banner,
-    string? ThumbnailUrl,
     string Description,
     string? ScarcityText,
     int OrganizerId,
-    bool IsFeatured,
-    List<int>? TagIds
+    List<int>? TagIds,
+    List<CreateEventShowInputDto>? Shows = null
 );
 
 public record UpdateAdminEventDto(
@@ -30,18 +36,16 @@ public record UpdateAdminEventDto(
     string City,
     string Venue,
     string? Address,
-    double? Latitude,
-    double? Longitude,
     DateTimeOffset StartDateUtc,
     DateTimeOffset EndDateUtc,
     decimal StartingPrice,
     string TicketingType,
     string Banner,
-    string? ThumbnailUrl,
     string Description,
     string? ScarcityText,
     int OrganizerId,
-    List<int>? TagIds
+    List<int>? TagIds,
+    List<CreateEventShowInputDto>? Shows = null
 );
 
 public record CreateOrganizerDto(
@@ -90,8 +94,22 @@ public record UpdateArtistDto(
     bool IsFeatured
 );
 
+public record CreateEventShowDto(
+    int EventId,
+    string ShowTitle,
+    DateTimeOffset StartTimeUtc,
+    DateTimeOffset EndTimeUtc
+);
+
+public record UpdateEventShowDto(
+    string ShowTitle,
+    DateTimeOffset StartTimeUtc,
+    DateTimeOffset EndTimeUtc
+);
+
 public record CreateTicketTierDto(
     int EventId,
+    int? EventShowId,
     string Name,
     string Description,
     decimal Price,
@@ -101,6 +119,7 @@ public record CreateTicketTierDto(
 );
 
 public record UpdateTicketTierDto(
+    int? EventShowId,
     string Name,
     string Description,
     decimal Price,
@@ -115,13 +134,15 @@ public record CreateSeatingZoneDto(
     int Rows,
     int Cols,
     decimal Price,
-    int SortOrder
+    int SortOrder,
+    string? LayoutJson = null
 );
 
 public record UpdateSeatingZoneDto(
     string Zone,
     decimal Price,
-    int SortOrder
+    int SortOrder,
+    string? LayoutJson = null
 );
 
 public record CreateTagDto(

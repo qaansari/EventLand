@@ -15,8 +15,11 @@ import {
   AlertCircle,
   FileSpreadsheet
 } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import SearchableSelect from './SearchableSelect';
 
 export default function OrganizerDashboard({ events, onNavigateToCreate, onSelectEvent }) {
+  const { showSuccess, showInfo } = useToast();
   const [activeTab, setActiveTab] = useState('my-events'); // 'my-events', 'scanner', 'payouts'
   
   // Gatekeeper Scanner Simulator State
@@ -59,7 +62,10 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
     setPayoutSubmitted(true);
     setTimeout(() => {
       setPayoutSubmitted(false);
-      alert(`🎉 Payout request for PKR ${Number(payoutForm.amount).toLocaleString()} via ${payoutForm.method} submitted successfully! Transfers are processed within 24 hours.`);
+      showSuccess(
+        'Payout Request Submitted 💳',
+        `Request for PKR ${Number(payoutForm.amount).toLocaleString()} via ${payoutForm.method} submitted. Processing within 24h.`
+      );
     }, 1200);
   };
 
@@ -244,7 +250,7 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
                 </button>
 
                 <button
-                  onClick={() => alert(`📥 Attendee roster CSV for "${ev.title}" downloaded!`)}
+                  onClick={() => showInfo('CSV Exported 📥', `Attendee roster CSV for "${ev.title}" downloaded.`)}
                   className="btn btn-outline-primary"
                   style={{ flex: 1, fontSize: '0.82rem', padding: '0.5rem' }}
                 >
@@ -375,24 +381,16 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
               <label style={{ display: 'block', fontSize: '0.85rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '0.4rem' }}>
                 Payout Transfer Method *
               </label>
-              <select
+              <SearchableSelect
                 value={payoutForm.method}
                 onChange={(e) => setPayoutForm({ ...payoutForm, method: e.target.value })}
-                style={{
-                  width: '100%',
-                  backgroundColor: '#16233f',
-                  color: '#fff',
-                  border: '1px solid rgba(59, 130, 246, 0.3)',
-                  borderRadius: '8px',
-                  padding: '0.7rem 1rem',
-                  fontSize: '0.95rem',
-                  outline: 'none'
-                }}
-              >
-                <option value="Bank Transfer">Direct Bank Transfer (Meezan, HBL, UBL, Alfalah)</option>
-                <option value="JazzCash">JazzCash Corporate Wallet</option>
-                <option value="EasyPaisa">EasyPaisa Corporate Account</option>
-              </select>
+                options={[
+                  { value: 'Bank Transfer', label: 'Direct Bank Transfer (Meezan, HBL, UBL, Alfalah)' },
+                  { value: 'JazzCash', label: 'JazzCash Corporate Wallet' },
+                  { value: 'EasyPaisa', label: 'EasyPaisa Corporate Account' }
+                ]}
+                placeholder="Select Payout Method..."
+              />
             </div>
 
             <div>

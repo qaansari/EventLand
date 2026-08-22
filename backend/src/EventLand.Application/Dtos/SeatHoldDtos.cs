@@ -3,7 +3,8 @@ namespace EventLand.Application.Dtos;
 public record HoldSeatsRequestDto(
     int EventId,
     List<int> SeatIds,
-    string CustomerEmail
+    string CustomerEmail,
+    int? EventShowId = null
 );
 
 public record HoldSeatsResponseDto(

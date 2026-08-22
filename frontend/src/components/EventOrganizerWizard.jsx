@@ -2,21 +2,29 @@ import React, { useState } from 'react';
 import { Sparkles, Grid, Layers } from 'lucide-react';
 import EventCard from './EventCard';
 import { uploadApi, adminApi } from '../services/api';
+import { useToast } from '../context/ToastContext';
+import SearchableSelect from './SearchableSelect';
+import MultiSearchableSelect from './MultiSearchableSelect';
+import { CITIES } from '../data/mockEvents';
 
 export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
+  const { showError, showSuccess } = useToast();
   const [tagsList, setTagsList] = useState([]);
   const [eventForm, setEventForm] = useState({
     title: '',
-    selectedTagId: '',
+    tagIds: [],
     category: 'Concerts',
     city: 'Karachi',
     venue: '',
+    address: '',
     date: '',
     time: '7:00 PM Onwards',
+    priceRange: 'PKR 2,000 - PKR 5,000',
     startingPrice: 2000,
     ticketingType: 'categorized', // 'categorized' or 'mapped'
     banner: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1200&q=80',
     description: '',
+    scarcityText: 'Selling Fast',
     organizer: '',
     organizerContact: '',
     tier1Name: 'Standard Entry',
@@ -50,19 +58,23 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
     id: 'user-created-' + Date.now(),
     title: eventForm.title || 'Your Event Title Here',
     category: eventForm.category,
-    status: 'LIVE',
+    status: 1, // 0: Draft, 1: Live, 2: Completed, 3: Cancelled
     isFeatured: true,
+    isPublished: true,
     city: eventForm.city,
     venue: eventForm.venue || 'Venue Address, City',
+    address: eventForm.address || 'Street Address, City',
     date: eventForm.date || 'TBD 2026',
+    startDateUtc: eventForm.date,
+    endDateUtc: eventForm.date,
     time: eventForm.time,
-    priceRange: `PKR ${Number(eventForm.startingPrice || 0).toLocaleString()} - 5,000`,
+    priceRange: eventForm.priceRange || `PKR ${Number(eventForm.startingPrice || 0).toLocaleString()} - 5,000`,
     startingPrice: Number(eventForm.startingPrice || 1000),
     ticketingType: eventForm.ticketingType,
     banner: eventForm.banner,
     description: eventForm.description || 'Provide a compelling description of your concert or festival.',
     organizer: eventForm.organizer || 'Organizer Name',
-    scarcityText: 'New Listing - Selling Fast',
+    scarcityText: eventForm.scarcityText || 'New Listing - Selling Fast',
     ticketTiers: eventForm.ticketingType === 'categorized' ? [
       { id: 't1', name: eventForm.tier1Name, price: Number(eventForm.tier1Price || 2000), description: 'Standard admission pass' },
       { id: 't2', name: eventForm.tier2Name, price: Number(eventForm.tier2Price || 4500), description: 'Fast track VIP entry pass' }
@@ -70,15 +82,14 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
       { id: 't1', name: 'General Entry', price: Number(eventForm.zone2Price || 2000), description: 'Standard entry pass' }
     ],
     seatingZones: eventForm.ticketingType === 'mapped' ? [
-      { zone: eventForm.zone1Name, rows: 4, cols: 8, price: Number(eventForm.zone1Price || 5000) },
-      { zone: eventForm.zone2Name, rows: 8, cols: 12, price: Number(eventForm.zone2Price || 2000) }
+      { zone: 'AC II ACP KARACHI Main Hall', rows: 11, cols: 28, price: Number(eventForm.startingPrice || 2500), layoutJson: 'AC_II_ACP_KARACHI' }
     ] : []
   };
 
   const handleFormSubmit = (e) => {
     e.preventDefault();
     if (!eventForm.title || !eventForm.venue || !eventForm.date) {
-      alert('Please fill out Title, Venue, and Date.');
+      showError('Validation Error', 'Please fill out Title, Venue, and Date before submitting.');
       return;
     }
 
@@ -197,59 +208,26 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                    Select Event Tag *
+                    Select Event Tags (Multiple Allowed) *
                   </label>
-                  <select
-                    required
-                    value={eventForm.selectedTagId}
-                    onChange={(e) => {
-                      const tagId = e.target.value;
-                      const selectedTag = tagsList.find(t => String(t.id) === String(tagId));
-                      setEventForm({
-                        ...eventForm,
-                        selectedTagId: tagId,
-                        category: selectedTag ? selectedTag.name : 'Concerts'
-                      });
-                    }}
-                    style={{
-                      width: '100%',
-                      backgroundColor: '#1e293b',
-                      border: '1px solid rgba(59, 130, 246, 0.25)',
-                      borderRadius: '10px',
-                      padding: '0.75rem 1rem',
-                      color: '#fff',
-                      outline: 'none'
-                    }}
-                  >
-                    <option value="">Select Tag...</option>
-                    {tagsList.map(t => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </select>
+                  <MultiSearchableSelect
+                    value={eventForm.tagIds || []}
+                    onChange={(e) => setEventForm({ ...eventForm, tagIds: e.target.value })}
+                    options={tagsList.map(t => ({ value: t.id, label: t.name }))}
+                    placeholder="Select one or multiple tags..."
+                  />
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
                     Host City *
                   </label>
-                  <select
+                  <SearchableSelect
                     value={eventForm.city}
                     onChange={(e) => setEventForm({ ...eventForm, city: e.target.value })}
-                    style={{
-                      width: '100%',
-                      backgroundColor: '#1e293b',
-                      border: '1px solid rgba(59, 130, 246, 0.25)',
-                      borderRadius: '10px',
-                      padding: '0.75rem 1rem',
-                      color: '#fff',
-                      outline: 'none'
-                    }}
-                  >
-                    <option value="Karachi">Karachi</option>
-                    <option value="Lahore">Lahore</option>
-                    <option value="Islamabad">Islamabad</option>
-                    <option value="Rawalpindi">Rawalpindi</option>
-                  </select>
+                    options={CITIES.filter(c => c !== 'All Cities')}
+                    placeholder="Select City..."
+                  />
                 </div>
               </div>
 
@@ -322,7 +300,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                  Banner Image (File Upload or URL)
+                  Event Banner Image <span style={{ color: '#38bdf8', fontWeight: 600 }}>(Recommended: 1200x500px)</span> *
                 </label>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <input
@@ -353,16 +331,17 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
                     Upload File
                     <input
                       type="file"
-                      accept="image/*"
+                      accept=".webp,.jpg,.jpeg,.png"
                       style={{ display: 'none' }}
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
                         try {
-                          const res = await uploadApi.uploadFile(file);
+                          const res = await uploadApi.uploadFile(file, 'events', eventForm.title);
                           setEventForm(prev => ({ ...prev, banner: res.url }));
+                          showSuccess('Banner Uploaded', `Saved banner as ${res.fileName || 'event banner'}`);
                         } catch (err) {
-                          alert(err.message || 'Upload failed');
+                          showError('Upload Failed', err.message || 'Image upload failed.');
                         }
                       }}
                     />

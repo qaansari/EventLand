@@ -1,5 +1,6 @@
 namespace EventLand.Infrastructure.Services;
 
+using System.Collections.Concurrent;
 using System.Text.Json;
 using EventLand.Application.Common;
 using EventLand.Application.Interfaces;
@@ -12,6 +13,7 @@ public class RedisCacheService : ICacheService
     private readonly IDistributedCache _distributedCache;
     private readonly IMemoryCache _memoryCache;
     private readonly ILogger<RedisCacheService> _logger;
+    private static readonly ConcurrentDictionary<string, byte> _knownKeys = new();
 
     public RedisCacheService(
         IDistributedCache distributedCache,
@@ -47,6 +49,8 @@ public class RedisCacheService : ICacheService
 
     public async Task SetAsync<T>(string key, T value, TimeSpan? absoluteExpiration = null)
     {
+        _knownKeys.TryAdd(key, 0);
+
         var options = new DistributedCacheEntryOptions
         {
             AbsoluteExpirationRelativeToNow = absoluteExpiration ?? TimeSpan.FromMinutes(10)
@@ -61,12 +65,15 @@ public class RedisCacheService : ICacheService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Redis SetAsync error for key '{Key}'. Storing in MemoryCache.", key);
-            _memoryCache.Set(key, value, absoluteExpiration ?? TimeSpan.FromMinutes(10));
         }
+
+        _memoryCache.Set(key, value, absoluteExpiration ?? TimeSpan.FromMinutes(10));
     }
 
     public async Task RemoveAsync(string key)
     {
+        _knownKeys.TryRemove(key, out _);
+
         try
         {
             await _distributedCache.RemoveAsync(key);
@@ -75,19 +82,46 @@ public class RedisCacheService : ICacheService
         {
             _logger.LogWarning(ex, "Redis RemoveAsync error for key '{Key}'. Removing from MemoryCache.", key);
         }
+
         _memoryCache.Remove(key);
     }
 
     public async Task RemoveByPrefixAsync(string prefixKey)
     {
-        // Simple prefix removal for memory cache fallback; Redis requires SCAN pattern or key tracking
         _logger.LogInformation("Evicting cache prefix '{PrefixKey}'", prefixKey);
+
+        var matchingKeys = _knownKeys.Keys
+            .Where(k => k.StartsWith(prefixKey, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        foreach (var key in matchingKeys)
+        {
+            await RemoveAsync(key);
+        }
+    }
+
+    public async Task ClearEventCacheAsync(int? eventId = null)
+    {
+        _logger.LogInformation("Clearing all event-related caches. EventId: {EventId}", eventId);
+
+        // Evict all public event listing, category, tag, city, search, and detail caches
+        await RemoveByPrefixAsync("events:");
+        await RemoveByPrefixAsync("event:");
+        await RemoveByPrefixAsync("organizers:");
+        await RemoveByPrefixAsync("tags:");
+
+        if (eventId.HasValue)
+        {
+            await RemoveAsync(string.Format(CacheKeys.EventDetail, eventId.Value));
+        }
     }
 
     // --- Redis Real-Time Seat Holding ---
-    public async Task<bool> HoldSeatsAsync(int eventId, List<int> seatIds, string email, TimeSpan holdDuration)
+    public async Task<bool> HoldSeatsAsync(int eventId, List<int> seatIds, string email, TimeSpan holdDuration, int? eventShowId = null)
     {
-        var lockKey = string.Format(CacheKeys.SeatLocks, eventId);
+        var lockKey = eventShowId.HasValue
+            ? $"eventland:seats:event:{eventId}:show:{eventShowId.Value}"
+            : string.Format(CacheKeys.SeatLocks, eventId);
         var currentlyHeld = await GetAsync<Dictionary<int, string>>(lockKey) ?? new Dictionary<int, string>();
 
         // Check if any seat is already locked by someone else
@@ -109,9 +143,11 @@ public class RedisCacheService : ICacheService
         return true;
     }
 
-    public async Task ReleaseSeatsAsync(int eventId, List<int> seatIds)
+    public async Task ReleaseSeatsAsync(int eventId, List<int> seatIds, int? eventShowId = null)
     {
-        var lockKey = string.Format(CacheKeys.SeatLocks, eventId);
+        var lockKey = eventShowId.HasValue
+            ? $"eventland:seats:event:{eventId}:show:{eventShowId.Value}"
+            : string.Format(CacheKeys.SeatLocks, eventId);
         var currentlyHeld = await GetAsync<Dictionary<int, string>>(lockKey);
 
         if (currentlyHeld != null)
@@ -124,9 +160,11 @@ public class RedisCacheService : ICacheService
         }
     }
 
-    public async Task<List<int>> GetHeldSeatIdsAsync(int eventId)
+    public async Task<List<int>> GetHeldSeatIdsAsync(int eventId, int? eventShowId = null)
     {
-        var lockKey = string.Format(CacheKeys.SeatLocks, eventId);
+        var lockKey = eventShowId.HasValue
+            ? $"eventland:seats:event:{eventId}:show:{eventShowId.Value}"
+            : string.Format(CacheKeys.SeatLocks, eventId);
         var currentlyHeld = await GetAsync<Dictionary<int, string>>(lockKey);
 
         if (currentlyHeld == null) return new List<int>();

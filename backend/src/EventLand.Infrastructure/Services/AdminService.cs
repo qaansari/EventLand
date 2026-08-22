@@ -183,6 +183,7 @@ public class AdminService : IAdminService
         var query = _context.Events
             .AsNoTracking()
             .Include(e => e.Organizer)
+            .Include(e => e.Shows.Where(s => !s.IsDeleted).OrderBy(s => s.StartTimeUtc))
             .Include(e => e.EventTags).ThenInclude(et => et.Tag)
             .Where(e => !e.IsDeleted);
 
@@ -205,10 +206,12 @@ public class AdminService : IAdminService
                 e.PriceRange,
                 e.StartingPrice,
                 e.TicketingType.ToString(),
-                e.Banner,
+                FileUrlHelper.FormatEventBannerUrl(e.Banner),
                 e.ScarcityText,
+                e.OrganizerId,
                 e.Organizer.Name,
-                e.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList()
+                e.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList(),
+                e.Shows.Select(s => new EventShowDto(s.Id, s.EventId, s.ShowTitle, s.StartTimeUtc, s.EndTimeUtc, new List<TicketTierDto>())).ToList()
             ))
             .ToListAsync();
 
@@ -218,6 +221,27 @@ public class AdminService : IAdminService
     public async Task<EventDetailDto> CreateEventAsync(CreateAdminEventDto dto)
     {
         Enum.TryParse<TicketingType>(dto.TicketingType, true, out var ticketingType);
+        Enum.TryParse<EventStatus>(dto.Status ?? "Live", true, out var status);
+
+        var organizerExists = await _context.Organizers.AnyAsync(o => o.Id == dto.OrganizerId && !o.IsDeleted);
+        var organizerId = organizerExists 
+            ? dto.OrganizerId 
+            : (await _context.Organizers.Where(o => !o.IsDeleted).Select(o => o.Id).FirstOrDefaultAsync());
+
+        if (organizerId == 0)
+        {
+            var defaultOrg = new Organizer
+            {
+                Name = "Event Land",
+                Email = "support@eventland.pk",
+                Phone = "+92 307 9353185",
+                WebsiteUrl = "https://eventland.pk",
+                IsVerified = true
+            };
+            _context.Organizers.Add(defaultOrg);
+            await _context.SaveChangesAsync();
+            organizerId = defaultOrg.Id;
+        }
 
         var ev = new Event
         {
@@ -226,35 +250,63 @@ public class AdminService : IAdminService
             City = dto.City,
             Venue = dto.Venue,
             Address = dto.Address,
-            Latitude = dto.Latitude,
-            Longitude = dto.Longitude,
             StartDateUtc = dto.StartDateUtc,
             EndDateUtc = dto.EndDateUtc,
             PriceRange = $"PKR {dto.StartingPrice:N0}+",
             StartingPrice = dto.StartingPrice,
             TicketingType = ticketingType,
-            Banner = dto.Banner,
-            ThumbnailUrl = dto.ThumbnailUrl,
+            Banner = FileUrlHelper.ExtractFileName(dto.Banner) ?? dto.Banner,
             Description = dto.Description,
             ScarcityText = dto.ScarcityText,
-            OrganizerId = dto.OrganizerId,
+            OrganizerId = organizerId,
             IsFeatured = dto.IsFeatured,
-            IsPublished = true,
-            Status = EventStatus.Live
+            IsPublished = dto.IsPublished,
+            Status = status
         };
-
-        if (dto.TagIds is not null && dto.TagIds.Any())
-        {
-            foreach (var tagId in dto.TagIds)
-            {
-                ev.EventTags.Add(new EventTag { Event = ev, TagId = tagId });
-            }
-        }
 
         _context.Events.Add(ev);
         await _context.SaveChangesAsync();
 
-        await _cacheService.RemoveByPrefixAsync(CacheKeys.EventsPrefix);
+        if (dto.TagIds is not null && dto.TagIds.Any())
+        {
+            var validTagIds = await _context.Tags
+                .Where(t => dto.TagIds.Contains(t.Id) && !t.IsDeleted)
+                .Select(t => t.Id)
+                .ToListAsync();
+
+            foreach (var tagId in validTagIds)
+            {
+                _context.EventTags.Add(new EventTag { EventId = ev.Id, TagId = tagId });
+            }
+            await _context.SaveChangesAsync();
+        }
+
+        if (dto.Shows is not null && dto.Shows.Any())
+        {
+            foreach (var sInput in dto.Shows)
+            {
+                _context.EventShows.Add(new EventShow
+                {
+                    EventId = ev.Id,
+                    ShowTitle = sInput.ShowTitle,
+                    StartTimeUtc = sInput.StartTimeUtc,
+                    EndTimeUtc = sInput.EndTimeUtc
+                });
+            }
+        }
+        else
+        {
+            _context.EventShows.Add(new EventShow
+            {
+                EventId = ev.Id,
+                ShowTitle = "Standard Performance",
+                StartTimeUtc = dto.StartDateUtc,
+                EndTimeUtc = dto.EndDateUtc
+            });
+        }
+        await _context.SaveChangesAsync();
+
+        await _cacheService.ClearEventCacheAsync(ev.Id);
 
         return await GetEventDetailDtoAsync(ev.Id);
     }
@@ -263,6 +315,7 @@ public class AdminService : IAdminService
     {
         var ev = await _context.Events
             .Include(e => e.EventTags)
+            .Include(e => e.Shows)
             .FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted);
 
         if (ev is null)
@@ -279,33 +332,74 @@ public class AdminService : IAdminService
         ev.City = dto.City;
         ev.Venue = dto.Venue;
         ev.Address = dto.Address;
-        ev.Latitude = dto.Latitude;
-        ev.Longitude = dto.Longitude;
         ev.StartDateUtc = dto.StartDateUtc;
         ev.EndDateUtc = dto.EndDateUtc;
         ev.PriceRange = $"PKR {dto.StartingPrice:N0}+";
         ev.StartingPrice = dto.StartingPrice;
         ev.TicketingType = ticketingType;
-        ev.Banner = dto.Banner;
-        ev.ThumbnailUrl = dto.ThumbnailUrl;
+        var newBannerFileName = FileUrlHelper.ExtractFileName(dto.Banner) ?? dto.Banner;
+        if (!string.Equals(ev.Banner, newBannerFileName, StringComparison.OrdinalIgnoreCase))
+        {
+            TryDeleteLocalFile(ev.Banner);
+            ev.Banner = newBannerFileName;
+        }
+
         ev.Description = dto.Description;
         ev.ScarcityText = dto.ScarcityText;
-        ev.OrganizerId = dto.OrganizerId;
+        var organizerExists = await _context.Organizers.AnyAsync(o => o.Id == dto.OrganizerId && !o.IsDeleted);
+        if (organizerExists)
+        {
+            ev.OrganizerId = dto.OrganizerId;
+        }
 
         // Update tags
         ev.EventTags.Clear();
         if (dto.TagIds is not null && dto.TagIds.Any())
         {
-            foreach (var tagId in dto.TagIds)
+            var validTagIds = await _context.Tags
+                .Where(t => dto.TagIds.Contains(t.Id) && !t.IsDeleted)
+                .Select(t => t.Id)
+                .ToListAsync();
+
+            foreach (var tagId in validTagIds)
             {
                 ev.EventTags.Add(new EventTag { EventId = id, TagId = tagId });
             }
         }
 
-        await _context.SaveChangesAsync();
+        // Update shows
+        if (dto.Shows is not null)
+        {
+            var existingShows = await _context.EventShows.Where(s => s.EventId == id).ToListAsync();
+            _context.EventShows.RemoveRange(existingShows);
 
-        await _cacheService.RemoveAsync(string.Format(CacheKeys.EventDetail, id));
-        await _cacheService.RemoveByPrefixAsync(CacheKeys.EventsPrefix);
+            if (dto.Shows.Any())
+            {
+                foreach (var sInput in dto.Shows)
+                {
+                    _context.EventShows.Add(new EventShow
+                    {
+                        EventId = id,
+                        ShowTitle = sInput.ShowTitle,
+                        StartTimeUtc = sInput.StartTimeUtc,
+                        EndTimeUtc = sInput.EndTimeUtc
+                    });
+                }
+            }
+            else
+            {
+                _context.EventShows.Add(new EventShow
+                {
+                    EventId = id,
+                    ShowTitle = "Standard Performance",
+                    StartTimeUtc = ev.StartDateUtc,
+                    EndTimeUtc = ev.EndDateUtc
+                });
+            }
+        }
+
+        await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync(id);
 
         return await GetEventDetailDtoAsync(id);
     }
@@ -317,22 +411,30 @@ public class AdminService : IAdminService
 
         ev.IsDeleted = true;
         ev.DeletedAt = DateTimeOffset.UtcNow;
+        TryDeleteLocalFile(ev.Banner);
         await _context.SaveChangesAsync();
-
-        await _cacheService.RemoveAsync(string.Format(CacheKeys.EventDetail, id));
-        await _cacheService.RemoveByPrefixAsync(CacheKeys.EventsPrefix);
+        await _cacheService.ClearEventCacheAsync(id);
         return true;
     }
 
     // --- Organizers CRUD ---
     public async Task<List<OrganizerDto>> GetOrganizersAsync()
     {
-        return await _context.Organizers
+        var list = await _context.Organizers
             .AsNoTracking()
             .Where(o => !o.IsDeleted)
             .OrderBy(o => o.Name)
-            .Select(o => new OrganizerDto(o.Id, o.Name, o.Email, o.Phone, o.LogoUrl, o.IsVerified))
             .ToListAsync();
+
+        return list.Select(o => new OrganizerDto(
+            o.Id, 
+            o.Name, 
+            o.Email, 
+            o.Phone, 
+            FileUrlHelper.FormatOrganizerLogoUrl(o.LogoUrl), 
+            o.WebsiteUrl, 
+            o.IsVerified
+        )).ToList();
     }
 
     public async Task<OrganizerDto?> GetOrganizerByIdAsync(int id)
@@ -340,25 +442,44 @@ public class AdminService : IAdminService
         var o = await _context.Organizers.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (o is null) return null;
 
-        return new OrganizerDto(o.Id, o.Name, o.Email, o.Phone, o.LogoUrl, o.IsVerified);
+        return new OrganizerDto(
+            o.Id, 
+            o.Name, 
+            o.Email, 
+            o.Phone, 
+            FileUrlHelper.FormatOrganizerLogoUrl(o.LogoUrl), 
+            o.WebsiteUrl, 
+            o.IsVerified
+        );
     }
 
     public async Task<OrganizerDto> CreateOrganizerAsync(CreateOrganizerDto dto)
     {
+        var fileNameOnly = FileUrlHelper.ExtractFileName(dto.LogoUrl);
+
         var org = new Organizer
         {
             Name = dto.Name,
             Email = dto.Email,
             Phone = dto.Phone,
-            LogoUrl = dto.LogoUrl,
+            LogoUrl = fileNameOnly,
             WebsiteUrl = dto.WebsiteUrl,
             IsVerified = dto.IsVerified
         };
 
         _context.Organizers.Add(org);
         await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync();
 
-        return new OrganizerDto(org.Id, org.Name, org.Email, org.Phone, org.LogoUrl, org.IsVerified);
+        return new OrganizerDto(
+            org.Id, 
+            org.Name, 
+            org.Email, 
+            org.Phone, 
+            FileUrlHelper.FormatOrganizerLogoUrl(org.LogoUrl), 
+            org.WebsiteUrl, 
+            org.IsVerified
+        );
     }
 
     public async Task<OrganizerDto> UpdateOrganizerAsync(int id, UpdateOrganizerDto dto)
@@ -367,16 +488,33 @@ public class AdminService : IAdminService
         if (org is null)
             throw new KeyNotFoundException($"Organizer '{id}' not found.");
 
+        var newFileNameOnly = FileUrlHelper.ExtractFileName(dto.LogoUrl);
+
         org.Name = dto.Name;
         org.Email = dto.Email;
         org.Phone = dto.Phone;
-        org.LogoUrl = dto.LogoUrl;
+
+        if (!string.Equals(org.LogoUrl, newFileNameOnly, StringComparison.OrdinalIgnoreCase))
+        {
+            TryDeleteLocalFile(org.LogoUrl);
+            org.LogoUrl = newFileNameOnly;
+        }
+
         org.WebsiteUrl = dto.WebsiteUrl;
         org.IsVerified = dto.IsVerified;
 
         await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync();
 
-        return new OrganizerDto(org.Id, org.Name, org.Email, org.Phone, org.LogoUrl, org.IsVerified);
+        return new OrganizerDto(
+            org.Id, 
+            org.Name, 
+            org.Email, 
+            org.Phone, 
+            FileUrlHelper.FormatOrganizerLogoUrl(org.LogoUrl), 
+            org.WebsiteUrl, 
+            org.IsVerified
+        );
     }
 
     public async Task<bool> DeleteOrganizerAsync(int id)
@@ -386,7 +524,9 @@ public class AdminService : IAdminService
 
         org.IsDeleted = true;
         org.DeletedAt = DateTimeOffset.UtcNow;
+        TryDeleteLocalFile(org.LogoUrl);
         await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync();
         return true;
     }
 
@@ -492,6 +632,7 @@ public class AdminService : IAdminService
         var tier = new TicketTier
         {
             EventId = dto.EventId,
+            EventShowId = dto.EventShowId,
             Name = dto.Name,
             Description = dto.Description,
             Price = dto.Price,
@@ -502,8 +643,9 @@ public class AdminService : IAdminService
 
         _context.TicketTiers.Add(tier);
         await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync(dto.EventId);
 
-        return new TicketTierDto(tier.Id, tier.EventId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder);
+        return new TicketTierDto(tier.Id, tier.EventId, tier.EventShowId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder);
     }
 
     public async Task<TicketTierDto> UpdateTicketTierAsync(int id, UpdateTicketTierDto dto)
@@ -512,6 +654,7 @@ public class AdminService : IAdminService
         if (tier is null)
             throw new KeyNotFoundException($"Ticket tier '{id}' not found.");
 
+        tier.EventShowId = dto.EventShowId;
         tier.Name = dto.Name;
         tier.Description = dto.Description;
         tier.Price = dto.Price;
@@ -520,8 +663,9 @@ public class AdminService : IAdminService
         tier.SortOrder = dto.SortOrder;
 
         await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync(tier.EventId);
 
-        return new TicketTierDto(tier.Id, tier.EventId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder);
+        return new TicketTierDto(tier.Id, tier.EventId, tier.EventShowId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder);
     }
 
     public async Task<bool> DeleteTicketTierAsync(int id)
@@ -532,6 +676,7 @@ public class AdminService : IAdminService
         tier.IsDeleted = true;
         tier.DeletedAt = DateTimeOffset.UtcNow;
         await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync(tier.EventId);
         return true;
     }
 
@@ -546,30 +691,67 @@ public class AdminService : IAdminService
             Cols = dto.Cols,
             Price = dto.Price,
             SortOrder = dto.SortOrder,
-            TotalCapacity = dto.Rows * dto.Cols
+            LayoutJson = dto.LayoutJson,
+            TotalCapacity = dto.LayoutJson == "AC_II_ACP_KARACHI" ? 272 : (dto.Rows * dto.Cols)
         };
 
-        for (int r = 1; r <= dto.Rows; r++)
+        if (dto.LayoutJson == "AC_II_ACP_KARACHI")
         {
-            char rowChar = (char)('A' + r - 1);
-            for (int c = 1; c <= dto.Cols; c++)
+            var rowSpecs = new[]
             {
-                zone.Seats.Add(new Seat
+                (Row: 1, RowChar: 'A', LeftEnd: 11, RightEnd: 23),
+                (Row: 2, RowChar: 'B', LeftEnd: 11, RightEnd: 24),
+                (Row: 3, RowChar: 'C', LeftEnd: 12, RightEnd: 25),
+                (Row: 4, RowChar: 'D', LeftEnd: 12, RightEnd: 25),
+                (Row: 5, RowChar: 'E', LeftEnd: 12, RightEnd: 26),
+                (Row: 6, RowChar: 'F', LeftEnd: 12, RightEnd: 26),
+                (Row: 7, RowChar: 'G', LeftEnd: 13, RightEnd: 27),
+                (Row: 8, RowChar: 'H', LeftEnd: 13, RightEnd: 28),
+                (Row: 9, RowChar: 'I', LeftEnd: 13, RightEnd: 28),
+                (Row: 10, RowChar: 'J', LeftEnd: 12, RightEnd: 26),
+                (Row: 11, RowChar: 'K', LeftEnd: 0,  RightEnd: 14)
+            };
+
+            foreach (var spec in rowSpecs)
+            {
+                for (int c = 1; c <= spec.RightEnd; c++)
                 {
-                    Zone = zone,
-                    Row = r,
-                    Col = c,
-                    Label = $"{rowChar}{c}",
-                    Status = SeatStatus.Available
-                });
+                    zone.Seats.Add(new Seat
+                    {
+                        Zone = zone,
+                        Row = spec.Row,
+                        Col = c,
+                        Label = $"{spec.RowChar}{c}",
+                        Status = SeatStatus.Available
+                    });
+                }
+            }
+        }
+        else
+        {
+            for (int r = 1; r <= dto.Rows; r++)
+            {
+                char rowChar = (char)('A' + r - 1);
+                for (int c = 1; c <= dto.Cols; c++)
+                {
+                    zone.Seats.Add(new Seat
+                    {
+                        Zone = zone,
+                        Row = r,
+                        Col = c,
+                        Label = $"{rowChar}{c}",
+                        Status = SeatStatus.Available
+                    });
+                }
             }
         }
 
         _context.SeatingZones.Add(zone);
         await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync(dto.EventId);
 
         return new SeatingZoneDto(
-            zone.Id, zone.EventId, zone.Zone, zone.Rows, zone.Cols, zone.Price, zone.TotalCapacity, zone.SortOrder,
+            zone.Id, zone.EventId, zone.Zone, zone.Rows, zone.Cols, zone.Price, zone.TotalCapacity, zone.SortOrder, zone.LayoutJson,
             zone.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString())).ToList()
         );
     }
@@ -586,11 +768,13 @@ public class AdminService : IAdminService
         zone.Zone = dto.Zone;
         zone.Price = dto.Price;
         zone.SortOrder = dto.SortOrder;
+        if (!string.IsNullOrEmpty(dto.LayoutJson)) zone.LayoutJson = dto.LayoutJson;
 
         await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync(zone.EventId);
 
         return new SeatingZoneDto(
-            zone.Id, zone.EventId, zone.Zone, zone.Rows, zone.Cols, zone.Price, zone.TotalCapacity, zone.SortOrder,
+            zone.Id, zone.EventId, zone.Zone, zone.Rows, zone.Cols, zone.Price, zone.TotalCapacity, zone.SortOrder, zone.LayoutJson,
             zone.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString())).ToList()
         );
     }
@@ -603,6 +787,7 @@ public class AdminService : IAdminService
         zone.IsDeleted = true;
         zone.DeletedAt = DateTimeOffset.UtcNow;
         await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync(zone.EventId);
         return true;
     }
 
@@ -676,6 +861,7 @@ public class AdminService : IAdminService
         if (Enum.TryParse<PaymentStatus>(dto.PaymentStatus, true, out var payStatus)) b.PaymentStatus = payStatus;
 
         await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync(b.EventId);
 
         return new BookingDto(
             b.Id, b.EventId, b.Event.Title, b.TicketTierId, b.TicketTier.Name, b.BookingRef,
@@ -693,6 +879,7 @@ public class AdminService : IAdminService
         b.IsDeleted = true;
         b.DeletedAt = DateTimeOffset.UtcNow;
         await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync(b.EventId);
         return true;
     }
 
@@ -712,6 +899,7 @@ public class AdminService : IAdminService
         var tag = new Tag { Name = dto.Name, Slug = dto.Slug };
         _context.Tags.Add(tag);
         await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync();
         return new TagDto(tag.Id, tag.Name, tag.Slug);
     }
 
@@ -724,6 +912,7 @@ public class AdminService : IAdminService
         tag.Name = dto.Name;
         tag.Slug = dto.Slug;
         await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync();
         return new TagDto(tag.Id, tag.Name, tag.Slug);
     }
 
@@ -743,8 +932,11 @@ public class AdminService : IAdminService
         var ev = await _context.Events
             .AsNoTracking()
             .Include(e => e.Organizer)
-            .Include(e => e.TicketTiers)
-            .Include(e => e.SeatingZones).ThenInclude(z => z.Seats)
+            .Include(e => e.Shows.Where(s => !s.IsDeleted).OrderBy(s => s.StartTimeUtc))
+                .ThenInclude(s => s.TicketTiers.Where(t => !t.IsDeleted))
+            .Include(e => e.TicketTiers.Where(t => !t.IsDeleted))
+            .Include(e => e.SeatingZones.Where(z => !z.IsDeleted))
+                .ThenInclude(z => z.Seats.Where(s => !s.IsDeleted))
             .Include(e => e.EventTags).ThenInclude(et => et.Tag)
             .FirstOrDefaultAsync(e => e.Id == eventId && !e.IsDeleted);
 
@@ -760,21 +952,57 @@ public class AdminService : IAdminService
             ev.City,
             ev.Venue,
             ev.Address,
-            ev.Latitude,
-            ev.Longitude,
             ev.StartDateUtc,
             ev.EndDateUtc,
             ev.PriceRange,
             ev.StartingPrice,
             ev.TicketingType.ToString(),
-            ev.Banner,
-            ev.ThumbnailUrl,
+            FileUrlHelper.FormatEventBannerUrl(ev.Banner),
             ev.Description,
             ev.ScarcityText,
-            new OrganizerDto(ev.Organizer.Id, ev.Organizer.Name, ev.Organizer.Email, ev.Organizer.Phone, ev.Organizer.LogoUrl, ev.Organizer.IsVerified),
-            ev.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder)).ToList(),
-            ev.SeatingZones.Select(z => new SeatingZoneDto(z.Id, z.EventId, z.Zone, z.Rows, z.Cols, z.Price, z.TotalCapacity, z.SortOrder, z.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString())).ToList())).ToList(),
+            new OrganizerDto(ev.Organizer.Id, ev.Organizer.Name, ev.Organizer.Email, ev.Organizer.Phone, FileUrlHelper.FormatOrganizerLogoUrl(ev.Organizer.LogoUrl), ev.Organizer.WebsiteUrl, ev.Organizer.IsVerified),
+            ev.Shows.Select(s => new EventShowDto(
+                s.Id,
+                s.EventId,
+                s.ShowTitle,
+                s.StartTimeUtc,
+                s.EndTimeUtc,
+                s.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder)).ToList()
+            )).ToList(),
+            ev.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder)).ToList(),
+            ev.SeatingZones.Select(z => new SeatingZoneDto(z.Id, z.EventId, z.Zone, z.Rows, z.Cols, z.Price, z.TotalCapacity, z.SortOrder, z.LayoutJson, z.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString())).ToList())).ToList(),
             ev.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList()
         );
+    }
+
+    private static void TryDeleteLocalFile(string? relativeUrl)
+    {
+        if (string.IsNullOrWhiteSpace(relativeUrl)) return;
+        try
+        {
+            var fileName = Path.GetFileName(relativeUrl);
+            if (string.IsNullOrEmpty(fileName)) return;
+
+            var webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            var candidatePaths = new[]
+            {
+                Path.Combine(webRootPath, "assets", "images", "organizers", fileName),
+                Path.Combine(webRootPath, "assets", "images", "events", fileName),
+                Path.Combine(webRootPath, "uploads", fileName),
+                Path.Combine(webRootPath, relativeUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar))
+            };
+
+            foreach (var localPath in candidatePaths)
+            {
+                if (File.Exists(localPath))
+                {
+                    File.Delete(localPath);
+                }
+            }
+        }
+        catch
+        {
+            // Ignore file deletion errors safely
+        }
     }
 }

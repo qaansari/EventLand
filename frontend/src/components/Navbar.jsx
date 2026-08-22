@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MapPin, Search, PlusCircle, User, Sparkles, Music, Calendar, Menu, X, ShieldCheck, Building2, LogIn, LogOut } from 'lucide-react';
+import SearchableSelect from './SearchableSelect';
 import { CITIES } from '../data/mockEvents';
 
 export default function Navbar({ 
@@ -104,30 +105,14 @@ export default function Navbar({
           flexShrink: 1,
           whiteSpace: 'nowrap'
         }} className="desktop-only">
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-            <MapPin size={15} color="#3b82f6" style={{ position: 'absolute', left: '12px', pointerEvents: 'none' }} />
-            <select
+          <div style={{ width: '150px', flexShrink: 0 }}>
+            <SearchableSelect
               value={selectedCity}
               onChange={(e) => onSelectCity(e.target.value)}
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                color: '#f8fafc',
-                border: '1px solid rgba(59, 130, 246, 0.25)',
-                borderRadius: '9999px',
-                padding: '0.5rem 1rem 0.5rem 2.2rem',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                outline: 'none',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {CITIES.map((city) => (
-                <option key={city} value={city} style={{ backgroundColor: '#0f172a', color: '#fff' }}>
-                  {city}
-                </option>
-              ))}
-            </select>
+              options={CITIES}
+              icon={MapPin}
+              placeholder="City..."
+            />
           </div>
 
           <div style={{ position: 'relative', width: '190px', flexShrink: 1 }}>
@@ -389,28 +374,14 @@ export default function Navbar({
               />
             </div>
 
-            <div style={{ position: 'relative' }}>
-              <MapPin size={16} color="#3b82f6" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-              <select
+            <div>
+              <SearchableSelect
                 value={selectedCity}
                 onChange={(e) => onSelectCity(e.target.value)}
-                style={{
-                  width: '100%',
-                  backgroundColor: '#16233f',
-                  color: '#fff',
-                  border: '1px solid rgba(59, 130, 246, 0.25)',
-                  borderRadius: '10px',
-                  padding: '0.65rem 1rem 0.65rem 2.3rem',
-                  fontSize: '0.9rem',
-                  outline: 'none'
-                }}
-              >
-                {CITIES.map((city) => (
-                  <option key={city} value={city}>
-                    {city}
-                  </option>
-                ))}
-              </select>
+                options={CITIES}
+                icon={MapPin}
+                placeholder="Select City..."
+              />
             </div>
           </div>
 
