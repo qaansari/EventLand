@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "5fd8bgYSYoM=",
+  "dgSpecHash": "dFJgeKNQ8uU=",
   "success": true,
-  "projectFilePath": "D:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj",
+  "projectFilePath": "E:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj",
   "expectedPackageFiles": [],
   "logs": []
 }
