@@ -615,10 +615,37 @@ public class AdminService : IAdminService
 
     public async Task<OrganizerDto> CreateOrganizerAsync(CreateOrganizerDto dto)
     {
-        var exists = await _context.Organizers.AnyAsync(o => 
-            (o.Name.ToLower() == dto.Name.ToLower() || (!string.IsNullOrEmpty(dto.Email) && o.Email.ToLower() == dto.Email.ToLower())) && !o.IsDeleted);
-        if (exists)
-            throw new InvalidOperationException($"An organizer with the name '{dto.Name}' or email '{dto.Email}' already exists.");
+        var existingOrg = await _context.Organizers
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(o => o.Name.ToLower() == dto.Name.ToLower() || (!string.IsNullOrEmpty(dto.Email) && o.Email.ToLower() == dto.Email.ToLower()));
+
+        if (existingOrg != null)
+        {
+            if (!existingOrg.IsDeleted)
+                throw new InvalidOperationException($"An organizer with the name '{dto.Name}' or email '{dto.Email}' already exists.");
+
+            var fileName = FileUrlHelper.ExtractFileName(dto.LogoUrl);
+            existingOrg.IsDeleted = false;
+            existingOrg.DeletedAt = null;
+            existingOrg.Name = dto.Name;
+            existingOrg.Email = dto.Email;
+            existingOrg.Phone = dto.Phone;
+            existingOrg.LogoUrl = fileName;
+            existingOrg.WebsiteUrl = dto.WebsiteUrl;
+            existingOrg.IsVerified = dto.IsVerified;
+            await _context.SaveChangesAsync();
+            await _cacheService.ClearEventCacheAsync();
+
+            return new OrganizerDto(
+                existingOrg.Id, 
+                existingOrg.Name, 
+                existingOrg.Email, 
+                existingOrg.Phone, 
+                FileUrlHelper.FormatOrganizerLogoUrl(existingOrg.LogoUrl), 
+                existingOrg.WebsiteUrl, 
+                existingOrg.IsVerified
+            );
+        }
 
         var fileNameOnly = FileUrlHelper.ExtractFileName(dto.LogoUrl);
 
@@ -735,9 +762,35 @@ public class AdminService : IAdminService
 
     public async Task<ArtistDto> CreateArtistAsync(CreateArtistDto dto)
     {
-        var exists = await _context.Artists.AnyAsync(a => a.Name.ToLower() == dto.Name.ToLower() && !a.IsDeleted);
-        if (exists)
-            throw new InvalidOperationException($"An artist named '{dto.Name}' already exists.");
+        var existingArtist = await _context.Artists
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(a => a.Name.ToLower() == dto.Name.ToLower());
+
+        if (existingArtist != null)
+        {
+            if (!existingArtist.IsDeleted)
+                throw new InvalidOperationException($"An artist named '{dto.Name}' already exists.");
+
+            existingArtist.IsDeleted = false;
+            existingArtist.DeletedAt = null;
+            existingArtist.Name = dto.Name;
+            existingArtist.Genre = dto.Genre;
+            existingArtist.Role = dto.Role;
+            existingArtist.City = dto.City;
+            existingArtist.ImageUrl = dto.ImageUrl;
+            existingArtist.Bio = dto.Bio;
+            existingArtist.Availability = dto.Availability;
+            existingArtist.StartingRate = dto.StartingRate;
+            existingArtist.Rating = dto.Rating;
+            existingArtist.ShowsDone = dto.ShowsDone;
+            existingArtist.IsFeatured = dto.IsFeatured;
+            await _context.SaveChangesAsync();
+
+            return new ArtistDto(
+                existingArtist.Id, existingArtist.Name, existingArtist.Genre, existingArtist.Role, existingArtist.City, existingArtist.ImageUrl,
+                existingArtist.Bio, existingArtist.Availability, existingArtist.StartingRate, existingArtist.Rating, existingArtist.ShowsDone, existingArtist.IsFeatured
+            );
+        }
 
         var artist = new Artist
         {
@@ -1044,9 +1097,23 @@ public class AdminService : IAdminService
 
     public async Task<TagDto> CreateTagAsync(CreateTagDto dto)
     {
-        var exists = await _context.Tags.AnyAsync(t => (t.Name.ToLower() == dto.Name.ToLower() || t.Slug.ToLower() == dto.Slug.ToLower()) && !t.IsDeleted);
-        if (exists)
-            throw new InvalidOperationException($"A tag with the name '{dto.Name}' or slug '{dto.Slug}' already exists.");
+        var existingTag = await _context.Tags
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.Name.ToLower() == dto.Name.ToLower() || t.Slug.ToLower() == dto.Slug.ToLower());
+
+        if (existingTag != null)
+        {
+            if (!existingTag.IsDeleted)
+                throw new InvalidOperationException($"A tag with the name '{dto.Name}' or slug '{dto.Slug}' already exists.");
+
+            existingTag.IsDeleted = false;
+            existingTag.DeletedAt = null;
+            existingTag.Name = dto.Name;
+            existingTag.Slug = dto.Slug;
+            await _context.SaveChangesAsync();
+            await _cacheService.ClearEventCacheAsync();
+            return new TagDto(existingTag.Id, existingTag.Name, existingTag.Slug);
+        }
 
         var tag = new Tag { Name = dto.Name, Slug = dto.Slug };
         _context.Tags.Add(tag);
@@ -1162,9 +1229,31 @@ public class AdminService : IAdminService
             ? dto.LayoutCode.Trim().ToUpperInvariant().Replace(" ", "_")
             : dto.Name.Trim().ToUpperInvariant().Replace(" ", "_");
 
-        var exists = await _context.AuditoriumLayouts.AnyAsync(a => (a.LayoutCode.ToLower() == layoutCode.ToLower() || a.Name.ToLower() == dto.Name.ToLower()) && !a.IsDeleted);
-        if (exists)
-            throw new InvalidOperationException($"An auditorium layout with code '{layoutCode}' or name '{dto.Name}' already exists.");
+        var existingLayout = await _context.AuditoriumLayouts
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(a => a.LayoutCode.ToLower() == layoutCode.ToLower() || a.Name.ToLower() == dto.Name.ToLower());
+
+        if (existingLayout != null)
+        {
+            if (!existingLayout.IsDeleted)
+                throw new InvalidOperationException($"An auditorium layout with code '{layoutCode}' or name '{dto.Name}' already exists.");
+
+            existingLayout.IsDeleted = false;
+            existingLayout.DeletedAt = null;
+            existingLayout.Name = dto.Name;
+            existingLayout.Venue = dto.Venue;
+            existingLayout.City = dto.City;
+            existingLayout.LayoutCode = layoutCode;
+            existingLayout.TotalCapacity = dto.TotalCapacity;
+            existingLayout.Description = dto.Description;
+            existingLayout.LayoutJson = dto.LayoutJson;
+            existingLayout.IsActive = dto.IsActive;
+            await _context.SaveChangesAsync();
+
+            return new AuditoriumLayoutDto(
+                existingLayout.Id, existingLayout.Name, existingLayout.Venue, existingLayout.City, existingLayout.LayoutCode, existingLayout.TotalCapacity, existingLayout.Description, existingLayout.LayoutJson, existingLayout.IsActive
+            );
+        }
 
         var layout = new AuditoriumLayout
         {

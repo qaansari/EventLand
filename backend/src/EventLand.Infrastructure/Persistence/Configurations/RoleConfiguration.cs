@@ -17,6 +17,7 @@ public sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
 
         builder.HasIndex(r => r.Name)
                .IsUnique()
+               .HasFilter("[IsDeleted] = 0")
                .HasDatabaseName("IX_Roles_Name");
 
         builder.Property(r => r.Description)

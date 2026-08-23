@@ -17,6 +17,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasIndex(u => u.Email)
                .IsUnique()
+               .HasFilter("[IsDeleted] = 0")
                .HasDatabaseName("IX_Users_Email");
 
         builder.Property(u => u.FullName)

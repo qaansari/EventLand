@@ -21,6 +21,7 @@ public sealed class OrganizerConfiguration : IEntityTypeConfiguration<Organizer>
 
         builder.HasIndex(o => o.Email)
                .IsUnique()
+               .HasFilter("[IsDeleted] = 0")
                .HasDatabaseName("IX_Organizers_Email");
 
         builder.Property(o => o.Phone)

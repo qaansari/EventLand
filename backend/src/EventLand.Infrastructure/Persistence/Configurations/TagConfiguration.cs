@@ -21,6 +21,7 @@ public sealed class TagConfiguration : IEntityTypeConfiguration<Tag>
 
         builder.HasIndex(t => t.Slug)
                .IsUnique()
+               .HasFilter("[IsDeleted] = 0")
                .HasDatabaseName("IX_Tags_Slug");
 
         builder.HasQueryFilter(t => !t.IsDeleted);

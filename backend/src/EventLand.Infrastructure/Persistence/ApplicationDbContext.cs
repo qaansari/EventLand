@@ -36,9 +36,20 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         // Automatically picks up all IEntityTypeConfiguration<T> classes in this assembly
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
 
-        // Configure all integer primary keys to start at 1000 for clean 4-digit numeric ID scheme
+        // Apply global soft-delete query filter for all BaseEntity models
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
+            if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
+            {
+                var parameter = System.Linq.Expressions.Expression.Parameter(entityType.ClrType, "e");
+                var property = System.Linq.Expressions.Expression.Property(parameter, nameof(BaseEntity.IsDeleted));
+                var falseConstant = System.Linq.Expressions.Expression.Constant(false);
+                var comparison = System.Linq.Expressions.Expression.Equal(property, falseConstant);
+                var lambda = System.Linq.Expressions.Expression.Lambda(comparison, parameter);
+
+                modelBuilder.Entity(entityType.ClrType).HasQueryFilter(lambda);
+            }
+
             var idProperty = entityType.FindProperty("Id");
             if (idProperty != null && idProperty.ClrType == typeof(int))
             {

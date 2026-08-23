@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "E:\\EventLand\\backend\\src\\EventLand.API\\EventLand.Api.csproj": {}
+    "E:\\EventLand\\backend\\src\\EventLand.Api\\EventLand.Api.csproj": {}
   },
   "projects": {
-    "E:\\EventLand\\backend\\src\\EventLand.API\\EventLand.Api.csproj": {
+    "E:\\EventLand\\backend\\src\\EventLand.Api\\EventLand.Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "E:\\EventLand\\backend\\src\\EventLand.API\\EventLand.Api.csproj",
+        "projectUniqueName": "E:\\EventLand\\backend\\src\\EventLand.Api\\EventLand.Api.csproj",
         "projectName": "EventLand.Api",
-        "projectPath": "E:\\EventLand\\backend\\src\\EventLand.API\\EventLand.Api.csproj",
+        "projectPath": "E:\\EventLand\\backend\\src\\EventLand.Api\\EventLand.Api.csproj",
         "packagesPath": "C:\\Users\\EVENT-LAND\\.nuget\\packages\\",
-        "outputPath": "E:\\EventLand\\backend\\src\\EventLand.API\\obj\\",
+        "outputPath": "E:\\EventLand\\backend\\src\\EventLand.Api\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

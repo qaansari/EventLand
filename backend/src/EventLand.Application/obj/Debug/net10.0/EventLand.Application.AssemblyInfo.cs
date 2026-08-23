@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("EventLand.Application")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+296f8a936ce21d7782407460d2ff8fbd41639c44")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+62d3d8473c355edba6ffbb0c0353a4aa731df983")]
 [assembly: System.Reflection.AssemblyProductAttribute("EventLand.Application")]
 [assembly: System.Reflection.AssemblyTitleAttribute("EventLand.Application")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
