@@ -484,15 +484,20 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
             ) : (
               /* Option 2: Mapped Venue Seat Selection */
               <div>
-                <p style={{ fontSize: '0.88rem', color: '#cbd5e1', marginBottom: '1.25rem' }}>
-                  This event features an interactive visual stage & venue seat map. Click below to view available rows and pick your exact seats.
-                </p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <p style={{ fontSize: '0.88rem', color: '#cbd5e1', margin: 0 }}>
+                    Selected Show Slot: <strong style={{ color: '#38bdf8' }}>{activeShow?.showTitle || 'Standard Performance'}</strong>
+                  </p>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '0.25rem 0.65rem', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                    Starting from PKR {(activeShow?.startingPrice || activeShow?.ticketTiers?.[0]?.price || event.startingPrice || 2500).toLocaleString()}
+                  </span>
+                </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                  {event.seatingZones?.map((zone) => (
-                    <div key={zone.zone} style={{ backgroundColor: '#10192d', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  {(event.seatingZones && event.seatingZones.length > 0 ? event.seatingZones : [{ zone: event.venue || 'Auditorium Main Hall', price: activeShow?.startingPrice || event.startingPrice || 2500 }]).map((zone, zIdx) => (
+                    <div key={zone.zone || zIdx} style={{ backgroundColor: '#10192d', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
                       <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', display: 'block' }}>{zone.zone}</span>
-                      <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#3b82f6' }}>PKR {zone.price.toLocaleString()}</span>
+                      <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#3b82f6' }}>PKR {(activeShow?.startingPrice || zone.price || event.startingPrice || 2500).toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
@@ -500,7 +505,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                 <button
                   onClick={handleMappedBookNow}
                   className="btn btn-primary"
-                  style={{ width: '100%', padding: '0.9rem', fontSize: '1rem' }}
+                  style={{ width: '100%', padding: '0.9rem', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                 >
                   <Grid size={18} /> Open Interactive Seat Picker & Book Now
                 </button>

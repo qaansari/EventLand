@@ -25,13 +25,18 @@ import {
   UploadCloud,
   Music,
   UserCheck,
-  Sparkles
+  Sparkles,
+  Grid,
+  Eye,
+  Check
 } from 'lucide-react';
 import { adminApi, uploadApi, getEventImageUrl, getOrganizerImageUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
 import EventCard from './EventCard';
+import InteractiveSeatPicker from './InteractiveSeatPicker';
+import { parseAuditoriumLayout, createBlankLayoutJson } from '../data/auditoriumLayouts';
 
 // --- File Upload Component Helper ---
 function FileUploadField({ label, value, onChange, placeholder = "Image URL or upload file...", type = "events", entityName = null, entityId = null }) {
@@ -125,6 +130,7 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [usersList, setUsersList] = useState([]);
   const [rolesList, setRolesList] = useState([]);
   const [tagsList, setTagsList] = useState([]);
+  const [auditoriumsList, setAuditoriumsList] = useState([]);
 
   // Form Modal States
   const [showEventModal, setShowEventModal] = useState(false);
@@ -134,6 +140,8 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
+  const [showAuditoriumModal, setShowAuditoriumModal] = useState(false);
+  const [previewAuditorium, setPreviewAuditorium] = useState(null);
 
   // --- Initial Form States ---
   const defaultEventForm = {
@@ -152,11 +160,24 @@ export default function AdminDashboard({ onSelectEvent }) {
     priceRange: 'PKR 1,500 - PKR 5,000',
     startingPrice: 1500,
     ticketingType: 'categorized',
+    auditoriumLayout: '',
     banner: '',
     description: 'Join us for an extraordinary live event experience featuring Pakistan top performers.',
     scarcityText: 'Selling Fast',
     organizerId: '',
     shows: []
+  };
+
+  const defaultAuditoriumForm = {
+    id: null,
+    name: '',
+    venue: '',
+    city: 'Karachi',
+    layoutCode: '',
+    totalCapacity: 200,
+    description: '',
+    layoutJson: createBlankLayoutJson(10, 20),
+    isActive: true
   };
 
   const defaultOrgForm = {
@@ -224,20 +245,22 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [userForm, setUserForm] = useState(defaultUserForm);
   const [roleForm, setRoleForm] = useState(defaultRoleForm);
   const [tagForm, setTagForm] = useState(defaultTagForm);
+  const [auditoriumForm, setAuditoriumForm] = useState(defaultAuditoriumForm);
 
   // Load Data from Backend API
   const fetchBackendData = async () => {
     setLoading(true);
     setErrorMsg('');
     try {
-      const [orgs, evs, arts, bks, rls, usrs, tgs] = await Promise.all([
+      const [orgs, evs, arts, bks, rls, usrs, tgs, auds] = await Promise.all([
         adminApi.organizers.getAll().catch(() => []),
         adminApi.events.getAll(1, 50).catch(() => ({ items: [] })),
         adminApi.artists.getAll(1, 50).catch(() => ({ items: [] })),
         adminApi.bookings.getAll(1, 50).catch(() => ({ items: [] })),
         adminApi.roles.getAll().catch(() => []),
         adminApi.users.getAll(1, 50).catch(() => ({ items: [] })),
-        adminApi.tags.getAll().catch(() => [])
+        adminApi.tags.getAll().catch(() => []),
+        adminApi.auditoriumLayouts.getAll().catch(() => [])
       ]);
 
       const rawOrgs = Array.isArray(orgs) ? orgs : (orgs?.items || []);
@@ -258,6 +281,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       setRolesList(rls || []);
       setUsersList(usrs.items || usrs || []);
       setTagsList(tgs || []);
+      setAuditoriumsList(Array.isArray(auds) ? auds : (auds?.items || []));
     } catch (err) {
       console.error('Error fetching admin data:', err);
       setErrorMsg(err.message || 'Failed to load backend data.');
@@ -325,7 +349,14 @@ export default function AdminDashboard({ onSelectEvent }) {
           : (s.startTimeUtc || new Date().toISOString()),
         endTimeUtc: s.endTimeUtc && !s.endTimeUtc.includes('+') && !s.endTimeUtc.includes('Z')
           ? `${s.endTimeUtc}:00+05:00`
-          : (s.endTimeUtc || new Date().toISOString())
+          : (s.endTimeUtc || new Date().toISOString()),
+        startingPrice: parseFloat(s.startingPrice) || parseFloat(eventForm.startingPrice) || 1500,
+        ticketTiers: (s.ticketTiers || []).map(t => ({
+          name: t.name || 'Standard Pass',
+          price: parseFloat(t.price) || parseFloat(s.startingPrice) || 1500,
+          availableQuantity: parseInt(t.availableQuantity, 10) || 100,
+          description: t.description || `${t.name || 'Standard'} pass for ${s.showTitle || 'Show'}`
+        }))
       }));
 
       const payload = {
@@ -341,6 +372,7 @@ export default function AdminDashboard({ onSelectEvent }) {
         endDateUtc: endDate.toISOString(),
         startingPrice: parseFloat(eventForm.startingPrice) || 0,
         ticketingType: eventForm.ticketingType || 'categorized',
+        auditoriumLayout: eventForm.auditoriumLayout || '',
         banner: eventForm.banner || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&h=500&fit=crop',
         description: eventForm.description || title,
         scarcityText: eventForm.scarcityText || 'Selling Fast',
@@ -389,6 +421,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       endDateUtc: ev.endDateUtc ? ev.endDateUtc.slice(0, 16) : new Date().toISOString().slice(0, 16),
       startingPrice: ev.startingPrice || 1500,
       ticketingType: (ev.ticketingType || 'categorized').toLowerCase(),
+      auditoriumLayout: ev.seatingZones?.[0]?.layoutJson || '',
       banner: ev.banner || '',
       description: ev.description || '',
       scarcityText: ev.scarcityText || 'Selling Fast',
@@ -397,7 +430,15 @@ export default function AdminDashboard({ onSelectEvent }) {
         id: s.id,
         showTitle: s.showTitle || '',
         startTimeUtc: s.startTimeUtc ? s.startTimeUtc.slice(0, 16) : '',
-        endTimeUtc: s.endTimeUtc ? s.endTimeUtc.slice(0, 16) : ''
+        endTimeUtc: s.endTimeUtc ? s.endTimeUtc.slice(0, 16) : '',
+        startingPrice: s.startingPrice || (s.ticketTiers?.[0]?.price) || ev.startingPrice || 1500,
+        ticketTiers: (s.ticketTiers || []).map(t => ({
+          id: t.id,
+          name: t.name || 'Standard Pass',
+          price: t.price || 1500,
+          availableQuantity: t.availableQuantity || 100,
+          description: t.description || ''
+        }))
       }))
     });
     setShowEventModal(true);
@@ -741,6 +782,80 @@ export default function AdminDashboard({ onSelectEvent }) {
     }
   };
 
+  // --- CRUD: AUDITORIUM LAYOUTS ---
+  const handleSaveAuditorium = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (!auditoriumForm.name || !auditoriumForm.venue) {
+      const msg = 'Please enter an auditorium name and venue.';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
+      return;
+    }
+
+    try {
+      const payload = {
+        name: auditoriumForm.name.trim(),
+        venue: auditoriumForm.venue.trim(),
+        city: auditoriumForm.city || 'Karachi',
+        layoutCode: auditoriumForm.layoutCode || auditoriumForm.name.toUpperCase().replace(/\s+/g, '_'),
+        totalCapacity: parseInt(auditoriumForm.totalCapacity, 10) || 200,
+        description: auditoriumForm.description || '',
+        layoutJson: typeof auditoriumForm.layoutJson === 'object' ? JSON.stringify(auditoriumForm.layoutJson) : (auditoriumForm.layoutJson || createBlankLayoutJson(10, 20)),
+        isActive: auditoriumForm.isActive !== false
+      };
+
+      if (auditoriumForm.id) {
+        await adminApi.auditoriumLayouts.update(auditoriumForm.id, payload);
+        const msg = `Auditorium layout "${payload.name}" updated successfully!`;
+        setSuccessMsg(msg);
+        showSuccess('Layout Updated', msg);
+      } else {
+        await adminApi.auditoriumLayouts.create(payload);
+        const msg = `Auditorium layout "${payload.name}" created successfully!`;
+        setSuccessMsg(msg);
+        showSuccess('Layout Created', msg);
+      }
+
+      setShowAuditoriumModal(false);
+      setAuditoriumForm(defaultAuditoriumForm);
+      fetchBackendData();
+    } catch (err) {
+      console.error('Save Auditorium Error:', err);
+      setErrorMsg(err.message || 'Failed to save auditorium layout.');
+      showError('Save Failed', err.message || 'Failed to save auditorium layout.');
+    }
+  };
+
+  const handleEditAuditorium = (aud) => {
+    setAuditoriumForm({
+      id: aud.id,
+      name: aud.name || '',
+      venue: aud.venue || '',
+      city: aud.city || 'Karachi',
+      layoutCode: aud.layoutCode || '',
+      totalCapacity: aud.totalCapacity || 200,
+      description: aud.description || '',
+      layoutJson: typeof aud.layoutJson === 'object' ? JSON.stringify(aud.layoutJson, null, 2) : (aud.layoutJson || ''),
+      isActive: aud.isActive ?? true
+    });
+    setShowAuditoriumModal(true);
+  };
+
+  const handleDeleteAuditorium = async (id) => {
+    if (!window.confirm('Are you sure you want to deactivate / delete this auditorium layout?')) return;
+    try {
+      await adminApi.auditoriumLayouts.delete(id);
+      setSuccessMsg('Auditorium layout deleted successfully.');
+      showSuccess('Auditorium Deleted', 'Layout removed from roster.');
+      fetchBackendData();
+    } catch (err) {
+      setErrorMsg(err.message || 'Delete failed.');
+    }
+  };
+
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1rem' }}>
       {/* Header */}
@@ -894,6 +1009,24 @@ export default function AdminDashboard({ onSelectEvent }) {
           }}
         >
           <ShieldCheck size={18} /> Roles ({rolesList.length})
+        </button>
+
+        <button
+          onClick={() => setActiveAdminTab('auditoriums')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'auditoriums' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Grid size={18} /> Auditorium Charts ({auditoriumsList.length})
         </button>
 
         <button
@@ -1336,6 +1469,85 @@ export default function AdminDashboard({ onSelectEvent }) {
         </div>
       )}
 
+      {/* --- TAB 8: AUDITORIUM CHARTS MANAGEMENT --- */}
+      {activeAdminTab === 'auditoriums' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>Auditorium Layouts & Seating Charts</h3>
+              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Create and manage custom auditorium seating charts.</p>
+            </div>
+            <button
+              onClick={() => { setAuditoriumForm(defaultAuditoriumForm); setShowAuditoriumModal(true); }}
+              style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <Plus size={16} /> Add Auditorium Layout
+            </button>
+          </div>
+
+          {auditoriumsList.length === 0 ? (
+            <div className="glass-card" style={{ padding: '3rem 2rem', textAlign: 'center', borderRadius: '16px' }}>
+              <Grid size={48} color="#3b82f6" style={{ margin: '0 auto 1rem', opacity: 0.8 }} />
+              <h4 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fff', marginBottom: '0.5rem' }}>No Auditorium Layouts In Database</h4>
+              <p style={{ color: '#94a3b8', fontSize: '0.9rem', maxWidth: '480px', margin: '0 auto 1.5rem' }}>
+                You have not added any auditorium layouts yet. Click below to create your custom auditorium blueprint.
+              </p>
+              <button
+                onClick={() => { setAuditoriumForm(defaultAuditoriumForm); setShowAuditoriumModal(true); }}
+                style={{ padding: '0.65rem 1.5rem', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+              >
+                + Create Your First Auditorium
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
+              {auditoriumsList.map(aud => (
+                <div key={aud.id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <span className="badge" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', marginBottom: '0.35rem' }}>
+                        {aud.city} • {aud.totalCapacity} Seats
+                      </span>
+                      <h4 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', marginTop: '0.2rem' }}>
+                        {aud.name}
+                      </h4>
+                      <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                        <MapPin size={13} style={{ display: 'inline', marginRight: '3px' }} /> {aud.venue}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: '0.83rem', color: '#cbd5e1', lineHeight: 1.4, flexGrow: 1 }}>
+                    {aud.description || 'Custom interactive venue blueprint.'}
+                  </p>
+
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <button
+                      onClick={() => setPreviewAuditorium(aud)}
+                      style={{ padding: '0.5rem 0.85rem', background: 'rgba(16, 185, 129, 0.18)', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: '6px', color: '#34d399', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600 }}
+                    >
+                      <Eye size={14} /> Preview Chart
+                    </button>
+                    <button
+                      onClick={() => handleEditAuditorium(aud)}
+                      style={{ flex: 1, padding: '0.5rem', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '6px', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600 }}
+                    >
+                      <Edit3 size={14} /> Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteAuditorium(aud.id)}
+                      style={{ padding: '0.5rem 0.8rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.82rem' }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* --- MODAL 1: CREATE / EDIT EVENT --- */}
       {showEventModal && (() => {
         const previewEvent = {
@@ -1480,6 +1692,44 @@ export default function AdminDashboard({ onSelectEvent }) {
                       </div>
                     </div>
 
+                    {/* Auditorium Seating Chart Selector (if Mapped Ticketing) */}
+                    {eventForm.ticketingType === 'mapped' && (
+                      <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '12px', padding: '1rem', marginTop: '0.25rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                          <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <Grid size={16} /> Select Auditorium Seating Layout *
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => { setShowEventModal(false); setActiveAdminTab('auditoriums'); }}
+                            style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                          >
+                            Manage Auditoriums ↗
+                          </button>
+                        </div>
+                        {auditoriumsList.length === 0 ? (
+                          <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', color: '#f87171', fontSize: '0.8rem' }}>
+                            No auditorium layouts exist in database yet. Please go to <strong>Auditorium Charts</strong> tab to create one first.
+                          </div>
+                        ) : (
+                          <SearchableSelect
+                            value={eventForm.auditoriumLayout || auditoriumsList[0]?.layoutCode || ''}
+                            onChange={e => {
+                              const code = e.target.value;
+                              const foundAud = auditoriumsList.find(a => a.layoutCode === code || a.name === code);
+                              setEventForm(prev => ({
+                                ...prev,
+                                auditoriumLayout: code,
+                                venue: prev.venue || foundAud?.venue || prev.venue,
+                                city: prev.city || foundAud?.city || prev.city
+                              }));
+                            }}
+                            options={auditoriumsList.map(a => ({ value: a.layoutCode || a.name, label: `${a.name} (${a.city} • ${a.totalCapacity} Seats)` }))}
+                          />
+                        )}
+                      </div>
+                    )}
+
                     {/* Integrated File Upload Field - Banner */}
                     <FileUploadField
                       label="Event Banner Image (Recommended: 1200x500px)"
@@ -1491,12 +1741,12 @@ export default function AdminDashboard({ onSelectEvent }) {
                       entityId={eventForm.id}
                     />
 
-                    {/* Multiple Show Slots Section */}
-                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    {/* Multiple Show Slots & Ticket Pricing Section */}
+                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                         <div>
-                          <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#f8fafc', display: 'block' }}>Event Shows & Timings (Multi-Show Support)</span>
-                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Add multiple show slots against this event</span>
+                          <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f8fafc', display: 'block' }}>🎭 Event Shows & Ticket Pricing per Show</span>
+                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Configure show timings and specific ticket tier prices for each performance</span>
                         </div>
                         <button
                           type="button"
@@ -1504,50 +1754,74 @@ export default function AdminDashboard({ onSelectEvent }) {
                             const newShows = [...(eventForm.shows || []), {
                               showTitle: `Show ${(eventForm.shows?.length || 0) + 1}`,
                               startTimeUtc: eventForm.startDateUtc || new Date().toISOString().slice(0, 16),
-                              endTimeUtc: eventForm.endDateUtc || new Date().toISOString().slice(0, 16)
+                              endTimeUtc: eventForm.endDateUtc || new Date().toISOString().slice(0, 16),
+                              startingPrice: parseFloat(eventForm.startingPrice) || 1500,
+                              ticketTiers: [
+                                { name: 'Standard Pass', price: parseFloat(eventForm.startingPrice) || 1500, availableQuantity: 150 },
+                                { name: 'VIP Pass', price: (parseFloat(eventForm.startingPrice) || 1500) * 2.25, availableQuantity: 50 }
+                              ]
                             }];
                             setEventForm({ ...eventForm, shows: newShows });
                           }}
-                          style={{ padding: '0.4rem 0.8rem', borderRadius: '6px', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', color: '#60a5fa', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                          style={{ padding: '0.45rem 0.85rem', borderRadius: '6px', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', color: '#60a5fa', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                         >
                           <Plus size={14} /> Add Show Slot
                         </button>
                       </div>
 
                       {(eventForm.shows || []).length === 0 ? (
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', padding: '0.5rem 0' }}>
-                          No separate show slots added. The main event start/end dates will be used as the default show.
+                        <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', padding: '0.75rem 0' }}>
+                          No separate show slots added. The main event start/end dates and starting price will be used as the default show.
                         </div>
                       ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                           {eventForm.shows.map((s, sIdx) => (
-                            <div key={sIdx} style={{ background: 'rgba(30, 41, 59, 0.6)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <div key={sIdx} style={{ background: 'rgba(30, 41, 59, 0.7)', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                                <input
-                                  type="text"
-                                  placeholder="Show Title (e.g. Matinee Show, Day 1)"
-                                  value={s.showTitle}
-                                  onChange={e => {
-                                    const updated = [...eventForm.shows];
-                                    updated[sIdx].showTitle = e.target.value;
-                                    setEventForm({ ...eventForm, shows: updated });
-                                  }}
-                                  style={{ flex: 1, padding: '0.5rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', color: '#fff', fontSize: '0.8125rem' }}
-                                />
+                                <div style={{ flex: 2 }}>
+                                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Show Title</label>
+                                  <input
+                                    type="text"
+                                    placeholder="Show Title (e.g. Matinee Show, Day 1)"
+                                    value={s.showTitle}
+                                    onChange={e => {
+                                      const updated = [...eventForm.shows];
+                                      updated[sIdx].showTitle = e.target.value;
+                                      setEventForm({ ...eventForm, shows: updated });
+                                    }}
+                                    style={{ width: '100%', padding: '0.5rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', color: '#fff', fontSize: '0.8125rem' }}
+                                  />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Base Price (PKR)</label>
+                                  <input
+                                    type="number"
+                                    placeholder="Base Price"
+                                    value={s.startingPrice ?? eventForm.startingPrice ?? 1500}
+                                    onChange={e => {
+                                      const updated = [...eventForm.shows];
+                                      updated[sIdx].startingPrice = parseFloat(e.target.value) || 0;
+                                      setEventForm({ ...eventForm, shows: updated });
+                                    }}
+                                    style={{ width: '100%', padding: '0.5rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', color: '#38bdf8', fontWeight: 700, fontSize: '0.8125rem' }}
+                                  />
+                                </div>
                                 <button
                                   type="button"
+                                  title="Delete Show Slot"
                                   onClick={() => {
                                     const updated = eventForm.shows.filter((_, idx) => idx !== sIdx);
                                     setEventForm({ ...eventForm, shows: updated });
                                   }}
-                                  style={{ padding: '0.4rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer' }}
+                                  style={{ padding: '0.5rem', marginTop: '1rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer' }}
                                 >
                                   <Trash2 size={14} />
                                 </button>
                               </div>
+
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                                 <div>
-                                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>Start Time (PKT)</label>
+                                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.2rem' }}>Start Time (PKT)</label>
                                   <input
                                     type="datetime-local"
                                     value={s.startTimeUtc}
@@ -1556,11 +1830,11 @@ export default function AdminDashboard({ onSelectEvent }) {
                                       updated[sIdx].startTimeUtc = e.target.value;
                                       setEventForm({ ...eventForm, shows: updated });
                                     }}
-                                    style={{ width: '100%', padding: '0.4rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', color: '#fff', fontSize: '0.75rem' }}
+                                    style={{ width: '100%', padding: '0.45rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', color: '#fff', fontSize: '0.75rem' }}
                                   />
                                 </div>
                                 <div>
-                                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8' }}>End Time (PKT)</label>
+                                  <label style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', marginBottom: '0.2rem' }}>End Time (PKT)</label>
                                   <input
                                     type="datetime-local"
                                     value={s.endTimeUtc}
@@ -1569,9 +1843,90 @@ export default function AdminDashboard({ onSelectEvent }) {
                                       updated[sIdx].endTimeUtc = e.target.value;
                                       setEventForm({ ...eventForm, shows: updated });
                                     }}
-                                    style={{ width: '100%', padding: '0.4rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', color: '#fff', fontSize: '0.75rem' }}
+                                    style={{ width: '100%', padding: '0.45rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', color: '#fff', fontSize: '0.75rem' }}
                                   />
                                 </div>
+                              </div>
+
+                              {/* Show-Specific Ticket Tiers */}
+                              <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '0.65rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#a5b4fc' }}>
+                                    🎟️ Ticket Tiers for {s.showTitle || `Show #${sIdx + 1}`}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = [...eventForm.shows];
+                                      const currentTiers = updated[sIdx].ticketTiers || [];
+                                      updated[sIdx].ticketTiers = [
+                                        ...currentTiers,
+                                        { name: 'Standard Pass', price: s.startingPrice || 1500, availableQuantity: 100 }
+                                      ];
+                                      setEventForm({ ...eventForm, shows: updated });
+                                    }}
+                                    style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', background: 'rgba(99, 102, 241, 0.2)', border: '1px solid rgba(99, 102, 241, 0.4)', borderRadius: '4px', color: '#c7d2fe', cursor: 'pointer' }}
+                                  >
+                                    + Add Tier
+                                  </button>
+                                </div>
+
+                                {(!s.ticketTiers || s.ticketTiers.length === 0) ? (
+                                  <div style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic' }}>
+                                    Standard & VIP tiers will be auto-assigned using Base Price (PKR {s.startingPrice || eventForm.startingPrice || 1500}).
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                    {s.ticketTiers.map((tier, tIdx) => (
+                                      <div key={tIdx} style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                                        <input
+                                          type="text"
+                                          placeholder="Tier Name"
+                                          value={tier.name}
+                                          onChange={e => {
+                                            const updated = [...eventForm.shows];
+                                            updated[sIdx].ticketTiers[tIdx].name = e.target.value;
+                                            setEventForm({ ...eventForm, shows: updated });
+                                          }}
+                                          style={{ flex: 2, padding: '0.35rem 0.5rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', color: '#fff', fontSize: '0.75rem' }}
+                                        />
+                                        <input
+                                          type="number"
+                                          placeholder="Price (PKR)"
+                                          value={tier.price}
+                                          onChange={e => {
+                                            const updated = [...eventForm.shows];
+                                            updated[sIdx].ticketTiers[tIdx].price = parseFloat(e.target.value) || 0;
+                                            setEventForm({ ...eventForm, shows: updated });
+                                          }}
+                                          style={{ flex: 1.2, padding: '0.35rem 0.5rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', color: '#38bdf8', fontWeight: 700, fontSize: '0.75rem' }}
+                                        />
+                                        <input
+                                          type="number"
+                                          placeholder="Qty"
+                                          value={tier.availableQuantity}
+                                          onChange={e => {
+                                            const updated = [...eventForm.shows];
+                                            updated[sIdx].ticketTiers[tIdx].availableQuantity = parseInt(e.target.value, 10) || 0;
+                                            setEventForm({ ...eventForm, shows: updated });
+                                          }}
+                                          style={{ width: '60px', padding: '0.35rem 0.5rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', color: '#94a3b8', fontSize: '0.75rem' }}
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const updated = [...eventForm.shows];
+                                            updated[sIdx].ticketTiers = updated[sIdx].ticketTiers.filter((_, idx) => idx !== tIdx);
+                                            setEventForm({ ...eventForm, shows: updated });
+                                          }}
+                                          style={{ padding: '0.3rem', background: 'rgba(239, 68, 68, 0.15)', border: 'none', borderRadius: '4px', color: '#f87171', cursor: 'pointer' }}
+                                        >
+                                          <X size={12} />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -1893,6 +2248,207 @@ export default function AdminDashboard({ onSelectEvent }) {
             </form>
           </div>
         </div>
+      )}
+
+      {/* --- MODAL 8: CREATE / EDIT AUDITORIUM LAYOUT --- */}
+      {showAuditoriumModal && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '780px', width: '95vw', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div>
+                <span style={{ fontSize: '0.75rem', color: '#60a5fa', fontWeight: 700, textTransform: 'uppercase' }}>VENUE BLUEPRINT DESIGNER</span>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f8fafc' }}>
+                  {auditoriumForm.id ? 'Edit Auditorium Layout' : 'Create New Auditorium Layout'}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowAuditoriumModal(false)}
+                style={{ background: 'rgba(255, 255, 255, 0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Blueprint Generator Quick Tool */}
+            <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>
+                BLUEPRINT UTILITIES:
+              </span>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewAuditorium({
+                      id: 'draft-preview',
+                      name: auditoriumForm.name || 'Draft Blueprint Preview',
+                      venue: auditoriumForm.venue || 'Venue Preview',
+                      city: auditoriumForm.city || 'Karachi',
+                      layoutJson: auditoriumForm.layoutJson,
+                      totalCapacity: parseInt(auditoriumForm.totalCapacity, 10) || 200
+                    });
+                  }}
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '8px',
+                    background: 'rgba(16, 185, 129, 0.18)',
+                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                    color: '#34d399',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem'
+                  }}
+                >
+                  <Eye size={13} /> Live Chart Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuditoriumForm(prev => ({ ...prev, layoutJson: createBlankLayoutJson(10, 20) }))}
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    borderRadius: '8px',
+                    background: 'rgba(59, 130, 246, 0.15)',
+                    border: '1px solid rgba(59, 130, 246, 0.35)',
+                    color: '#93c5fd',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  ⚡ Reset to 10x20
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveAuditorium} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Auditorium Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Arts Council Karachi (AC II)"
+                    value={auditoriumForm.name}
+                    onChange={e => setAuditoriumForm({ ...auditoriumForm, name: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Venue Complex *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Arts Council of Pakistan"
+                    value={auditoriumForm.venue}
+                    onChange={e => setAuditoriumForm({ ...auditoriumForm, venue: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>City *</label>
+                  <SearchableSelect
+                    value={auditoriumForm.city}
+                    onChange={e => setAuditoriumForm({ ...auditoriumForm, city: e.target.value })}
+                    options={['Karachi', 'Lahore', 'Islamabad', 'Rawalpindi', 'Peshawar', 'Quetta']}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Total Capacity (Seats) *</label>
+                  <input
+                    type="number"
+                    required
+                    value={auditoriumForm.totalCapacity}
+                    onChange={e => setAuditoriumForm({ ...auditoriumForm, totalCapacity: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Layout Code / Slug</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. ACP_AC_II"
+                    value={auditoriumForm.layoutCode}
+                    onChange={e => setAuditoriumForm({ ...auditoriumForm, layoutCode: e.target.value.toUpperCase().replace(/\s+/g, '_') })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#38bdf8', fontFamily: 'monospace' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Description & Features</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Acoustic soundproofing, dual central aisles, tiered ground orchestra."
+                  value={auditoriumForm.description}
+                  onChange={e => setAuditoriumForm({ ...auditoriumForm, description: e.target.value })}
+                  style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
+                />
+              </div>
+
+              {/* JSON Blueprint Schema Editor */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  <label style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: 600 }}>
+                    Layout JSON Configuration (Rows, Sections & Aisles)
+                  </label>
+                  <span style={{ fontSize: '0.75rem', color: '#10b981' }}>
+                    ✓ JSON Schema Valid
+                  </span>
+                </div>
+                <textarea
+                  rows={8}
+                  value={auditoriumForm.layoutJson}
+                  onChange={e => setAuditoriumForm({ ...auditoriumForm, layoutJson: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    background: 'rgba(2, 6, 23, 0.85)',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    borderRadius: '8px',
+                    color: '#34d399',
+                    fontFamily: 'monospace',
+                    fontSize: '0.8rem',
+                    lineHeight: 1.4
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button type="button" onClick={() => setShowAuditoriumModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Save Auditorium Layout</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* --- BLUEPRINT PREVIEW MODAL --- */}
+      {previewAuditorium && (
+        <InteractiveSeatPicker
+          isPreview={true}
+          event={{
+            id: 'preview-' + previewAuditorium.id,
+            title: `${previewAuditorium.name} (Blueprint Preview)`,
+            venue: `${previewAuditorium.venue}, ${previewAuditorium.city}`,
+            totalCapacity: previewAuditorium.totalCapacity,
+            seatingZones: [
+              {
+                id: 1,
+                zone: previewAuditorium.name,
+                rows: 14,
+                cols: 98,
+                price: 2500,
+                layoutJson: previewAuditorium.layoutJson,
+                totalCapacity: previewAuditorium.totalCapacity
+              }
+            ]
+          }}
+          onClose={() => setPreviewAuditorium(null)}
+        />
       )}
     </div>
   );

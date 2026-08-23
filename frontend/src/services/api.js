@@ -191,7 +191,20 @@ export const adminApi = {
     create: async (dto) => request('/admin/roles', { method: 'POST', body: JSON.stringify(dto) }),
     update: async (id, dto) => request(`/admin/roles/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
     delete: async (id) => request(`/admin/roles/${id}`, { method: 'DELETE' })
+  },
+  auditoriumLayouts: {
+    getAll: async () => request('/admin/auditorium-layouts'),
+    getById: async (id) => request(`/admin/auditorium-layouts/${id}`),
+    create: async (dto) => request('/admin/auditorium-layouts', { method: 'POST', body: JSON.stringify(dto) }),
+    update: async (id, dto) => request(`/admin/auditorium-layouts/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+    delete: async (id) => request(`/admin/auditorium-layouts/${id}`, { method: 'DELETE' })
   }
+};
+
+// --- Public Auditorium Layouts API ---
+export const auditoriumLayoutsApi = {
+  getAll: async () => request('/auditorium-layouts'),
+  getById: async (id) => request(`/auditorium-layouts/${id}`)
 };
 
 // --- File & Image Upload API ---

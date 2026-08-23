@@ -18,6 +18,7 @@ public interface IApplicationDbContext
     DbSet<Artist>      Artists      { get; }
     DbSet<Tag>         Tags         { get; }
     DbSet<EventTag>    EventTags    { get; }
+    DbSet<AuditoriumLayout> AuditoriumLayouts { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

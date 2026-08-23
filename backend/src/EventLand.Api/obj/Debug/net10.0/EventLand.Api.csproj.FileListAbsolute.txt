@@ -352,7 +352,6 @@ E:\EventLand\backend\src\EventLand.Api\obj\Debug\net10.0\staticwebassets.build.j
 E:\EventLand\backend\src\EventLand.Api\obj\Debug\net10.0\staticwebassets.development.json
 E:\EventLand\backend\src\EventLand.Api\obj\Debug\net10.0\staticwebassets.build.endpoints.json
 E:\EventLand\backend\src\EventLand.Api\obj\Debug\net10.0\swae.build.ex.cache
-E:\EventLand\backend\src\EventLand.Api\obj\Debug\net10.0\staticwebassets.upToDateCheck.txt
 E:\EventLand\backend\src\EventLand.Api\obj\Debug\net10.0\EventLan.FB27011D.Up2Date
 E:\EventLand\backend\src\EventLand.Api\obj\Debug\net10.0\EventLand.Api.dll
 E:\EventLand\backend\src\EventLand.Api\obj\Debug\net10.0\refint\EventLand.Api.dll

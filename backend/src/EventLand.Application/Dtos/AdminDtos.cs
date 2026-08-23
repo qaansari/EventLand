@@ -1,9 +1,18 @@
 namespace EventLand.Application.Dtos;
 
+public record CreateShowTicketTierInputDto(
+    string Name,
+    decimal Price,
+    int AvailableQuantity = 100,
+    string? Description = null
+);
+
 public record CreateEventShowInputDto(
     string ShowTitle,
     DateTimeOffset StartTimeUtc,
-    DateTimeOffset EndTimeUtc
+    DateTimeOffset EndTimeUtc,
+    decimal? StartingPrice = null,
+    List<CreateShowTicketTierInputDto>? TicketTiers = null
 );
 
 public record CreateAdminEventDto(
@@ -24,7 +33,8 @@ public record CreateAdminEventDto(
     string? ScarcityText,
     int OrganizerId,
     List<int>? TagIds,
-    List<CreateEventShowInputDto>? Shows = null
+    List<CreateEventShowInputDto>? Shows = null,
+    string? AuditoriumLayout = null
 );
 
 public record UpdateAdminEventDto(
@@ -45,7 +55,8 @@ public record UpdateAdminEventDto(
     string? ScarcityText,
     int OrganizerId,
     List<int>? TagIds,
-    List<CreateEventShowInputDto>? Shows = null
+    List<CreateEventShowInputDto>? Shows = null,
+    string? AuditoriumLayout = null
 );
 
 public record CreateOrganizerDto(

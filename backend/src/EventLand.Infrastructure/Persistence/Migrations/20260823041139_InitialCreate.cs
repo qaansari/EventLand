@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace EventLand.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialSchema : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -38,6 +38,32 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Artists", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "AuditoriumLayouts",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1000, 1"),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Venue = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    City = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    LayoutCode = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TotalCapacity = table.Column<int>(type: "int", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    LayoutJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AuditoriumLayouts", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -389,15 +415,15 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_BookingSeats_Seats_SeatId",
-                        column: x => x.SeatId,
-                        principalTable: "Seats",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
                         name: "FK_BookingSeats_EventShows_EventShowId",
                         column: x => x.EventShowId,
                         principalTable: "EventShows",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_BookingSeats_Seats_SeatId",
+                        column: x => x.SeatId,
+                        principalTable: "Seats",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -432,6 +458,11 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 name: "IX_Bookings_TicketTierId",
                 table: "Bookings",
                 column: "TicketTierId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_BookingSeats_EventShowId",
+                table: "BookingSeats",
+                column: "EventShowId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_BookingSeats_SeatId",
@@ -544,6 +575,9 @@ namespace EventLand.Infrastructure.Persistence.Migrations
         {
             migrationBuilder.DropTable(
                 name: "Artists");
+
+            migrationBuilder.DropTable(
+                name: "AuditoriumLayouts");
 
             migrationBuilder.DropTable(
                 name: "BookingSeats");

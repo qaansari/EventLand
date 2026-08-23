@@ -233,6 +233,11 @@ export default function App() {
   const handleProceedFromDetail = (event, targetFlow, seats) => {
     setActiveDetailEvent(null);
 
+    if (targetFlow === 'seat-picker') {
+      setActiveSeatPickerEvent(event);
+      return;
+    }
+
     if (!currentUser) {
       setPendingBookingData({ event, targetFlow, seats });
       setAuthModalRole('customer');
@@ -241,9 +246,7 @@ export default function App() {
       return;
     }
 
-    if (targetFlow === 'seat-picker') {
-      setActiveSeatPickerEvent(event);
-    } else if (targetFlow === 'checkout') {
+    if (targetFlow === 'checkout') {
       setCheckoutData({ event, seats });
     }
   };
@@ -424,7 +427,7 @@ export default function App() {
 
         {/* View: AI Event Matchmaker Assistant */}
         {activeView === 'ai-assistant' && (
-          <AiEventAssistant onSelectEvent={handleSelectEventForDetail} />
+          <AiEventAssistant events={events} onSelectEvent={handleSelectEventForDetail} />
         )}
 
         {/* View: List Your Event Wizard */}

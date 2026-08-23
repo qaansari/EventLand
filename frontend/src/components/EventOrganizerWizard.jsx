@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Sparkles, Grid, Layers } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sparkles, Grid, Layers, MapPin, CheckCircle } from 'lucide-react';
 import EventCard from './EventCard';
-import { uploadApi, adminApi } from '../services/api';
+import { uploadApi, adminApi, auditoriumLayoutsApi } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
@@ -10,6 +10,8 @@ import { CITIES } from '../data/mockEvents';
 export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
   const { showError, showSuccess } = useToast();
   const [tagsList, setTagsList] = useState([]);
+  const [auditoriumsList, setAuditoriumsList] = useState([]);
+
   const [eventForm, setEventForm] = useState({
     title: '',
     tagIds: [],
@@ -22,6 +24,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
     priceRange: 'PKR 2,000 - PKR 5,000',
     startingPrice: 2000,
     ticketingType: 'categorized', // 'categorized' or 'mapped'
+    auditoriumLayout: '',
     banner: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1200&q=80',
     description: '',
     scarcityText: 'Selling Fast',
@@ -30,14 +33,10 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
     tier1Name: 'Standard Entry',
     tier1Price: 2000,
     tier2Name: 'VIP Pass',
-    tier2Price: 4500,
-    zone1Name: 'VIP Front Row',
-    zone1Price: 5000,
-    zone2Name: 'General Lawn',
-    zone2Price: 2000
+    tier2Price: 4500
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     adminApi.tags.getAll()
       .then(tags => setTagsList(tags || []))
       .catch(() => setTagsList([
@@ -50,9 +49,26 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
         { id: 7, name: 'Workshops' },
         { id: 8, name: 'Corporate' }
       ]));
+
+    auditoriumLayoutsApi.getAll()
+      .then(auds => {
+        const list = auds || [];
+        setAuditoriumsList(list);
+        if (list.length > 0) {
+          setEventForm(prev => ({
+            ...prev,
+            auditoriumLayout: prev.auditoriumLayout || list[0].layoutCode || list[0].name
+          }));
+        }
+      })
+      .catch(() => setAuditoriumsList([]));
   }, []);
 
   const [publishedSuccess, setPublishedSuccess] = useState(false);
+
+  const selectedAuditorium = auditoriumsList.find(
+    a => a.layoutCode === eventForm.auditoriumLayout || a.name === eventForm.auditoriumLayout
+  ) || auditoriumsList[0];
 
   const previewEventObject = {
     id: 'user-created-' + Date.now(),
@@ -71,6 +87,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
     priceRange: eventForm.priceRange || `PKR ${Number(eventForm.startingPrice || 0).toLocaleString()} - 5,000`,
     startingPrice: Number(eventForm.startingPrice || 1000),
     ticketingType: eventForm.ticketingType,
+    auditoriumLayout: eventForm.auditoriumLayout,
     banner: eventForm.banner,
     description: eventForm.description || 'Provide a compelling description of your concert or festival.',
     organizer: eventForm.organizer || 'Organizer Name',
@@ -79,10 +96,16 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
       { id: 't1', name: eventForm.tier1Name, price: Number(eventForm.tier1Price || 2000), description: 'Standard admission pass' },
       { id: 't2', name: eventForm.tier2Name, price: Number(eventForm.tier2Price || 4500), description: 'Fast track VIP entry pass' }
     ] : [
-      { id: 't1', name: 'General Entry', price: Number(eventForm.zone2Price || 2000), description: 'Standard entry pass' }
+      { id: 't1', name: 'General Entry', price: Number(eventForm.startingPrice || 2500), description: 'Standard seat booking' }
     ],
     seatingZones: eventForm.ticketingType === 'mapped' ? [
-      { zone: 'AC II ACP KARACHI Main Hall', rows: 11, cols: 28, price: Number(eventForm.startingPrice || 2500), layoutJson: 'AC_II_ACP_KARACHI' }
+      {
+        zone: selectedAuditorium?.name || 'Auditorium Main Hall',
+        rows: 10,
+        cols: 20,
+        price: Number(eventForm.startingPrice || 2500),
+        layoutJson: selectedAuditorium?.layoutJson || eventForm.auditoriumLayout || ''
+      }
     ] : []
   };
 
@@ -199,11 +222,58 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
                     <Grid color="#3b82f6" size={22} />
                     <div>
                       <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem', display: 'block' }}>2) Mapped</span>
-                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Interactive Venue Seat Grid</span>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Interactive Auditorium Seat Chart</span>
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Auditorium Layout Picker (when Mapped Ticketing) */}
+              {eventForm.ticketingType === 'mapped' && (
+                <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '12px', padding: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#60a5fa', fontWeight: 700, marginBottom: '0.35rem' }}>
+                    Select Auditorium / Hall Blueprint *
+                  </label>
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '0.75rem' }}>
+                    Choose the auditorium layout for reserved seat bookings:
+                  </span>
+                  
+                  {auditoriumsList.length === 0 ? (
+                    <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', color: '#f87171', fontSize: '0.8rem' }}>
+                      No auditorium layouts found in database. Contact an admin to configure an auditorium blueprint.
+                    </div>
+                  ) : (
+                    <>
+                      <SearchableSelect
+                        value={eventForm.auditoriumLayout || auditoriumsList[0]?.layoutCode || ''}
+                        onChange={(e) => {
+                          const code = e.target.value;
+                          const chosen = auditoriumsList.find(a => a.layoutCode === code || a.name === code);
+                          setEventForm(prev => ({
+                            ...prev,
+                            auditoriumLayout: code,
+                            venue: chosen?.venue ? `${chosen.venue}, ${chosen.city}` : prev.venue,
+                            city: chosen?.city || prev.city
+                          }));
+                        }}
+                        options={auditoriumsList.map(a => ({
+                          value: a.layoutCode || a.name,
+                          label: `${a.name} (${a.city} • ${a.totalCapacity} Seats)`
+                        }))}
+                      />
+
+                      {selectedAuditorium && (
+                        <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <CheckCircle size={15} color="#10b981" />
+                          <span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>
+                            Selected: <strong style={{ color: '#fff' }}>{selectedAuditorium.name}</strong> ({selectedAuditorium.totalCapacity} seats layout)
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>

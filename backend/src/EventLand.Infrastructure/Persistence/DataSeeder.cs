@@ -1,10 +1,11 @@
 namespace EventLand.Infrastructure.Persistence;
 
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 
 /// <summary>
 /// Database Initializer.
-/// Applies EF Core migrations on application startup to ensure schema is created.
+/// Applies EF Core migrations on application startup.
 /// </summary>
 public static class DataSeeder
 {

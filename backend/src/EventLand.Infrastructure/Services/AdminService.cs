@@ -285,26 +285,103 @@ public class AdminService : IAdminService
         {
             foreach (var sInput in dto.Shows)
             {
-                _context.EventShows.Add(new EventShow
+                var show = new EventShow
                 {
                     EventId = ev.Id,
                     ShowTitle = sInput.ShowTitle,
                     StartTimeUtc = sInput.StartTimeUtc,
                     EndTimeUtc = sInput.EndTimeUtc
-                });
+                };
+                _context.EventShows.Add(show);
+                await _context.SaveChangesAsync();
+
+                if (sInput.TicketTiers is not null && sInput.TicketTiers.Any())
+                {
+                    int sort = 1;
+                    foreach (var tInput in sInput.TicketTiers)
+                    {
+                        _context.TicketTiers.Add(new TicketTier
+                        {
+                            EventId = ev.Id,
+                            EventShowId = show.Id,
+                            Name = tInput.Name,
+                            Description = tInput.Description ?? $"{tInput.Name} pass for {show.ShowTitle}",
+                            Price = tInput.Price > 0 ? tInput.Price : (dto.StartingPrice > 0 ? dto.StartingPrice : 1500m),
+                            AvailableQuantity = tInput.AvailableQuantity > 0 ? tInput.AvailableQuantity : 100,
+                            SortOrder = sort++
+                        });
+                    }
+                }
+                else if (ticketingType == TicketingType.Categorized)
+                {
+                    var basePrice = sInput.StartingPrice ?? (dto.StartingPrice > 0 ? dto.StartingPrice : 1500m);
+                    _context.TicketTiers.Add(new TicketTier
+                    {
+                        EventId = ev.Id,
+                        EventShowId = show.Id,
+                        Name = "Standard Pass",
+                        Description = $"Standard admission pass for {show.ShowTitle}",
+                        Price = basePrice,
+                        AvailableQuantity = 150,
+                        SortOrder = 1
+                    });
+                    _context.TicketTiers.Add(new TicketTier
+                    {
+                        EventId = ev.Id,
+                        EventShowId = show.Id,
+                        Name = "VIP Pass",
+                        Description = $"VIP fast-track pass for {show.ShowTitle}",
+                        Price = basePrice * 2.25m,
+                        AvailableQuantity = 50,
+                        SortOrder = 2
+                    });
+                }
             }
         }
         else
         {
-            _context.EventShows.Add(new EventShow
+            var defaultShow = new EventShow
             {
                 EventId = ev.Id,
                 ShowTitle = "Standard Performance",
                 StartTimeUtc = dto.StartDateUtc,
                 EndTimeUtc = dto.EndDateUtc
-            });
+            };
+            _context.EventShows.Add(defaultShow);
+            await _context.SaveChangesAsync();
+
+            if (ticketingType == TicketingType.Categorized)
+            {
+                var basePrice = dto.StartingPrice > 0 ? dto.StartingPrice : 1500m;
+                _context.TicketTiers.Add(new TicketTier
+                {
+                    EventId = ev.Id,
+                    EventShowId = defaultShow.Id,
+                    Name = "Standard Pass",
+                    Description = "Standard admission pass",
+                    Price = basePrice,
+                    AvailableQuantity = 150,
+                    SortOrder = 1
+                });
+                _context.TicketTiers.Add(new TicketTier
+                {
+                    EventId = ev.Id,
+                    EventShowId = defaultShow.Id,
+                    Name = "VIP Pass",
+                    Description = "VIP fast-track pass",
+                    Price = basePrice * 2.25m,
+                    AvailableQuantity = 50,
+                    SortOrder = 2
+                });
+            }
         }
         await _context.SaveChangesAsync();
+
+        // If Mapped Seating, automatically generate SeatingZone & Seats for selected Auditorium
+        if (ticketingType == TicketingType.Mapped)
+        {
+            await CreateSeatingZoneFromLayoutAsync(ev.Id, dto.AuditoriumLayout, dto.StartingPrice);
+        }
 
         await _cacheService.ClearEventCacheAsync(ev.Id);
 
@@ -367,34 +444,106 @@ public class AdminService : IAdminService
             }
         }
 
-        // Update shows
+        // Update shows & show ticket tiers
         if (dto.Shows is not null)
         {
             var existingShows = await _context.EventShows.Where(s => s.EventId == id).ToListAsync();
             _context.EventShows.RemoveRange(existingShows);
+            await _context.SaveChangesAsync();
 
             if (dto.Shows.Any())
             {
                 foreach (var sInput in dto.Shows)
                 {
-                    _context.EventShows.Add(new EventShow
+                    var show = new EventShow
                     {
                         EventId = id,
                         ShowTitle = sInput.ShowTitle,
                         StartTimeUtc = sInput.StartTimeUtc,
                         EndTimeUtc = sInput.EndTimeUtc
-                    });
+                    };
+                    _context.EventShows.Add(show);
+                    await _context.SaveChangesAsync();
+
+                    if (sInput.TicketTiers is not null && sInput.TicketTiers.Any())
+                    {
+                        int sort = 1;
+                        foreach (var tInput in sInput.TicketTiers)
+                        {
+                            _context.TicketTiers.Add(new TicketTier
+                            {
+                                EventId = id,
+                                EventShowId = show.Id,
+                                Name = tInput.Name,
+                                Description = tInput.Description ?? $"{tInput.Name} pass for {show.ShowTitle}",
+                                Price = tInput.Price > 0 ? tInput.Price : (dto.StartingPrice > 0 ? dto.StartingPrice : 1500m),
+                                AvailableQuantity = tInput.AvailableQuantity > 0 ? tInput.AvailableQuantity : 100,
+                                SortOrder = sort++
+                            });
+                        }
+                    }
+                    else if (ticketingType == TicketingType.Categorized)
+                    {
+                        var basePrice = sInput.StartingPrice ?? (dto.StartingPrice > 0 ? dto.StartingPrice : 1500m);
+                        _context.TicketTiers.Add(new TicketTier
+                        {
+                            EventId = id,
+                            EventShowId = show.Id,
+                            Name = "Standard Pass",
+                            Description = $"Standard admission pass for {show.ShowTitle}",
+                            Price = basePrice,
+                            AvailableQuantity = 150,
+                            SortOrder = 1
+                        });
+                        _context.TicketTiers.Add(new TicketTier
+                        {
+                            EventId = id,
+                            EventShowId = show.Id,
+                            Name = "VIP Pass",
+                            Description = $"VIP fast-track pass for {show.ShowTitle}",
+                            Price = basePrice * 2.25m,
+                            AvailableQuantity = 50,
+                            SortOrder = 2
+                        });
+                    }
                 }
             }
             else
             {
-                _context.EventShows.Add(new EventShow
+                var defaultShow = new EventShow
                 {
                     EventId = id,
                     ShowTitle = "Standard Performance",
                     StartTimeUtc = ev.StartDateUtc,
                     EndTimeUtc = ev.EndDateUtc
-                });
+                };
+                _context.EventShows.Add(defaultShow);
+                await _context.SaveChangesAsync();
+
+                if (ticketingType == TicketingType.Categorized)
+                {
+                    var basePrice = dto.StartingPrice > 0 ? dto.StartingPrice : 1500m;
+                    _context.TicketTiers.Add(new TicketTier
+                    {
+                        EventId = id,
+                        EventShowId = defaultShow.Id,
+                        Name = "Standard Pass",
+                        Description = "Standard admission pass",
+                        Price = basePrice,
+                        AvailableQuantity = 150,
+                        SortOrder = 1
+                    });
+                    _context.TicketTiers.Add(new TicketTier
+                    {
+                        EventId = id,
+                        EventShowId = defaultShow.Id,
+                        Name = "VIP Pass",
+                        Description = "VIP fast-track pass",
+                        Price = basePrice * 2.25m,
+                        AvailableQuantity = 50,
+                        SortOrder = 2
+                    });
+                }
             }
         }
 
@@ -692,66 +841,28 @@ public class AdminService : IAdminService
             Price = dto.Price,
             SortOrder = dto.SortOrder,
             LayoutJson = dto.LayoutJson,
-            TotalCapacity = dto.LayoutJson == "AC_II_ACP_KARACHI" ? 272 : (dto.Rows * dto.Cols)
+            TotalCapacity = dto.Rows * dto.Cols
         };
 
-        if (dto.LayoutJson == "AC_II_ACP_KARACHI")
+        GenerateSeatsForZone(zone, dto.LayoutJson);
+        if (zone.Seats.Any())
         {
-            var rowSpecs = new[]
-            {
-                (Row: 1, RowChar: 'A', LeftEnd: 11, RightEnd: 23),
-                (Row: 2, RowChar: 'B', LeftEnd: 11, RightEnd: 24),
-                (Row: 3, RowChar: 'C', LeftEnd: 12, RightEnd: 25),
-                (Row: 4, RowChar: 'D', LeftEnd: 12, RightEnd: 25),
-                (Row: 5, RowChar: 'E', LeftEnd: 12, RightEnd: 26),
-                (Row: 6, RowChar: 'F', LeftEnd: 12, RightEnd: 26),
-                (Row: 7, RowChar: 'G', LeftEnd: 13, RightEnd: 27),
-                (Row: 8, RowChar: 'H', LeftEnd: 13, RightEnd: 28),
-                (Row: 9, RowChar: 'I', LeftEnd: 13, RightEnd: 28),
-                (Row: 10, RowChar: 'J', LeftEnd: 12, RightEnd: 26),
-                (Row: 11, RowChar: 'K', LeftEnd: 0,  RightEnd: 14)
-            };
-
-            foreach (var spec in rowSpecs)
-            {
-                for (int c = 1; c <= spec.RightEnd; c++)
-                {
-                    zone.Seats.Add(new Seat
-                    {
-                        Zone = zone,
-                        Row = spec.Row,
-                        Col = c,
-                        Label = $"{spec.RowChar}{c}",
-                        Status = SeatStatus.Available
-                    });
-                }
-            }
-        }
-        else
-        {
-            for (int r = 1; r <= dto.Rows; r++)
-            {
-                char rowChar = (char)('A' + r - 1);
-                for (int c = 1; c <= dto.Cols; c++)
-                {
-                    zone.Seats.Add(new Seat
-                    {
-                        Zone = zone,
-                        Row = r,
-                        Col = c,
-                        Label = $"{rowChar}{c}",
-                        Status = SeatStatus.Available
-                    });
-                }
-            }
+            zone.TotalCapacity = zone.Seats.Count;
         }
 
         _context.SeatingZones.Add(zone);
         await _context.SaveChangesAsync();
-        await _cacheService.ClearEventCacheAsync(dto.EventId);
 
         return new SeatingZoneDto(
-            zone.Id, zone.EventId, zone.Zone, zone.Rows, zone.Cols, zone.Price, zone.TotalCapacity, zone.SortOrder, zone.LayoutJson,
+            zone.Id,
+            zone.EventId,
+            zone.Zone,
+            zone.Rows,
+            zone.Cols,
+            zone.Price,
+            zone.TotalCapacity,
+            zone.SortOrder,
+            zone.LayoutJson,
             zone.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString())).ToList()
         );
     }
@@ -975,6 +1086,255 @@ public class AdminService : IAdminService
         );
     }
 
+    // --- Auditorium Layouts CRUD ---
+    public async Task<List<AuditoriumLayoutDto>> GetAuditoriumLayoutsAsync(bool activeOnly = false)
+    {
+        var query = _context.AuditoriumLayouts.AsNoTracking().Where(a => !a.IsDeleted);
+        if (activeOnly)
+        {
+            query = query.Where(a => a.IsActive);
+        }
+
+        var list = await query.OrderBy(a => a.Name).ToListAsync();
+        return list.Select(a => new AuditoriumLayoutDto(
+            a.Id, a.Name, a.Venue, a.City, a.LayoutCode, a.TotalCapacity, a.Description, a.LayoutJson, a.IsActive
+        )).ToList();
+    }
+
+    public async Task<AuditoriumLayoutDto?> GetAuditoriumLayoutByIdAsync(int id)
+    {
+        var a = await _context.AuditoriumLayouts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        if (a is null) return null;
+
+        return new AuditoriumLayoutDto(
+            a.Id, a.Name, a.Venue, a.City, a.LayoutCode, a.TotalCapacity, a.Description, a.LayoutJson, a.IsActive
+        );
+    }
+
+    public async Task<AuditoriumLayoutDto> CreateAuditoriumLayoutAsync(CreateAuditoriumLayoutDto dto)
+    {
+        var layoutCode = !string.IsNullOrWhiteSpace(dto.LayoutCode)
+            ? dto.LayoutCode.Trim().ToUpperInvariant().Replace(" ", "_")
+            : dto.Name.Trim().ToUpperInvariant().Replace(" ", "_");
+
+        var layout = new AuditoriumLayout
+        {
+            Name = dto.Name,
+            Venue = dto.Venue,
+            City = dto.City,
+            LayoutCode = layoutCode,
+            TotalCapacity = dto.TotalCapacity,
+            Description = dto.Description,
+            LayoutJson = dto.LayoutJson,
+            IsActive = dto.IsActive
+        };
+
+        _context.AuditoriumLayouts.Add(layout);
+        await _context.SaveChangesAsync();
+
+        return new AuditoriumLayoutDto(
+            layout.Id, layout.Name, layout.Venue, layout.City, layout.LayoutCode, layout.TotalCapacity, layout.Description, layout.LayoutJson, layout.IsActive
+        );
+    }
+
+    public async Task<AuditoriumLayoutDto> UpdateAuditoriumLayoutAsync(int id, UpdateAuditoriumLayoutDto dto)
+    {
+        var layout = await _context.AuditoriumLayouts.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        if (layout is null)
+            throw new KeyNotFoundException($"Auditorium layout with ID '{id}' not found.");
+
+        layout.Name = dto.Name;
+        layout.Venue = dto.Venue;
+        layout.City = dto.City;
+        if (!string.IsNullOrWhiteSpace(dto.LayoutCode))
+        {
+            layout.LayoutCode = dto.LayoutCode.Trim().ToUpperInvariant().Replace(" ", "_");
+        }
+        layout.TotalCapacity = dto.TotalCapacity;
+        layout.Description = dto.Description;
+        layout.LayoutJson = dto.LayoutJson;
+        layout.IsActive = dto.IsActive;
+
+        await _context.SaveChangesAsync();
+
+        return new AuditoriumLayoutDto(
+            layout.Id, layout.Name, layout.Venue, layout.City, layout.LayoutCode, layout.TotalCapacity, layout.Description, layout.LayoutJson, layout.IsActive
+        );
+    }
+
+    public async Task<bool> DeleteAuditoriumLayoutAsync(int id)
+    {
+        var layout = await _context.AuditoriumLayouts.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        if (layout is null) return false;
+
+        layout.IsDeleted = true;
+        layout.DeletedAt = DateTimeOffset.UtcNow;
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    private async Task CreateSeatingZoneFromLayoutAsync(int eventId, string? layoutCodeOrName, decimal startingPrice)
+    {
+        AuditoriumLayout? layout = null;
+        if (!string.IsNullOrWhiteSpace(layoutCodeOrName))
+        {
+            layout = await _context.AuditoriumLayouts
+                .AsNoTracking()
+                .FirstOrDefaultAsync(l => (l.LayoutCode == layoutCodeOrName || l.Name == layoutCodeOrName) && !l.IsDeleted);
+        }
+
+        var zoneName = layout?.Name ?? "Main Auditorium Hall";
+        var layoutJson = layout?.LayoutJson ?? layoutCodeOrName ?? "";
+        var capacity = layout?.TotalCapacity ?? 200;
+
+        var zone = new SeatingZone
+        {
+            EventId = eventId,
+            Zone = zoneName,
+            Rows = 10,
+            Cols = 20,
+            Price = startingPrice > 0 ? startingPrice : 2500m,
+            SortOrder = 1,
+            LayoutJson = layoutJson,
+            TotalCapacity = capacity
+        };
+
+        GenerateSeatsForZone(zone, layoutJson);
+
+        _context.SeatingZones.Add(zone);
+        await _context.SaveChangesAsync();
+    }
+
+    private static void GenerateSeatsForZone(SeatingZone zone, string? layoutJson)
+    {
+        if (string.IsNullOrWhiteSpace(layoutJson))
+        {
+            GenerateDefaultGridSeats(zone, zone.Rows, zone.Cols);
+            return;
+        }
+
+        if (layoutJson.TrimStart().StartsWith("{") || layoutJson.TrimStart().StartsWith("["))
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(layoutJson);
+                var root = doc.RootElement;
+                
+                // Case A: Multi-section layout (e.g. { "sections": [ { "rows": [...] } ] })
+                if (root.ValueKind == System.Text.Json.JsonValueKind.Object && root.TryGetProperty("sections", out var sectionsProp) && sectionsProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    int rowIndex = 1;
+                    foreach (var secEl in sectionsProp.EnumerateArray())
+                    {
+                        if (secEl.TryGetProperty("rows", out var secRows) && secRows.ValueKind == System.Text.Json.JsonValueKind.Array)
+                        {
+                            foreach (var rowEl in secRows.EnumerateArray())
+                            {
+                                AddSeatsFromRowElement(zone, rowEl, rowIndex++);
+                            }
+                        }
+                    }
+                    if (zone.Seats.Any()) return;
+                }
+
+                // Case B: Direct rows array (e.g. { "rows": [...] })
+                if (root.ValueKind == System.Text.Json.JsonValueKind.Object && root.TryGetProperty("rows", out var rowsProp) && rowsProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    int rowIndex = 1;
+                    foreach (var rowEl in rowsProp.EnumerateArray())
+                    {
+                        AddSeatsFromRowElement(zone, rowEl, rowIndex++);
+                    }
+                    if (zone.Seats.Any()) return;
+                }
+            }
+            catch
+            {
+                // Fallback to default grid below
+            }
+        }
+
+        GenerateDefaultGridSeats(zone, zone.Rows, zone.Cols);
+    }
+
+    private static void AddSeatsFromRowElement(SeatingZone zone, System.Text.Json.JsonElement rowEl, int rowIndex)
+    {
+        var rowChar = rowEl.TryGetProperty("rowChar", out var rc) ? rc.GetString() ?? $"{rowIndex}" : $"{rowIndex}";
+        var seatNumbers = new List<int>();
+
+        if (rowEl.TryGetProperty("blocks", out var blocksProp) && blocksProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var block in blocksProp.EnumerateArray())
+            {
+                if (block.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var s in block.EnumerateArray()) if (s.TryGetInt32(out var num)) seatNumbers.Add(num);
+                }
+            }
+        }
+        if (rowEl.TryGetProperty("left", out var leftProp) && leftProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var s in leftProp.EnumerateArray()) if (s.TryGetInt32(out var num)) seatNumbers.Add(num);
+        }
+        if (rowEl.TryGetProperty("centerLeft", out var clProp) && clProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var s in clProp.EnumerateArray()) if (s.TryGetInt32(out var num)) seatNumbers.Add(num);
+        }
+        if (rowEl.TryGetProperty("centerRight", out var crProp) && crProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var s in crProp.EnumerateArray()) if (s.TryGetInt32(out var num)) seatNumbers.Add(num);
+        }
+        if (rowEl.TryGetProperty("center", out var centerProp) && centerProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var s in centerProp.EnumerateArray()) if (s.TryGetInt32(out var num)) seatNumbers.Add(num);
+        }
+        if (rowEl.TryGetProperty("right", out var rightProp) && rightProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var s in rightProp.EnumerateArray()) if (s.TryGetInt32(out var num)) seatNumbers.Add(num);
+        }
+        if (rowEl.TryGetProperty("seats", out var seatsProp) && seatsProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var s in seatsProp.EnumerateArray()) if (s.TryGetInt32(out var num)) seatNumbers.Add(num);
+        }
+
+        if (!seatNumbers.Any() && rowEl.TryGetProperty("count", out var countProp) && countProp.TryGetInt32(out var count))
+        {
+            for (int i = 1; i <= count; i++) seatNumbers.Add(i);
+        }
+
+        int colIndex = 1;
+        foreach (var num in seatNumbers)
+        {
+            zone.Seats.Add(new Seat
+            {
+                Zone = zone,
+                Row = rowIndex,
+                Col = colIndex++,
+                Label = $"{rowChar}{num}",
+                Status = SeatStatus.Available
+            });
+        }
+    }
+
+    private static void GenerateDefaultGridSeats(SeatingZone zone, int rows, int cols)
+    {
+        for (int r = 1; r <= rows; r++)
+        {
+            char rowChar = (char)('A' + r - 1);
+            for (int c = 1; c <= cols; c++)
+            {
+                zone.Seats.Add(new Seat
+                {
+                    Zone = zone,
+                    Row = r,
+                    Col = c,
+                    Label = $"{rowChar}{c}",
+                    Status = SeatStatus.Available
+                });
+            }
+        }
+    }
+
     private static void TryDeleteLocalFile(string? relativeUrl)
     {
         if (string.IsNullOrWhiteSpace(relativeUrl)) return;
@@ -1006,3 +1366,4 @@ public class AdminService : IAdminService
         }
     }
 }
+

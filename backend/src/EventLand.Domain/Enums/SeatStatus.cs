@@ -4,5 +4,6 @@ public enum SeatStatus
 {
     Available = 0,
     Reserved  = 1,   // Temporarily held (e.g. in checkout session)
-    Booked    = 2    // Confirmed booking
+    Booked    = 2,   // Confirmed booking
+    Blocked   = 3    // Unavailable / not present in hall
 }

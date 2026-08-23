@@ -1,9 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Send, Bot, User, Ticket, Flame, Compass, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Sparkles, Send, Bot, User, Ticket } from 'lucide-react';
 import { getEventImageUrl } from '../services/api';
-import { MOCK_EVENTS } from '../data/mockEvents';
 
-export default function AiEventAssistant({ onSelectEvent }) {
+export default function AiEventAssistant({ events = [], onSelectEvent }) {
   const [messages, setMessages] = useState([
     {
       sender: 'bot',
@@ -14,9 +13,9 @@ export default function AiEventAssistant({ onSelectEvent }) {
   const [inputText, setInputText] = useState('');
 
   const quickPrompts = [
-    "Rock concert in Islamabad this month",
-    "Family street food festival in Lahore",
-    "Under 2000 PKR entry in Karachi",
+    "Concerts in Islamabad",
+    "Food festivals & Bazaars in Lahore",
+    "Under 2500 PKR entry in Karachi",
     "Theatre play & dramatic performances"
   ];
 
@@ -32,21 +31,22 @@ export default function AiEventAssistant({ onSelectEvent }) {
     setMessages(newMessages);
     if (!userPrompt) setInputText('');
 
-    // Process intelligent matching
+    // Process intelligent matching across live database events
     setTimeout(() => {
       const lower = textToSubmit.toLowerCase();
       let matched = [];
 
-      if (lower.includes('rock') || lower.includes('concert') || lower.includes('ali noor') || lower.includes('music')) {
-        matched = MOCK_EVENTS.filter((e) => e.category === 'Concerts');
-      } else if (lower.includes('food') || lower.includes('lahore') || lower.includes('qawwali')) {
-        matched = MOCK_EVENTS.filter((e) => e.category === 'Food' || e.city === 'Lahore');
-      } else if (lower.includes('2000') || lower.includes('under') || lower.includes('cheap')) {
-        matched = MOCK_EVENTS.filter((e) => e.startingPrice <= 2000);
-      } else if (lower.includes('theatre') || lower.includes('play')) {
-        matched = MOCK_EVENTS.filter((e) => e.category === 'Theatre');
-      } else {
-        matched = MOCK_EVENTS.slice(0, 3);
+      matched = events.filter((e) => {
+        const catMatch = e.category && lower.includes(e.category.toLowerCase());
+        const cityMatch = e.city && lower.includes(e.city.toLowerCase());
+        const titleMatch = e.title && lower.includes(e.title.toLowerCase().slice(0, 5));
+        const priceMatch = (lower.includes('2000') || lower.includes('2500') || lower.includes('cheap') || lower.includes('budget')) && (e.startingPrice <= 2500);
+
+        return catMatch || cityMatch || titleMatch || priceMatch;
+      });
+
+      if (matched.length === 0) {
+        matched = events.slice(0, 3);
       }
 
       setMessages((prev) => [
@@ -57,7 +57,7 @@ export default function AiEventAssistant({ onSelectEvent }) {
           suggestedEvents: matched
         }
       ]);
-    }, 600);
+    }, 400);
   };
 
   return (
@@ -89,7 +89,7 @@ export default function AiEventAssistant({ onSelectEvent }) {
           Personalized Event Matchmaker
         </h1>
         <p style={{ color: '#94a3b8', fontSize: '1rem' }}>
-          Not sure what to attend? Ask EventVibe AI to find the perfect concerts, bazaars, and shows tailored to your mood.
+          Ask EventVibe AI to find the perfect concerts, bazaars, and shows tailored to your vibe.
         </p>
       </div>
 
@@ -166,11 +166,11 @@ export default function AiEventAssistant({ onSelectEvent }) {
                           <img src={getEventImageUrl(ev.banner)} alt={ev.title} style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover' }} />
                           <div>
                             <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#fff', display: 'block' }}>{ev.title}</span>
-                            <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{ev.city} • {ev.date}</span>
+                            <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{ev.city} • {ev.venue}</span>
                           </div>
                         </div>
                         <button className="btn btn-primary" style={{ padding: '0.35rem 0.85rem', fontSize: '0.78rem' }}>
-                          <Ticket size={14} /> Book PKR {ev.startingPrice}
+                          <Ticket size={14} /> View Details
                         </button>
                       </div>
                     ))}
@@ -242,7 +242,7 @@ export default function AiEventAssistant({ onSelectEvent }) {
         >
           <input
             type="text"
-            placeholder="Ask EventVibe AI (e.g. Find me a comedy night in Karachi)..."
+            placeholder="Ask EventVibe AI (e.g. Find me a concert in Karachi)..."
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             style={{

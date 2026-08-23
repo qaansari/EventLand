@@ -59,4 +59,11 @@ public interface IAdminService
     Task<TagDto> CreateTagAsync(CreateTagDto dto);
     Task<TagDto> UpdateTagAsync(int id, UpdateTagDto dto);
     Task<bool> DeleteTagAsync(int id);
+
+    // --- Auditorium Layouts CRUD ---
+    Task<List<AuditoriumLayoutDto>> GetAuditoriumLayoutsAsync(bool activeOnly = false);
+    Task<AuditoriumLayoutDto?> GetAuditoriumLayoutByIdAsync(int id);
+    Task<AuditoriumLayoutDto> CreateAuditoriumLayoutAsync(CreateAuditoriumLayoutDto dto);
+    Task<AuditoriumLayoutDto> UpdateAuditoriumLayoutAsync(int id, UpdateAuditoriumLayoutDto dto);
+    Task<bool> DeleteAuditoriumLayoutAsync(int id);
 }

@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
-import { Music, Star, Calendar, MapPin, Send, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Star, X } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 import { CITIES } from '../data/mockEvents';
-import { MOCK_ARTISTS } from '../data/mockArtists';
+import { artistsApi } from '../services/api';
 import { useToast } from '../context/ToastContext';
 
 export default function ArtistBookings() {
   const { showSuccess } = useToast();
+  const [artists, setArtists] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedArtist, setSelectedArtist] = useState(null);
   const [inquirySubmitted, setInquirySubmitted] = useState(false);
   const [inquiryForm, setInquiryForm] = useState({
@@ -19,6 +21,19 @@ export default function ArtistBookings() {
     notes: ''
   });
 
+  useEffect(() => {
+    setLoading(true);
+    artistsApi.getArtists({ pageSize: 50 })
+      .then(res => {
+        setArtists(res.items || res || []);
+      })
+      .catch(err => {
+        console.error('Failed to load artists from backend API:', err);
+        setArtists([]);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
   const handleSubmitInquiry = (e) => {
     e.preventDefault();
     setInquirySubmitted(true);
@@ -29,7 +44,7 @@ export default function ArtistBookings() {
       );
       setInquirySubmitted(false);
       setSelectedArtist(null);
-    }, 1500);
+    }, 1200);
   };
 
   return (
@@ -55,88 +70,94 @@ export default function ArtistBookings() {
       </div>
 
       {/* Artist Cards Grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-        gap: '1.5rem'
-      }}>
-        {MOCK_ARTISTS.map((artist) => (
-          <div key={artist.id} className="glass-card" style={{ display: 'flex', flexDirection: 'column' }}>
-            <div className="card-img-container" style={{ position: 'relative', height: '260px' }}>
-              <img
-                src={artist.image}
-                alt={artist.name}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-              <div style={{
-                position: 'absolute',
-                top: '12px',
-                right: '12px',
-                backgroundColor: 'rgba(9, 13, 22, 0.85)',
-                backdropFilter: 'blur(6px)',
-                color: '#f59e0b',
-                padding: '0.25rem 0.65rem',
-                borderRadius: '8px',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-                border: '1px solid rgba(245, 158, 11, 0.3)'
-              }}>
-                <Star size={14} fill="#f59e0b" /> {artist.rating} ({artist.showsDone}+ shows)
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#94a3b8' }}>
+          <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
+          <p>Loading talent roster from database...</p>
+        </div>
+      ) : artists.length === 0 ? (
+        <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+          <p>No artists listed in the database currently.</p>
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: '1.5rem'
+        }}>
+          {artists.map((artist) => (
+            <div key={artist.id} className="glass-card" style={{ display: 'flex', flexDirection: 'column' }}>
+              <div className="card-img-container" style={{ position: 'relative', height: '260px' }}>
+                <img
+                  src={artist.imageUrl || artist.image || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80'}
+                  alt={artist.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+                <div style={{
+                  position: 'absolute',
+                  top: '12px',
+                  right: '12px',
+                  backgroundColor: 'rgba(9, 13, 22, 0.85)',
+                  backdropFilter: 'blur(6px)',
+                  color: '#f59e0b',
+                  padding: '0.25rem 0.65rem',
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem',
+                  border: '1px solid rgba(245, 158, 11, 0.3)'
+                }}>
+                  <Star size={14} fill="#f59e0b" /> {artist.rating || 5.0} ({artist.showsDone || 0}+ shows)
+                </div>
               </div>
-            </div>
 
-            <div style={{ padding: '1.35rem', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
-              <h3 style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: '1.3rem',
-                fontWeight: 800,
-                letterSpacing: '-0.02em',
-                color: '#fff',
-                marginBottom: '0.25rem'
-              }}>
-                {artist.name}
-              </h3>
-              <span style={{ fontSize: '0.82rem', color: '#60a5fa', fontWeight: 600, marginBottom: '0.75rem' }}>
-                {artist.genre}
-              </span>
-              <p style={{ fontSize: '0.86rem', color: '#94a3b8', marginBottom: '1.1rem', lineHeight: 1.5 }}>
-                {artist.bio}
-              </p>
+              <div style={{ padding: '1.35rem', display: 'flex', flexDirection: 'column', flexGrow: 1 }}>
+                <h3 style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '1.3rem',
+                  fontWeight: 800,
+                  letterSpacing: '-0.02em',
+                  color: '#fff',
+                  marginBottom: '0.25rem'
+                }}>
+                  {artist.name}
+                </h3>
+                <span style={{ fontSize: '0.82rem', color: '#60a5fa', fontWeight: 600, marginBottom: '0.75rem' }}>
+                  {artist.genre || artist.role}
+                </span>
+                <p style={{ fontSize: '0.86rem', color: '#94a3b8', marginBottom: '1.1rem', lineHeight: 1.5 }}>
+                  {artist.bio}
+                </p>
 
-              <div style={{ backgroundColor: 'rgba(0,0,0,0.35)', padding: '0.8rem', borderRadius: '10px', marginBottom: '1.25rem', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block', marginBottom: '0.35rem', fontWeight: 600, letterSpacing: '0.05em' }}>TOP TRACKS</span>
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                  {artist.topTracks.map((t) => (
-                    <span key={t} style={{ fontSize: '0.75rem', backgroundColor: 'rgba(255,255,255,0.07)', color: '#e2e8f0', padding: '0.2rem 0.55rem', borderRadius: '6px' }}>
-                      🎵 {t}
+                {artist.availability && (
+                  <div style={{ backgroundColor: 'rgba(0,0,0,0.35)', padding: '0.6rem 0.8rem', borderRadius: '8px', marginBottom: '1.25rem', border: '1px solid rgba(255, 255, 255, 0.05)', fontSize: '0.8rem', color: '#cbd5e1' }}>
+                    <span style={{ color: '#10b981', fontWeight: 600 }}>✓ </span> {artist.availability}
+                  </div>
+                )}
+
+                <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Starting Rate</span>
+                    <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 800, color: '#60a5fa' }}>
+                      PKR {typeof artist.startingRate === 'number' ? artist.startingRate.toLocaleString() : (artist.startingRate || 'Custom')}
                     </span>
-                  ))}
-                </div>
-              </div>
+                  </div>
 
-              <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                <div>
-                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Starting Rate</span>
-                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 800, color: '#60a5fa' }}>
-                    {artist.startingRate}
-                  </span>
+                  <button
+                    onClick={() => setSelectedArtist(artist)}
+                    className="btn btn-primary"
+                    style={{ padding: '0.5rem 1.1rem', fontSize: '0.85rem' }}
+                  >
+                    Request Quote
+                  </button>
                 </div>
-
-                <button
-                  onClick={() => setSelectedArtist(artist)}
-                  className="btn btn-primary"
-                  style={{ padding: '0.5rem 1.1rem', fontSize: '0.85rem' }}
-                >
-                  Request Quote
-                </button>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Inquiry Form Modal */}
       {selectedArtist && (
