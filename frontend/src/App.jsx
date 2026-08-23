@@ -14,8 +14,8 @@ import AdminDashboard from './components/AdminDashboard';
 import OrganizerDashboard from './components/OrganizerDashboard';
 import AuthModal from './components/AuthModal';
 import Footer from './components/Footer';
-import { Ticket, MapPin, Trash2 } from 'lucide-react';
-import { eventsApi } from './services/api';
+import { Ticket, MapPin, Trash2, Search, RefreshCw } from 'lucide-react';
+import { eventsApi, bookingsApi } from './services/api';
 import { useToast } from './context/ToastContext';
 import './App.css';
 
@@ -146,11 +146,84 @@ export default function App() {
     const updated = purchasedTickets.filter((t) => t.ticketId !== ticketId);
     setPurchasedTickets(updated);
     localStorage.setItem('eventland_purchased_tickets', JSON.stringify(updated));
+    showInfo('Pass Removed 🎫', `Digital pass #${ticketId} removed from saved tickets.`);
   };
 
   const handleClearAllTickets = () => {
     setPurchasedTickets([]);
     localStorage.removeItem('eventland_purchased_tickets');
+    showInfo('Passes Cleared 🎫', 'All saved digital ticket passes have been cleared.');
+  };
+
+  // Ticket Lookup State
+  const [ticketLookupQuery, setTicketLookupQuery] = useState('');
+  const [isLookingUpTicket, setIsLookingUpTicket] = useState(false);
+
+  const handleLookupTickets = async (e) => {
+    e?.preventDefault();
+    const query = ticketLookupQuery.trim();
+    if (!query) {
+      showWarning('Lookup Query Required', 'Please enter your email or booking reference (e.g. EVL-123456)');
+      return;
+    }
+
+    setIsLookingUpTicket(true);
+    try {
+      if (query.toUpperCase().startsWith('EVL-')) {
+        const booking = await bookingsApi.getBookingByRef(query.toUpperCase());
+        if (booking) {
+          const tObj = {
+            ticketId: booking.bookingRef,
+            eventTitle: booking.eventTitle,
+            venue: 'Confirmed Venue',
+            attendeeName: booking.customerName,
+            attendeeEmail: booking.customerEmail,
+            phone: booking.customerPhone,
+            seats: (booking.selectedSeats || []).map(s => ({ id: s.label || s.id, zone: s.label })),
+            paymentMethod: booking.paymentMethod || 'PAID',
+            totalPaid: booking.totalAmount,
+            bookingTime: new Date(booking.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+          };
+
+          const exists = purchasedTickets.some(t => t.ticketId === tObj.ticketId);
+          if (!exists) {
+            const updated = [tObj, ...purchasedTickets];
+            setPurchasedTickets(updated);
+            localStorage.setItem('eventland_purchased_tickets', JSON.stringify(updated));
+          }
+          showSuccess('Booking Retrieved', `Found booking ${booking.bookingRef} for ${booking.customerName}`);
+          setActiveTicketView(tObj);
+        }
+      } else {
+        const res = await bookingsApi.getBookingsByEmail(query, 1, 20);
+        const list = res.items || [];
+        if (list.length === 0) {
+          showInfo('No Bookings Found', `No bookings found for email: ${query}`);
+        } else {
+          const newTickets = list.map(b => ({
+            ticketId: b.bookingRef,
+            eventTitle: b.eventTitle,
+            venue: 'Confirmed Venue',
+            attendeeName: b.customerName,
+            attendeeEmail: b.customerEmail,
+            phone: b.customerPhone,
+            seats: (b.selectedSeats || []).map(s => ({ id: s.label || s.id, zone: s.label })),
+            paymentMethod: b.paymentMethod || 'PAID',
+            totalPaid: b.totalAmount,
+            bookingTime: new Date(b.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+          }));
+
+          const merged = [...newTickets, ...purchasedTickets.filter(t => !newTickets.some(nt => nt.ticketId === t.ticketId))];
+          setPurchasedTickets(merged);
+          localStorage.setItem('eventland_purchased_tickets', JSON.stringify(merged));
+          showSuccess('Bookings Retrieved', `Found ${list.length} booking(s) for ${query}`);
+        }
+      }
+    } catch (err) {
+      showError('Lookup Failed', err.message || 'Could not find booking.');
+    } finally {
+      setIsLookingUpTicket(false);
+    }
   };
 
   // Active Modals
@@ -279,7 +352,9 @@ export default function App() {
     if (existingCustom) {
       try {
         customList = JSON.parse(existingCustom);
-      } catch (e) {}
+      } catch {
+        customList = [];
+      }
     }
     customList = [newEvent, ...customList];
     localStorage.setItem('eventland_custom_events', JSON.stringify(customList));
@@ -466,6 +541,38 @@ export default function App() {
                 </button>
               )}
             </div>
+
+            {/* Ticket Lookup Bar */}
+            <form onSubmit={handleLookupTickets} style={{ marginBottom: '2rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '280px', position: 'relative' }}>
+                <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  type="text"
+                  placeholder="Look up passes by Email Address or Booking Reference (e.g. EVL-123456)..."
+                  value={ticketLookupQuery}
+                  onChange={(e) => setTicketLookupQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '0.85rem 1rem 0.85rem 2.8rem',
+                    background: 'rgba(15, 23, 42, 0.7)',
+                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    borderRadius: '12px',
+                    color: '#fff',
+                    outline: 'none',
+                    fontSize: '0.9rem'
+                  }}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLookingUpTicket}
+                className="btn btn-primary"
+                style={{ padding: '0.85rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
+              >
+                <RefreshCw size={16} className={isLookingUpTicket ? 'animate-spin' : ''} />
+                {isLookingUpTicket ? 'Searching...' : 'Find Passes'}
+              </button>
+            </form>
 
             {purchasedTickets.length === 0 ? (
               <div className="glass-card" style={{ padding: '4rem 2rem', textAlign: 'center' }}>

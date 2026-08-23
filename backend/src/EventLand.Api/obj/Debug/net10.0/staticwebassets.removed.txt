@@ -1,3 +1,0 @@
-D:\EventLand\backend\src\EventLand.Api\wwwroot\assets\images\organizers\153315d43fbd42feba3512a7be840aa1.png
-D:\EventLand\backend\src\EventLand.Api\wwwroot\assets\images\organizers\d9d1f3a37f80478585f226c2509048e4.png
-D:\EventLand\backend\src\EventLand.Api\wwwroot\assets\images\organizers\e8e7ff6b5e6d4ff2abe6010ad24563bd.png

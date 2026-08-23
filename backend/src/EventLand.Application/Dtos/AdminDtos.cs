@@ -34,7 +34,8 @@ public record CreateAdminEventDto(
     int OrganizerId,
     List<int>? TagIds,
     List<CreateEventShowInputDto>? Shows = null,
-    string? AuditoriumLayout = null
+    string? AuditoriumLayout = null,
+    string? PriceRange = null
 );
 
 public record UpdateAdminEventDto(
@@ -56,7 +57,8 @@ public record UpdateAdminEventDto(
     int OrganizerId,
     List<int>? TagIds,
     List<CreateEventShowInputDto>? Shows = null,
-    string? AuditoriumLayout = null
+    string? AuditoriumLayout = null,
+    string? PriceRange = null
 );
 
 public record CreateOrganizerDto(

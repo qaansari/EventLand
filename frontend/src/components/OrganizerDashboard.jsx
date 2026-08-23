@@ -19,7 +19,7 @@ import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
 
 export default function OrganizerDashboard({ events, onNavigateToCreate, onSelectEvent }) {
-  const { showSuccess, showInfo } = useToast();
+  const { showSuccess, showError, showInfo } = useToast();
   const [activeTab, setActiveTab] = useState('my-events'); // 'my-events', 'scanner', 'payouts'
   
   // Gatekeeper Scanner Simulator State
@@ -40,20 +40,24 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
 
     // Simulate verification
     if (scanTicketInput.toUpperCase().includes('FAIL') || scanTicketInput.length < 5) {
+      const errMsg = '❌ INVALID / EXPIRED PASS - Ticket not found in roster!';
       setScanResult({
         valid: false,
-        message: '❌ INVALID / EXPIRED PASS - Ticket not found in roster!'
+        message: errMsg
       });
+      showError('Invalid Ticket Pass ❌', 'Ticket reference not found or pass has expired.');
     } else {
+      const ticketRef = scanTicketInput.toUpperCase();
       setScanResult({
         valid: true,
-        ticketId: scanTicketInput.toUpperCase(),
+        ticketId: ticketRef,
         attendee: 'Qamar Ansari',
         eventTitle: 'Rangrez Bazaar 2026',
         tier: 'VIP Pass (Qawwali Lounge Access)',
         seats: 'Zone A - Seat #14, Seat #15',
         status: 'ENTRY VERIFIED & CHECKED-IN'
       });
+      showSuccess('Pass Verified & Checked-In ✅', `Ticket #${ticketRef} verified for Qamar Ansari.`);
     }
   };
 

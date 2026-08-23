@@ -38,17 +38,22 @@ async function request(endpoint, options = {}) {
   if (!response.ok) {
     let errorText = 'API Request Failed';
     try {
-      const errJson = await response.json();
-      if (errJson.errors && typeof errJson.errors === 'object') {
-        const errorMessages = Object.entries(errJson.errors)
-          .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
-          .join(' | ');
-        errorText = errorMessages || errJson.title || errorText;
-      } else {
-        errorText = errJson.message || errJson.title || JSON.stringify(errJson);
+      const rawText = await response.text();
+      try {
+        const errJson = JSON.parse(rawText);
+        if (errJson.errors && typeof errJson.errors === 'object') {
+          const errorMessages = Object.entries(errJson.errors)
+            .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
+            .join(' | ');
+          errorText = errorMessages || errJson.title || errorText;
+        } else {
+          errorText = errJson.message || errJson.title || (typeof errJson === 'string' ? errJson : rawText);
+        }
+      } catch {
+        errorText = rawText || `Error ${response.status}`;
       }
     } catch {
-      errorText = await response.text();
+      errorText = `Error ${response.status}: ${response.statusText}`;
     }
     throw new Error(errorText || `Error ${response.status}`);
   }
@@ -225,7 +230,7 @@ export const uploadApi = {
     if (name) query.append('name', name);
     if (id) query.append('id', id);
 
-    const response = await fetch(`/api/upload?${query.toString()}`, {
+    const response = await fetch(`${BASE_URL}/upload?${query.toString()}`, {
       method: 'POST',
       headers,
       body: formData
@@ -236,7 +241,9 @@ export const uploadApi = {
       try {
         const json = await response.json();
         errText = json.message || errText;
-      } catch {}
+      } catch {
+        // Ignore malformed non-JSON responses and fall back to the base error.
+      }
       throw new Error(errText);
     }
     return await response.json();

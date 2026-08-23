@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Sparkles, Grid, Layers, MapPin, CheckCircle } from 'lucide-react';
 import EventCard from './EventCard';
 import { uploadApi, adminApi, auditoriumLayoutsApi } from '../services/api';
@@ -6,6 +6,8 @@ import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
 import { CITIES } from '../data/mockEvents';
+
+const makePreviewId = () => `user-created-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
 export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
   const { showError, showSuccess } = useToast();
@@ -71,7 +73,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
   ) || auditoriumsList[0];
 
   const previewEventObject = {
-    id: 'user-created-' + Date.now(),
+    id: makePreviewId(),
     title: eventForm.title || 'Your Event Title Here',
     category: eventForm.category,
     status: 1, // 0: Draft, 1: Live, 2: Completed, 3: Cancelled
@@ -453,8 +455,9 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
               </button>
               <button
                 type="submit"
+                disabled={publishedSuccess}
                 className="btn btn-primary"
-                style={{ width: '70%', padding: '0.85rem' }}
+                style={{ width: '70%', padding: '0.85rem', opacity: publishedSuccess ? 0.6 : 1, cursor: publishedSuccess ? 'not-allowed' : 'pointer' }}
               >
                 {publishedSuccess ? 'Publishing Event...' : '🚀 Publish Event Live'}
               </button>

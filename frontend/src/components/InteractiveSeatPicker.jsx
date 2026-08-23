@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X, Ticket, Calendar, Layers, ZoomIn, ZoomOut, RotateCcw, Maximize2, ShieldAlert } from 'lucide-react';
 import { seatHoldApi, eventsApi, auditoriumLayoutsApi } from '../services/api';
 import { parseAuditoriumLayout } from '../data/auditoriumLayouts';
+
+const createGuestEmail = () => `guest_${Math.floor(100000 + Math.random() * 900000)}@eventland.pk`;
 
 export default function InteractiveSeatPicker({ event: initialEvent, onClose, onProceedToCheckout, isPreview = false }) {
   const isPreviewMode = isPreview || !onProceedToCheckout || String(initialEvent?.id || '').startsWith('preview-');
@@ -104,7 +106,17 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
       setSelectedSeats(newSeats);
       if (!isPreviewMode && typeof event.id === 'number' && typeof seatId === 'number') {
         try {
-          await seatHoldApi.holdSeats(event.id, [seatId], 'buyer@eventland.com', selectedShowId);
+          let userEmail = 'authenticated_user@eventland.com';
+          const currentUserEmail = localStorage.getItem('eventland_user_email');
+          const jwtToken = localStorage.getItem('eventland_jwt_token');
+
+          if (currentUserEmail) {
+            userEmail = currentUserEmail;
+          } else if (!jwtToken) {
+            userEmail = createGuestEmail();
+          }
+
+          await seatHoldApi.holdSeats(event.id, [seatId], userEmail, selectedShowId);
         } catch (err) { console.warn('Seat hold error:', err); }
       }
     }
@@ -224,15 +236,19 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
               {rSpec.right.map((num) => renderSeatBtn(rowChar, num, rSpec))}
             </div>
           </div>
-        ) : rSpec.left && rSpec.right ? (
+        ) : rSpec.left || rSpec.right ? (
           /* 2-block with center aisle */
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            <div style={{ display: 'flex', gap: '0.2rem' }}>
-              {rSpec.left.map((num) => renderSeatBtn(rowChar, num, rSpec))}
-            </div>
-            <div style={{ display: 'flex', gap: '0.2rem' }}>
-              {rSpec.right.map((num) => renderSeatBtn(rowChar, num, rSpec))}
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', justifyContent: (rSpec.right && !rSpec.left) ? 'flex-end' : (rSpec.left && !rSpec.right ? 'flex-start' : 'center') }}>
+            {rSpec.left && (
+              <div style={{ display: 'flex', gap: '0.2rem' }}>
+                {rSpec.left.map((num) => renderSeatBtn(rowChar, num, rSpec))}
+              </div>
+            )}
+            {rSpec.right && (
+              <div style={{ display: 'flex', gap: '0.2rem' }}>
+                {rSpec.right.map((num) => renderSeatBtn(rowChar, num, rSpec))}
+              </div>
+            )}
           </div>
         ) : rSpec.seats ? (
           /* Single continuous block */

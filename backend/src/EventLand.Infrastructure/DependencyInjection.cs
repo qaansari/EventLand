@@ -47,7 +47,14 @@ public static class DependencyInjection
         var redisConnectionString = configuration.GetConnectionString("Redis") ?? "localhost:6379";
         services.AddStackExchangeRedisCache(options =>
         {
-            options.Configuration = redisConnectionString;
+            var configOptions = StackExchange.Redis.ConfigurationOptions.Parse(redisConnectionString);
+            configOptions.ConnectTimeout = 300;
+            configOptions.SyncTimeout = 300;
+            configOptions.AsyncTimeout = 300;
+            configOptions.AbortOnConnectFail = false;
+            configOptions.ConnectRetry = 1;
+
+            options.ConfigurationOptions = configOptions;
             options.InstanceName = "EventLand:";
         });
 

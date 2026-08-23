@@ -122,6 +122,117 @@
     "ReturnTypes": []
   },
   {
+    "ContainingType": "EventLand.Api.Controllers.Admin.AdminAuditoriumLayoutsController",
+    "Method": "GetAll",
+    "RelativePath": "api/admin/auditorium-layouts",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[EventLand.Application.Dtos.AuditoriumLayoutDto, EventLand.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "application/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "EventLand.Api.Controllers.Admin.AdminAuditoriumLayoutsController",
+    "Method": "Create",
+    "RelativePath": "api/admin/auditorium-layouts",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "dto",
+        "Type": "EventLand.Application.Dtos.CreateAuditoriumLayoutDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "EventLand.Application.Dtos.AuditoriumLayoutDto",
+        "MediaTypes": [
+          "application/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "EventLand.Api.Controllers.Admin.AdminAuditoriumLayoutsController",
+    "Method": "GetById",
+    "RelativePath": "api/admin/auditorium-layouts/{id}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "EventLand.Application.Dtos.AuditoriumLayoutDto",
+        "MediaTypes": [
+          "application/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "EventLand.Api.Controllers.Admin.AdminAuditoriumLayoutsController",
+    "Method": "Update",
+    "RelativePath": "api/admin/auditorium-layouts/{id}",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      },
+      {
+        "Name": "dto",
+        "Type": "EventLand.Application.Dtos.UpdateAuditoriumLayoutDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "EventLand.Application.Dtos.AuditoriumLayoutDto",
+        "MediaTypes": [
+          "application/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "EventLand.Api.Controllers.Admin.AdminAuditoriumLayoutsController",
+    "Method": "Delete",
+    "RelativePath": "api/admin/auditorium-layouts/{id}",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
     "ContainingType": "EventLand.Api.Controllers.Admin.AdminBookingsController",
     "Method": "GetBookings",
     "RelativePath": "api/admin/bookings",
@@ -947,6 +1058,48 @@
     "ReturnTypes": [
       {
         "Type": "EventLand.Application.Dtos.ArtistDto",
+        "MediaTypes": [
+          "application/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "EventLand.Api.Controllers.AuditoriumLayoutsController",
+    "Method": "GetActiveAuditoriums",
+    "RelativePath": "api/auditorium-layouts",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[EventLand.Application.Dtos.AuditoriumLayoutDto, EventLand.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "application/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "EventLand.Api.Controllers.AuditoriumLayoutsController",
+    "Method": "GetAuditoriumById",
+    "RelativePath": "api/auditorium-layouts/{id}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.Int32",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "EventLand.Application.Dtos.AuditoriumLayoutDto",
         "MediaTypes": [
           "application/json"
         ],

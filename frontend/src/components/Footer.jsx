@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { ChevronDown, Send, Phone, Mail } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 export default function Footer({ onSelectCity }) {
+  const { showSuccess } = useToast();
   const [openFaq, setOpenFaq] = useState(null);
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [subscribedToast, setSubscribedToast] = useState(false);
@@ -29,6 +31,7 @@ export default function Footer({ onSelectCity }) {
     e.preventDefault();
     if (!newsletterEmail) return;
     setSubscribedToast(true);
+    showSuccess('Subscribed 📧', `Subscribed ${newsletterEmail} to EventLand newsletter updates!`);
     setNewsletterEmail('');
     setTimeout(() => setSubscribedToast(false), 3000);
   };

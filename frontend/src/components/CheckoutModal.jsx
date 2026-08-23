@@ -44,22 +44,31 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
     setIsProcessing(true);
 
     try {
-      // Map event ticket tier ID
-      const ticketTierId = event.ticketTiers && event.ticketTiers.length > 0
-        ? event.ticketTiers[0].id
-        : 1000;
+      // Resolve accurate ticket tier ID
+      const explicitTierId = selectedSeats.find(s => s.tierId)?.tierId;
+      const showTierId = event.selectedShow?.ticketTiers?.[0]?.id;
+      const eventTierId = event.ticketTiers?.[0]?.id;
+      const ticketTierId = explicitTierId || showTierId || eventTierId;
+
+      if (!ticketTierId) {
+        showError('Booking Error', 'No active ticket tier found for this event.');
+        setIsProcessing(false);
+        return;
+      }
 
       const seatIds = selectedSeats.map(s => s.id).filter(id => typeof id === 'number');
+      const showId = event.selectedShow?.id || selectedSeats?.[0]?.showId || null;
 
       const dto = {
-        eventId: typeof event.id === 'number' ? event.id : 1000,
+        eventId: typeof event.id === 'number' ? event.id : parseInt(event.id, 10),
         ticketTierId: ticketTierId,
-        customerName: formData.name,
-        customerEmail: formData.email,
-        customerPhone: formData.phone,
+        customerName: formData.name.trim(),
+        customerEmail: formData.email.trim(),
+        customerPhone: formData.phone.trim(),
         quantity: selectedSeats.length || 1,
         paymentMethod: paymentMethod === 'jazzcash' ? 'JazzCash' : (paymentMethod === 'easypaisa' ? 'EasyPaisa' : 'CreditCard'),
-        selectedSeatIds: seatIds
+        selectedSeatIds: seatIds.length > 0 ? seatIds : null,
+        eventShowId: showId
       };
 
       const backendBooking = await bookingsApi.createBooking(dto);
@@ -68,7 +77,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         ticketId: backendBooking.bookingRef || ('EVL-' + Math.floor(100000 + Math.random() * 900000)),
         eventTitle: event.title,
         venue: event.venue,
-        date: event.date || 'TBA',
+        date: event.date || event.startDate || 'TBA',
         time: event.time || 'TBA',
         attendeeName: formData.name,
         attendeeEmail: formData.email,
@@ -79,25 +88,11 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         bookingTime: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
       };
 
+      showSuccess('Booking Confirmed!', `Booking Reference: ${ticketObject.ticketId}`);
       onBookingSuccess(ticketObject);
     } catch (err) {
       console.error('Booking error:', err);
-      // Fallback local ticket generation if offline
-      const ticketObject = {
-        ticketId: 'EVL-' + Math.floor(100000 + Math.random() * 900000),
-        eventTitle: event.title,
-        venue: event.venue,
-        date: event.date || 'TBA',
-        time: event.time || 'TBA',
-        attendeeName: formData.name,
-        attendeeEmail: formData.email,
-        phone: formData.phone,
-        seats: selectedSeats,
-        paymentMethod: paymentMethod.toUpperCase(),
-        totalPaid: totalAmount,
-        bookingTime: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
-      };
-      onBookingSuccess(ticketObject);
+      showError('Booking Failed', err.message || 'Payment processing could not be completed.');
     } finally {
       setIsProcessing(false);
     }

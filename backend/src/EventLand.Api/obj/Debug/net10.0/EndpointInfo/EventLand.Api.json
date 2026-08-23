@@ -178,6 +178,162 @@
         }
       }
     },
+    "/api/admin/auditorium-layouts": {
+      "get": {
+        "tags": [
+          "AdminAuditoriumLayouts"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditoriumLayoutDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AdminAuditoriumLayouts"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAuditoriumLayoutDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAuditoriumLayoutDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAuditoriumLayoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditoriumLayoutDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/auditorium-layouts/{id}": {
+      "get": {
+        "tags": [
+          "AdminAuditoriumLayouts"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditoriumLayoutDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "AdminAuditoriumLayouts"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAuditoriumLayoutDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAuditoriumLayoutDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAuditoriumLayoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditoriumLayoutDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "AdminAuditoriumLayouts"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/admin/bookings": {
       "get": {
         "tags": [
@@ -1382,6 +1538,58 @@
         }
       }
     },
+    "/api/auditorium-layouts": {
+      "get": {
+        "tags": [
+          "AuditoriumLayouts"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditoriumLayoutDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auditorium-layouts/{id}": {
+      "get": {
+        "tags": [
+          "AuditoriumLayouts"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditoriumLayoutDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/Auth/login": {
       "post": {
         "tags": [
@@ -1939,6 +2147,47 @@
         },
         "additionalProperties": false
       },
+      "AuditoriumLayoutDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "venue": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "layoutCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalCapacity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "layoutJson": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
       "BookingDto": {
         "type": "object",
         "properties": {
@@ -2135,6 +2384,14 @@
               "$ref": "#/components/schemas/CreateEventShowInputDto"
             },
             "nullable": true
+          },
+          "auditoriumLayout": {
+            "type": "string",
+            "nullable": true
+          },
+          "priceRange": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -2183,6 +2440,43 @@
             "format": "int32"
           },
           "isFeatured": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateAuditoriumLayoutDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "venue": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "layoutCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalCapacity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "layoutJson": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
             "type": "boolean"
           }
         },
@@ -2249,6 +2543,18 @@
           "endTimeUtc": {
             "type": "string",
             "format": "date-time"
+          },
+          "startingPrice": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "ticketTiers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateShowTicketTierInputDto"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -2324,6 +2630,28 @@
             "format": "int32"
           },
           "layoutJson": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateShowTicketTierInputDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "availableQuantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": {
             "type": "string",
             "nullable": true
           }
@@ -3018,6 +3346,14 @@
               "$ref": "#/components/schemas/CreateEventShowInputDto"
             },
             "nullable": true
+          },
+          "auditoriumLayout": {
+            "type": "string",
+            "nullable": true
+          },
+          "priceRange": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -3066,6 +3402,43 @@
             "format": "int32"
           },
           "isFeatured": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "UpdateAuditoriumLayoutDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "venue": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "layoutCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "totalCapacity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "layoutJson": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
             "type": "boolean"
           }
         },
@@ -3297,6 +3670,9 @@
       "name": "AdminArtists"
     },
     {
+      "name": "AdminAuditoriumLayouts"
+    },
+    {
       "name": "AdminBookings"
     },
     {
@@ -3322,6 +3698,9 @@
     },
     {
       "name": "Artists"
+    },
+    {
+      "name": "AuditoriumLayouts"
     },
     {
       "name": "Auth"

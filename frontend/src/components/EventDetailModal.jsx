@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, MapPin, Sparkles, ShieldCheck, Ticket, Layers, Grid, Globe, Clock } from 'lucide-react';
+import { X, Calendar, MapPin, Sparkles, ShieldCheck, Ticket, Layers, Grid, Globe, Clock, Eye } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { formatEventDateRange, formatEventStartTime } from '../utils/dateUtils';
 import { getEventImageUrl, eventsApi } from '../services/api';
+import InteractiveSeatPicker from './InteractiveSeatPicker';
 
 export default function EventDetailModal({ event: initialEvent, onClose, onProceedToBooking }) {
   const { showWarning } = useToast();
   const [eventDetail, setEventDetail] = useState(initialEvent);
   const [selectedShowId, setSelectedShowId] = useState(initialEvent?.shows?.[0]?.id || null);
   const [selectedTiers, setSelectedTiers] = useState({});
+  const [showLayoutPreview, setShowLayoutPreview] = useState(false);
 
   useEffect(() => {
     if (initialEvent?.id) {
@@ -53,6 +55,8 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
       for (let i = 0; i < qty; i++) {
         result.push({
           id: `${tier.name} #${i + 1}`,
+          tierId: tier.id,
+          tierName: tier.name,
           zone: tier.name,
           price: tier.price,
           showTitle: activeShow?.showTitle || null
@@ -502,18 +506,35 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                   ))}
                 </div>
 
-                <button
-                  onClick={handleMappedBookNow}
-                  className="btn btn-primary"
-                  style={{ width: '100%', padding: '0.9rem', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-                >
-                  <Grid size={18} /> Open Interactive Seat Picker & Book Now
-                </button>
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <button
+                    onClick={() => setShowLayoutPreview(true)}
+                    style={{ flex: 1, padding: '0.85rem', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '10px', color: '#60a5fa', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                  >
+                    <Eye size={18} /> View Auditorium Layout Blueprint
+                  </button>
+                  <button
+                    onClick={handleMappedBookNow}
+                    className="btn btn-primary"
+                    style={{ flex: 1.5, padding: '0.85rem', fontSize: '0.95rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                  >
+                    <Grid size={18} /> Open Seat Picker & Book Now
+                  </button>
+                </div>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Auditorium Layout Blueprint Preview Overlay */}
+      {showLayoutPreview && (
+        <InteractiveSeatPicker
+          isPreview={true}
+          event={event}
+          onClose={() => setShowLayoutPreview(false)}
+        />
+      )}
     </div>
   );
 }

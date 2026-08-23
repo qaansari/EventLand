@@ -243,6 +243,14 @@ public class AdminService : IAdminService
             organizerId = defaultOrg.Id;
         }
 
+        var exists = await _context.Events.AnyAsync(e => 
+            e.Title.ToLower() == dto.Title.ToLower() && 
+            e.Venue.ToLower() == dto.Venue.ToLower() && 
+            e.StartDateUtc == dto.StartDateUtc && 
+            !e.IsDeleted);
+        if (exists)
+            throw new InvalidOperationException($"An event titled '{dto.Title}' at venue '{dto.Venue}' starting at '{dto.StartDateUtc:g}' already exists.");
+
         var ev = new Event
         {
             Title = dto.Title,
@@ -252,7 +260,7 @@ public class AdminService : IAdminService
             Address = dto.Address,
             StartDateUtc = dto.StartDateUtc,
             EndDateUtc = dto.EndDateUtc,
-            PriceRange = $"PKR {dto.StartingPrice:N0}+",
+            PriceRange = !string.IsNullOrWhiteSpace(dto.PriceRange) ? dto.PriceRange : $"PKR {dto.StartingPrice:N0}+",
             StartingPrice = dto.StartingPrice,
             TicketingType = ticketingType,
             Banner = FileUrlHelper.ExtractFileName(dto.Banner) ?? dto.Banner,
@@ -278,7 +286,6 @@ public class AdminService : IAdminService
             {
                 _context.EventTags.Add(new EventTag { EventId = ev.Id, TagId = tagId });
             }
-            await _context.SaveChangesAsync();
         }
 
         if (dto.Shows is not null && dto.Shows.Any())
@@ -401,6 +408,14 @@ public class AdminService : IAdminService
         Enum.TryParse<TicketingType>(dto.TicketingType, true, out var ticketingType);
         Enum.TryParse<EventStatus>(dto.Status, true, out var status);
 
+        var exists = await _context.Events.AnyAsync(e => 
+            e.Title.ToLower() == dto.Title.ToLower() && 
+            e.Venue.ToLower() == dto.Venue.ToLower() && 
+            e.StartDateUtc == dto.StartDateUtc && 
+            !e.IsDeleted);
+        if (exists)
+            throw new InvalidOperationException($"An event titled '{dto.Title}' at venue '{dto.Venue}' starting at '{dto.StartDateUtc:g}' already exists.");
+
         ev.Title = dto.Title;
         ev.Category = dto.Category;
         ev.Status = status;
@@ -411,23 +426,15 @@ public class AdminService : IAdminService
         ev.Address = dto.Address;
         ev.StartDateUtc = dto.StartDateUtc;
         ev.EndDateUtc = dto.EndDateUtc;
-        ev.PriceRange = $"PKR {dto.StartingPrice:N0}+";
+        ev.PriceRange = !string.IsNullOrWhiteSpace(dto.PriceRange) ? dto.PriceRange : $"PKR {dto.StartingPrice:N0}+";
         ev.StartingPrice = dto.StartingPrice;
         ev.TicketingType = ticketingType;
-        var newBannerFileName = FileUrlHelper.ExtractFileName(dto.Banner) ?? dto.Banner;
-        if (!string.Equals(ev.Banner, newBannerFileName, StringComparison.OrdinalIgnoreCase))
-        {
-            TryDeleteLocalFile(ev.Banner);
-            ev.Banner = newBannerFileName;
-        }
-
+        if (!string.IsNullOrWhiteSpace(dto.Banner))
+            ev.Banner = FileUrlHelper.ExtractFileName(dto.Banner) ?? dto.Banner;
         ev.Description = dto.Description;
         ev.ScarcityText = dto.ScarcityText;
-        var organizerExists = await _context.Organizers.AnyAsync(o => o.Id == dto.OrganizerId && !o.IsDeleted);
-        if (organizerExists)
-        {
+        if (dto.OrganizerId > 0)
             ev.OrganizerId = dto.OrganizerId;
-        }
 
         // Update tags
         ev.EventTags.Clear();
@@ -447,8 +454,12 @@ public class AdminService : IAdminService
         // Update shows & show ticket tiers
         if (dto.Shows is not null)
         {
-            var existingShows = await _context.EventShows.Where(s => s.EventId == id).ToListAsync();
-            _context.EventShows.RemoveRange(existingShows);
+            var existingShows = await _context.EventShows.Where(s => s.EventId == id && !s.IsDeleted).ToListAsync();
+            foreach (var s in existingShows)
+            {
+                s.IsDeleted = true;
+                s.DeletedAt = DateTimeOffset.UtcNow;
+            }
             await _context.SaveChangesAsync();
 
             if (dto.Shows.Any())
@@ -604,6 +615,11 @@ public class AdminService : IAdminService
 
     public async Task<OrganizerDto> CreateOrganizerAsync(CreateOrganizerDto dto)
     {
+        var exists = await _context.Organizers.AnyAsync(o => 
+            (o.Name.ToLower() == dto.Name.ToLower() || (!string.IsNullOrEmpty(dto.Email) && o.Email.ToLower() == dto.Email.ToLower())) && !o.IsDeleted);
+        if (exists)
+            throw new InvalidOperationException($"An organizer with the name '{dto.Name}' or email '{dto.Email}' already exists.");
+
         var fileNameOnly = FileUrlHelper.ExtractFileName(dto.LogoUrl);
 
         var org = new Organizer
@@ -636,6 +652,11 @@ public class AdminService : IAdminService
         var org = await _context.Organizers.FirstOrDefaultAsync(o => o.Id == id && !o.IsDeleted);
         if (org is null)
             throw new KeyNotFoundException($"Organizer '{id}' not found.");
+
+        var exists = await _context.Organizers.AnyAsync(o => 
+            o.Id != id && (o.Name.ToLower() == dto.Name.ToLower() || (!string.IsNullOrEmpty(dto.Email) && o.Email.ToLower() == dto.Email.ToLower())) && !o.IsDeleted);
+        if (exists)
+            throw new InvalidOperationException($"An organizer with the name '{dto.Name}' or email '{dto.Email}' already exists.");
 
         var newFileNameOnly = FileUrlHelper.ExtractFileName(dto.LogoUrl);
 
@@ -714,6 +735,10 @@ public class AdminService : IAdminService
 
     public async Task<ArtistDto> CreateArtistAsync(CreateArtistDto dto)
     {
+        var exists = await _context.Artists.AnyAsync(a => a.Name.ToLower() == dto.Name.ToLower() && !a.IsDeleted);
+        if (exists)
+            throw new InvalidOperationException($"An artist named '{dto.Name}' already exists.");
+
         var artist = new Artist
         {
             Name = dto.Name,
@@ -743,6 +768,10 @@ public class AdminService : IAdminService
         var artist = await _context.Artists.FirstOrDefaultAsync(a => a.Id == id && !a.IsDeleted);
         if (artist is null)
             throw new KeyNotFoundException($"Artist '{id}' not found.");
+
+        var exists = await _context.Artists.AnyAsync(a => a.Id != id && a.Name.ToLower() == dto.Name.ToLower() && !a.IsDeleted);
+        if (exists)
+            throw new InvalidOperationException($"An artist named '{dto.Name}' already exists.");
 
         artist.Name = dto.Name;
         artist.Genre = dto.Genre;
@@ -778,6 +807,10 @@ public class AdminService : IAdminService
     // --- TicketTiers CRUD ---
     public async Task<TicketTierDto> CreateTicketTierAsync(CreateTicketTierDto dto)
     {
+        var exists = await _context.TicketTiers.AnyAsync(t => t.EventId == dto.EventId && t.EventShowId == dto.EventShowId && t.Name.ToLower() == dto.Name.ToLower() && !t.IsDeleted);
+        if (exists)
+            throw new InvalidOperationException($"A ticket tier named '{dto.Name}' already exists for this show.");
+
         var tier = new TicketTier
         {
             EventId = dto.EventId,
@@ -802,6 +835,10 @@ public class AdminService : IAdminService
         var tier = await _context.TicketTiers.FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted);
         if (tier is null)
             throw new KeyNotFoundException($"Ticket tier '{id}' not found.");
+
+        var exists = await _context.TicketTiers.AnyAsync(t => t.Id != id && t.EventId == tier.EventId && t.EventShowId == dto.EventShowId && t.Name.ToLower() == dto.Name.ToLower() && !t.IsDeleted);
+        if (exists)
+            throw new InvalidOperationException($"A ticket tier named '{dto.Name}' already exists for this show.");
 
         tier.EventShowId = dto.EventShowId;
         tier.Name = dto.Name;
@@ -1007,6 +1044,10 @@ public class AdminService : IAdminService
 
     public async Task<TagDto> CreateTagAsync(CreateTagDto dto)
     {
+        var exists = await _context.Tags.AnyAsync(t => (t.Name.ToLower() == dto.Name.ToLower() || t.Slug.ToLower() == dto.Slug.ToLower()) && !t.IsDeleted);
+        if (exists)
+            throw new InvalidOperationException($"A tag with the name '{dto.Name}' or slug '{dto.Slug}' already exists.");
+
         var tag = new Tag { Name = dto.Name, Slug = dto.Slug };
         _context.Tags.Add(tag);
         await _context.SaveChangesAsync();
@@ -1019,6 +1060,10 @@ public class AdminService : IAdminService
         var tag = await _context.Tags.FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted);
         if (tag is null)
             throw new KeyNotFoundException($"Tag '{id}' not found.");
+
+        var exists = await _context.Tags.AnyAsync(t => t.Id != id && (t.Name.ToLower() == dto.Name.ToLower() || t.Slug.ToLower() == dto.Slug.ToLower()) && !t.IsDeleted);
+        if (exists)
+            throw new InvalidOperationException($"A tag with the name '{dto.Name}' or slug '{dto.Slug}' already exists.");
 
         tag.Name = dto.Name;
         tag.Slug = dto.Slug;
@@ -1117,6 +1162,10 @@ public class AdminService : IAdminService
             ? dto.LayoutCode.Trim().ToUpperInvariant().Replace(" ", "_")
             : dto.Name.Trim().ToUpperInvariant().Replace(" ", "_");
 
+        var exists = await _context.AuditoriumLayouts.AnyAsync(a => (a.LayoutCode.ToLower() == layoutCode.ToLower() || a.Name.ToLower() == dto.Name.ToLower()) && !a.IsDeleted);
+        if (exists)
+            throw new InvalidOperationException($"An auditorium layout with code '{layoutCode}' or name '{dto.Name}' already exists.");
+
         var layout = new AuditoriumLayout
         {
             Name = dto.Name,
@@ -1142,6 +1191,14 @@ public class AdminService : IAdminService
         var layout = await _context.AuditoriumLayouts.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (layout is null)
             throw new KeyNotFoundException($"Auditorium layout with ID '{id}' not found.");
+
+        var layoutCode = !string.IsNullOrWhiteSpace(dto.LayoutCode)
+            ? dto.LayoutCode.Trim().ToUpperInvariant().Replace(" ", "_")
+            : dto.Name.Trim().ToUpperInvariant().Replace(" ", "_");
+
+        var exists = await _context.AuditoriumLayouts.AnyAsync(a => a.Id != id && (a.LayoutCode.ToLower() == layoutCode.ToLower() || a.Name.ToLower() == dto.Name.ToLower()) && !a.IsDeleted);
+        if (exists)
+            throw new InvalidOperationException($"An auditorium layout with code '{layoutCode}' or name '{dto.Name}' already exists.");
 
         layout.Name = dto.Name;
         layout.Venue = dto.Venue;
@@ -1202,6 +1259,27 @@ public class AdminService : IAdminService
         GenerateSeatsForZone(zone, layoutJson);
 
         _context.SeatingZones.Add(zone);
+        await _context.SaveChangesAsync();
+
+        // Check if event shows exist and if TicketTiers are missing, generate row-lane TicketTiers automatically!
+        var shows = await _context.EventShows.Where(s => s.EventId == eventId && !s.IsDeleted).ToListAsync();
+        foreach (var show in shows)
+        {
+            var existingTiers = await _context.TicketTiers.Where(t => t.EventId == eventId && t.EventShowId == show.Id && !t.IsDeleted).ToListAsync();
+            if (!existingTiers.Any())
+            {
+                var basePrice = startingPrice > 0 ? startingPrice : 500m;
+                var rowTiers = new[]
+                {
+                    new TicketTier { EventId = eventId, EventShowId = show.Id, Name = "Platinum - 1st Row", Description = "Front Row Platinum Seating", Price = basePrice * 3.0m, AvailableQuantity = 25, SortOrder = 1 },
+                    new TicketTier { EventId = eventId, EventShowId = show.Id, Name = "Diamond - 2nd and 3rd Row", Description = "Premium Orchestra Seating", Price = basePrice * 2.0m, AvailableQuantity = 50, SortOrder = 2 },
+                    new TicketTier { EventId = eventId, EventShowId = show.Id, Name = "Gold - 4th and 5th Row", Description = "Prime Mid-Hall Seating", Price = basePrice * 1.6m, AvailableQuantity = 50, SortOrder = 3 },
+                    new TicketTier { EventId = eventId, EventShowId = show.Id, Name = "Bronze - 6th and 7th Row", Description = "Standard Center Seating", Price = basePrice * 1.4m, AvailableQuantity = 55, SortOrder = 4 },
+                    new TicketTier { EventId = eventId, EventShowId = show.Id, Name = "Standard - 8th to 11th Row", Description = "Standard Admission Seating", Price = basePrice, AvailableQuantity = 100, SortOrder = 5 }
+                };
+                _context.TicketTiers.AddRange(rowTiers);
+            }
+        }
         await _context.SaveChangesAsync();
     }
 

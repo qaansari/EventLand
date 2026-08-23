@@ -106,21 +106,10 @@ function FileUploadField({ label, value, onChange, placeholder = "Image URL or u
 export default function AdminDashboard({ onSelectEvent }) {
   const { showSuccess, showError } = useToast();
   const [activeAdminTab, setActiveAdminTab] = useState('events'); // 'events', 'organizers', 'artists', 'bookings', 'users', 'roles', 'ticket-tiers', 'tags'
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-
-  useEffect(() => {
-    if (successMsg) {
-      showSuccess('Admin Operations', successMsg);
-    }
-  }, [successMsg]);
-
-  useEffect(() => {
-    if (errorMsg) {
-      showError('Admin Error', errorMsg);
-    }
-  }, [errorMsg]);
 
   // Loaded Data States
   const [eventsList, setEventsList] = useState([]);
@@ -248,8 +237,8 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [auditoriumForm, setAuditoriumForm] = useState(defaultAuditoriumForm);
 
   // Load Data from Backend API
-  const fetchBackendData = async () => {
-    setLoading(true);
+  const fetchBackendData = async (isInitial = false) => {
+    if (isInitial) setLoading(true);
     setErrorMsg('');
     try {
       const [orgs, evs, arts, bks, rls, usrs, tgs, auds] = await Promise.all([
@@ -286,17 +275,18 @@ export default function AdminDashboard({ onSelectEvent }) {
       console.error('Error fetching admin data:', err);
       setErrorMsg(err.message || 'Failed to load backend data.');
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchBackendData();
+    fetchBackendData(true);
   }, []);
 
   // --- CRUD: EVENTS ---
   const handleSaveEvent = async (e) => {
     e.preventDefault();
+    setIsSaving(true);
     setErrorMsg('');
     setSuccessMsg('');
 
@@ -308,12 +298,28 @@ export default function AdminDashboard({ onSelectEvent }) {
       const msg = 'Please enter an event title.';
       setErrorMsg(msg);
       showError('Validation Error', msg);
+      setIsSaving(false);
       return;
     }
     if (!venue) {
       const msg = 'Please enter a venue.';
       setErrorMsg(msg);
       showError('Validation Error', msg);
+      setIsSaving(false);
+      return;
+    }
+
+    // Duplicate check for Event
+    const isDupEvent = eventsList.some(ev => 
+      String(ev.id) !== String(eventForm.id) && 
+      ev.title.trim().toLowerCase() === title.toLowerCase() && 
+      ev.venue.trim().toLowerCase() === venue.toLowerCase()
+    );
+    if (isDupEvent) {
+      const msg = `An event titled '${title}' at venue '${venue}' already exists.`;
+      setErrorMsg(msg);
+      showError('Duplicate Event', msg);
+      setIsSaving(false);
       return;
     }
 
@@ -335,6 +341,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
         setErrorMsg('Invalid start or end date format.');
         showError('Invalid Date', 'Please select valid start and end dates.');
+        setIsSaving(false);
         return;
       }
 
@@ -401,6 +408,8 @@ export default function AdminDashboard({ onSelectEvent }) {
       const errMsg = err.message || 'Failed to save event.';
       setErrorMsg(errMsg);
       showError('Save Failed', errMsg);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -419,6 +428,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       address: ev.address || '',
       startDateUtc: ev.startDateUtc ? ev.startDateUtc.slice(0, 16) : new Date().toISOString().slice(0, 16),
       endDateUtc: ev.endDateUtc ? ev.endDateUtc.slice(0, 16) : new Date().toISOString().slice(0, 16),
+      priceRange: ev.priceRange || '',
       startingPrice: ev.startingPrice || 1500,
       ticketingType: (ev.ticketingType || 'categorized').toLowerCase(),
       auditoriumLayout: ev.seatingZones?.[0]?.layoutJson || '',
@@ -448,10 +458,14 @@ export default function AdminDashboard({ onSelectEvent }) {
     if (!window.confirm('Are you sure you want to delete this event?')) return;
     try {
       await adminApi.events.delete(id);
-      setSuccessMsg('Event deleted successfully.');
+      const msg = 'Event deleted successfully.';
+      setSuccessMsg(msg);
+      showSuccess('Event Deleted 🗑️', msg);
       fetchBackendData();
     } catch (err) {
-      setErrorMsg(err.message || 'Delete failed.');
+      const msg = err.message || 'Delete failed.';
+      setErrorMsg(msg);
+      showError('Delete Failed', msg);
     }
   };
 
@@ -460,6 +474,19 @@ export default function AdminDashboard({ onSelectEvent }) {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
+    // Duplicate check for Organizer
+    const isDupOrg = organizersList.some(o => 
+      String(o.id) !== String(orgForm.id) && 
+      (o.name.trim().toLowerCase() === (orgForm.name || '').trim().toLowerCase() ||
+       (orgForm.email && o.email && o.email.trim().toLowerCase() === orgForm.email.trim().toLowerCase()))
+    );
+    if (isDupOrg) {
+      const msg = `An organizer with the name '${orgForm.name}' or email '${orgForm.email}' already exists.`;
+      setErrorMsg(msg);
+      showError('Duplicate Organizer', msg);
+      return;
+    }
+
     try {
       const payload = {
         name: orgForm.name,
@@ -472,16 +499,22 @@ export default function AdminDashboard({ onSelectEvent }) {
 
       if (orgForm.id) {
         await adminApi.organizers.update(orgForm.id, payload);
-        setSuccessMsg('Organizer updated successfully!');
+        const msg = 'Organizer updated successfully!';
+        setSuccessMsg(msg);
+        showSuccess('Organizer Updated', msg);
       } else {
         await adminApi.organizers.create(payload);
-        setSuccessMsg('Organizer created successfully!');
+        const msg = 'Organizer created successfully!';
+        setSuccessMsg(msg);
+        showSuccess('Organizer Created', msg);
       }
       setShowOrgModal(false);
       setOrgForm(defaultOrgForm);
       fetchBackendData();
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to save organizer.');
+      const msg = err.message || 'Failed to save organizer.';
+      setErrorMsg(msg);
+      showError('Save Failed', msg);
     }
   };
 
@@ -503,10 +536,14 @@ export default function AdminDashboard({ onSelectEvent }) {
     if (!window.confirm('Are you sure you want to delete this organizer?')) return;
     try {
       await adminApi.organizers.delete(id);
-      setSuccessMsg('Organizer deleted successfully.');
+      const msg = 'Organizer deleted successfully.';
+      setSuccessMsg(msg);
+      showSuccess('Organizer Deleted 🗑️', msg);
       fetchBackendData();
     } catch (err) {
-      setErrorMsg(err.message || 'Delete failed.');
+      const msg = err.message || 'Delete failed.';
+      setErrorMsg(msg);
+      showError('Delete Failed', msg);
     }
   };
 
@@ -515,6 +552,18 @@ export default function AdminDashboard({ onSelectEvent }) {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
+    // Duplicate check for Artist
+    const isDupArtist = artistsList.some(a => 
+      String(a.id) !== String(artistForm.id) && 
+      a.name.trim().toLowerCase() === (artistForm.name || '').trim().toLowerCase()
+    );
+    if (isDupArtist) {
+      const msg = `An artist named '${artistForm.name}' already exists.`;
+      setErrorMsg(msg);
+      showError('Duplicate Artist', msg);
+      return;
+    }
+
     try {
       const payload = {
         name: artistForm.name,
@@ -532,16 +581,22 @@ export default function AdminDashboard({ onSelectEvent }) {
 
       if (artistForm.id) {
         await adminApi.artists.update(artistForm.id, payload);
-        setSuccessMsg('Artist updated successfully!');
+        const msg = 'Artist updated successfully!';
+        setSuccessMsg(msg);
+        showSuccess('Artist Updated', msg);
       } else {
         await adminApi.artists.create(payload);
-        setSuccessMsg('Artist created successfully!');
+        const msg = 'Artist created successfully!';
+        setSuccessMsg(msg);
+        showSuccess('Artist Created', msg);
       }
       setShowArtistModal(false);
       setArtistForm(defaultArtistForm);
       fetchBackendData();
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to save artist.');
+      const msg = err.message || 'Failed to save artist.';
+      setErrorMsg(msg);
+      showError('Save Failed', msg);
     }
   };
 
@@ -567,10 +622,14 @@ export default function AdminDashboard({ onSelectEvent }) {
     if (!window.confirm('Are you sure you want to delete this artist?')) return;
     try {
       await adminApi.artists.delete(id);
-      setSuccessMsg('Artist deleted successfully.');
+      const msg = 'Artist deleted successfully.';
+      setSuccessMsg(msg);
+      showSuccess('Artist Deleted 🗑️', msg);
       fetchBackendData();
     } catch (err) {
-      setErrorMsg(err.message || 'Delete failed.');
+      const msg = err.message || 'Delete failed.';
+      setErrorMsg(msg);
+      showError('Delete Failed', msg);
     }
   };
 
@@ -581,33 +640,42 @@ export default function AdminDashboard({ onSelectEvent }) {
     setSuccessMsg('');
 
     if (!tierForm.eventId) {
-      setErrorMsg('Please select an event.');
+      const msg = 'Please select an event.';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
       return;
     }
 
     try {
       const payload = {
         eventId: parseInt(tierForm.eventId, 10),
+        eventShowId: tierForm.eventShowId ? parseInt(tierForm.eventShowId, 10) : null,
         name: tierForm.name,
-        description: tierForm.description,
+        description: tierForm.description || '',
         price: parseFloat(tierForm.price),
-        availableQuantity: parseInt(tierForm.availableQuantity, 10),
-        maxPerOrder: parseInt(tierForm.maxPerOrder, 10),
+        availableQuantity: parseInt(tierForm.availableQuantity, 10) || 100,
+        maxPerOrder: parseInt(tierForm.maxPerOrder, 10) || 5,
         sortOrder: parseInt(tierForm.sortOrder, 10) || 1
       };
 
       if (tierForm.id) {
         await adminApi.ticketTiers.update(tierForm.id, payload);
-        setSuccessMsg('Ticket tier updated successfully!');
+        const msg = 'Ticket tier updated successfully!';
+        setSuccessMsg(msg);
+        showSuccess('Ticket Tier Updated', msg);
       } else {
         await adminApi.ticketTiers.create(payload);
-        setSuccessMsg('Ticket tier created successfully!');
+        const msg = 'Ticket tier created successfully!';
+        setSuccessMsg(msg);
+        showSuccess('Ticket Tier Created', msg);
       }
       setShowTierModal(false);
       setTierForm(defaultTierForm);
       fetchBackendData();
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to save ticket tier.');
+      const msg = err.message || 'Failed to save ticket tier.';
+      setErrorMsg(msg);
+      showError('Save Failed', msg);
     }
   };
 
@@ -618,8 +686,21 @@ export default function AdminDashboard({ onSelectEvent }) {
     setSuccessMsg('');
 
     if (!userForm.roleId) {
-      setErrorMsg('Please select a role.');
+      const msg = 'Please select a role.';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
       return;
+    }
+
+    // Duplicate check for User
+    if (!userForm.id) {
+      const isDupUser = usersList.some(u => u.email.trim().toLowerCase() === (userForm.email || '').trim().toLowerCase());
+      if (isDupUser) {
+        const msg = `A user with the email '${userForm.email}' already exists.`;
+        setErrorMsg(msg);
+        showError('Duplicate User', msg);
+        return;
+      }
     }
 
     try {
@@ -631,7 +712,9 @@ export default function AdminDashboard({ onSelectEvent }) {
           isActive: true
         };
         await adminApi.users.update(userForm.id, payload);
-        setSuccessMsg('User account updated successfully!');
+        const msg = 'User account updated successfully!';
+        setSuccessMsg(msg);
+        showSuccess('User Updated', msg);
       } else {
         const payload = {
           email: userForm.email,
@@ -641,13 +724,17 @@ export default function AdminDashboard({ onSelectEvent }) {
           phoneNumber: userForm.phoneNumber
         };
         await adminApi.users.create(payload);
-        setSuccessMsg('User account created successfully!');
+        const msg = 'User account created successfully!';
+        setSuccessMsg(msg);
+        showSuccess('User Created', msg);
       }
       setShowUserModal(false);
       setUserForm(defaultUserForm);
       fetchBackendData();
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to save user.');
+      const msg = err.message || 'Failed to save user.';
+      setErrorMsg(msg);
+      showError('Save Failed', msg);
     }
   };
 
@@ -667,10 +754,14 @@ export default function AdminDashboard({ onSelectEvent }) {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
     try {
       await adminApi.users.delete(id);
-      setSuccessMsg('User account deleted.');
+      const msg = 'User account deleted.';
+      setSuccessMsg(msg);
+      showSuccess('User Deleted 🗑️', msg);
       fetchBackendData();
     } catch (err) {
-      setErrorMsg(err.message || 'Delete failed.');
+      const msg = err.message || 'Delete failed.';
+      setErrorMsg(msg);
+      showError('Delete Failed', msg);
     }
   };
 
@@ -679,19 +770,37 @@ export default function AdminDashboard({ onSelectEvent }) {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
+    // Duplicate check for Role
+    const isDupRole = rolesList.some(r => 
+      String(r.id) !== String(roleForm.id) && 
+      r.name.trim().toLowerCase() === (roleForm.name || '').trim().toLowerCase()
+    );
+    if (isDupRole) {
+      const msg = `A role named '${roleForm.name}' already exists.`;
+      setErrorMsg(msg);
+      showError('Duplicate Role', msg);
+      return;
+    }
+
     try {
       if (roleForm.id) {
         await adminApi.roles.update(roleForm.id, { name: roleForm.name, description: roleForm.description });
-        setSuccessMsg('Role updated successfully!');
+        const msg = 'Role updated successfully!';
+        setSuccessMsg(msg);
+        showSuccess('Role Updated', msg);
       } else {
         await adminApi.roles.create({ name: roleForm.name, description: roleForm.description });
-        setSuccessMsg('Role created successfully!');
+        const msg = 'Role created successfully!';
+        setSuccessMsg(msg);
+        showSuccess('Role Created', msg);
       }
       setShowRoleModal(false);
       setRoleForm(defaultRoleForm);
       fetchBackendData();
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to save role.');
+      const msg = err.message || 'Failed to save role.';
+      setErrorMsg(msg);
+      showError('Save Failed', msg);
     }
   };
 
@@ -704,10 +813,14 @@ export default function AdminDashboard({ onSelectEvent }) {
     if (!window.confirm('Delete role?')) return;
     try {
       await adminApi.roles.delete(id);
-      setSuccessMsg('Role deleted.');
+      const msg = 'Role deleted.';
+      setSuccessMsg(msg);
+      showSuccess('Role Deleted 🗑️', msg);
       fetchBackendData();
     } catch (err) {
-      setErrorMsg(err.message || 'Delete failed.');
+      const msg = err.message || 'Delete failed.';
+      setErrorMsg(msg);
+      showError('Delete Failed', msg);
     }
   };
 
@@ -721,22 +834,42 @@ export default function AdminDashboard({ onSelectEvent }) {
       const slug = (tagForm.slug ? tagForm.slug.trim() : name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')).toLowerCase();
       
       if (!name) {
-        setErrorMsg('Please enter a tag name.');
+        const msg = 'Please enter a tag name.';
+        setErrorMsg(msg);
+        showError('Validation Error', msg);
+        return;
+      }
+
+      // Duplicate check for Tag
+      const isDupTag = tagsList.some(t => 
+        String(t.id) !== String(tagForm.id) && 
+        (t.name.trim().toLowerCase() === name.toLowerCase() || t.slug.trim().toLowerCase() === slug.toLowerCase())
+      );
+      if (isDupTag) {
+        const msg = `A tag with the name '${name}' or slug '${slug}' already exists.`;
+        setErrorMsg(msg);
+        showError('Duplicate Tag', msg);
         return;
       }
 
       if (tagForm.id) {
         await adminApi.tags.update(tagForm.id, { name, slug });
-        setSuccessMsg('Tag updated successfully!');
+        const msg = 'Tag updated successfully!';
+        setSuccessMsg(msg);
+        showSuccess('Tag Updated', msg);
       } else {
         await adminApi.tags.create({ name, slug });
-        setSuccessMsg('Tag created successfully!');
+        const msg = 'Tag created successfully!';
+        setSuccessMsg(msg);
+        showSuccess('Tag Created', msg);
       }
       setShowTagModal(false);
       setTagForm(defaultTagForm);
       fetchBackendData();
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to save tag.');
+      const msg = err.message || 'Failed to save tag.';
+      setErrorMsg(msg);
+      showError('Save Failed', msg);
     }
   };
 
@@ -753,10 +886,14 @@ export default function AdminDashboard({ onSelectEvent }) {
     if (!window.confirm('Delete tag?')) return;
     try {
       await adminApi.tags.delete(id);
-      setSuccessMsg('Tag deleted.');
+      const msg = 'Tag deleted.';
+      setSuccessMsg(msg);
+      showSuccess('Tag Deleted 🗑️', msg);
       fetchBackendData();
     } catch (err) {
-      setErrorMsg(err.message || 'Delete failed.');
+      const msg = err.message || 'Delete failed.';
+      setErrorMsg(msg);
+      showError('Delete Failed', msg);
     }
   };
 
@@ -765,20 +902,29 @@ export default function AdminDashboard({ onSelectEvent }) {
     if (!window.confirm('Delete booking?')) return;
     try {
       await adminApi.bookings.delete(id);
-      setSuccessMsg('Booking deleted.');
+      const msg = 'Booking deleted successfully.';
+      setSuccessMsg(msg);
+      showSuccess('Booking Deleted 🗑️', msg);
       fetchBackendData();
     } catch (err) {
-      setErrorMsg(err.message || 'Delete failed.');
+      const msg = err.message || 'Delete failed.';
+      setErrorMsg(msg);
+      showError('Delete Failed', msg);
     }
   };
 
-  const handleUpdateBookingStatus = async (id, status, paymentStatus) => {
+  const handleUpdateBookingStatus = async (id, status, paymentStatus = null) => {
     try {
-      await adminApi.bookings.updateStatus(id, status, paymentStatus);
-      setSuccessMsg('Booking status updated.');
+      const resolvedPaymentStatus = paymentStatus || (status === 'Cancelled' ? 'Refunded' : (status === 'Pending' ? 'Pending' : 'Paid'));
+      await adminApi.bookings.updateStatus(id, status, resolvedPaymentStatus);
+      const msg = `Booking status updated to ${status} (${resolvedPaymentStatus})`;
+      setSuccessMsg(msg);
+      showSuccess('Booking Updated', msg);
       fetchBackendData();
     } catch (err) {
-      setErrorMsg(err.message || 'Update failed.');
+      const msg = err.message || 'Update failed.';
+      setErrorMsg(msg);
+      showError('Update Failed', msg);
     }
   };
 
@@ -792,6 +938,19 @@ export default function AdminDashboard({ onSelectEvent }) {
       const msg = 'Please enter an auditorium name and venue.';
       setErrorMsg(msg);
       showError('Validation Error', msg);
+      return;
+    }
+
+    const layoutCode = auditoriumForm.layoutCode || auditoriumForm.name.toUpperCase().replace(/\s+/g, '_');
+    const isDupAuditorium = auditoriumsList.some(a => 
+      String(a.id) !== String(auditoriumForm.id) && 
+      (a.name.trim().toLowerCase() === auditoriumForm.name.trim().toLowerCase() ||
+       a.layoutCode.trim().toLowerCase() === layoutCode.trim().toLowerCase())
+    );
+    if (isDupAuditorium) {
+      const msg = `An auditorium layout with name '${auditoriumForm.name}' or code '${layoutCode}' already exists.`;
+      setErrorMsg(msg);
+      showError('Duplicate Layout', msg);
       return;
     }
 
@@ -889,17 +1048,7 @@ export default function AdminDashboard({ onSelectEvent }) {
         </button>
       </div>
 
-      {/* Notifications */}
-      {errorMsg && (
-        <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '12px', color: '#f87171', marginBottom: '1.5rem' }}>
-          {errorMsg}
-        </div>
-      )}
-      {successMsg && (
-        <div style={{ padding: '1rem', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '12px', color: '#4ade80', marginBottom: '1.5rem' }}>
-          {successMsg}
-        </div>
-      )}
+
 
       {/* Navigation Tabs */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '1rem' }}>
@@ -1289,7 +1438,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                     <td style={{ padding: '1rem' }}>
                       <SearchableSelect
                         value={b.status || 'Confirmed'}
-                        onChange={(e) => handleUpdateBookingStatus(b.id, e.target.value, 'Paid')}
+                        onChange={(e) => handleUpdateBookingStatus(b.id, e.target.value)}
                         options={['Confirmed', 'Completed', 'Cancelled', 'Pending']}
                         style={{ width: '130px' }}
                       />
@@ -1624,14 +1773,9 @@ export default function AdminDashboard({ onSelectEvent }) {
                       <div>
                         <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Status *</label>
                         <SearchableSelect
-                          value={eventForm.status}
-                          onChange={e => setEventForm({ ...eventForm, status: Number(e.target.value) })}
-                          options={[
-                            { value: 0, label: 'Draft (0)' },
-                            { value: 1, label: 'Live / Published (1)' },
-                            { value: 2, label: 'Completed (2)' },
-                            { value: 3, label: 'Cancelled (3)' }
-                          ]}
+                          value={eventForm.status || 'Live'}
+                          onChange={e => setEventForm({ ...eventForm, status: e.target.value })}
+                          options={['Live', 'Draft', 'Completed', 'Cancelled']}
                         />
                       </div>
                     </div>
@@ -1756,7 +1900,13 @@ export default function AdminDashboard({ onSelectEvent }) {
                               startTimeUtc: eventForm.startDateUtc || new Date().toISOString().slice(0, 16),
                               endTimeUtc: eventForm.endDateUtc || new Date().toISOString().slice(0, 16),
                               startingPrice: parseFloat(eventForm.startingPrice) || 1500,
-                              ticketTiers: [
+                              ticketTiers: eventForm.ticketingType === 'mapped' ? [
+                                { name: 'Platinum - 1st Row', price: (parseFloat(eventForm.startingPrice) || 500) * 3.0, availableQuantity: 25 },
+                                { name: 'Diamond - 2nd and 3rd Row', price: (parseFloat(eventForm.startingPrice) || 500) * 2.0, availableQuantity: 50 },
+                                { name: 'Gold - 4th and 5th Row', price: (parseFloat(eventForm.startingPrice) || 500) * 1.6, availableQuantity: 50 },
+                                { name: 'Bronze - 6th and 7th Row', price: (parseFloat(eventForm.startingPrice) || 500) * 1.4, availableQuantity: 55 },
+                                { name: 'Standard - 8th to 11th Row', price: parseFloat(eventForm.startingPrice) || 500, availableQuantity: 100 }
+                              ] : [
                                 { name: 'Standard Pass', price: parseFloat(eventForm.startingPrice) || 1500, availableQuantity: 150 },
                                 { name: 'VIP Pass', price: (parseFloat(eventForm.startingPrice) || 1500) * 2.25, availableQuantity: 50 }
                               ]
@@ -1952,7 +2102,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                     <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                       <button type="button" onClick={() => setShowEventModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                      <button type="submit" style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Save Event</button>
+                      <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Event...' : 'Save Event'}</button>
                     </div>
                   </form>
                 </div>
@@ -2013,7 +2163,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowOrgModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Save Organizer</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Organizer...' : 'Save Organizer'}</button>
               </div>
             </form>
           </div>
@@ -2068,51 +2218,84 @@ export default function AdminDashboard({ onSelectEvent }) {
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowArtistModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #a855f7, #6b21a8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Save Artist</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #a855f7, #6b21a8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Artist...' : 'Save Artist'}</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* --- MODAL 4: CREATE TICKET TIER --- */}
-      {showTierModal && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px', padding: '2rem', position: 'relative' }}>
-            <button
-              onClick={() => setShowTierModal(false)}
-              style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255, 255, 255, 0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-            >
-              <X size={18} />
-            </button>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>Add Ticket Tier</h3>
-            <form onSubmit={handleSaveTicketTier} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Select Event *</label>
-                <SearchableSelect
-                  required
-                  value={tierForm.eventId}
-                  onChange={e => setTierForm({ ...tierForm, eventId: e.target.value })}
-                  options={eventsList.map(ev => ({ value: ev.id, label: ev.title }))}
-                  placeholder="Select Event..."
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Tier Name *</label>
-                <input type="text" required value={tierForm.name} onChange={e => setTierForm({ ...tierForm, name: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Price (PKR) *</label>
-                <input type="number" required value={tierForm.price} onChange={e => setTierForm({ ...tierForm, price: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-              </div>
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                <button type="button" onClick={() => setShowTierModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Save Tier</button>
-              </div>
-            </form>
+      {/* --- MODAL 4: CREATE / EDIT TICKET TIER --- */}
+      {showTierModal && (() => {
+        const selectedEv = eventsList.find(ev => String(ev.id) === String(tierForm.eventId));
+        const showsForEv = selectedEv?.shows || [];
+
+        return (
+          <div className="modal-overlay">
+            <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px', padding: '2rem', position: 'relative' }}>
+              <button
+                onClick={() => setShowTierModal(false)}
+                style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255, 255, 255, 0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>
+                {tierForm.id ? 'Edit Ticket Tier' : 'Add Ticket Tier & Row Pricing'}
+              </h3>
+              <form onSubmit={handleSaveTicketTier} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Select Event *</label>
+                  <SearchableSelect
+                    required
+                    value={tierForm.eventId}
+                    onChange={e => setTierForm({ ...tierForm, eventId: e.target.value, eventShowId: '' })}
+                    options={eventsList.map(ev => ({ value: ev.id, label: ev.title }))}
+                    placeholder="Select Event..."
+                  />
+                </div>
+
+                {showsForEv.length > 0 && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Select Show Slot (Optional)</label>
+                    <SearchableSelect
+                      value={tierForm.eventShowId || ''}
+                      onChange={e => setTierForm({ ...tierForm, eventShowId: e.target.value })}
+                      options={showsForEv.map(s => ({ value: s.id, label: s.showTitle }))}
+                      placeholder="All Shows (General)"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Tier / Row Category Name *</label>
+                  <input type="text" required placeholder="e.g. VIP Front Rows A-E" value={tierForm.name} onChange={e => setTierForm({ ...tierForm, name: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Row Range / Zone Description</label>
+                  <input type="text" placeholder="e.g. Rows A to E, Premium Orchestra Seating" value={tierForm.description || ''} onChange={e => setTierForm({ ...tierForm, description: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Price per Ticket (PKR) *</label>
+                    <input type="number" required value={tierForm.price} onChange={e => setTierForm({ ...tierForm, price: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#38bdf8', fontWeight: 700 }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Available Capacity</label>
+                    <input type="number" value={tierForm.availableQuantity || 100} onChange={e => setTierForm({ ...tierForm, availableQuantity: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                  <button type="button" onClick={() => setShowTierModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
+                  <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Tier...' : 'Save Tier & Price'}</button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* --- MODAL 5: CREATE / EDIT USER ACCOUNT --- */}
       {showUserModal && (
@@ -2154,7 +2337,7 @@ export default function AdminDashboard({ onSelectEvent }) {
               </div>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowUserModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Save User</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving User...' : 'Save User'}</button>
               </div>
             </form>
           </div>
@@ -2185,7 +2368,7 @@ export default function AdminDashboard({ onSelectEvent }) {
               </div>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowRoleModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Save Role</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Role...' : 'Save Role'}</button>
               </div>
             </form>
           </div>
@@ -2243,7 +2426,7 @@ export default function AdminDashboard({ onSelectEvent }) {
               </div>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowTagModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #10b981, #047857)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Save Tag</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #10b981, #047857)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Tag...' : 'Save Tag'}</button>
               </div>
             </form>
           </div>
@@ -2420,7 +2603,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowAuditoriumModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Save Auditorium Layout</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Layout...' : 'Save Auditorium Layout'}</button>
               </div>
             </form>
           </div>

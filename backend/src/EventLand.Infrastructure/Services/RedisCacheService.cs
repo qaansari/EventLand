@@ -14,6 +14,7 @@ public class RedisCacheService : ICacheService
     private readonly IMemoryCache _memoryCache;
     private readonly ILogger<RedisCacheService> _logger;
     private static readonly ConcurrentDictionary<string, byte> _knownKeys = new();
+    private static DateTimeOffset _redisDisabledUntil = DateTimeOffset.MinValue;
 
     public RedisCacheService(
         IDistributedCache distributedCache,
@@ -25,23 +26,38 @@ public class RedisCacheService : ICacheService
         _logger = logger;
     }
 
+    private static bool IsRedisAvailable()
+    {
+        return DateTimeOffset.UtcNow > _redisDisabledUntil;
+    }
+
+    private static void DisableRedisTemporarily()
+    {
+        _redisDisabledUntil = DateTimeOffset.UtcNow.AddMinutes(2);
+    }
+
     public async Task<T?> GetAsync<T>(string key)
     {
-        try
+        if (IsRedisAvailable())
         {
-            var value = await _distributedCache.GetStringAsync(key);
-            if (!string.IsNullOrEmpty(value))
+            try
             {
-                return JsonSerializer.Deserialize<T>(value);
+                var value = await _distributedCache.GetStringAsync(key);
+                if (!string.IsNullOrEmpty(value))
+                {
+                    return JsonSerializer.Deserialize<T>(value);
+                }
+            }
+            catch (Exception ex)
+            {
+                DisableRedisTemporarily();
+                _logger.LogWarning(ex, "Redis GetAsync error for key '{Key}'. Temporarily switching to MemoryCache.", key);
             }
         }
-        catch (Exception ex)
+
+        if (_memoryCache.TryGetValue(key, out T? memoryValue))
         {
-            _logger.LogWarning(ex, "Redis GetAsync error for key '{Key}'. Falling back to MemoryCache.", key);
-            if (_memoryCache.TryGetValue(key, out T? memoryValue))
-            {
-                return memoryValue;
-            }
+            return memoryValue;
         }
 
         return default;
@@ -50,37 +66,46 @@ public class RedisCacheService : ICacheService
     public async Task SetAsync<T>(string key, T value, TimeSpan? absoluteExpiration = null)
     {
         _knownKeys.TryAdd(key, 0);
+        var duration = absoluteExpiration ?? TimeSpan.FromMinutes(10);
 
-        var options = new DistributedCacheEntryOptions
+        if (IsRedisAvailable())
         {
-            AbsoluteExpirationRelativeToNow = absoluteExpiration ?? TimeSpan.FromMinutes(10)
-        };
+            var options = new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = duration
+            };
 
-        var json = JsonSerializer.Serialize(value);
+            var json = JsonSerializer.Serialize(value);
 
-        try
-        {
-            await _distributedCache.SetStringAsync(key, json, options);
+            try
+            {
+                await _distributedCache.SetStringAsync(key, json, options);
+            }
+            catch (Exception ex)
+            {
+                DisableRedisTemporarily();
+                _logger.LogWarning(ex, "Redis SetAsync error for key '{Key}'. Storing in MemoryCache.", key);
+            }
         }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Redis SetAsync error for key '{Key}'. Storing in MemoryCache.", key);
-        }
 
-        _memoryCache.Set(key, value, absoluteExpiration ?? TimeSpan.FromMinutes(10));
+        _memoryCache.Set(key, value, duration);
     }
 
     public async Task RemoveAsync(string key)
     {
         _knownKeys.TryRemove(key, out _);
 
-        try
+        if (IsRedisAvailable())
         {
-            await _distributedCache.RemoveAsync(key);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Redis RemoveAsync error for key '{Key}'. Removing from MemoryCache.", key);
+            try
+            {
+                await _distributedCache.RemoveAsync(key);
+            }
+            catch (Exception ex)
+            {
+                DisableRedisTemporarily();
+                _logger.LogWarning(ex, "Redis RemoveAsync error for key '{Key}'. Removing from MemoryCache.", key);
+            }
         }
 
         _memoryCache.Remove(key);

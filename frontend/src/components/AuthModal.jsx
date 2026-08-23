@@ -4,7 +4,7 @@ import { authApi } from '../services/api';
 import { useToast } from '../context/ToastContext';
 
 export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'login' }) {
-  const { showError, showSuccess } = useToast();
+  const { showSuccess, showError } = useToast();
   const [isSignUp, setIsSignUp] = useState(initialMode === 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,6 +36,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
           return;
         }
         // General customer registration simulation
+        showSuccess('Account Created! 🎉', `Welcome to EventLand, ${name.trim()}!`);
         onLoginSuccess({
           name: name.trim(),
           email: email.trim(),
@@ -178,7 +179,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
               <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
               <input
                 type="email"
-                placeholder="admin@eventland.pk"
+                placeholder="Enter your email (e.g. admin@eventland.pk)"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -204,7 +205,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
               <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
               <input
                 type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
