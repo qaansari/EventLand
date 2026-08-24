@@ -124,6 +124,25 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
 
   const totalPrice = selectedSeats.reduce((sum, s) => sum + (s.price || activeShowPrice || 1500), 0);
 
+  // Helper to resolve row-wise price
+  const getRowSeatPrice = (rowChar, seatObj) => {
+    if (seatObj?.price) return seatObj.price;
+    const showTiers = activeShow?.ticketTiers || event.ticketTiers || [];
+    const rowUpper = String(rowChar).trim().toUpperCase();
+    const matchingTier = showTiers.find(t => {
+      if (!t.rowRange) return false;
+      const r = t.rowRange.trim().toUpperCase();
+      if (r === rowUpper || r === `ROW ${rowUpper}`) return true;
+      const clean = r.replace('ROWS', '').replace('ROW', '').trim();
+      if (clean.includes('-')) {
+        const [start, end] = clean.split('-').map(x => x.trim());
+        if (start && end && rowUpper >= start && rowUpper <= end) return true;
+      }
+      return false;
+    });
+    return matchingTier?.price || activeShowPrice || currentZone.price || 1500;
+  };
+
   // Helper to render a seat button
   const renderSeatBtn = (rowChar, seatNum, rSpec = null) => {
     const seatLabel = `${rowChar}${seatNum}`;
@@ -136,12 +155,13 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
                        resolvedBlueprint?.disabledSeats?.includes(seatLabel) ||
                        resolvedBlueprint?.unavailableSeats?.includes(seatLabel);
     const isSelected = selectedSeats.some((s) => s.id === seatId);
+    const seatPrice = getRowSeatPrice(rowChar, seatObj);
 
     return (
       <button
         key={seatLabel}
         disabled={occupied || isDisabled}
-        onClick={() => !isDisabled && handleSeatClick(seatId, seatLabel, currentZone.price)}
+        onClick={() => !isDisabled && handleSeatClick(seatId, seatLabel, seatPrice)}
         style={{
           minWidth: '22px',
           height: '23px',
@@ -173,7 +193,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
           justifyContent: 'center',
           userSelect: 'none'
         }}
-        title={isDisabled ? `Row ${rowChar} Seat ${seatNum} (Unavailable / Not in Hall)` : `Row ${rowChar} Seat ${seatNum}`}
+        title={isDisabled ? `Row ${rowChar} Seat ${seatNum} (Unavailable / Not in Hall)` : `Row ${rowChar} Seat ${seatNum} • PKR ${Number(seatPrice).toLocaleString()}`}
       >
         {seatNum}
       </button>
@@ -427,6 +447,19 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
             transformOrigin: 'top center',
             transition: 'transform 0.15s ease'
           }}>
+            {/* Row Tier Price Legend */}
+            {((activeShow?.ticketTiers || event.ticketTiers || []).filter(t => t.rowRange).length > 0) && (
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '1.25rem', padding: '0.5rem 1rem', background: 'rgba(30, 41, 59, 0.7)', borderRadius: '9999px', border: '1px solid rgba(255, 255, 255, 0.1)', display: 'inline-flex' }}>
+                {(activeShow?.ticketTiers || event.ticketTiers || []).filter(t => t.rowRange).map((t, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: idx === 0 ? '#f59e0b' : idx === 1 ? '#a855f7' : '#3b82f6' }} />
+                    <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{t.name} (Row {t.rowRange}):</span>
+                    <span style={{ color: '#38bdf8', fontWeight: 700 }}>PKR {Number(t.price).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Stage Element */}
             <div style={{
               background: 'linear-gradient(180deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.8) 100%)',

@@ -28,7 +28,11 @@ import {
   Sparkles,
   Grid,
   Eye,
-  Check
+  Check,
+  Save,
+  Clock,
+  FileText,
+  Upload
 } from 'lucide-react';
 import { adminApi, uploadApi, getEventImageUrl, getOrganizerImageUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -362,7 +366,8 @@ export default function AdminDashboard({ onSelectEvent }) {
           name: t.name || 'Standard Pass',
           price: parseFloat(t.price) || parseFloat(s.startingPrice) || 1500,
           availableQuantity: parseInt(t.availableQuantity, 10) || 100,
-          description: t.description || `${t.name || 'Standard'} pass for ${s.showTitle || 'Show'}`
+          description: t.description || `${t.name || 'Standard'} pass for ${s.showTitle || 'Show'}`,
+          rowRange: t.rowRange || null
         }))
       }));
 
@@ -413,41 +418,52 @@ export default function AdminDashboard({ onSelectEvent }) {
     }
   };
 
-  const handleEditEvent = (ev) => {
-    const existingTagIds = ev.tags?.map(t => t.id) || ev.eventTags?.map(et => et.tagId) || [];
+  const handleEditEvent = async (ev) => {
+    let fullEv = ev;
+    try {
+      if (ev.id && adminApi?.events?.getById) {
+        const fetched = await adminApi.events.getById(ev.id);
+        if (fetched) fullEv = fetched;
+      }
+    } catch (err) {
+      console.warn('Could not fetch full event detail for edit, using list item:', err);
+    }
+
+    const existingTagIds = fullEv.tags?.map(t => t.id) || fullEv.eventTags?.map(et => et.tagId) || [];
     setEventForm({
-      id: ev.id,
-      title: ev.title || '',
-      category: ev.category || 'Concerts',
+      id: fullEv.id,
+      title: fullEv.title || '',
+      category: fullEv.category || 'Concerts',
       tagIds: existingTagIds,
-      status: ev.status || 'Live',
-      isFeatured: Boolean(ev.isFeatured),
-      isPublished: ev.isPublished !== false,
-      city: ev.city || 'Karachi',
-      venue: ev.venue || '',
-      address: ev.address || '',
-      startDateUtc: ev.startDateUtc ? ev.startDateUtc.slice(0, 16) : new Date().toISOString().slice(0, 16),
-      endDateUtc: ev.endDateUtc ? ev.endDateUtc.slice(0, 16) : new Date().toISOString().slice(0, 16),
-      priceRange: ev.priceRange || '',
-      startingPrice: ev.startingPrice || 1500,
-      ticketingType: (ev.ticketingType || 'categorized').toLowerCase(),
-      auditoriumLayout: ev.seatingZones?.[0]?.layoutJson || '',
-      banner: ev.banner || '',
-      description: ev.description || '',
-      scarcityText: ev.scarcityText || 'Selling Fast',
-      organizerId: ev.organizerId || ev.organizer?.id || (organizersList[0]?.id || ''),
-      shows: (ev.shows || []).map(s => ({
+      status: fullEv.status || 'Live',
+      isFeatured: Boolean(fullEv.isFeatured),
+      isPublished: fullEv.isPublished !== false,
+      city: fullEv.city || 'Karachi',
+      venue: fullEv.venue || '',
+      address: fullEv.address || fullEv.venue || '',
+      startDateUtc: fullEv.startDateUtc ? fullEv.startDateUtc.slice(0, 16) : new Date().toISOString().slice(0, 16),
+      endDateUtc: fullEv.endDateUtc ? fullEv.endDateUtc.slice(0, 16) : new Date().toISOString().slice(0, 16),
+      priceRange: fullEv.priceRange || '',
+      startingPrice: fullEv.startingPrice || 1500,
+      ticketingType: (fullEv.ticketingType || 'categorized').toLowerCase(),
+      auditoriumLayout: fullEv.seatingZones?.[0]?.layoutJson || fullEv.auditoriumLayout || '',
+      banner: fullEv.banner || '',
+      description: fullEv.description || '',
+      scarcityText: fullEv.scarcityText || 'Selling Fast',
+      organizerId: fullEv.organizerId || fullEv.organizer?.id || (organizersList[0]?.id || ''),
+      shows: (fullEv.shows || []).map(s => ({
         id: s.id,
         showTitle: s.showTitle || '',
         startTimeUtc: s.startTimeUtc ? s.startTimeUtc.slice(0, 16) : '',
         endTimeUtc: s.endTimeUtc ? s.endTimeUtc.slice(0, 16) : '',
-        startingPrice: s.startingPrice || (s.ticketTiers?.[0]?.price) || ev.startingPrice || 1500,
+        startingPrice: s.startingPrice || (s.ticketTiers?.[0]?.price) || fullEv.startingPrice || 1500,
         ticketTiers: (s.ticketTiers || []).map(t => ({
           id: t.id,
           name: t.name || 'Standard Pass',
           price: t.price || 1500,
           availableQuantity: t.availableQuantity || 100,
-          description: t.description || ''
+          description: t.description || '',
+          rowRange: t.rowRange || ''
         }))
       }))
     });
@@ -1714,183 +1730,224 @@ export default function AdminDashboard({ onSelectEvent }) {
         };
 
         return (
-          <div className="modal-overlay">
-            <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '1060px', width: '95%', padding: '2rem', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="modal-overlay" style={{ background: 'rgba(7, 11, 20, 0.82)', backdropFilter: 'blur(10px)', zIndex: 1000 }}>
+            <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '1100px', width: '95%', padding: '2.25rem', position: 'relative', maxHeight: '90vh', overflowY: 'auto', borderRadius: '20px', border: '1px solid rgba(59, 130, 246, 0.25)', boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(59, 130, 246, 0.15)', background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(7, 11, 20, 0.98))' }}>
+              
+              {/* Close Button */}
               <button
                 onClick={() => setShowEventModal(false)}
-                style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255, 255, 255, 0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10 }}
+                style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.12)', color: '#94a3b8', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10, transition: 'all 0.15s ease' }}
+                title="Close Modal"
               >
                 <X size={18} />
               </button>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem' }}>
-                {/* Form Column */}
-                <div style={{ width: '100%' }}>
-                  <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>
-                    {eventForm.id ? 'Edit Event' : 'Create New Event'}
+              {/* Modal Header */}
+              <div style={{ marginBottom: '1.75rem', paddingBottom: '1.25rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, rgba(59,130,246,0.25), rgba(37,99,235,0.45))', border: '1px solid rgba(59,130,246,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#60a5fa', boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}>
+                  <Calendar size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.025em', marginBottom: '0.2rem' }}>
+                    {eventForm.id ? 'Edit Event Configuration' : 'Create & Publish New Event'}
                   </h3>
-                  <form onSubmit={handleSaveEvent} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Event Title *</label>
-                      <input type="text" required value={eventForm.title} onChange={e => setEventForm({ ...eventForm, title: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-                    </div>
+                  <p style={{ fontSize: '0.8125rem', color: '#94a3b8' }}>
+                    Configure basic information, location details, show slots, and row-wise or categorized ticket pricing.
+                  </p>
+                </div>
+              </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Category *</label>
-                        <SearchableSelect
-                          required
-                          value={eventForm.category}
-                          onChange={e => setEventForm({ ...eventForm, category: e.target.value })}
-                          options={["Concerts", "Festivals", "Qawwali", "Theatre", "Comedy", "Food", "Workshops", "Corporate"]}
-                          placeholder="Select Category..."
-                        />
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Organizer *</label>
-                        <SearchableSelect
-                          required
-                          value={eventForm.organizerId || (organizersList[0]?.id || '')}
-                          onChange={e => setEventForm({ ...eventForm, organizerId: e.target.value })}
-                          options={organizersList.map(o => ({ value: o.id, label: o.name }))}
-                          placeholder="Select Organizer..."
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Select Event Tags (Multiple Allowed)</label>
-                        <MultiSearchableSelect
-                          value={eventForm.tagIds || []}
-                          onChange={e => setEventForm({ ...eventForm, tagIds: e.target.value })}
-                          options={tagsList.map(t => ({ value: t.id, label: t.name }))}
-                          placeholder="Select one or multiple tags..."
-                        />
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: '2rem', alignItems: 'start' }}>
+                {/* Left Column: Event Form */}
+                <div style={{ width: '100%' }}>
+                  <form onSubmit={handleSaveEvent} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    
+                    {/* SECTION 1: Basic Event Information */}
+                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Tag size={15} /> 1. Basic Event Details
                       </div>
 
                       <div>
-                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Status *</label>
-                        <SearchableSelect
-                          value={eventForm.status || 'Live'}
-                          onChange={e => setEventForm({ ...eventForm, status: e.target.value })}
-                          options={['Live', 'Draft', 'Completed', 'Cancelled']}
-                        />
+                        <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Event Title *</label>
+                        <input type="text" required placeholder="Enter event title..." value={eventForm.title} onChange={e => setEventForm({ ...eventForm, title: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.9rem' }} />
                       </div>
-                    </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>City *</label>
-                        <input type="text" required value={eventForm.city} onChange={e => setEventForm({ ...eventForm, city: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Venue *</label>
-                        <input type="text" required value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Full Street Address</label>
-                      <input type="text" placeholder="e.g. Beach Park, Block 4, Clifton, Karachi" value={eventForm.address || ''} onChange={e => setEventForm({ ...eventForm, address: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Start Date & Time</label>
-                        <input type="datetime-local" value={eventForm.startDateUtc} onChange={e => setEventForm({ ...eventForm, startDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>End Date & Time</label>
-                        <input type="datetime-local" value={eventForm.endDateUtc} onChange={e => setEventForm({ ...eventForm, endDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Starting Price (PKR)</label>
-                        <input type="number" value={eventForm.startingPrice} onChange={e => setEventForm({ ...eventForm, startingPrice: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Price Range Summary</label>
-                        <input type="text" placeholder="e.g. PKR 1,500 - PKR 5,000" value={eventForm.priceRange || ''} onChange={e => setEventForm({ ...eventForm, priceRange: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Ticketing Layout</label>
-                        <SearchableSelect
-                          value={eventForm.ticketingType}
-                          onChange={e => setEventForm({ ...eventForm, ticketingType: e.target.value })}
-                          options={[
-                            { value: 'categorized', label: 'Categorized Passes' },
-                            { value: 'mapped', label: 'Mapped Seat Picker' }
-                          ]}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Scarcity / Badge Text</label>
-                        <input type="text" placeholder="e.g. Selling Fast - 85% Sold" value={eventForm.scarcityText || ''} onChange={e => setEventForm({ ...eventForm, scarcityText: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
-                      </div>
-                    </div>
-
-                    {/* Auditorium Seating Chart Selector (if Mapped Ticketing) */}
-                    {eventForm.ticketingType === 'mapped' && (
-                      <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '12px', padding: '1rem', marginTop: '0.25rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                          <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <Grid size={16} /> Select Auditorium Seating Layout *
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => { setShowEventModal(false); setActiveAdminTab('auditoriums'); }}
-                            style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
-                          >
-                            Manage Auditoriums ↗
-                          </button>
-                        </div>
-                        {auditoriumsList.length === 0 ? (
-                          <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', color: '#f87171', fontSize: '0.8rem' }}>
-                            No auditorium layouts exist in database yet. Please go to <strong>Auditorium Charts</strong> tab to create one first.
-                          </div>
-                        ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Category *</label>
                           <SearchableSelect
-                            value={eventForm.auditoriumLayout || auditoriumsList[0]?.layoutCode || ''}
-                            onChange={e => {
-                              const code = e.target.value;
-                              const foundAud = auditoriumsList.find(a => a.layoutCode === code || a.name === code);
-                              setEventForm(prev => ({
-                                ...prev,
-                                auditoriumLayout: code,
-                                venue: prev.venue || foundAud?.venue || prev.venue,
-                                city: prev.city || foundAud?.city || prev.city
-                              }));
-                            }}
-                            options={auditoriumsList.map(a => ({ value: a.layoutCode || a.name, label: `${a.name} (${a.city} • ${a.totalCapacity} Seats)` }))}
+                            required
+                            value={eventForm.category}
+                            onChange={e => setEventForm({ ...eventForm, category: e.target.value })}
+                            options={["Concerts", "Festivals", "Qawwali", "Theatre", "Comedy", "Food", "Workshops", "Corporate"]}
+                            placeholder="Select Category..."
                           />
-                        )}
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Organizer *</label>
+                          <SearchableSelect
+                            required
+                            value={eventForm.organizerId || (organizersList[0]?.id || '')}
+                            onChange={e => setEventForm({ ...eventForm, organizerId: e.target.value })}
+                            options={organizersList.map(o => ({ value: o.id, label: o.name }))}
+                            placeholder="Select Organizer..."
+                          />
+                        </div>
                       </div>
-                    )}
 
-                    {/* Integrated File Upload Field - Banner */}
-                    <FileUploadField
-                      label="Event Banner Image (Recommended: 1200x500px)"
-                      value={eventForm.banner}
-                      onChange={(url) => setEventForm({ ...eventForm, banner: url })}
-                      placeholder="Upload 1200x500px banner image or enter URL..."
-                      type="events"
-                      entityName={eventForm.title}
-                      entityId={eventForm.id}
-                    />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Event Tags (Multiple)</label>
+                          <MultiSearchableSelect
+                            value={eventForm.tagIds || []}
+                            onChange={e => setEventForm({ ...eventForm, tagIds: e.target.value })}
+                            options={tagsList.map(t => ({ value: t.id, label: t.name }))}
+                            placeholder="Select tags..."
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Event Status *</label>
+                          <SearchableSelect
+                            value={eventForm.status || 'Live'}
+                            onChange={e => setEventForm({ ...eventForm, status: e.target.value })}
+                            options={['Live', 'Draft', 'Completed', 'Cancelled']}
+                          />
+                        </div>
+                      </div>
+                    </div>
 
-                    {/* Multiple Show Slots & Ticket Pricing Section */}
-                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                    {/* SECTION 2: Location & Venue Details */}
+                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <MapPin size={15} /> 2. Location & Venue Info
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>City *</label>
+                          <input type="text" required placeholder="e.g. Karachi, Lahore, Islamabad" value={eventForm.city} onChange={e => setEventForm({ ...eventForm, city: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.9rem' }} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Venue Name *</label>
+                          <input type="text" required placeholder="e.g. Arts Council Open Air Theatre" value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.9rem' }} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Full Street Address</label>
+                        <input type="text" placeholder="e.g. M.R. Kiyani Road, Saddar, Karachi" value={eventForm.address || ''} onChange={e => setEventForm({ ...eventForm, address: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.9rem' }} />
+                      </div>
+                    </div>
+
+                    {/* SECTION 3: Timings, Pricing & Layout */}
+                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Clock size={15} /> 3. Dates, Pricing & Ticketing Mode
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Start Date & Time (PKT)</label>
+                          <input type="datetime-local" value={eventForm.startDateUtc} onChange={e => setEventForm({ ...eventForm, startDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>End Date & Time (PKT)</label>
+                          <input type="datetime-local" value={eventForm.endDateUtc} onChange={e => setEventForm({ ...eventForm, endDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }} />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Starting Price (PKR)</label>
+                          <input type="number" value={eventForm.startingPrice} onChange={e => setEventForm({ ...eventForm, startingPrice: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#38bdf8', fontWeight: 700, fontSize: '0.9rem' }} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Price Range Summary</label>
+                          <input type="text" placeholder="e.g. PKR 1,500 - PKR 5,000" value={eventForm.priceRange || ''} onChange={e => setEventForm({ ...eventForm, priceRange: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.9rem' }} />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Ticketing Mode</label>
+                          <SearchableSelect
+                            value={eventForm.ticketingType}
+                            onChange={e => setEventForm({ ...eventForm, ticketingType: e.target.value })}
+                            options={[
+                              { value: 'categorized', label: 'Categorized Passes (Pass Tiers)' },
+                              { value: 'mapped', label: 'Mapped Seat Picker (Row-Wise)' }
+                            ]}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Badge / Scarcity Text</label>
+                          <input type="text" placeholder="e.g. Selling Fast - 85% Sold" value={eventForm.scarcityText || ''} onChange={e => setEventForm({ ...eventForm, scarcityText: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.9rem' }} />
+                        </div>
+                      </div>
+
+                      {/* Auditorium Seating Chart Selector (if Mapped Ticketing) */}
+                      {eventForm.ticketingType === 'mapped' && (
+                        <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '12px', padding: '1rem', marginTop: '0.25rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <Grid size={16} /> Select Auditorium Seating Layout *
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => { setShowEventModal(false); setActiveAdminTab('auditoriums'); }}
+                              style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                            >
+                              Manage Auditoriums ↗
+                            </button>
+                          </div>
+                          {auditoriumsList.length === 0 ? (
+                            <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', color: '#f87171', fontSize: '0.8rem' }}>
+                              No auditorium layouts exist in database yet. Please go to <strong>Auditorium Charts</strong> tab to create one first.
+                            </div>
+                          ) : (
+                            <SearchableSelect
+                              value={eventForm.auditoriumLayout || auditoriumsList[0]?.layoutCode || ''}
+                              onChange={e => {
+                                const code = e.target.value;
+                                const foundAud = auditoriumsList.find(a => a.layoutCode === code || a.name === code);
+                                setEventForm(prev => ({
+                                  ...prev,
+                                  auditoriumLayout: code,
+                                  venue: prev.venue || foundAud?.venue || prev.venue,
+                                  city: prev.city || foundAud?.city || prev.city
+                                }));
+                              }}
+                              options={auditoriumsList.map(a => ({ value: a.layoutCode || a.name, label: `${a.name} (${a.city} • ${a.totalCapacity} Seats)` }))}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* SECTION 4: Media Banner Upload */}
+                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem' }}>
+                      <FileUploadField
+                        label="Event Banner Image (Recommended: 1200x500px)"
+                        value={eventForm.banner}
+                        onChange={(url) => setEventForm({ ...eventForm, banner: url })}
+                        placeholder="Upload 1200x500px banner image or enter URL..."
+                        type="events"
+                        entityName={eventForm.title}
+                        entityId={eventForm.id}
+                      />
+                    </div>
+
+                    {/* SECTION 5: Show Slots & Ticket Pricing */}
+                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                         <div>
-                          <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f8fafc', display: 'block' }}>🎭 Event Shows & Ticket Pricing per Show</span>
-                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Configure show timings and specific ticket tier prices for each performance</span>
+                          <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <Ticket size={16} color="#60a5fa" /> Event Shows & Ticket Tier Pricing
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                            {eventForm.ticketingType === 'mapped' ? 'Set row-wise ticket prices (e.g. Row A, Rows B-E)' : 'Set category pass prices and stock limits'}
+                          </span>
                         </div>
                         <button
                           type="button"
@@ -1901,11 +1958,9 @@ export default function AdminDashboard({ onSelectEvent }) {
                               endTimeUtc: eventForm.endDateUtc || new Date().toISOString().slice(0, 16),
                               startingPrice: parseFloat(eventForm.startingPrice) || 1500,
                               ticketTiers: eventForm.ticketingType === 'mapped' ? [
-                                { name: 'Platinum - 1st Row', price: (parseFloat(eventForm.startingPrice) || 500) * 3.0, availableQuantity: 25 },
-                                { name: 'Diamond - 2nd and 3rd Row', price: (parseFloat(eventForm.startingPrice) || 500) * 2.0, availableQuantity: 50 },
-                                { name: 'Gold - 4th and 5th Row', price: (parseFloat(eventForm.startingPrice) || 500) * 1.6, availableQuantity: 50 },
-                                { name: 'Bronze - 6th and 7th Row', price: (parseFloat(eventForm.startingPrice) || 500) * 1.4, availableQuantity: 55 },
-                                { name: 'Standard - 8th to 11th Row', price: parseFloat(eventForm.startingPrice) || 500, availableQuantity: 100 }
+                                { name: 'Platinum - 1st Row', rowRange: 'A', price: (parseFloat(eventForm.startingPrice) || 1500) * 2.5, availableQuantity: 25 },
+                                { name: 'Diamond - Rows B-E', rowRange: 'B-E', price: (parseFloat(eventForm.startingPrice) || 1500) * 1.8, availableQuantity: 80 },
+                                { name: 'Gold - Rows F-O', rowRange: 'F-O', price: parseFloat(eventForm.startingPrice) || 1500, availableQuantity: 150 }
                               ] : [
                                 { name: 'Standard Pass', price: parseFloat(eventForm.startingPrice) || 1500, availableQuantity: 150 },
                                 { name: 'VIP Pass', price: (parseFloat(eventForm.startingPrice) || 1500) * 2.25, availableQuantity: 50 }
@@ -1921,7 +1976,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                       {(eventForm.shows || []).length === 0 ? (
                         <div style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic', padding: '0.75rem 0' }}>
-                          No separate show slots added. The main event start/end dates and starting price will be used as the default show.
+                          No show slots added yet. Click "+ Add Show Slot" above to define performance timings and ticket tier prices.
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1998,11 +2053,11 @@ export default function AdminDashboard({ onSelectEvent }) {
                                 </div>
                               </div>
 
-                              {/* Show-Specific Ticket Tiers */}
-                              <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '0.65rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                              {/* Ticket Tiers Builder */}
+                              <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                                   <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#a5b4fc' }}>
-                                    🎟️ Ticket Tiers for {s.showTitle || `Show #${sIdx + 1}`}
+                                    🎟️ {eventForm.ticketingType === 'mapped' ? 'Row-Wise Pricing Tiers' : 'Category Passes'} for {s.showTitle || `Show #${sIdx + 1}`}
                                   </span>
                                   <button
                                     type="button"
@@ -2011,11 +2066,11 @@ export default function AdminDashboard({ onSelectEvent }) {
                                       const currentTiers = updated[sIdx].ticketTiers || [];
                                       updated[sIdx].ticketTiers = [
                                         ...currentTiers,
-                                        { name: 'Standard Pass', price: s.startingPrice || 1500, availableQuantity: 100 }
+                                        { name: 'Standard Pass', rowRange: eventForm.ticketingType === 'mapped' ? 'A' : '', price: s.startingPrice || 1500, availableQuantity: 100 }
                                       ];
                                       setEventForm({ ...eventForm, shows: updated });
                                     }}
-                                    style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', background: 'rgba(99, 102, 241, 0.2)', border: '1px solid rgba(99, 102, 241, 0.4)', borderRadius: '4px', color: '#c7d2fe', cursor: 'pointer' }}
+                                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.7rem', background: 'rgba(99, 102, 241, 0.2)', border: '1px solid rgba(99, 102, 241, 0.4)', borderRadius: '4px', color: '#c7d2fe', cursor: 'pointer', fontWeight: 600 }}
                                   >
                                     + Add Tier
                                   </button>
@@ -2023,10 +2078,10 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                                 {(!s.ticketTiers || s.ticketTiers.length === 0) ? (
                                   <div style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic' }}>
-                                    Standard & VIP tiers will be auto-assigned using Base Price (PKR {s.startingPrice || eventForm.startingPrice || 1500}).
+                                    Standard tier will be auto-assigned using Base Price (PKR {s.startingPrice || eventForm.startingPrice || 1500}).
                                   </div>
                                 ) : (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                                     {s.ticketTiers.map((tier, tIdx) => (
                                       <div key={tIdx} style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
                                         <input
@@ -2040,6 +2095,20 @@ export default function AdminDashboard({ onSelectEvent }) {
                                           }}
                                           style={{ flex: 2, padding: '0.35rem 0.5rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', color: '#fff', fontSize: '0.75rem' }}
                                         />
+                                        {eventForm.ticketingType === 'mapped' && (
+                                          <input
+                                            type="text"
+                                            placeholder="Row (e.g. A, B-E)"
+                                            value={tier.rowRange || ''}
+                                            onChange={e => {
+                                              const updated = [...eventForm.shows];
+                                              updated[sIdx].ticketTiers[tIdx].rowRange = e.target.value;
+                                              setEventForm({ ...eventForm, shows: updated });
+                                            }}
+                                            style={{ flex: 1.2, padding: '0.35rem 0.5rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '4px', color: '#60a5fa', fontWeight: 700, fontSize: '0.75rem' }}
+                                            title="Row Range for mapped seating pricing (e.g. A, B-E, F-O)"
+                                          />
+                                        )}
                                         <input
                                           type="number"
                                           placeholder="Price (PKR)"
@@ -2084,37 +2153,59 @@ export default function AdminDashboard({ onSelectEvent }) {
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', gap: '1.5rem', margin: '0.5rem 0' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f8fafc', fontSize: '0.875rem', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={eventForm.isFeatured} onChange={e => setEventForm({ ...eventForm, isFeatured: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: '#3b82f6' }} />
-                        Featured Event
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f8fafc', fontSize: '0.875rem', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={eventForm.isPublished} onChange={e => setEventForm({ ...eventForm, isPublished: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: '#10b981' }} />
-                        Published / Active
-                      </label>
+                    {/* SECTION 6: Description & Visibility */}
+                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <FileText size={15} /> 6. Description & Visibility Settings
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '2rem', margin: '0.25rem 0' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f8fafc', fontSize: '0.875rem', cursor: 'pointer', fontWeight: 600 }}>
+                          <input type="checkbox" checked={eventForm.isFeatured} onChange={e => setEventForm({ ...eventForm, isFeatured: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: '#3b82f6' }} />
+                          Featured Event
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f8fafc', fontSize: '0.875rem', cursor: 'pointer', fontWeight: 600 }}>
+                          <input type="checkbox" checked={eventForm.isPublished} onChange={e => setEventForm({ ...eventForm, isPublished: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: '#10b981' }} />
+                          Published / Active
+                        </label>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Event Description</label>
+                        <textarea rows={4} placeholder="Write detailed description of the event..." value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.9rem' }} />
+                      </div>
                     </div>
 
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Event Description</label>
-                      <textarea rows={3} value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                    {/* Footer Action Buttons */}
+                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowEventModal(false)}
+                        style={{ flex: 1, padding: '0.85rem 1.25rem', background: 'rgba(255, 255, 255, 0.06)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '10px', color: '#cbd5e1', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSaving}
+                        style={{ flex: 2, padding: '0.85rem 1.5rem', background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', border: '1px solid rgba(59, 130, 246, 0.5)', borderRadius: '10px', color: '#fff', fontWeight: 700, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1, boxShadow: '0 4px 15px rgba(37, 99, 235, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.95rem' }}
+                      >
+                        <Save size={18} /> {isSaving ? 'Saving Event...' : (eventForm.id ? 'Update & Save Event' : 'Create & Publish Event')}
+                      </button>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                      <button type="button" onClick={() => setShowEventModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                      <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Event...' : 'Save Event'}</button>
-                    </div>
                   </form>
                 </div>
 
                 {/* Right Column: Live Event Card Preview */}
-                <div style={{ flex: '0 0 340px', minWidth: '300px', alignSelf: 'flex-start', position: 'sticky', top: '0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#60a5fa', fontWeight: 700, fontSize: '0.9rem' }}>
+                <div style={{ minWidth: '300px', alignSelf: 'flex-start', position: 'sticky', top: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#60a5fa', fontWeight: 700, fontSize: '0.875rem', letterSpacing: '0.05em' }}>
                     <Sparkles size={16} /> LIVE CARD PREVIEW
                   </div>
                   <EventCard event={previewEvent} onSelect={() => {}} isSaved={false} onToggleSave={() => {}} />
                 </div>
               </div>
+
             </div>
           </div>
         );

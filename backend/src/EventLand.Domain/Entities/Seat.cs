@@ -15,6 +15,7 @@ public class Seat : BaseEntity
     public int    Row    { get; set; }
     public int    Col    { get; set; }
     public string Label  { get; set; } = string.Empty; // e.g. "A1", "B5"
+    public decimal? Price { get; set; }
 
     public SeatStatus Status { get; set; } = SeatStatus.Available;
 

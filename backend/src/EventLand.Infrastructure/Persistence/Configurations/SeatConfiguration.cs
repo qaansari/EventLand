@@ -21,6 +21,9 @@ public sealed class SeatConfiguration : IEntityTypeConfiguration<Seat>
                .IsRequired()
                .HasMaxLength(20);
 
+        builder.Property(s => s.Price)
+               .HasPrecision(18, 2);
+
         builder.Property(s => s.Status)
                .HasConversion<int>();
 

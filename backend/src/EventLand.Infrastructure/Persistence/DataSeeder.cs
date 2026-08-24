@@ -11,7 +11,7 @@ public static class DataSeeder
 {
     public static async Task SeedAsync(ApplicationDbContext context)
     {
-        // Automatically create DB and apply schema migrations on startup
+        // Apply schema migrations on startup
         await context.Database.MigrateAsync();
     }
 }

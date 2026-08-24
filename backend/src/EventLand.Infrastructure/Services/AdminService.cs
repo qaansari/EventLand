@@ -201,6 +201,7 @@ public class AdminService : IAdminService
                 e.IsFeatured,
                 e.City,
                 e.Venue,
+                e.Address,
                 e.StartDateUtc,
                 e.EndDateUtc,
                 e.PriceRange,
@@ -315,7 +316,8 @@ public class AdminService : IAdminService
                             Description = tInput.Description ?? $"{tInput.Name} pass for {show.ShowTitle}",
                             Price = tInput.Price > 0 ? tInput.Price : (dto.StartingPrice > 0 ? dto.StartingPrice : 1500m),
                             AvailableQuantity = tInput.AvailableQuantity > 0 ? tInput.AvailableQuantity : 100,
-                            SortOrder = sort++
+                            SortOrder = sort++,
+                            RowRange = tInput.RowRange
                         });
                     }
                 }
@@ -489,7 +491,8 @@ public class AdminService : IAdminService
                                 Description = tInput.Description ?? $"{tInput.Name} pass for {show.ShowTitle}",
                                 Price = tInput.Price > 0 ? tInput.Price : (dto.StartingPrice > 0 ? dto.StartingPrice : 1500m),
                                 AvailableQuantity = tInput.AvailableQuantity > 0 ? tInput.AvailableQuantity : 100,
-                                SortOrder = sort++
+                                SortOrder = sort++,
+                                RowRange = tInput.RowRange
                             });
                         }
                     }
@@ -880,7 +883,7 @@ public class AdminService : IAdminService
         await _context.SaveChangesAsync();
         await _cacheService.ClearEventCacheAsync(dto.EventId);
 
-        return new TicketTierDto(tier.Id, tier.EventId, tier.EventShowId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder);
+        return new TicketTierDto(tier.Id, tier.EventId, tier.EventShowId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder, tier.RowRange);
     }
 
     public async Task<TicketTierDto> UpdateTicketTierAsync(int id, UpdateTicketTierDto dto)
@@ -904,7 +907,7 @@ public class AdminService : IAdminService
         await _context.SaveChangesAsync();
         await _cacheService.ClearEventCacheAsync(tier.EventId);
 
-        return new TicketTierDto(tier.Id, tier.EventId, tier.EventShowId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder);
+        return new TicketTierDto(tier.Id, tier.EventId, tier.EventShowId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder, tier.RowRange);
     }
 
     public async Task<bool> DeleteTicketTierAsync(int id)
@@ -1190,10 +1193,10 @@ public class AdminService : IAdminService
                 s.ShowTitle,
                 s.StartTimeUtc,
                 s.EndTimeUtc,
-                s.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder)).ToList()
+                s.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange)).ToList()
             )).ToList(),
-            ev.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder)).ToList(),
-            ev.SeatingZones.Select(z => new SeatingZoneDto(z.Id, z.EventId, z.Zone, z.Rows, z.Cols, z.Price, z.TotalCapacity, z.SortOrder, z.LayoutJson, z.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString())).ToList())).ToList(),
+            ev.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange)).ToList(),
+            ev.SeatingZones.Select(z => new SeatingZoneDto(z.Id, z.EventId, z.Zone, z.Rows, z.Cols, z.Price, z.TotalCapacity, z.SortOrder, z.LayoutJson, z.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString(), s.Price)).ToList())).ToList(),
             ev.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList()
         );
     }

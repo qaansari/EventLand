@@ -4,7 +4,8 @@ public record CreateShowTicketTierInputDto(
     string Name,
     decimal Price,
     int AvailableQuantity = 100,
-    string? Description = null
+    string? Description = null,
+    string? RowRange = null
 );
 
 public record CreateEventShowInputDto(

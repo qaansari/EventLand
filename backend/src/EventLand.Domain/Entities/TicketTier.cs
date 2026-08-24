@@ -17,6 +17,7 @@ public class TicketTier : BaseEntity
     public string Name              { get; set; } = string.Empty;
     public string Description       { get; set; } = string.Empty;
     public decimal Price            { get; set; }
+    public string? RowRange         { get; set; }
 
     // Inventory
     public int AvailableQuantity    { get; set; } = 100;

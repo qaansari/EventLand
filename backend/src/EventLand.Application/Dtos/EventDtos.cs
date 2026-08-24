@@ -8,6 +8,7 @@ public record EventSummaryDto(
     bool IsFeatured,
     string City,
     string Venue,
+    string? Address,
     DateTimeOffset StartDateUtc,
     DateTimeOffset EndDateUtc,
     string PriceRange,
@@ -64,7 +65,8 @@ public record TicketTierDto(
     int AvailableQuantity,
     int SoldCount,
     int MaxPerOrder,
-    int SortOrder
+    int SortOrder,
+    string? RowRange = null
 );
 
 public record SeatingZoneDto(
@@ -86,7 +88,8 @@ public record SeatDto(
     int Row,
     int Col,
     string Label,
-    string Status
+    string Status,
+    decimal? Price = null
 );
 
 public record TagDto(

@@ -70,6 +70,7 @@ public class EventService : IEventService
                 e.IsFeatured,
                 e.City,
                 e.Venue,
+                e.Address,
                 e.StartDateUtc,
                 e.EndDateUtc,
                 e.PriceRange,

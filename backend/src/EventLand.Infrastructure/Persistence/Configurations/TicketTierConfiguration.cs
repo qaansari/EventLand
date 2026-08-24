@@ -21,6 +21,9 @@ public sealed class TicketTierConfiguration : IEntityTypeConfiguration<TicketTie
         builder.Property(t => t.Price)
                .HasPrecision(18, 2);
 
+        builder.Property(t => t.RowRange)
+               .HasMaxLength(100);
+
         builder.Property(t => t.AvailableQuantity)
                .IsRequired();
 

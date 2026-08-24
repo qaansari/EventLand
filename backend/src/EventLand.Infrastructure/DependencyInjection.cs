@@ -26,6 +26,7 @@ public static class DependencyInjection
         // SQL Server DbContext with resilience & query splitting
         services.AddDbContext<ApplicationDbContext>(options =>
         {
+            options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
             options.UseSqlServer(
                 connectionString,
                 sqlServerOptions =>
