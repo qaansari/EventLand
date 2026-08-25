@@ -73,6 +73,25 @@ public static class FileUrlHelper
     }
 
     /// <summary>
+    /// Formats an artist image URL for API responses.
+    /// </summary>
+    public static string FormatArtistImageUrl(string? imageUrl)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl)) return string.Empty;
+
+        var trimmed = imageUrl.Trim();
+
+        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
+            trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("/"))
+        {
+            return trimmed;
+        }
+
+        return $"/assets/images/artists/{trimmed}";
+    }
+
+    /// <summary>
     /// Generates structured image filename following strict naming convention:
     /// Organizers: org_[name]_[last2digitsofId].[ext] (e.g. org_eventland_01.png)
     /// Events: ev_[name]_[last2digitsofId].[ext] (e.g. ev_suffinight_01.jpg)

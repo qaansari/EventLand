@@ -1,16 +1,24 @@
 import React from 'react';
-import { SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal, Tag as TagIcon } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
-import { CATEGORIES, CITIES } from '../data/mockEvents';
+
+const CITIES = ['All Cities', 'Karachi', 'Lahore', 'Islamabad'];
 
 export default function EventFilterBar({
-  selectedCategory,
-  onSelectCategory,
-  selectedCity,
+  tags = [],
+  cities = [],
+  selectedTag = 'All',
+  onSelectTag,
+  selectedCity = 'All Cities',
   onSelectCity,
-  sortBy,
+  sortBy = 'featured',
   onSortChange
 }) {
+  const allTags = ['All', ...(tags || []).map(t => typeof t === 'string' ? t : t.name)];
+  const cityList = cities && cities.length > 0
+    ? ['All Cities', ...cities.map(c => typeof c === 'string' ? c : c.name)]
+    : CITIES;
+
   return (
     <div style={{
       marginBottom: '2rem',
@@ -18,7 +26,7 @@ export default function EventFilterBar({
       flexDirection: 'column',
       gap: '1rem'
     }}>
-      {/* Category Pills Row */}
+      {/* Dynamic Tag Pills Row */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -26,12 +34,12 @@ export default function EventFilterBar({
         overflowX: 'auto',
         paddingBottom: '0.5rem'
       }}>
-        {CATEGORIES.map((cat) => {
-          const isActive = selectedCategory === cat;
+        {allTags.map((tagName) => {
+          const isActive = selectedTag === tagName;
           return (
             <button
-              key={cat}
-              onClick={() => onSelectCategory(cat)}
+              key={tagName}
+              onClick={() => onSelectTag && onSelectTag(tagName)}
               style={{
                 fontFamily: 'var(--font-display)',
                 background: isActive 
@@ -47,10 +55,14 @@ export default function EventFilterBar({
                 whiteSpace: 'nowrap',
                 cursor: 'pointer',
                 transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                boxShadow: isActive ? '0 4px 18px rgba(59, 130, 246, 0.45)' : 'none'
+                boxShadow: isActive ? '0 4px 18px rgba(59, 130, 246, 0.45)' : 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem'
               }}
             >
-              {cat}
+              {tagName !== 'All' && <TagIcon size={13} opacity={0.7} />}
+              {tagName === 'All' ? 'All Events' : tagName}
             </button>
           );
         })}
@@ -71,7 +83,7 @@ export default function EventFilterBar({
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>Filter by City:</span>
           <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-            {CITIES.map((city) => (
+            {cityList.map((city) => (
               <button
                 key={city}
                 onClick={() => onSelectCity(city)}

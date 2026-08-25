@@ -34,7 +34,7 @@ import {
   FileText,
   Upload
 } from 'lucide-react';
-import { adminApi, uploadApi, getEventImageUrl, getOrganizerImageUrl } from '../services/api';
+import { adminApi, locationsApi, uploadApi, getEventImageUrl, getOrganizerImageUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
@@ -116,7 +116,7 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [successMsg, setSuccessMsg] = useState('');
 
   // Loaded Data States
-  const [eventsList, setEventsList] = useState([]);
+  const [eventsList, setEventsList] = useState([]);  
   const [organizersList, setOrganizersList] = useState([]);
   const [artistsList, setArtistsList] = useState([]);
   const [bookingsList, setBookingsList] = useState([]);
@@ -124,6 +124,9 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [rolesList, setRolesList] = useState([]);
   const [tagsList, setTagsList] = useState([]);
   const [auditoriumsList, setAuditoriumsList] = useState([]);
+  const [countriesList, setCountriesList] = useState([]);
+  const [citiesList, setCitiesList] = useState([]);
+  const [venuesList, setVenuesList] = useState([]);
 
   // Form Modal States
   const [showEventModal, setShowEventModal] = useState(false);
@@ -140,13 +143,14 @@ export default function AdminDashboard({ onSelectEvent }) {
   const defaultEventForm = {
     id: null,
     title: '',
-    category: 'Concerts',
     tagIds: [],
     status: 'Live',
     isFeatured: false,
     isPublished: true,
-    city: 'Karachi',
-    venue: '',
+    countryId: '',
+    cityId: '',
+    venueId: '',
+    auditoriumId: '',
     address: '',
     startDateUtc: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
     endDateUtc: new Date(Date.now() + 172800000).toISOString().slice(0, 16),
@@ -163,6 +167,9 @@ export default function AdminDashboard({ onSelectEvent }) {
 
   const defaultAuditoriumForm = {
     id: null,
+    countryId: '',
+    cityId: '',
+    venueId: '',
     name: '',
     venue: '',
     city: 'Karachi',
@@ -186,35 +193,31 @@ export default function AdminDashboard({ onSelectEvent }) {
   const defaultArtistForm = {
     id: null,
     name: '',
-    genre: 'Pop / Sufi Rock',
-    role: 'Lead Vocalist',
-    city: 'Lahore',
-    imageUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600',
-    bio: 'Renowned Pakistani performer delivering electrifying live concert experiences.',
-    availability: 'Available for National Tours',
-    startingRate: 450000,
-    rating: 4.9,
-    showsDone: 85,
-    isFeatured: true
+    genre: 'Pop',
+    bio: '',
+    imageUrl: '',
+    isFeatured: false
   };
 
   const defaultTierForm = {
     id: null,
     eventId: '',
-    name: 'General Pass',
-    description: 'Standard Entry Access',
-    price: 1500,
+    name: 'VIP Pass',
+    price: 3000,
+    totalQuantity: 100,
     availableQuantity: 100,
-    maxPerOrder: 5,
-    sortOrder: 1
+    perks: 'Standard Entry, Access to Main Arena',
+    description: '',
+    rowRange: ''
   };
 
   const defaultUserForm = {
     id: null,
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
-    fullName: '',
-    roleId: '',
+    roleId: 2,
     phoneNumber: '+92 300 0000000'
   };
 
@@ -230,6 +233,10 @@ export default function AdminDashboard({ onSelectEvent }) {
     slug: ''
   };
 
+  const defaultCountryForm = { id: null, name: '', code: '', isActive: true };
+  const defaultCityForm = { id: null, countryId: '', name: '', isActive: true };
+  const defaultVenueForm = { id: null, countryId: '', cityId: '', name: '', address: '', description: '', isActive: true };
+
   // Form Binding States
   const [eventForm, setEventForm] = useState(defaultEventForm);
   const [orgForm, setOrgForm] = useState(defaultOrgForm);
@@ -239,13 +246,24 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [roleForm, setRoleForm] = useState(defaultRoleForm);
   const [tagForm, setTagForm] = useState(defaultTagForm);
   const [auditoriumForm, setAuditoriumForm] = useState(defaultAuditoriumForm);
+  const [countryForm, setCountryForm] = useState(defaultCountryForm);
+  const [cityForm, setCityForm] = useState(defaultCityForm);
+  const [venueForm, setVenueForm] = useState(defaultVenueForm);
+
+  const [showCountryModal, setShowCountryModal] = useState(false);
+  const [showCityModal, setShowCityModal] = useState(false);
+  const [showVenueModal, setShowVenueModal] = useState(false);
+
+  const [countrySearch, setCountrySearch] = useState('');
+  const [citySearch, setCitySearch] = useState('');
+  const [venueSearch, setVenueSearch] = useState('');
 
   // Load Data from Backend API
   const fetchBackendData = async (isInitial = false) => {
     if (isInitial) setLoading(true);
     setErrorMsg('');
     try {
-      const [orgs, evs, arts, bks, rls, usrs, tgs, auds] = await Promise.all([
+      const [orgs, evs, arts, bks, rls, usrs, tgs, auds, cnts, cts, vns] = await Promise.all([
         adminApi.organizers.getAll().catch(() => []),
         adminApi.events.getAll(1, 50).catch(() => ({ items: [] })),
         adminApi.artists.getAll(1, 50).catch(() => ({ items: [] })),
@@ -253,7 +271,10 @@ export default function AdminDashboard({ onSelectEvent }) {
         adminApi.roles.getAll().catch(() => []),
         adminApi.users.getAll(1, 50).catch(() => ({ items: [] })),
         adminApi.tags.getAll().catch(() => []),
-        adminApi.auditoriumLayouts.getAll().catch(() => [])
+        locationsApi.getAuditoriums().catch(() => []),
+        locationsApi.getCountries().catch(() => []),
+        locationsApi.getCities().catch(() => []),
+        locationsApi.getVenues().catch(() => [])
       ]);
 
       const rawOrgs = Array.isArray(orgs) ? orgs : (orgs?.items || []);
@@ -275,6 +296,9 @@ export default function AdminDashboard({ onSelectEvent }) {
       setUsersList(usrs.items || usrs || []);
       setTagsList(tgs || []);
       setAuditoriumsList(Array.isArray(auds) ? auds : (auds?.items || []));
+      setCountriesList(cnts || []);
+      setCitiesList(cts || []);
+      setVenuesList(vns || []);
     } catch (err) {
       console.error('Error fetching admin data:', err);
       setErrorMsg(err.message || 'Failed to load backend data.');
@@ -363,6 +387,7 @@ export default function AdminDashboard({ onSelectEvent }) {
           : (s.endTimeUtc || new Date().toISOString()),
         startingPrice: parseFloat(s.startingPrice) || parseFloat(eventForm.startingPrice) || 1500,
         ticketTiers: (s.ticketTiers || []).map(t => ({
+          id: t.id ? (typeof t.id === 'number' ? t.id : parseInt(t.id, 10)) : null,
           name: t.name || 'Standard Pass',
           price: parseFloat(t.price) || parseFloat(s.startingPrice) || 1500,
           availableQuantity: parseInt(t.availableQuantity, 10) || 100,
@@ -371,18 +396,25 @@ export default function AdminDashboard({ onSelectEvent }) {
         }))
       }));
 
+      const countryId = eventForm.countryId ? parseInt(eventForm.countryId, 10) : (countriesList[0]?.id || null);
+      const cityId = eventForm.cityId ? parseInt(eventForm.cityId, 10) : (citiesList[0]?.id || null);
+      const venueId = eventForm.venueId ? parseInt(eventForm.venueId, 10) : (venuesList[0]?.id || null);
+      const auditoriumId = eventForm.auditoriumId ? parseInt(eventForm.auditoriumId, 10) : null;
+
       const payload = {
         title: title,
-        category: eventForm.category || 'Concerts',
         status: statusStr,
         isFeatured: Boolean(eventForm.isFeatured),
         isPublished: eventForm.isPublished !== false,
-        city: eventForm.city || 'Karachi',
-        venue: venue,
-        address: eventForm.address || venue,
+        countryId: countryId,
+        cityId: cityId,
+        venueId: venueId,
+        auditoriumId: auditoriumId,
+        address: eventForm.address || '',
         startDateUtc: startDate.toISOString(),
         endDateUtc: endDate.toISOString(),
         startingPrice: parseFloat(eventForm.startingPrice) || 0,
+        priceRange: eventForm.priceRange || '',
         ticketingType: eventForm.ticketingType || 'categorized',
         auditoriumLayout: eventForm.auditoriumLayout || '',
         banner: eventForm.banner || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&h=500&fit=crop',
@@ -429,18 +461,49 @@ export default function AdminDashboard({ onSelectEvent }) {
       console.warn('Could not fetch full event detail for edit, using list item:', err);
     }
 
-    const existingTagIds = fullEv.tags?.map(t => t.id) || fullEv.eventTags?.map(et => et.tagId) || [];
+    let showsToUse = (fullEv.shows && fullEv.shows.length > 0) ? fullEv.shows : [];
+    if (showsToUse.length === 0) {
+      showsToUse = [{
+        id: null,
+        showTitle: fullEv.title || 'Day 01 - Performance',
+        startTimeUtc: fullEv.startDateUtc,
+        endTimeUtc: fullEv.endDateUtc,
+        startingPrice: fullEv.startingPrice || 1500,
+        ticketTiers: fullEv.ticketTiers || []
+      }];
+    }
+
+    const formattedShows = showsToUse.map(s => {
+      const tiersToUse = (s.ticketTiers && s.ticketTiers.length > 0) ? s.ticketTiers : (fullEv.ticketTiers || []);
+      return {
+        id: s.id || null,
+        showTitle: s.showTitle || 'Show Slot',
+        startTimeUtc: s.startTimeUtc ? s.startTimeUtc.slice(0, 16) : '',
+        endTimeUtc: s.endTimeUtc ? s.endTimeUtc.slice(0, 16) : '',
+        startingPrice: s.startingPrice || (tiersToUse[0]?.price) || fullEv.startingPrice || 1500,
+        ticketTiers: tiersToUse.map(t => ({
+          id: t.id || null,
+          name: t.name || 'Standard Pass',
+          price: t.price || 1500,
+          availableQuantity: t.availableQuantity || 100,
+          description: t.description || '',
+          rowRange: t.rowRange || ''
+        }))
+      };
+    });
+
     setEventForm({
       id: fullEv.id,
       title: fullEv.title || '',
-      category: fullEv.category || 'Concerts',
       tagIds: existingTagIds,
       status: fullEv.status || 'Live',
       isFeatured: Boolean(fullEv.isFeatured),
       isPublished: fullEv.isPublished !== false,
-      city: fullEv.city || 'Karachi',
-      venue: fullEv.venue || '',
-      address: fullEv.address || fullEv.venue || '',
+      countryId: fullEv.countryId || (countriesList[0]?.id || ''),
+      cityId: fullEv.cityId || (citiesList[0]?.id || ''),
+      venueId: fullEv.venueId || (venuesList[0]?.id || ''),
+      auditoriumId: fullEv.auditoriumId || '',
+      address: fullEv.address || '',
       startDateUtc: fullEv.startDateUtc ? fullEv.startDateUtc.slice(0, 16) : new Date().toISOString().slice(0, 16),
       endDateUtc: fullEv.endDateUtc ? fullEv.endDateUtc.slice(0, 16) : new Date().toISOString().slice(0, 16),
       priceRange: fullEv.priceRange || '',
@@ -451,21 +514,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       description: fullEv.description || '',
       scarcityText: fullEv.scarcityText || 'Selling Fast',
       organizerId: fullEv.organizerId || fullEv.organizer?.id || (organizersList[0]?.id || ''),
-      shows: (fullEv.shows || []).map(s => ({
-        id: s.id,
-        showTitle: s.showTitle || '',
-        startTimeUtc: s.startTimeUtc ? s.startTimeUtc.slice(0, 16) : '',
-        endTimeUtc: s.endTimeUtc ? s.endTimeUtc.slice(0, 16) : '',
-        startingPrice: s.startingPrice || (s.ticketTiers?.[0]?.price) || fullEv.startingPrice || 1500,
-        ticketTiers: (s.ticketTiers || []).map(t => ({
-          id: t.id,
-          name: t.name || 'Standard Pass',
-          price: t.price || 1500,
-          availableQuantity: t.availableQuantity || 100,
-          description: t.description || '',
-          rowRange: t.rowRange || ''
-        }))
-      }))
+      shows: formattedShows
     });
     setShowEventModal(true);
   };
@@ -669,6 +718,7 @@ export default function AdminDashboard({ onSelectEvent }) {
         name: tierForm.name,
         description: tierForm.description || '',
         price: parseFloat(tierForm.price),
+        rowRange: tierForm.rowRange || null,
         availableQuantity: parseInt(tierForm.availableQuantity, 10) || 100,
         maxPerOrder: parseInt(tierForm.maxPerOrder, 10) || 5,
         sortOrder: parseInt(tierForm.sortOrder, 10) || 1
@@ -945,13 +995,33 @@ export default function AdminDashboard({ onSelectEvent }) {
   };
 
   // --- CRUD: AUDITORIUM LAYOUTS ---
+  const handleOpenNewAuditorium = () => {
+    const defaultCountry = countriesList[0]?.id || 1000;
+    const filteredCities = citiesList.filter(c => String(c.countryId) === String(defaultCountry));
+    const defaultCity = filteredCities[0]?.id || (citiesList[0]?.id || 1000);
+    const filteredVenues = venuesList.filter(v => String(v.cityId) === String(defaultCity));
+    const defaultVenue = filteredVenues[0]?.id || (venuesList[0]?.id || 1000);
+    const matchedVenue = venuesList.find(v => v.id === defaultVenue);
+
+    setAuditoriumForm({
+      ...defaultAuditoriumForm,
+      countryId: defaultCountry,
+      cityId: defaultCity,
+      venueId: defaultVenue,
+      venue: matchedVenue?.name || '',
+      layoutJson: createBlankLayoutJson(10, 20)
+    });
+    setShowAuditoriumModal(true);
+  };
+
   const handleSaveAuditorium = async (e) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!auditoriumForm.name || !auditoriumForm.venue) {
-      const msg = 'Please enter an auditorium name and venue.';
+    const venueId = parseInt(auditoriumForm.venueId, 10) || (venuesList[0]?.id || 1000);
+    if (!auditoriumForm.name || !venueId) {
+      const msg = 'Please enter an auditorium name and select a venue.';
       setErrorMsg(msg);
       showError('Validation Error', msg);
       return;
@@ -960,22 +1030,25 @@ export default function AdminDashboard({ onSelectEvent }) {
     const layoutCode = auditoriumForm.layoutCode || auditoriumForm.name.toUpperCase().replace(/\s+/g, '_');
     const isDupAuditorium = auditoriumsList.some(a => 
       String(a.id) !== String(auditoriumForm.id) && 
+      (a.venueId === venueId || a.venue === auditoriumForm.venue) &&
       (a.name.trim().toLowerCase() === auditoriumForm.name.trim().toLowerCase() ||
        a.layoutCode.trim().toLowerCase() === layoutCode.trim().toLowerCase())
     );
     if (isDupAuditorium) {
-      const msg = `An auditorium layout with name '${auditoriumForm.name}' or code '${layoutCode}' already exists.`;
+      const msg = `An auditorium layout with name '${auditoriumForm.name}' or code '${layoutCode}' already exists for this venue.`;
       setErrorMsg(msg);
       showError('Duplicate Layout', msg);
       return;
     }
 
     try {
+      const selVenue = venuesList.find(v => v.id === venueId);
       const payload = {
+        venueId: venueId,
         name: auditoriumForm.name.trim(),
-        venue: auditoriumForm.venue.trim(),
+        venue: selVenue?.name || auditoriumForm.venue || '',
         city: auditoriumForm.city || 'Karachi',
-        layoutCode: auditoriumForm.layoutCode || auditoriumForm.name.toUpperCase().replace(/\s+/g, '_'),
+        layoutCode: layoutCode,
         totalCapacity: parseInt(auditoriumForm.totalCapacity, 10) || 200,
         description: auditoriumForm.description || '',
         layoutJson: typeof auditoriumForm.layoutJson === 'object' ? JSON.stringify(auditoriumForm.layoutJson) : (auditoriumForm.layoutJson || createBlankLayoutJson(10, 20)),
@@ -1005,11 +1078,21 @@ export default function AdminDashboard({ onSelectEvent }) {
   };
 
   const handleEditAuditorium = (aud) => {
+    // Preserve & resolve the 3-tier location hierarchy: Country -> City -> Venue
+    const matchedVenue = venuesList.find(v => v.id === aud.venueId || v.name.toLowerCase() === (aud.venueName || aud.venue || '').toLowerCase());
+    const venueId = matchedVenue?.id || aud.venueId || (venuesList[0]?.id || '');
+    const cityId = matchedVenue?.cityId || (citiesList[0]?.id || '');
+    const matchedCity = citiesList.find(c => c.id === cityId);
+    const countryId = matchedCity?.countryId || (countriesList[0]?.id || '');
+
     setAuditoriumForm({
       id: aud.id,
+      countryId: countryId,
+      cityId: cityId,
+      venueId: venueId,
       name: aud.name || '',
-      venue: aud.venue || '',
-      city: aud.city || 'Karachi',
+      venue: matchedVenue?.name || aud.venueName || aud.venue || '',
+      city: matchedCity?.name || aud.city || 'Karachi',
       layoutCode: aud.layoutCode || '',
       totalCapacity: aud.totalCapacity || 200,
       description: aud.description || '',
@@ -1028,6 +1111,242 @@ export default function AdminDashboard({ onSelectEvent }) {
       fetchBackendData();
     } catch (err) {
       setErrorMsg(err.message || 'Delete failed.');
+    }
+  };
+
+  // --- CRUD: COUNTRIES ---
+  const handleSaveCountry = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    const name = countryForm.name ? countryForm.name.trim() : '';
+    const code = countryForm.code ? countryForm.code.trim().toUpperCase() : '';
+
+    if (!name || !code) {
+      const msg = 'Please enter country name and ISO code.';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
+      return;
+    }
+
+    const isDup = countriesList.some(c => 
+      String(c.id) !== String(countryForm.id) &&
+      (c.name.trim().toLowerCase() === name.toLowerCase() || c.code.trim().toUpperCase() === code)
+    );
+    if (isDup) {
+      const msg = `Country with name '${name}' or code '${code}' already exists.`;
+      setErrorMsg(msg);
+      showError('Duplicate Country', msg);
+      return;
+    }
+
+    try {
+      if (countryForm.id) {
+        await locationsApi.updateCountry(countryForm.id, { name, code, isActive: countryForm.isActive });
+        const msg = `Country '${name}' updated successfully!`;
+        setSuccessMsg(msg);
+        showSuccess('Country Updated', msg);
+      } else {
+        await locationsApi.createCountry({ name, code });
+        const msg = `Country '${name}' created successfully!`;
+        setSuccessMsg(msg);
+        showSuccess('Country Created', msg);
+      }
+      setShowCountryModal(false);
+      setCountryForm(defaultCountryForm);
+      fetchBackendData();
+    } catch (err) {
+      const msg = err.message || 'Failed to save country.';
+      setErrorMsg(msg);
+      showError('Save Failed', msg);
+    }
+  };
+
+  const handleEditCountry = (country) => {
+    setCountryForm({
+      id: country.id,
+      name: country.name || '',
+      code: country.code || '',
+      isActive: country.isActive ?? true
+    });
+    setShowCountryModal(true);
+  };
+
+  const handleDeleteCountry = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this country?')) return;
+    try {
+      await locationsApi.deleteCountry(id);
+      const msg = 'Country deleted successfully.';
+      setSuccessMsg(msg);
+      showSuccess('Country Deleted 🗑️', msg);
+      fetchBackendData();
+    } catch (err) {
+      const msg = err.message || 'Delete failed.';
+      setErrorMsg(msg);
+      showError('Delete Failed', msg);
+    }
+  };
+
+  // --- CRUD: CITIES ---
+  const handleSaveCity = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    const name = cityForm.name ? cityForm.name.trim() : '';
+    const countryId = parseInt(cityForm.countryId, 10) || (countriesList[0]?.id || 1000);
+
+    if (!name || !countryId) {
+      const msg = 'Please enter city name and select a country.';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
+      return;
+    }
+
+    const isDup = citiesList.some(c => 
+      String(c.id) !== String(cityForm.id) &&
+      c.countryId === countryId &&
+      c.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (isDup) {
+      const msg = `City '${name}' already exists under the selected country.`;
+      setErrorMsg(msg);
+      showError('Duplicate City', msg);
+      return;
+    }
+
+    try {
+      if (cityForm.id) {
+        await locationsApi.updateCity(cityForm.id, { name, isActive: cityForm.isActive });
+        const msg = `City '${name}' updated successfully!`;
+        setSuccessMsg(msg);
+        showSuccess('City Updated', msg);
+      } else {
+        await locationsApi.createCity({ countryId, name });
+        const msg = `City '${name}' created successfully!`;
+        setSuccessMsg(msg);
+        showSuccess('City Created', msg);
+      }
+      setShowCityModal(false);
+      setCityForm(defaultCityForm);
+      fetchBackendData();
+    } catch (err) {
+      const msg = err.message || 'Failed to save city.';
+      setErrorMsg(msg);
+      showError('Save Failed', msg);
+    }
+  };
+
+  const handleEditCity = (city) => {
+    setCityForm({
+      id: city.id,
+      countryId: city.countryId || (countriesList[0]?.id || 1000),
+      name: city.name || '',
+      isActive: city.isActive ?? true
+    });
+    setShowCityModal(true);
+  };
+
+  const handleDeleteCity = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this city?')) return;
+    try {
+      await locationsApi.deleteCity(id);
+      const msg = 'City deleted successfully.';
+      setSuccessMsg(msg);
+      showSuccess('City Deleted 🗑️', msg);
+      fetchBackendData();
+    } catch (err) {
+      const msg = err.message || 'Delete failed.';
+      setErrorMsg(msg);
+      showError('Delete Failed', msg);
+    }
+  };
+
+  // --- CRUD: VENUES ---
+  const handleSaveVenue = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    const name = venueForm.name ? venueForm.name.trim() : '';
+    const cityId = parseInt(venueForm.cityId, 10) || (citiesList[0]?.id || 1000);
+
+    if (!name || !cityId) {
+      const msg = 'Please enter venue name and select a city.';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
+      return;
+    }
+
+    const isDup = venuesList.some(v => 
+      String(v.id) !== String(venueForm.id) &&
+      v.cityId === cityId &&
+      v.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (isDup) {
+      const msg = `Venue '${name}' already exists in this city.`;
+      setErrorMsg(msg);
+      showError('Duplicate Venue', msg);
+      return;
+    }
+
+    try {
+      const payload = {
+        cityId,
+        name,
+        address: venueForm.address || '',
+        description: venueForm.description || '',
+        isActive: venueForm.isActive !== false
+      };
+
+      if (venueForm.id) {
+        await locationsApi.updateVenue(venueForm.id, payload);
+        const msg = `Venue '${name}' updated successfully!`;
+        setSuccessMsg(msg);
+        showSuccess('Venue Updated', msg);
+      } else {
+        await locationsApi.createVenue(payload);
+        const msg = `Venue '${name}' created successfully!`;
+        setSuccessMsg(msg);
+        showSuccess('Venue Created', msg);
+      }
+      setShowVenueModal(false);
+      setVenueForm(defaultVenueForm);
+      fetchBackendData();
+    } catch (err) {
+      const msg = err.message || 'Failed to save venue.';
+      setErrorMsg(msg);
+      showError('Save Failed', msg);
+    }
+  };
+
+  const handleEditVenue = (venue) => {
+    const matchedCity = citiesList.find(c => c.id === venue.cityId);
+    setVenueForm({
+      id: venue.id,
+      countryId: matchedCity?.countryId || (countriesList[0]?.id || 1000),
+      cityId: venue.cityId || (citiesList[0]?.id || 1000),
+      name: venue.name || '',
+      address: venue.address || '',
+      description: venue.description || '',
+      isActive: venue.isActive ?? true
+    });
+    setShowVenueModal(true);
+  };
+
+  const handleDeleteVenue = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this venue?')) return;
+    try {
+      await locationsApi.deleteVenue(id);
+      const msg = 'Venue deleted successfully.';
+      setSuccessMsg(msg);
+      showSuccess('Venue Deleted 🗑️', msg);
+      fetchBackendData();
+    } catch (err) {
+      const msg = err.message || 'Delete failed.';
+      setErrorMsg(msg);
+      showError('Delete Failed', msg);
     }
   };
 
@@ -1192,6 +1511,60 @@ export default function AdminDashboard({ onSelectEvent }) {
           }}
         >
           <Grid size={18} /> Auditorium Charts ({auditoriumsList.length})
+        </button>
+
+        <button
+          onClick={() => setActiveAdminTab('venues')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'venues' ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Building2 size={18} /> Venues ({venuesList.length})
+        </button>
+
+        <button
+          onClick={() => setActiveAdminTab('cities')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'cities' ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <MapPin size={18} /> Cities ({citiesList.length})
+        </button>
+
+        <button
+          onClick={() => setActiveAdminTab('countries')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'countries' ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Sparkles size={18} /> Countries ({countriesList.length})
         </button>
 
         <button
@@ -1643,7 +2016,7 @@ export default function AdminDashboard({ onSelectEvent }) {
               <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Create and manage custom auditorium seating charts.</p>
             </div>
             <button
-              onClick={() => { setAuditoriumForm(defaultAuditoriumForm); setShowAuditoriumModal(true); }}
+              onClick={handleOpenNewAuditorium}
               style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <Plus size={16} /> Add Auditorium Layout
@@ -1658,7 +2031,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                 You have not added any auditorium layouts yet. Click below to create your custom auditorium blueprint.
               </p>
               <button
-                onClick={() => { setAuditoriumForm(defaultAuditoriumForm); setShowAuditoriumModal(true); }}
+                onClick={handleOpenNewAuditorium}
                 style={{ padding: '0.65rem 1.5rem', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
               >
                 + Create Your First Auditorium
@@ -1710,6 +2083,214 @@ export default function AdminDashboard({ onSelectEvent }) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* --- TAB: VENUES MANAGEMENT --- */}
+      {activeAdminTab === 'venues' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ position: 'relative', width: '320px' }}>
+              <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input
+                type="text"
+                placeholder="Search venues by name, city, or address..."
+                value={venueSearch}
+                onChange={e => setVenueSearch(e.target.value)}
+                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '10px', color: '#fff' }}
+              />
+            </div>
+            <button
+              onClick={() => {
+                const defaultCity = citiesList[0]?.id || 1000;
+                const matchedCity = citiesList.find(c => c.id === defaultCity);
+                setVenueForm({
+                  ...defaultVenueForm,
+                  cityId: defaultCity,
+                  countryId: matchedCity?.countryId || (countriesList[0]?.id || 1000)
+                });
+                setShowVenueModal(true);
+              }}
+              style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <Plus size={18} /> Add New Venue
+            </button>
+          </div>
+
+          <div className="glass-card" style={{ borderRadius: '16px', overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>ID</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>Venue Name</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>City</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>Address</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>Auditoriums</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>Status</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {venuesList
+                  .filter(v => !venueSearch || v.name.toLowerCase().includes(venueSearch.toLowerCase()) || (v.cityName && v.cityName.toLowerCase().includes(venueSearch.toLowerCase())) || (v.address && v.address.toLowerCase().includes(venueSearch.toLowerCase())))
+                  .map(v => {
+                    const audCount = auditoriumsList.filter(a => a.venueId === v.id).length;
+                    const matchedCity = citiesList.find(c => c.id === v.cityId);
+                    return (
+                      <tr key={v.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <td style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>#{v.id}</td>
+                        <td style={{ padding: '1rem', color: '#f8fafc', fontWeight: 600 }}>🏛️ {v.name}</td>
+                        <td style={{ padding: '1rem', color: '#38bdf8' }}>🏙️ {v.cityName || matchedCity?.name || 'Karachi'}</td>
+                        <td style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.address || '—'}</td>
+                        <td style={{ padding: '1rem', color: '#94a3b8' }}>{audCount} auditoriums</td>
+                        <td style={{ padding: '1rem' }}>
+                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: v.isActive !== false ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: v.isActive !== false ? '#34d399' : '#f87171' }}>
+                            {v.isActive !== false ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                            <button onClick={() => handleEditVenue(v)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(59, 130, 246, 0.2)', border: 'none', borderRadius: '6px', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Edit3 size={14} /> Edit</button>
+                            <button onClick={() => handleDeleteVenue(v.id)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(239, 68, 68, 0.2)', border: 'none', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Trash2 size={14} /> Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* --- TAB: CITIES MANAGEMENT --- */}
+      {activeAdminTab === 'cities' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ position: 'relative', width: '320px' }}>
+              <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input
+                type="text"
+                placeholder="Search cities..."
+                value={citySearch}
+                onChange={e => setCitySearch(e.target.value)}
+                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '10px', color: '#fff' }}
+              />
+            </div>
+            <button
+              onClick={() => { setCityForm({ ...defaultCityForm, countryId: countriesList[0]?.id || 1000 }); setShowCityModal(true); }}
+              style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <Plus size={18} /> Add New City
+            </button>
+          </div>
+
+          <div className="glass-card" style={{ borderRadius: '16px', overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>ID</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>City Name</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>Country</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>Venues Count</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>Status</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {citiesList
+                  .filter(c => !citySearch || c.name.toLowerCase().includes(citySearch.toLowerCase()) || (c.countryName && c.countryName.toLowerCase().includes(citySearch.toLowerCase())))
+                  .map(c => {
+                    const venueCount = venuesList.filter(v => v.cityId === c.id).length;
+                    const matchedCountry = countriesList.find(cnt => cnt.id === c.countryId);
+                    return (
+                      <tr key={c.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <td style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>#{c.id}</td>
+                        <td style={{ padding: '1rem', color: '#f8fafc', fontWeight: 600 }}>🏙️ {c.name}</td>
+                        <td style={{ padding: '1rem', color: '#94a3b8' }}>🌍 {c.countryName || matchedCountry?.name || 'Pakistan'}</td>
+                        <td style={{ padding: '1rem', color: '#94a3b8' }}>{venueCount} venues</td>
+                        <td style={{ padding: '1rem' }}>
+                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: c.isActive !== false ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: c.isActive !== false ? '#34d399' : '#f87171' }}>
+                            {c.isActive !== false ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                            <button onClick={() => handleEditCity(c)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(59, 130, 246, 0.2)', border: 'none', borderRadius: '6px', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Edit3 size={14} /> Edit</button>
+                            <button onClick={() => handleDeleteCity(c.id)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(239, 68, 68, 0.2)', border: 'none', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Trash2 size={14} /> Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* --- TAB: COUNTRIES MANAGEMENT --- */}
+      {activeAdminTab === 'countries' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ position: 'relative', width: '320px' }}>
+              <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              <input
+                type="text"
+                placeholder="Search countries by name or ISO code..."
+                value={countrySearch}
+                onChange={e => setCountrySearch(e.target.value)}
+                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '10px', color: '#fff' }}
+              />
+            </div>
+            <button
+              onClick={() => { setCountryForm(defaultCountryForm); setShowCountryModal(true); }}
+              style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <Plus size={18} /> Add New Country
+            </button>
+          </div>
+
+          <div className="glass-card" style={{ borderRadius: '16px', overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>ID</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>Country Name</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>ISO Code</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>Cities Count</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>Status</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {countriesList
+                  .filter(c => !countrySearch || c.name.toLowerCase().includes(countrySearch.toLowerCase()) || c.code.toLowerCase().includes(countrySearch.toLowerCase()))
+                  .map(c => {
+                    const cityCount = citiesList.filter(ct => ct.countryId === c.id).length;
+                    return (
+                      <tr key={c.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <td style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>#{c.id}</td>
+                        <td style={{ padding: '1rem', color: '#f8fafc', fontWeight: 600 }}>🌍 {c.name}</td>
+                        <td style={{ padding: '1rem', color: '#38bdf8', fontFamily: 'monospace', fontWeight: 700 }}>{c.code}</td>
+                        <td style={{ padding: '1rem', color: '#94a3b8' }}>{cityCount} cities</td>
+                        <td style={{ padding: '1rem' }}>
+                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: c.isActive !== false ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: c.isActive !== false ? '#34d399' : '#f87171' }}>
+                            {c.isActive !== false ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                            <button onClick={() => handleEditCountry(c)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(59, 130, 246, 0.2)', border: 'none', borderRadius: '6px', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Edit3 size={14} /> Edit</button>
+                            <button onClick={() => handleDeleteCountry(c.id)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(239, 68, 68, 0.2)', border: 'none', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Trash2 size={14} /> Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -1775,16 +2356,6 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div>
-                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Category *</label>
-                          <SearchableSelect
-                            required
-                            value={eventForm.category}
-                            onChange={e => setEventForm({ ...eventForm, category: e.target.value })}
-                            options={["Concerts", "Festivals", "Qawwali", "Theatre", "Comedy", "Food", "Workshops", "Corporate"]}
-                            placeholder="Select Category..."
-                          />
-                        </div>
-                        <div>
                           <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Organizer *</label>
                           <SearchableSelect
                             required
@@ -1792,18 +2363,6 @@ export default function AdminDashboard({ onSelectEvent }) {
                             onChange={e => setEventForm({ ...eventForm, organizerId: e.target.value })}
                             options={organizersList.map(o => ({ value: o.id, label: o.name }))}
                             placeholder="Select Organizer..."
-                          />
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Event Tags (Multiple)</label>
-                          <MultiSearchableSelect
-                            value={eventForm.tagIds || []}
-                            onChange={e => setEventForm({ ...eventForm, tagIds: e.target.value })}
-                            options={tagsList.map(t => ({ value: t.id, label: t.name }))}
-                            placeholder="Select tags..."
                           />
                         </div>
                         <div>
@@ -1815,22 +2374,97 @@ export default function AdminDashboard({ onSelectEvent }) {
                           />
                         </div>
                       </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Event Tags (Fetched from Backend)</label>
+                        <MultiSearchableSelect
+                          value={eventForm.tagIds || []}
+                          onChange={e => setEventForm({ ...eventForm, tagIds: e.target.value })}
+                          options={tagsList.map(t => ({ value: t.id, label: t.name }))}
+                          placeholder="Select tags (e.g. Concerts, Festivals, Qawwali)..."
+                        />
+                      </div>
                     </div>
 
-                    {/* SECTION 2: Location & Venue Details */}
+                    {/* SECTION 2: Location & Cascading Venue Details */}
                     <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                       <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <MapPin size={15} /> 2. Location & Venue Info
+                        <MapPin size={15} /> 2. Location & Venue Selection (Cascading Hierarchy)
                       </div>
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div>
-                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>City *</label>
-                          <input type="text" required placeholder="e.g. Karachi, Lahore, Islamabad" value={eventForm.city} onChange={e => setEventForm({ ...eventForm, city: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.9rem' }} />
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Country *</label>
+                          <SearchableSelect
+                            value={eventForm.countryId || (countriesList[0]?.id || '')}
+                            onChange={e => {
+                              const countryId = e.target.value;
+                              const filteredCities = citiesList.filter(c => String(c.countryId) === String(countryId));
+                              const defaultCity = filteredCities[0]?.id || '';
+                              setEventForm(prev => ({ ...prev, countryId, cityId: defaultCity, venueId: '', auditoriumId: '' }));
+                            }}
+                            options={countriesList.map(c => ({ value: c.id, label: `${c.name} (${c.code})` }))}
+                            placeholder="Select Country..."
+                          />
                         </div>
                         <div>
-                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Venue Name *</label>
-                          <input type="text" required placeholder="e.g. Arts Council Open Air Theatre" value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.9rem' }} />
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>City *</label>
+                          <SearchableSelect
+                            value={eventForm.cityId || ''}
+                            onChange={e => {
+                              const cityId = e.target.value;
+                              const filteredVenues = venuesList.filter(v => String(v.cityId) === String(cityId));
+                              const defaultVenue = filteredVenues[0]?.id || '';
+                              setEventForm(prev => ({ ...prev, cityId, venueId: defaultVenue, auditoriumId: '' }));
+                            }}
+                            options={citiesList
+                              .filter(c => !eventForm.countryId || String(c.countryId) === String(eventForm.countryId))
+                              .map(c => ({ value: c.id, label: c.name }))}
+                            placeholder="Select City..."
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Venue *</label>
+                          <SearchableSelect
+                            value={eventForm.venueId || ''}
+                            onChange={e => {
+                              const venueId = e.target.value;
+                              const selVenue = venuesList.find(v => String(v.id) === String(venueId));
+                              const filteredAuds = auditoriumsList.filter(a => String(a.venueId) === String(venueId));
+                              setEventForm(prev => ({
+                                ...prev,
+                                venueId,
+                                address: selVenue?.address || prev.address,
+                                auditoriumId: filteredAuds[0]?.id || ''
+                              }));
+                            }}
+                            options={venuesList
+                              .filter(v => !eventForm.cityId || String(v.cityId) === String(eventForm.cityId))
+                              .map(v => ({ value: v.id, label: v.name }))}
+                            placeholder="Select Venue..."
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Auditorium / Stage Hall</label>
+                          <SearchableSelect
+                            value={eventForm.auditoriumId || ''}
+                            onChange={e => {
+                              const auditoriumId = e.target.value;
+                              const selAud = auditoriumsList.find(a => String(a.id) === String(auditoriumId));
+                              setEventForm(prev => ({
+                                ...prev,
+                                auditoriumId,
+                                auditoriumLayout: selAud?.layoutCode || prev.auditoriumLayout
+                              }));
+                            }}
+                            options={auditoriumsList
+                              .filter(a => !eventForm.venueId || String(a.venueId) === String(eventForm.venueId))
+                              .map(a => ({ value: a.id, label: `${a.name} (${a.totalCapacity} Seats)` }))}
+                            placeholder="Select Auditorium Hall (Optional)..."
+                          />
                         </div>
                       </div>
 
@@ -1850,10 +2484,20 @@ export default function AdminDashboard({ onSelectEvent }) {
                         <div>
                           <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Start Date & Time (PKT)</label>
                           <input type="datetime-local" value={eventForm.startDateUtc} onChange={e => setEventForm({ ...eventForm, startDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }} />
+                          {eventForm.startDateUtc && !isNaN(new Date(eventForm.startDateUtc).getTime()) && (
+                            <span style={{ fontSize: '0.75rem', color: '#38bdf8', marginTop: '0.25rem', display: 'block' }}>
+                              📅 {new Date(eventForm.startDateUtc).toLocaleString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })} PKT
+                            </span>
+                          )}
                         </div>
                         <div>
                           <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>End Date & Time (PKT)</label>
                           <input type="datetime-local" value={eventForm.endDateUtc} onChange={e => setEventForm({ ...eventForm, endDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }} />
+                          {eventForm.endDateUtc && !isNaN(new Date(eventForm.endDateUtc).getTime()) && (
+                            <span style={{ fontSize: '0.75rem', color: '#38bdf8', marginTop: '0.25rem', display: 'block' }}>
+                              📅 {new Date(eventForm.endDateUtc).toLocaleString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })} PKT
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -2363,8 +3007,13 @@ export default function AdminDashboard({ onSelectEvent }) {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Row Range / Zone Description</label>
-                  <input type="text" placeholder="e.g. Rows A to E, Premium Orchestra Seating" value={tierForm.description || ''} onChange={e => setTierForm({ ...tierForm, description: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#60a5fa', fontWeight: 700, marginBottom: '0.25rem' }}>Row Range (for Interactive Mapped Seating)</label>
+                  <input type="text" placeholder="e.g. G, A-F, H-K, or A, B, C" value={tierForm.rowRange || ''} onChange={e => setTierForm({ ...tierForm, rowRange: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '8px', color: '#60a5fa', fontWeight: 700 }} />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Description / Perks</label>
+                  <input type="text" placeholder="e.g. Front row seating with fast-track entry" value={tierForm.description || ''} onChange={e => setTierForm({ ...tierForm, description: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -2597,38 +3246,99 @@ export default function AdminDashboard({ onSelectEvent }) {
             </div>
 
             <form onSubmit={handleSaveAuditorium} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Auditorium Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Arts Council Karachi (AC II)"
-                    value={auditoriumForm.name}
-                    onChange={e => setAuditoriumForm({ ...auditoriumForm, name: e.target.value })}
-                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
-                  />
+              {/* 3-Tier Cascading Location Selection: Country -> City -> Venue */}
+              <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '12px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <MapPin size={15} /> Venue & Location Selection (Cascading Hierarchy)
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Venue Complex *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Arts Council of Pakistan"
-                    value={auditoriumForm.venue}
-                    onChange={e => setAuditoriumForm({ ...auditoriumForm, venue: e.target.value })}
-                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
-                  />
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>1. Country *</label>
+                    <SearchableSelect
+                      required
+                      value={auditoriumForm.countryId || (countriesList[0]?.id || '')}
+                      onChange={e => {
+                        const newCountryId = e.target.value;
+                        const filteredCities = citiesList.filter(c => String(c.countryId) === String(newCountryId));
+                        const defaultCityId = filteredCities[0]?.id || '';
+                        const filteredVenues = venuesList.filter(v => String(v.cityId) === String(defaultCityId));
+                        const defaultVenueId = filteredVenues[0]?.id || '';
+                        const matchedVenue = venuesList.find(v => String(v.id) === String(defaultVenueId));
+                        const matchedCity = citiesList.find(c => String(c.id) === String(defaultCityId));
+                        setAuditoriumForm(prev => ({
+                          ...prev,
+                          countryId: newCountryId,
+                          cityId: defaultCityId,
+                          venueId: defaultVenueId,
+                          venue: matchedVenue?.name || prev.venue,
+                          city: matchedCity?.name || prev.city
+                        }));
+                      }}
+                      options={countriesList.map(c => ({ value: c.id, label: `${c.name} (${c.code})` }))}
+                      placeholder="Select Country..."
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>2. City *</label>
+                    <SearchableSelect
+                      required
+                      value={auditoriumForm.cityId || ''}
+                      onChange={e => {
+                        const newCityId = e.target.value;
+                        const filteredVenues = venuesList.filter(v => String(v.cityId) === String(newCityId));
+                        const defaultVenueId = filteredVenues[0]?.id || '';
+                        const matchedVenue = venuesList.find(v => String(v.id) === String(defaultVenueId));
+                        const matchedCity = citiesList.find(c => String(c.id) === String(newCityId));
+                        setAuditoriumForm(prev => ({
+                          ...prev,
+                          cityId: newCityId,
+                          venueId: defaultVenueId,
+                          venue: matchedVenue?.name || prev.venue,
+                          city: matchedCity?.name || prev.city
+                        }));
+                      }}
+                      options={citiesList
+                        .filter(c => !auditoriumForm.countryId || String(c.countryId) === String(auditoriumForm.countryId))
+                        .map(c => ({ value: c.id, label: c.name }))}
+                      placeholder="Select City..."
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>3. Venue Complex *</label>
+                    <SearchableSelect
+                      required
+                      value={auditoriumForm.venueId || ''}
+                      onChange={e => {
+                        const newVenueId = e.target.value;
+                        const selVenue = venuesList.find(v => String(v.id) === String(newVenueId));
+                        setAuditoriumForm(prev => ({
+                          ...prev,
+                          venueId: newVenueId,
+                          venue: selVenue?.name || prev.venue
+                        }));
+                      }}
+                      options={venuesList
+                        .filter(v => !auditoriumForm.cityId || String(v.cityId) === String(auditoriumForm.cityId))
+                        .map(v => ({ value: v.id, label: v.name }))}
+                      placeholder="Select Venue..."
+                    />
+                  </div>
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>City *</label>
-                  <SearchableSelect
-                    value={auditoriumForm.city}
-                    onChange={e => setAuditoriumForm({ ...auditoriumForm, city: e.target.value })}
-                    options={['Karachi', 'Lahore', 'Islamabad', 'Rawalpindi', 'Peshawar', 'Quetta']}
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Auditorium / Hall Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Auditorium Hall 1"
+                    value={auditoriumForm.name}
+                    onChange={e => setAuditoriumForm({ ...auditoriumForm, name: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
                   />
                 </div>
                 <div>
@@ -2700,6 +3410,151 @@ export default function AdminDashboard({ onSelectEvent }) {
           </div>
         </div>
       )}
+      {/* --- MODAL: CREATE / EDIT COUNTRY --- */}
+      {showCountryModal && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px', padding: '2rem', position: 'relative' }}>
+            <button
+              onClick={() => setShowCountryModal(false)}
+              style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255, 255, 255, 0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <X size={18} />
+            </button>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>
+              {countryForm.id ? 'Edit Country' : 'Add New Country'}
+            </h3>
+            <form onSubmit={handleSaveCountry} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Country Name *</label>
+                <input type="text" required placeholder="e.g. Pakistan" value={countryForm.name} onChange={e => setCountryForm({ ...countryForm, name: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>ISO Country Code *</label>
+                <input type="text" required placeholder="e.g. PK" value={countryForm.code} onChange={e => setCountryForm({ ...countryForm, code: e.target.value.toUpperCase() })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#38bdf8', fontFamily: 'monospace', fontWeight: 700 }} />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button type="button" onClick={() => setShowCountryModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Country...' : 'Save Country'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL: CREATE / EDIT CITY --- */}
+      {showCityModal && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px', padding: '2rem', position: 'relative' }}>
+            <button
+              onClick={() => setShowCityModal(false)}
+              style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255, 255, 255, 0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <X size={18} />
+            </button>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>
+              {cityForm.id ? 'Edit City' : 'Add New City'}
+            </h3>
+            <form onSubmit={handleSaveCity} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Country *</label>
+                <SearchableSelect
+                  required
+                  value={cityForm.countryId || (countriesList[0]?.id || 1000)}
+                  onChange={e => setCityForm({ ...cityForm, countryId: e.target.value })}
+                  options={countriesList.map(c => ({ value: c.id, label: `${c.name} (${c.code})` }))}
+                  placeholder="Select Country..."
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>City Name *</label>
+                <input type="text" required placeholder="e.g. Karachi" value={cityForm.name} onChange={e => setCityForm({ ...cityForm, name: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button type="button" onClick={() => setShowCityModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving City...' : 'Save City'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL: CREATE / EDIT VENUE --- */}
+      {showVenueModal && (() => {
+        const selectedCountryId = venueForm.countryId || (countriesList[0]?.id || 1000);
+        const filteredCities = citiesList.filter(c => c.countryId === parseInt(selectedCountryId, 10));
+
+        return (
+          <div className="modal-overlay">
+            <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px', padding: '2rem', position: 'relative' }}>
+              <button
+                onClick={() => setShowVenueModal(false)}
+                style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255, 255, 255, 0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>
+                {venueForm.id ? 'Edit Venue' : 'Add New Venue'}
+              </h3>
+              <form onSubmit={handleSaveVenue} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Country *</label>
+                    <SearchableSelect
+                      required
+                      value={selectedCountryId}
+                      onChange={e => {
+                        const newCountryId = e.target.value;
+                        const newFilteredCities = citiesList.filter(c => c.countryId === parseInt(newCountryId, 10));
+                        setVenueForm({
+                          ...venueForm,
+                          countryId: newCountryId,
+                          cityId: newFilteredCities[0]?.id || ''
+                        });
+                      }}
+                      options={countriesList.map(c => ({ value: c.id, label: c.name }))}
+                      placeholder="Select Country..."
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>City *</label>
+                    <SearchableSelect
+                      required
+                      value={venueForm.cityId || (filteredCities[0]?.id || '')}
+                      onChange={e => setVenueForm({ ...venueForm, cityId: e.target.value })}
+                      options={filteredCities.map(c => ({ value: c.id, label: c.name }))}
+                      placeholder="Select City..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Venue Name *</label>
+                  <input type="text" required placeholder="e.g. Arts Council of Pakistan" value={venueForm.name} onChange={e => setVenueForm({ ...venueForm, name: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Full Address</label>
+                  <input type="text" placeholder="e.g. M.R. Kiyani Road, Saddar, Karachi" value={venueForm.address} onChange={e => setVenueForm({ ...venueForm, address: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Description & Highlights</label>
+                  <textarea rows={3} placeholder="Premier cultural venue hosting live concerts, theatre, and conventions..." value={venueForm.description} onChange={e => setVenueForm({ ...venueForm, description: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                  <button type="button" onClick={() => setShowVenueModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
+                  <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Venue...' : 'Save Venue'}</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* --- BLUEPRINT PREVIEW MODAL --- */}
       {previewAuditorium && (
         <InteractiveSeatPicker

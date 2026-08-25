@@ -89,7 +89,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
           </div>
         </div>
 
-        {/* Category Pill */}
+        {/* Tag Pill */}
         <div style={{
           position: 'absolute',
           bottom: '14px',
@@ -103,7 +103,9 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
           fontWeight: 700,
           border: '1px solid rgba(59, 130, 246, 0.4)'
         }}>
-          {event.category}
+          {event.tags && event.tags.length > 0
+            ? event.tags.map(t => typeof t === 'string' ? t : t.name).join(' • ')
+            : (event.tag || 'Event')}
         </div>
       </div>
 

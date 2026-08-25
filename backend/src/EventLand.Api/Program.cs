@@ -44,8 +44,9 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Global Exception Handler
+// Global Exception Handler & Security Headers
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
+app.UseMiddleware<SecurityHeadersMiddleware>();
 
 // Enable Swagger & Swagger UI (Served at application root http://localhost:4257/)
 app.UseSwagger();

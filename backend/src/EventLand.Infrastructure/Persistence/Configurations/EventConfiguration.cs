@@ -17,18 +17,6 @@ public sealed class EventConfiguration : IEntityTypeConfiguration<Event>
                .IsRequired()
                .HasMaxLength(300);
 
-        builder.Property(e => e.Category)
-               .IsRequired()
-               .HasMaxLength(100);
-
-        builder.Property(e => e.City)
-               .IsRequired()
-               .HasMaxLength(100);
-
-        builder.Property(e => e.Venue)
-               .IsRequired()
-               .HasMaxLength(300);
-
         builder.Property(e => e.Address)
                .HasMaxLength(500);
 
@@ -51,6 +39,26 @@ public sealed class EventConfiguration : IEntityTypeConfiguration<Event>
                .HasConversion<int>();
 
         // --- Relationships ---
+        builder.HasOne(e => e.Country)
+               .WithMany(c => c.Events)
+               .HasForeignKey(e => e.CountryId)
+               .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(e => e.City)
+               .WithMany(c => c.Events)
+               .HasForeignKey(e => e.CityId)
+               .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(e => e.Venue)
+               .WithMany(v => v.Events)
+               .HasForeignKey(e => e.VenueId)
+               .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(e => e.Auditorium)
+               .WithMany(a => a.Events)
+               .HasForeignKey(e => e.AuditoriumId)
+               .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasOne(e => e.Organizer)
                .WithMany(o => o.Events)
                .HasForeignKey(e => e.OrganizerId)
@@ -72,11 +80,11 @@ public sealed class EventConfiguration : IEntityTypeConfiguration<Event>
                .OnDelete(DeleteBehavior.Restrict);
 
         // --- Indexes ---
-        builder.HasIndex(e => e.Category)
-               .HasDatabaseName("IX_Events_Category");
+        builder.HasIndex(e => e.CityId)
+               .HasDatabaseName("IX_Events_CityId");
 
-        builder.HasIndex(e => e.City)
-               .HasDatabaseName("IX_Events_City");
+        builder.HasIndex(e => e.VenueId)
+               .HasDatabaseName("IX_Events_VenueId");
 
         builder.HasIndex(e => e.Status)
                .HasDatabaseName("IX_Events_Status");

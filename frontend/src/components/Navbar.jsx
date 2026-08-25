@@ -15,9 +15,12 @@ export default function Navbar({
   onSelectRole,
   currentUser = null,
   onOpenAuthModal,
-  onLogout
+  onLogout,
+  cities = []
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const cityOptions = ['All Cities', ...(cities || []).map(c => typeof c === 'string' ? c : c.name)];
 
   const handleNavClick = (view) => {
     onNavigate(view);
@@ -109,7 +112,7 @@ export default function Navbar({
             <SearchableSelect
               value={selectedCity}
               onChange={(e) => onSelectCity(e.target.value)}
-              options={CITIES}
+              options={cityOptions.length > 1 ? cityOptions : CITIES}
               icon={MapPin}
               placeholder="City..."
             />

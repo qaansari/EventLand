@@ -4,6 +4,30 @@ using EventLand.Application.Dtos;
 
 public interface IAdminService
 {
+    // --- Location & Venue Hierarchy ---
+    Task<List<CountryDto>> GetCountriesAsync();
+    Task<CountryDto?> GetCountryByIdAsync(int id);
+    Task<CountryDto> CreateCountryAsync(CreateCountryDto dto);
+    Task<CountryDto> UpdateCountryAsync(int id, UpdateCountryDto dto);
+    Task<bool> DeleteCountryAsync(int id);
+
+    Task<List<CityDto>> GetCitiesAsync(int? countryId = null);
+    Task<CityDto?> GetCityByIdAsync(int id);
+    Task<CityDto> CreateCityAsync(CreateCityDto dto);
+    Task<CityDto> UpdateCityAsync(int id, UpdateCityDto dto);
+    Task<bool> DeleteCityAsync(int id);
+
+    Task<List<VenueDto>> GetVenuesAsync(int? cityId = null);
+    Task<VenueDto?> GetVenueByIdAsync(int id);
+    Task<VenueDto> CreateVenueAsync(CreateVenueDto dto);
+    Task<VenueDto> UpdateVenueAsync(int id, UpdateVenueDto dto);
+    Task<bool> DeleteVenueAsync(int id);
+    Task<List<AuditoriumDto>> GetAuditoriumsAsync(int? venueId = null);
+    Task<AuditoriumDto?> GetAuditoriumByIdAsync(int id);
+    Task<AuditoriumDto> CreateAuditoriumAsync(CreateAuditoriumDto dto);
+    Task<AuditoriumDto> UpdateAuditoriumAsync(int id, UpdateAuditoriumDto dto);
+    Task<bool> DeleteAuditoriumAsync(int id);
+
     // --- Roles CRUD ---
     Task<List<RoleDto>> GetRolesAsync();
     Task<RoleDto?> GetRoleByIdAsync(int id);
@@ -20,9 +44,15 @@ public interface IAdminService
 
     // --- Events CRUD ---
     Task<PagedResult<EventSummaryDto>> GetEventsAsync(int pageNumber = 1, int pageSize = 10);
+    Task<EventDetailDto> GetEventByIdAsync(int eventId);
     Task<EventDetailDto> CreateEventAsync(CreateAdminEventDto dto);
     Task<EventDetailDto> UpdateEventAsync(int id, UpdateAdminEventDto dto);
     Task<bool> DeleteEventAsync(int id);
+
+    // --- EventShows CRUD ---
+    Task<EventShowDto> CreateEventShowAsync(CreateEventShowDto dto);
+    Task<EventShowDto> UpdateEventShowAsync(int id, UpdateEventShowDto dto);
+    Task<bool> DeleteEventShowAsync(int id);
 
     // --- Organizers CRUD ---
     Task<List<OrganizerDto>> GetOrganizersAsync();
@@ -59,11 +89,4 @@ public interface IAdminService
     Task<TagDto> CreateTagAsync(CreateTagDto dto);
     Task<TagDto> UpdateTagAsync(int id, UpdateTagDto dto);
     Task<bool> DeleteTagAsync(int id);
-
-    // --- Auditorium Layouts CRUD ---
-    Task<List<AuditoriumLayoutDto>> GetAuditoriumLayoutsAsync(bool activeOnly = false);
-    Task<AuditoriumLayoutDto?> GetAuditoriumLayoutByIdAsync(int id);
-    Task<AuditoriumLayoutDto> CreateAuditoriumLayoutAsync(CreateAuditoriumLayoutDto dto);
-    Task<AuditoriumLayoutDto> UpdateAuditoriumLayoutAsync(int id, UpdateAuditoriumLayoutDto dto);
-    Task<bool> DeleteAuditoriumLayoutAsync(int id);
 }

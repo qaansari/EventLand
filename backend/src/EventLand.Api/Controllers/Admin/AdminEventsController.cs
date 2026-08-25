@@ -27,6 +27,13 @@ public class AdminEventsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<EventDetailDto>> GetEventById(int id)
+    {
+        var ev = await _adminService.GetEventByIdAsync(id);
+        return Ok(ev);
+    }
+
     [HttpPost]
     public async Task<ActionResult<EventDetailDto>> CreateEvent([FromBody] CreateAdminEventDto dto)
     {

@@ -48,9 +48,16 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
 
   const currentZone = event.seatingZones?.[selectedZoneIndex] || defaultZone;
 
-  // Active show object & show-specific price
   const activeShow = showsList.find(s => s.id === selectedShowId) || initialEvent.selectedShow || showsList[0];
-  const activeShowPrice = activeShow?.ticketTiers?.[0]?.price || activeShow?.startingPrice || currentZone.price || event.startingPrice || 2500;
+
+  const effectiveTiers = useMemo(() => {
+    if (activeShow?.ticketTiers && activeShow.ticketTiers.length > 0) {
+      return activeShow.ticketTiers;
+    }
+    return event.ticketTiers || [];
+  }, [activeShow, event.ticketTiers]);
+
+  const activeShowPrice = effectiveTiers[0]?.price || activeShow?.startingPrice || currentZone.price || event.startingPrice || 2500;
 
   // Resolve Layout Blueprint Schema dynamically from database JSON or auditorium layout
   const resolvedBlueprint = useMemo(() => {
@@ -91,8 +98,11 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
     return redisHeldSeats.includes(seatId);
   };
 
-  const handleSeatClick = async (seatId, label, price) => {
-    const seatPrice = activeShowPrice || price || 2500;
+  const handleSeatClick = async (seatId, label, seatInfo) => {
+    const seatPrice = seatInfo?.price ?? activeShowPrice ?? currentZone.price ?? 2500;
+    const tierId = seatInfo?.tierId ?? null;
+    const tierName = seatInfo?.tierName ?? null;
+
     if (selectedSeats.some((s) => s.id === seatId)) {
       const remaining = selectedSeats.filter((s) => s.id !== seatId);
       setSelectedSeats(remaining);
@@ -102,7 +112,19 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
         } catch (err) { console.warn('Seat release error:', err); }
       }
     } else {
-      const newSeats = [...selectedSeats, { id: seatId, label, zone: currentZone.zone, price: seatPrice, showId: selectedShowId, showTitle: activeShow?.showTitle }];
+      const newSeats = [
+        ...selectedSeats, 
+        { 
+          id: seatId, 
+          label, 
+          zone: currentZone.zone, 
+          price: seatPrice, 
+          tierId: tierId,
+          tierName: tierName,
+          showId: selectedShowId, 
+          showTitle: activeShow?.showTitle 
+        }
+      ];
       setSelectedSeats(newSeats);
       if (!isPreviewMode && typeof event.id === 'number' && typeof seatId === 'number') {
         try {
@@ -122,25 +144,48 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
     }
   };
 
-  const totalPrice = selectedSeats.reduce((sum, s) => sum + (s.price || activeShowPrice || 1500), 0);
+  const totalPrice = selectedSeats.reduce((sum, s) => sum + (Number(s.price) || Number(activeShowPrice) || 1500), 0);
 
-  // Helper to resolve row-wise price
-  const getRowSeatPrice = (rowChar, seatObj) => {
-    if (seatObj?.price) return seatObj.price;
-    const showTiers = activeShow?.ticketTiers || event.ticketTiers || [];
+  // Helper to resolve row-wise price, tier ID and tier name
+  const getRowSeatInfo = (rowChar, seatObj) => {
+    if (seatObj?.price && Number(seatObj.price) > 0) {
+      return { 
+        price: Number(seatObj.price), 
+        tierId: seatObj.tierId || null, 
+        tierName: seatObj.tierName || null 
+      };
+    }
+
+    const showTiers = effectiveTiers;
     const rowUpper = String(rowChar).trim().toUpperCase();
+
     const matchingTier = showTiers.find(t => {
       if (!t.rowRange) return false;
-      const r = t.rowRange.trim().toUpperCase();
-      if (r === rowUpper || r === `ROW ${rowUpper}`) return true;
-      const clean = r.replace('ROWS', '').replace('ROW', '').trim();
-      if (clean.includes('-')) {
-        const [start, end] = clean.split('-').map(x => x.trim());
-        if (start && end && rowUpper >= start && rowUpper <= end) return true;
+      const rawRanges = t.rowRange.split(',').map(s => s.trim().toUpperCase());
+      for (const r of rawRanges) {
+        if (!r) continue;
+        const clean = r.replace(/ROWS?/g, '').trim();
+        if (!clean) continue;
+        if (clean === rowUpper) return true;
+
+        if (clean.includes('-')) {
+          const parts = clean.split('-').map(x => x.trim());
+          if (parts.length === 2 && parts[0] && parts[1]) {
+            const start = parts[0];
+            const end = parts[1];
+            if (rowUpper >= start && rowUpper <= end) return true;
+          }
+        }
       }
       return false;
     });
-    return matchingTier?.price || activeShowPrice || currentZone.price || 1500;
+
+    const fallbackPrice = activeShowPrice || currentZone.price || event.startingPrice || 1500;
+    return {
+      price: matchingTier?.price ? Number(matchingTier.price) : Number(fallbackPrice),
+      tierId: matchingTier?.id || null,
+      tierName: matchingTier?.name || null
+    };
   };
 
   // Helper to render a seat button
@@ -155,13 +200,14 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
                        resolvedBlueprint?.disabledSeats?.includes(seatLabel) ||
                        resolvedBlueprint?.unavailableSeats?.includes(seatLabel);
     const isSelected = selectedSeats.some((s) => s.id === seatId);
-    const seatPrice = getRowSeatPrice(rowChar, seatObj);
+    const seatInfo = getRowSeatInfo(rowChar, seatObj);
+    const seatPrice = seatInfo.price;
 
     return (
       <button
         key={seatLabel}
         disabled={occupied || isDisabled}
-        onClick={() => !isDisabled && handleSeatClick(seatId, seatLabel, seatPrice)}
+        onClick={() => !isDisabled && handleSeatClick(seatId, seatLabel, seatInfo)}
         style={{
           minWidth: '22px',
           height: '23px',
@@ -193,7 +239,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
           justifyContent: 'center',
           userSelect: 'none'
         }}
-        title={isDisabled ? `Row ${rowChar} Seat ${seatNum} (Unavailable / Not in Hall)` : `Row ${rowChar} Seat ${seatNum} • PKR ${Number(seatPrice).toLocaleString()}`}
+        title={isDisabled ? `Row ${rowChar} Seat ${seatNum} (Unavailable / Not in Hall)` : `Row ${rowChar} Seat ${seatNum} • PKR ${Number(seatPrice).toLocaleString()}${seatInfo.tierName ? ` (${seatInfo.tierName})` : ''}`}
       >
         {seatNum}
       </button>
@@ -448,9 +494,9 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
             transition: 'transform 0.15s ease'
           }}>
             {/* Row Tier Price Legend */}
-            {((activeShow?.ticketTiers || event.ticketTiers || []).filter(t => t.rowRange).length > 0) && (
+            {(effectiveTiers.filter(t => t.rowRange).length > 0) && (
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '1.25rem', padding: '0.5rem 1rem', background: 'rgba(30, 41, 59, 0.7)', borderRadius: '9999px', border: '1px solid rgba(255, 255, 255, 0.1)', display: 'inline-flex' }}>
-                {(activeShow?.ticketTiers || event.ticketTiers || []).filter(t => t.rowRange).map((t, idx) => (
+                {effectiveTiers.filter(t => t.rowRange).map((t, idx) => (
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem' }}>
                     <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: idx === 0 ? '#f59e0b' : idx === 1 ? '#a855f7' : '#3b82f6' }} />
                     <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{t.name} (Row {t.rowRange}):</span>

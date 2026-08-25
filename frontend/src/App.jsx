@@ -15,7 +15,7 @@ import OrganizerDashboard from './components/OrganizerDashboard';
 import AuthModal from './components/AuthModal';
 import Footer from './components/Footer';
 import { Ticket, MapPin, Trash2, Search, RefreshCw } from 'lucide-react';
-import { eventsApi, bookingsApi } from './services/api';
+import { eventsApi, bookingsApi, tagsApi, locationsApi } from './services/api';
 import { useToast } from './context/ToastContext';
 import './App.css';
 
@@ -23,17 +23,28 @@ export default function App() {
   const { showSuccess, showInfo, showError, showWarning } = useToast();
   const [events, setEvents] = useState([]);
 
+  const [tags, setTags] = useState([]);
+  const [countries, setCountries] = useState([]);
+  const [cities, setCities] = useState([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
 
-  // Fetch live events from .NET Backend API on mount
+  // Fetch live events, tags, countries, and cities from .NET Backend API on mount
   useEffect(() => {
     setLoadingEvents(true);
-    eventsApi.getEvents({ pageSize: 100 })
-      .then(res => {
-        setEvents(res.items || []);
+    Promise.all([
+      eventsApi.getEvents({ pageSize: 100 }).catch(() => ({ items: [] })),
+      tagsApi.getAll().catch(() => []),
+      locationsApi.getCountries().catch(() => []),
+      locationsApi.getCities().catch(() => [])
+    ])
+      .then(([resEvents, resTags, resCountries, resCities]) => {
+        setEvents(resEvents.items || []);
+        setTags(Array.isArray(resTags) ? resTags : (resTags?.items || []));
+        setCountries(Array.isArray(resCountries) ? resCountries : (resCountries?.items || []));
+        setCities(Array.isArray(resCities) ? resCities : (resCities?.items || []));
       })
       .catch(err => {
-        console.error('Could not connect to backend events API:', err);
+        console.error('Could not connect to backend API:', err);
         setEvents([]);
       })
       .finally(() => setLoadingEvents(false));
@@ -42,7 +53,7 @@ export default function App() {
   const [activeView, setActiveView] = useState('explore'); // explore, artists, ai-assistant, organizer-wizard, my-tickets, organizer, admin
   const [userRole, setUserRole] = useState('customer'); // customer, organizer, admin
   const [selectedCity, setSelectedCity] = useState('All Cities');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedTag, setSelectedTag] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('featured');
 
@@ -266,10 +277,10 @@ export default function App() {
       // Explore View
       if (searchQuery.trim()) {
         document.title = `Search: "${searchQuery}" | Event Land`;
-      } else if (selectedCategory !== 'All' && selectedCity !== 'All Cities') {
-        document.title = `${selectedCategory} Events in ${selectedCity} | Event Land`;
-      } else if (selectedCategory !== 'All') {
-        document.title = `${selectedCategory} Events | Event Land`;
+      } else if (selectedTag !== 'All' && selectedCity !== 'All Cities') {
+        document.title = `${selectedTag} Events in ${selectedCity} | Event Land`;
+      } else if (selectedTag !== 'All') {
+        document.title = `${selectedTag} Events | Event Land`;
       } else if (selectedCity !== 'All Cities') {
         document.title = `Events in ${selectedCity} | Event Land`;
       } else {
@@ -279,7 +290,7 @@ export default function App() {
   }, [
     activeView,
     selectedCity,
-    selectedCategory,
+    selectedTag,
     searchQuery,
     activeDetailEvent,
     activeSeatPickerEvent,
@@ -385,15 +396,24 @@ export default function App() {
 
   // Filter & Sort Events
   const filteredEvents = events.filter((ev) => {
-    const matchCity = selectedCity === 'All Cities' || ev.city.toLowerCase() === selectedCity.toLowerCase();
-    const matchCategory = selectedCategory === 'All' || ev.category.toLowerCase() === selectedCategory.toLowerCase();
+    const matchCity = selectedCity === 'All Cities' || (ev.city && ev.city.toLowerCase() === selectedCity.toLowerCase());
+    
+    let matchTag = true;
+    if (selectedTag !== 'All') {
+      const selectedSlug = selectedTag.toLowerCase();
+      matchTag = (ev.tags || []).some(t => {
+        const tName = (typeof t === 'string' ? t : (t.name || t.slug || '')).toLowerCase();
+        return tName === selectedSlug;
+      });
+    }
+
     const matchSearch =
       !searchQuery ||
       ev.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ev.venue.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ev.city.toLowerCase().includes(searchQuery.toLowerCase());
+      (ev.venue && ev.venue.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (ev.city && ev.city.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    return matchCity && matchCategory && matchSearch;
+    return matchCity && matchTag && matchSearch;
   });
 
   const sortedEvents = [...filteredEvents].sort((a, b) => {
@@ -420,6 +440,7 @@ export default function App() {
         currentUser={currentUser}
         onOpenAuthModal={handleOpenAuthModal}
         onLogout={handleLogout}
+        cities={cities}
       />
 
       {/* Main View Router */}
@@ -434,8 +455,10 @@ export default function App() {
 
             {/* Filter Bar */}
             <EventFilterBar
-              selectedCategory={selectedCategory}
-              onSelectCategory={setSelectedCategory}
+              tags={tags}
+              cities={cities}
+              selectedTag={selectedTag}
+              onSelectTag={setSelectedTag}
               selectedCity={selectedCity}
               onSelectCity={setSelectedCity}
               sortBy={sortBy}
@@ -446,7 +469,7 @@ export default function App() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
                 <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff' }}>
-                  {selectedCategory === 'All' ? 'Upcoming Events' : `${selectedCategory} Events`}
+                  {selectedTag === 'All' ? 'Upcoming Events' : `${selectedTag} Events`}
                   {selectedCity !== 'All Cities' && ` in ${selectedCity}`}
                 </h2>
                 <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
@@ -466,7 +489,7 @@ export default function App() {
                 <button
                   onClick={() => {
                     setSelectedCity('All Cities');
-                    setSelectedCategory('All');
+                    setSelectedTag('All');
                     setSearchQuery('');
                   }}
                   className="btn btn-primary"

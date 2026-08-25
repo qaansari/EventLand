@@ -26,7 +26,10 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Artist>      Artists      => Set<Artist>();
     public DbSet<Tag>         Tags         => Set<Tag>();
     public DbSet<EventTag>    EventTags    => Set<EventTag>();
-    public DbSet<AuditoriumLayout> AuditoriumLayouts => Set<AuditoriumLayout>();
+    public DbSet<Country>     Countries    => Set<Country>();
+    public DbSet<City>        Cities       => Set<City>();
+    public DbSet<Venue>       Venues       => Set<Venue>();
+    public DbSet<Auditorium>  Auditoriums  => Set<Auditorium>();
 
     // ── Model Configuration ──────────────────────────────────────────────────
     protected override void OnModelCreating(ModelBuilder modelBuilder)

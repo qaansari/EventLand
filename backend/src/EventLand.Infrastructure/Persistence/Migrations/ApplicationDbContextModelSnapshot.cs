@@ -104,17 +104,13 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     b.ToTable("Artists");
                 });
 
-            modelBuilder.Entity("EventLand.Domain.Entities.AuditoriumLayout", b =>
+            modelBuilder.Entity("EventLand.Domain.Entities.Auditorium", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
-
-                    b.Property<string>("City")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -156,13 +152,14 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Venue")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("VenueId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.ToTable("AuditoriumLayouts");
+                    b.HasIndex("VenueId");
+
+                    b.ToTable("Auditoriums");
                 });
 
             modelBuilder.Entity("EventLand.Domain.Entities.Booking", b =>
@@ -280,6 +277,91 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     b.ToTable("BookingSeats");
                 });
 
+            modelBuilder.Entity("EventLand.Domain.Entities.City", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
+
+                    b.Property<int>("CountryId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CountryId");
+
+                    b.ToTable("Cities");
+                });
+
+            modelBuilder.Entity("EventLand.Domain.Entities.Country", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Countries");
+                });
+
             modelBuilder.Entity("EventLand.Domain.Entities.Event", b =>
                 {
                     b.Property<int>("Id")
@@ -292,20 +374,19 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<int?>("AuditoriumId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Banner")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                    b.Property<int>("CityId")
+                        .HasColumnType("int");
 
-                    b.Property<string>("City")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                    b.Property<int>("CountryId")
+                        .HasColumnType("int");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
@@ -368,18 +449,17 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Venue")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
+                    b.Property<int>("VenueId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Category")
-                        .HasDatabaseName("IX_Events_Category");
+                    b.HasIndex("AuditoriumId");
 
-                    b.HasIndex("City")
-                        .HasDatabaseName("IX_Events_City");
+                    b.HasIndex("CityId")
+                        .HasDatabaseName("IX_Events_CityId");
+
+                    b.HasIndex("CountryId");
 
                     b.HasIndex("IsFeatured")
                         .HasDatabaseName("IX_Events_IsFeatured");
@@ -391,6 +471,9 @@ namespace EventLand.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Status")
                         .HasDatabaseName("IX_Events_Status");
+
+                    b.HasIndex("VenueId")
+                        .HasDatabaseName("IX_Events_VenueId");
 
                     b.HasIndex("IsDeleted", "IsPublished", "StartDateUtc")
                         .HasDatabaseName("IX_Events_Published_Date");
@@ -517,7 +600,8 @@ namespace EventLand.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique()
-                        .HasDatabaseName("IX_Organizers_Email");
+                        .HasDatabaseName("IX_Organizers_Email")
+                        .HasFilter("[IsDeleted] = 0");
 
                     b.ToTable("Organizers");
                 });
@@ -562,7 +646,8 @@ namespace EventLand.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Name")
                         .IsUnique()
-                        .HasDatabaseName("IX_Roles_Name");
+                        .HasDatabaseName("IX_Roles_Name")
+                        .HasFilter("[IsDeleted] = 0");
 
                     b.ToTable("Roles");
                 });
@@ -594,6 +679,10 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal?>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<int>("Row")
                         .HasColumnType("int");
@@ -723,7 +812,8 @@ namespace EventLand.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Slug")
                         .IsUnique()
-                        .HasDatabaseName("IX_Tags_Slug");
+                        .HasDatabaseName("IX_Tags_Slug")
+                        .HasFilter("[IsDeleted] = 0");
 
                     b.ToTable("Tags");
                 });
@@ -773,6 +863,10 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("Price")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("RowRange")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<int>("SoldCount")
                         .HasColumnType("int");
@@ -857,11 +951,74 @@ namespace EventLand.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique()
-                        .HasDatabaseName("IX_Users_Email");
+                        .HasDatabaseName("IX_Users_Email")
+                        .HasFilter("[IsDeleted] = 0");
 
                     b.HasIndex("RoleId");
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("EventLand.Domain.Entities.Venue", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("CityId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CityId");
+
+                    b.ToTable("Venues");
+                });
+
+            modelBuilder.Entity("EventLand.Domain.Entities.Auditorium", b =>
+                {
+                    b.HasOne("EventLand.Domain.Entities.Venue", "Venue")
+                        .WithMany("Auditoriums")
+                        .HasForeignKey("VenueId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Venue");
                 });
 
             modelBuilder.Entity("EventLand.Domain.Entities.Booking", b =>
@@ -909,15 +1066,57 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     b.Navigation("Seat");
                 });
 
+            modelBuilder.Entity("EventLand.Domain.Entities.City", b =>
+                {
+                    b.HasOne("EventLand.Domain.Entities.Country", "Country")
+                        .WithMany("Cities")
+                        .HasForeignKey("CountryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Country");
+                });
+
             modelBuilder.Entity("EventLand.Domain.Entities.Event", b =>
                 {
+                    b.HasOne("EventLand.Domain.Entities.Auditorium", "Auditorium")
+                        .WithMany("Events")
+                        .HasForeignKey("AuditoriumId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("EventLand.Domain.Entities.City", "City")
+                        .WithMany("Events")
+                        .HasForeignKey("CityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EventLand.Domain.Entities.Country", "Country")
+                        .WithMany("Events")
+                        .HasForeignKey("CountryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("EventLand.Domain.Entities.Organizer", "Organizer")
                         .WithMany("Events")
                         .HasForeignKey("OrganizerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("EventLand.Domain.Entities.Venue", "Venue")
+                        .WithMany("Events")
+                        .HasForeignKey("VenueId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Auditorium");
+
+                    b.Navigation("City");
+
+                    b.Navigation("Country");
+
                     b.Navigation("Organizer");
+
+                    b.Navigation("Venue");
                 });
 
             modelBuilder.Entity("EventLand.Domain.Entities.EventShow", b =>
@@ -1001,9 +1200,39 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     b.Navigation("Role");
                 });
 
+            modelBuilder.Entity("EventLand.Domain.Entities.Venue", b =>
+                {
+                    b.HasOne("EventLand.Domain.Entities.City", "City")
+                        .WithMany("Venues")
+                        .HasForeignKey("CityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("City");
+                });
+
+            modelBuilder.Entity("EventLand.Domain.Entities.Auditorium", b =>
+                {
+                    b.Navigation("Events");
+                });
+
             modelBuilder.Entity("EventLand.Domain.Entities.Booking", b =>
                 {
                     b.Navigation("BookingSeats");
+                });
+
+            modelBuilder.Entity("EventLand.Domain.Entities.City", b =>
+                {
+                    b.Navigation("Events");
+
+                    b.Navigation("Venues");
+                });
+
+            modelBuilder.Entity("EventLand.Domain.Entities.Country", b =>
+                {
+                    b.Navigation("Cities");
+
+                    b.Navigation("Events");
                 });
 
             modelBuilder.Entity("EventLand.Domain.Entities.Event", b =>
@@ -1052,6 +1281,13 @@ namespace EventLand.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("EventLand.Domain.Entities.TicketTier", b =>
                 {
                     b.Navigation("Bookings");
+                });
+
+            modelBuilder.Entity("EventLand.Domain.Entities.Venue", b =>
+                {
+                    b.Navigation("Auditoriums");
+
+                    b.Navigation("Events");
                 });
 #pragma warning restore 612, 618
         }

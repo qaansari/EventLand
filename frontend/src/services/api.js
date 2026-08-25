@@ -136,9 +136,15 @@ export const seatHoldApi = {
 export const adminApi = {
   events: {
     getAll: async (pageNumber = 1, pageSize = 10) => request(`/admin/events?pageNumber=${pageNumber}&pageSize=${pageSize}`),
+    getById: async (id) => request(`/admin/events/${id}`),
     create: async (dto) => request('/admin/events', { method: 'POST', body: JSON.stringify(dto) }),
     update: async (id, dto) => request(`/admin/events/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
     delete: async (id) => request(`/admin/events/${id}`, { method: 'DELETE' })
+  },
+  eventShows: {
+    create: async (dto) => request('/admin/event-shows', { method: 'POST', body: JSON.stringify(dto) }),
+    update: async (id, dto) => request(`/admin/event-shows/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+    delete: async (id) => request(`/admin/event-shows/${id}`, { method: 'DELETE' })
   },
   organizers: {
     getAll: async () => request('/admin/organizers'),
@@ -210,6 +216,35 @@ export const adminApi = {
 export const auditoriumLayoutsApi = {
   getAll: async () => request('/auditorium-layouts'),
   getById: async (id) => request(`/auditorium-layouts/${id}`)
+};
+
+// --- Public Locations & Admin Locations API ---
+export const locationsApi = {
+  getCountries: async () => request('/countries'),
+  createCountry: async (dto) => request('/countries', { method: 'POST', body: JSON.stringify(dto) }),
+  updateCountry: async (id, dto) => request(`/countries/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  deleteCountry: async (id) => request(`/countries/${id}`, { method: 'DELETE' }),
+
+  getCities: async (countryId = null) => request(`/cities${countryId ? `?countryId=${countryId}` : ''}`),
+  createCity: async (dto) => request('/cities', { method: 'POST', body: JSON.stringify(dto) }),
+  updateCity: async (id, dto) => request(`/cities/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  deleteCity: async (id) => request(`/cities/${id}`, { method: 'DELETE' }),
+
+  getVenues: async (cityId = null) => request(`/venues${cityId ? `?cityId=${cityId}` : ''}`),
+  createVenue: async (dto) => request('/venues', { method: 'POST', body: JSON.stringify(dto) }),
+  updateVenue: async (id, dto) => request(`/venues/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  deleteVenue: async (id) => request(`/venues/${id}`, { method: 'DELETE' }),
+
+  getAuditoriums: async (venueId = null) => request(`/auditoriums${venueId ? `?venueId=${venueId}` : ''}`),
+  getAuditoriumById: async (id) => request(`/auditoriums/${id}`),
+  createAuditorium: async (dto) => request('/auditoriums', { method: 'POST', body: JSON.stringify(dto) }),
+  updateAuditorium: async (id, dto) => request(`/auditoriums/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  deleteAuditorium: async (id) => request(`/auditoriums/${id}`, { method: 'DELETE' })
+};
+
+// --- Public Tags API ---
+export const tagsApi = {
+  getAll: async () => request('/tags')
 };
 
 // --- File & Image Upload API ---

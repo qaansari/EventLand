@@ -1,14 +1,17 @@
 namespace EventLand.Api.Controllers;
 
 using EventLand.Application.Common;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/upload")]
+[Authorize(Roles = "SuperAdmin,Admin,Organizer")]
 [Produces("application/json")]
 public class UploadController : ControllerBase
 {
     private readonly IWebHostEnvironment _environment;
+    private const long MaxFileSizeInBytes = 10 * 1024 * 1024; // 10 MB
 
     public UploadController(IWebHostEnvironment environment)
     {
@@ -27,13 +30,24 @@ public class UploadController : ControllerBase
             return BadRequest(new { message = "No file was uploaded." });
         }
 
-        // Strict extension validation: webp, jpg, jpeg, png ONLY
+        if (file.Length > MaxFileSizeInBytes)
+        {
+            return BadRequest(new { message = "File size exceeds the 10 MB limit." });
+        }
+
+        // Strict extension & content-type validation: webp, jpg, jpeg, png ONLY
         var allowedExtensions = new[] { ".webp", ".jpg", ".jpeg", ".png" };
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
 
         if (!allowedExtensions.Contains(extension))
         {
             return BadRequest(new { message = $"Unsupported file format '{extension}'. Only webp, jpg, and png images are allowed." });
+        }
+
+        var allowedContentTypes = new[] { "image/webp", "image/jpeg", "image/png", "image/pjpeg" };
+        if (!string.IsNullOrWhiteSpace(file.ContentType) && !allowedContentTypes.Contains(file.ContentType.ToLowerInvariant()))
+        {
+            return BadRequest(new { message = "Invalid content type for image upload." });
         }
 
         var subFolder = (type?.ToLowerInvariant()) switch

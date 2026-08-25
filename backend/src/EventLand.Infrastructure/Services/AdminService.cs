@@ -6,54 +6,405 @@ using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using EventLand.Domain.Entities;
 using EventLand.Domain.Enums;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 public class AdminService : IAdminService
 {
     private readonly IApplicationDbContext _context;
     private readonly ICacheService _cacheService;
-    private readonly IPasswordHasher<User> _passwordHasher;
+    private readonly Microsoft.Extensions.Logging.ILogger<AdminService> _logger;
 
-    public AdminService(
-        IApplicationDbContext context,
-        ICacheService cacheService,
-        IPasswordHasher<User> passwordHasher)
+    public AdminService(IApplicationDbContext context, ICacheService cacheService, Microsoft.Extensions.Logging.ILogger<AdminService> logger)
     {
         _context = context;
         _cacheService = cacheService;
-        _passwordHasher = passwordHasher;
+        _logger = logger;
+    }
+
+    // --- Location & Venue Hierarchy ---
+    public async Task<List<CountryDto>> GetCountriesAsync()
+    {
+        var list = await _context.Countries.AsNoTracking().Where(c => !c.IsDeleted && c.IsActive).OrderBy(c => c.Name).ToListAsync();
+        return list.Select(c => new CountryDto(c.Id, c.Name, c.Code, c.IsActive)).ToList();
+    }
+
+    public async Task<List<CityDto>> GetCitiesAsync(int? countryId = null)
+    {
+        var query = _context.Cities.AsNoTracking().Include(c => c.Country).Where(c => !c.IsDeleted && c.IsActive);
+        if (countryId.HasValue && countryId.Value > 0)
+            query = query.Where(c => c.CountryId == countryId.Value);
+
+        var list = await query.OrderBy(c => c.Name).ToListAsync();
+        return list.Select(c => new CityDto(c.Id, c.CountryId, c.Country?.Name, c.Name, c.IsActive)).ToList();
+    }
+
+    public async Task<List<VenueDto>> GetVenuesAsync(int? cityId = null)
+    {
+        var query = _context.Venues.AsNoTracking().Include(v => v.City).Where(v => !v.IsDeleted && v.IsActive);
+        if (cityId.HasValue && cityId.Value > 0)
+            query = query.Where(v => v.CityId == cityId.Value);
+
+        var list = await query.OrderBy(v => v.Name).ToListAsync();
+        return list.Select(v => new VenueDto(v.Id, v.CityId, v.City?.Name, v.Name, v.Address, v.Description, v.IsActive)).ToList();
+    }
+
+    public async Task<List<AuditoriumDto>> GetAuditoriumsAsync(int? venueId = null)
+    {
+        var query = _context.Auditoriums.AsNoTracking().Include(a => a.Venue).Where(a => !a.IsDeleted && a.IsActive);
+        if (venueId.HasValue && venueId.Value > 0)
+            query = query.Where(a => a.VenueId == venueId.Value);
+
+        var list = await query.OrderBy(a => a.Name).ToListAsync();
+        return list.Select(a => new AuditoriumDto(a.Id, a.VenueId, a.Venue?.Name, a.Name, a.LayoutCode, a.TotalCapacity, a.Description, a.LayoutJson, a.IsActive)).ToList();
+    }
+
+    public async Task<AuditoriumDto?> GetAuditoriumByIdAsync(int id)
+    {
+        var a = await _context.Auditoriums.AsNoTracking().Include(x => x.Venue).FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        if (a is null) return null;
+        return new AuditoriumDto(a.Id, a.VenueId, a.Venue?.Name, a.Name, a.LayoutCode, a.TotalCapacity, a.Description, a.LayoutJson, a.IsActive);
+    }
+
+    public async Task<CountryDto> CreateCountryAsync(CreateCountryDto dto)
+    {
+        try
+        {
+            var nameClean = dto.Name.Trim();
+            var codeClean = dto.Code.Trim().ToUpperInvariant();
+
+            var exists = await _context.Countries.AnyAsync(c => !c.IsDeleted && (c.Name.ToLower() == nameClean.ToLower() || c.Code == codeClean));
+            if (exists)
+                throw new InvalidOperationException($"Country with name '{nameClean}' or code '{codeClean}' already exists.");
+
+            var country = new Country { Name = nameClean, Code = codeClean, IsActive = true };
+            _context.Countries.Add(country);
+            await _context.SaveChangesAsync();
+            return new CountryDto(country.Id, country.Name, country.Code, country.IsActive);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating country {Name}", dto.Name);
+            throw;
+        }
+        finally
+        {
+        }
+    }
+
+    public async Task<CityDto> CreateCityAsync(CreateCityDto dto)
+    {
+        try
+        {
+            var nameClean = dto.Name.Trim();
+            var exists = await _context.Cities.AnyAsync(c => !c.IsDeleted && c.CountryId == dto.CountryId && c.Name.ToLower() == nameClean.ToLower());
+            if (exists)
+                throw new InvalidOperationException($"City '{nameClean}' already exists under the selected country.");
+
+            var city = new City { CountryId = dto.CountryId, Name = nameClean, IsActive = true };
+            _context.Cities.Add(city);
+            await _context.SaveChangesAsync();
+
+            var country = await _context.Countries.FirstOrDefaultAsync(c => c.Id == dto.CountryId);
+            return new CityDto(city.Id, city.CountryId, country?.Name, city.Name, city.IsActive);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating city {Name}", dto.Name);
+            throw;
+        }
+        finally
+        {
+        }
+    }
+
+    public async Task<CountryDto?> GetCountryByIdAsync(int id)
+    {
+        var c = await _context.Countries.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        if (c is null) return null;
+        return new CountryDto(c.Id, c.Name, c.Code, c.IsActive);
+    }
+
+    public async Task<CountryDto> UpdateCountryAsync(int id, UpdateCountryDto dto)
+    {
+        try
+        {
+            var country = await _context.Countries.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
+            if (country is null) throw new KeyNotFoundException($"Country '{id}' not found.");
+
+            var nameClean = dto.Name.Trim();
+            var codeClean = dto.Code.Trim().ToUpperInvariant();
+
+            var exists = await _context.Countries.AnyAsync(c => c.Id != id && !c.IsDeleted && (c.Name.ToLower() == nameClean.ToLower() || c.Code == codeClean));
+            if (exists)
+                throw new InvalidOperationException($"Country with name '{nameClean}' or code '{codeClean}' already exists.");
+
+            country.Name = nameClean;
+            country.Code = codeClean;
+            country.IsActive = dto.IsActive;
+
+            await _context.SaveChangesAsync();
+            return new CountryDto(country.Id, country.Name, country.Code, country.IsActive);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating country {Id}", id);
+            throw;
+        }
+        finally
+        {
+        }
+    }
+
+    public async Task<bool> DeleteCountryAsync(int id)
+    {
+        var country = await _context.Countries.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
+        if (country is null) return false;
+
+        var hasCities = await _context.Cities.AnyAsync(c => c.CountryId == id && !c.IsDeleted);
+        if (hasCities)
+            throw new InvalidOperationException($"Cannot delete country '{country.Name}' because it has active cities.");
+
+        country.IsDeleted = true;
+        country.DeletedAt = DateTimeOffset.UtcNow;
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<CityDto?> GetCityByIdAsync(int id)
+    {
+        var c = await _context.Cities.AsNoTracking().Include(x => x.Country).FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        if (c is null) return null;
+        return new CityDto(c.Id, c.CountryId, c.Country?.Name, c.Name, c.IsActive);
+    }
+
+    public async Task<CityDto> UpdateCityAsync(int id, UpdateCityDto dto)
+    {
+        try
+        {
+            var city = await _context.Cities.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
+            if (city is null) throw new KeyNotFoundException($"City '{id}' not found.");
+
+            var nameClean = dto.Name.Trim();
+            var exists = await _context.Cities.AnyAsync(c => c.Id != id && c.CountryId == city.CountryId && !c.IsDeleted && c.Name.ToLower() == nameClean.ToLower());
+            if (exists)
+                throw new InvalidOperationException($"City '{nameClean}' already exists under this country.");
+
+            city.Name = nameClean;
+            city.IsActive = dto.IsActive;
+
+            await _context.SaveChangesAsync();
+
+            var country = await _context.Countries.FirstOrDefaultAsync(c => c.Id == city.CountryId);
+            return new CityDto(city.Id, city.CountryId, country?.Name, city.Name, city.IsActive);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating city {Id}", id);
+            throw;
+        }
+        finally
+        {
+        }
+    }
+
+    public async Task<bool> DeleteCityAsync(int id)
+    {
+        var city = await _context.Cities.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
+        if (city is null) return false;
+
+        var hasVenues = await _context.Venues.AnyAsync(v => v.CityId == id && !v.IsDeleted);
+        if (hasVenues)
+            throw new InvalidOperationException($"Cannot delete city '{city.Name}' because it has active venues.");
+
+        city.IsDeleted = true;
+        city.DeletedAt = DateTimeOffset.UtcNow;
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<VenueDto> CreateVenueAsync(CreateVenueDto dto)
+    {
+        try
+        {
+            var nameClean = dto.Name.Trim();
+            var exists = await _context.Venues.AnyAsync(v => !v.IsDeleted && v.CityId == dto.CityId && v.Name.ToLower() == nameClean.ToLower());
+            if (exists)
+                throw new InvalidOperationException($"Venue '{nameClean}' already exists in this city.");
+
+            var venue = new Venue
+            {
+                CityId = dto.CityId,
+                Name = nameClean,
+                Address = dto.Address?.Trim() ?? "",
+                Description = dto.Description?.Trim() ?? "",
+                IsActive = true
+            };
+            _context.Venues.Add(venue);
+            await _context.SaveChangesAsync();
+
+            var city = await _context.Cities.FirstOrDefaultAsync(c => c.Id == dto.CityId);
+            return new VenueDto(venue.Id, venue.CityId, city?.Name, venue.Name, venue.Address, venue.Description, venue.IsActive);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating venue {Name}", dto.Name);
+            throw;
+        }
+        finally
+        {
+        }
+    }
+
+    public async Task<VenueDto?> GetVenueByIdAsync(int id)
+    {
+        var v = await _context.Venues.AsNoTracking().Include(x => x.City).FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        if (v is null) return null;
+        return new VenueDto(v.Id, v.CityId, v.City?.Name, v.Name, v.Address, v.Description, v.IsActive);
+    }
+
+    public async Task<VenueDto> UpdateVenueAsync(int id, UpdateVenueDto dto)
+    {
+        try
+        {
+            var venue = await _context.Venues.FirstOrDefaultAsync(v => v.Id == id && !v.IsDeleted);
+            if (venue is null) throw new KeyNotFoundException($"Venue '{id}' not found.");
+
+            var nameClean = dto.Name.Trim();
+            var exists = await _context.Venues.AnyAsync(v => v.Id != id && v.CityId == dto.CityId && !v.IsDeleted && v.Name.ToLower() == nameClean.ToLower());
+            if (exists)
+                throw new InvalidOperationException($"Venue '{nameClean}' already exists in this city.");
+
+            venue.CityId = dto.CityId;
+            venue.Name = nameClean;
+            venue.Address = dto.Address?.Trim() ?? "";
+            venue.Description = dto.Description?.Trim() ?? "";
+            venue.IsActive = dto.IsActive;
+
+            await _context.SaveChangesAsync();
+
+            var city = await _context.Cities.FirstOrDefaultAsync(c => c.Id == dto.CityId);
+            return new VenueDto(venue.Id, venue.CityId, city?.Name, venue.Name, venue.Address, venue.Description, venue.IsActive);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating venue {Id}", id);
+            throw;
+        }
+        finally
+        {
+        }
+    }
+
+    public async Task<bool> DeleteVenueAsync(int id)
+    {
+        var venue = await _context.Venues.FirstOrDefaultAsync(v => v.Id == id && !v.IsDeleted);
+        if (venue is null) return false;
+
+        var hasAuditoriums = await _context.Auditoriums.AnyAsync(a => a.VenueId == id && !a.IsDeleted);
+        if (hasAuditoriums)
+            throw new InvalidOperationException($"Cannot delete venue '{venue.Name}' because it has active auditoriums.");
+
+        var hasEvents = await _context.Events.AnyAsync(e => e.VenueId == id && !e.IsDeleted);
+        if (hasEvents)
+            throw new InvalidOperationException($"Cannot delete venue '{venue.Name}' because events are scheduled at this venue.");
+
+        venue.IsDeleted = true;
+        venue.DeletedAt = DateTimeOffset.UtcNow;
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<AuditoriumDto> CreateAuditoriumAsync(CreateAuditoriumDto dto)
+    {
+        try
+        {
+            var nameClean = dto.Name.Trim();
+            var layoutCodeClean = string.IsNullOrWhiteSpace(dto.LayoutCode) 
+                ? $"AUD_{Guid.NewGuid().ToString("N")[..6].ToUpper()}" 
+                : dto.LayoutCode.Trim();
+
+            var exists = await _context.Auditoriums.AnyAsync(a => !a.IsDeleted && a.VenueId == dto.VenueId && 
+                (a.Name.ToLower() == nameClean.ToLower() || a.LayoutCode.ToLower() == layoutCodeClean.ToLower()));
+            if (exists)
+                throw new InvalidOperationException($"Auditorium '{nameClean}' or LayoutCode '{layoutCodeClean}' already exists for this venue.");
+
+            var aud = new Auditorium
+            {
+                VenueId = dto.VenueId,
+                Name = nameClean,
+                LayoutCode = layoutCodeClean,
+                TotalCapacity = dto.TotalCapacity > 0 ? dto.TotalCapacity : 200,
+                Description = dto.Description ?? "",
+                LayoutJson = dto.LayoutJson ?? "",
+                IsActive = true
+            };
+            _context.Auditoriums.Add(aud);
+            await _context.SaveChangesAsync();
+
+            var venue = await _context.Venues.FirstOrDefaultAsync(v => v.Id == dto.VenueId);
+            return new AuditoriumDto(aud.Id, aud.VenueId, venue?.Name, aud.Name, aud.LayoutCode, aud.TotalCapacity, aud.Description, aud.LayoutJson, aud.IsActive);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating auditorium {Name}", dto.Name);
+            throw;
+        }
+        finally
+        {
+        }
+    }
+
+    public async Task<AuditoriumDto> UpdateAuditoriumAsync(int id, UpdateAuditoriumDto dto)
+    {
+        var aud = await _context.Auditoriums.FirstOrDefaultAsync(a => a.Id == id && !a.IsDeleted);
+        if (aud is null) throw new KeyNotFoundException($"Auditorium '{id}' not found.");
+
+        aud.VenueId = dto.VenueId;
+        aud.Name = dto.Name;
+        aud.LayoutCode = dto.LayoutCode;
+        aud.TotalCapacity = dto.TotalCapacity;
+        aud.Description = dto.Description ?? "";
+        aud.LayoutJson = dto.LayoutJson ?? "";
+        aud.IsActive = dto.IsActive;
+
+        await _context.SaveChangesAsync();
+        var venue = await _context.Venues.FirstOrDefaultAsync(v => v.Id == dto.VenueId);
+        return new AuditoriumDto(aud.Id, aud.VenueId, venue?.Name, aud.Name, aud.LayoutCode, aud.TotalCapacity, aud.Description, aud.LayoutJson, aud.IsActive);
+    }
+
+    public async Task<bool> DeleteAuditoriumAsync(int id)
+    {
+        var aud = await _context.Auditoriums.FirstOrDefaultAsync(a => a.Id == id && !a.IsDeleted);
+        if (aud is null) return false;
+        aud.IsDeleted = true;
+        aud.DeletedAt = DateTimeOffset.UtcNow;
+        await _context.SaveChangesAsync();
+        return true;
     }
 
     // --- Roles CRUD ---
     public async Task<List<RoleDto>> GetRolesAsync()
     {
-        return await _context.Roles
-            .AsNoTracking()
-            .Where(r => !r.IsDeleted)
-            .OrderBy(r => r.Id)
-            .Select(r => new RoleDto(r.Id, r.Name, r.Description))
-            .ToListAsync();
+        var roles = await _context.Roles.AsNoTracking().Where(r => !r.IsDeleted).OrderBy(r => r.Id).ToListAsync();
+        return roles.Select(r => new RoleDto(r.Id, r.Name, r.Description)).ToList();
     }
 
     public async Task<RoleDto?> GetRoleByIdAsync(int id)
     {
         var r = await _context.Roles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
-        if (r is null) return null;
-        return new RoleDto(r.Id, r.Name, r.Description);
+        return r is null ? null : new RoleDto(r.Id, r.Name, r.Description);
     }
 
     public async Task<RoleDto> CreateRoleAsync(CreateRoleDto dto)
     {
-        var role = new Role
-        {
-            Name = dto.Name,
-            Description = dto.Description
-        };
+        var exists = await _context.Roles.AnyAsync(r => r.Name.ToLower() == dto.Name.Trim().ToLower() && !r.IsDeleted);
+        if (exists)
+            throw new InvalidOperationException($"Role '{dto.Name}' already exists.");
 
+        var role = new Role { Name = dto.Name.Trim(), Description = dto.Description ?? "" };
         _context.Roles.Add(role);
         await _context.SaveChangesAsync();
-
         return new RoleDto(role.Id, role.Name, role.Description);
     }
 
@@ -63,11 +414,13 @@ public class AdminService : IAdminService
         if (role is null)
             throw new KeyNotFoundException($"Role '{id}' not found.");
 
-        role.Name = dto.Name;
-        role.Description = dto.Description;
+        var exists = await _context.Roles.AnyAsync(r => r.Id != id && r.Name.ToLower() == dto.Name.Trim().ToLower() && !r.IsDeleted);
+        if (exists)
+            throw new InvalidOperationException($"Role '{dto.Name}' already exists.");
 
+        role.Name = dto.Name.Trim();
+        role.Description = dto.Description ?? "";
         await _context.SaveChangesAsync();
-
         return new RoleDto(role.Id, role.Name, role.Description);
     }
 
@@ -75,6 +428,10 @@ public class AdminService : IAdminService
     {
         var role = await _context.Roles.FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted);
         if (role is null) return false;
+
+        var inUse = await _context.Users.AnyAsync(u => u.RoleId == id && !u.IsDeleted);
+        if (inUse)
+            throw new InvalidOperationException($"Cannot delete role '{role.Name}' because it is assigned to users.");
 
         role.IsDeleted = true;
         role.DeletedAt = DateTimeOffset.UtcNow;
@@ -88,24 +445,14 @@ public class AdminService : IAdminService
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var query = _context.Users
-            .AsNoTracking()
-            .Include(u => u.Role)
-            .Where(u => !u.IsDeleted);
-
+        var query = _context.Users.AsNoTracking().Include(u => u.Role).Where(u => !u.IsDeleted);
         var totalCount = await query.CountAsync();
 
         var items = await query
             .OrderByDescending(u => u.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(u => new UserDto(
-                u.Id,
-                u.Email,
-                u.FullName,
-                u.Role.Name,
-                u.LastLoginAt
-            ))
+            .Select(u => new UserDto(u.Id, u.Email, u.FullName, u.Role.Name, u.LastLoginAt))
             .ToListAsync();
 
         return new PagedResult<UserDto>(items, totalCount, pageNumber, pageSize);
@@ -113,54 +460,54 @@ public class AdminService : IAdminService
 
     public async Task<UserDto?> GetUserByIdAsync(int id)
     {
-        var u = await _context.Users
-            .AsNoTracking()
-            .Include(u => u.Role)
-            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
-
-        if (u is null) return null;
-
-        return new UserDto(u.Id, u.Email, u.FullName, u.Role.Name, u.LastLoginAt);
+        var u = await _context.Users.AsNoTracking().Include(x => x.Role).FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        return u is null ? null : new UserDto(u.Id, u.Email, u.FullName, u.Role.Name, u.LastLoginAt);
     }
 
     public async Task<UserDto> CreateUserAsync(CreateUserDto dto)
     {
+        var exists = await _context.Users.AnyAsync(u => u.Email.ToLower() == dto.Email.Trim().ToLower() && !u.IsDeleted);
+        if (exists)
+            throw new InvalidOperationException($"A user with email '{dto.Email}' already exists.");
+
+        var role = await _context.Roles.FirstOrDefaultAsync(r => r.Id == dto.RoleId && !r.IsDeleted);
+        if (role is null)
+            throw new KeyNotFoundException($"Role '{dto.RoleId}' not found.");
+
         var user = new User
         {
-            Email = dto.Email,
-            FullName = dto.FullName,
+            Email = dto.Email.Trim(),
+            FullName = dto.FullName.Trim(),
             RoleId = dto.RoleId,
             PhoneNumber = dto.PhoneNumber,
             IsActive = true
         };
 
-        user.PasswordHash = _passwordHasher.HashPassword(user, dto.Password);
+        var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<User>();
+        user.PasswordHash = hasher.HashPassword(user, dto.Password);
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
-
-        return await GetUserByIdAsync(user.Id)
-            ?? throw new InvalidOperationException("Failed to load created user.");
+        return new UserDto(user.Id, user.Email, user.FullName, role.Name, null);
     }
 
     public async Task<UserDto> UpdateUserAsync(int id, UpdateUserDto dto)
     {
-        var user = await _context.Users
-            .Include(u => u.Role)
-            .FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
-
+        var user = await _context.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
         if (user is null)
             throw new KeyNotFoundException($"User '{id}' not found.");
 
-        user.FullName = dto.FullName;
+        var role = await _context.Roles.FirstOrDefaultAsync(r => r.Id == dto.RoleId && !r.IsDeleted);
+        if (role is null)
+            throw new KeyNotFoundException($"Role '{dto.RoleId}' not found.");
+
+        user.FullName = dto.FullName.Trim();
         user.RoleId = dto.RoleId;
         user.PhoneNumber = dto.PhoneNumber;
         user.IsActive = dto.IsActive;
 
         await _context.SaveChangesAsync();
-
-        return await GetUserByIdAsync(id)
-            ?? throw new InvalidOperationException("Failed to load updated user.");
+        return new UserDto(user.Id, user.Email, user.FullName, role.Name, user.LastLoginAt);
     }
 
     public async Task<bool> DeleteUserAsync(int id)
@@ -183,8 +530,12 @@ public class AdminService : IAdminService
         var query = _context.Events
             .AsNoTracking()
             .Include(e => e.Organizer)
-            .Include(e => e.Shows.Where(s => !s.IsDeleted).OrderBy(s => s.StartTimeUtc))
+            .Include(e => e.Country)
+            .Include(e => e.City)
+            .Include(e => e.Venue)
+            .Include(e => e.Auditorium)
             .Include(e => e.EventTags).ThenInclude(et => et.Tag)
+            .Include(e => e.Shows.Where(s => !s.IsDeleted).OrderBy(s => s.StartTimeUtc))
             .Where(e => !e.IsDeleted);
 
         var totalCount = await query.CountAsync();
@@ -196,12 +547,17 @@ public class AdminService : IAdminService
             .Select(e => new EventSummaryDto(
                 e.Id,
                 e.Title,
-                e.Category,
                 e.Status.ToString(),
                 e.IsFeatured,
-                e.City,
-                e.Venue,
-                e.Address,
+                e.CountryId,
+                e.Country != null ? e.Country.Name : "Pakistan",
+                e.CityId,
+                e.City != null ? e.City.Name : "Karachi",
+                e.VenueId,
+                e.Venue != null ? e.Venue.Name : "",
+                e.AuditoriumId,
+                e.Auditorium != null ? e.Auditorium.Name : null,
+                e.Address ?? (e.Venue != null ? e.Venue.Address : null),
                 e.StartDateUtc,
                 e.EndDateUtc,
                 e.PriceRange,
@@ -219,45 +575,96 @@ public class AdminService : IAdminService
         return new PagedResult<EventSummaryDto>(items, totalCount, pageNumber, pageSize);
     }
 
+    public async Task<EventDetailDto> GetEventByIdAsync(int eventId)
+    {
+        return await GetEventDetailDtoAsync(eventId);
+    }
+
     public async Task<EventDetailDto> CreateEventAsync(CreateAdminEventDto dto)
     {
-        Enum.TryParse<TicketingType>(dto.TicketingType, true, out var ticketingType);
-        Enum.TryParse<EventStatus>(dto.Status ?? "Live", true, out var status);
-
-        var organizerExists = await _context.Organizers.AnyAsync(o => o.Id == dto.OrganizerId && !o.IsDeleted);
-        var organizerId = organizerExists 
-            ? dto.OrganizerId 
-            : (await _context.Organizers.Where(o => !o.IsDeleted).Select(o => o.Id).FirstOrDefaultAsync());
-
-        if (organizerId == 0)
+        try
         {
-            var defaultOrg = new Organizer
+            var titleClean = dto.Title.Trim();
+            var exists = await _context.Events.AnyAsync(e => !e.IsDeleted && 
+                e.Title.ToLower() == titleClean.ToLower() && 
+                e.StartDateUtc == dto.StartDateUtc);
+            if (exists)
+                throw new InvalidOperationException($"An event titled '{titleClean}' starting at the same time already exists.");
+
+            Enum.TryParse<TicketingType>(dto.TicketingType, true, out var ticketingType);
+            var statusStr = string.IsNullOrWhiteSpace(dto.Status) ? "Live" : dto.Status;
+            Enum.TryParse<EventStatus>(statusStr, true, out var status);
+
+            var organizerId = dto.OrganizerId;
+            if (organizerId <= 0)
             {
-                Name = "Event Land",
-                Email = "support@eventland.pk",
-                Phone = "+92 307 9353185",
-                WebsiteUrl = "https://eventland.pk",
-                IsVerified = true
-            };
-            _context.Organizers.Add(defaultOrg);
-            await _context.SaveChangesAsync();
-            organizerId = defaultOrg.Id;
+                var firstOrg = await _context.Organizers.FirstOrDefaultAsync(o => !o.IsDeleted);
+                organizerId = firstOrg?.Id ?? 1000;
+            }
+
+        // Country selection (Default: Pakistan)
+        var countryId = dto.CountryId ?? (await _context.Countries.FirstOrDefaultAsync(c => c.Name == "Pakistan"))?.Id ?? 1000;
+
+        // City selection
+        int cityId;
+        if (dto.CityId.HasValue && dto.CityId.Value > 0)
+        {
+            cityId = dto.CityId.Value;
+        }
+        else
+        {
+            var cityName = !string.IsNullOrWhiteSpace(dto.City) ? dto.City : "Karachi";
+            var cityEntity = await _context.Cities.FirstOrDefaultAsync(c => c.Name.ToLower() == cityName.ToLower());
+            if (cityEntity == null)
+            {
+                cityEntity = new City { CountryId = countryId, Name = cityName, IsActive = true };
+                _context.Cities.Add(cityEntity);
+                await _context.SaveChangesAsync();
+            }
+            cityId = cityEntity.Id;
         }
 
-        var exists = await _context.Events.AnyAsync(e => 
-            e.Title.ToLower() == dto.Title.ToLower() && 
-            e.Venue.ToLower() == dto.Venue.ToLower() && 
-            e.StartDateUtc == dto.StartDateUtc && 
-            !e.IsDeleted);
-        if (exists)
-            throw new InvalidOperationException($"An event titled '{dto.Title}' at venue '{dto.Venue}' starting at '{dto.StartDateUtc:g}' already exists.");
+        // Venue selection
+        int venueId;
+        if (dto.VenueId.HasValue && dto.VenueId.Value > 0)
+        {
+            venueId = dto.VenueId.Value;
+        }
+        else
+        {
+            var venueName = !string.IsNullOrWhiteSpace(dto.Venue) ? dto.Venue : "Arts Council of Pakistan";
+            var venueEntity = await _context.Venues.FirstOrDefaultAsync(v => v.CityId == cityId && v.Name.ToLower() == venueName.ToLower());
+            if (venueEntity == null)
+            {
+                venueEntity = new Venue { CityId = cityId, Name = venueName, Address = dto.Address ?? "", IsActive = true };
+                _context.Venues.Add(venueEntity);
+                await _context.SaveChangesAsync();
+            }
+            venueId = venueEntity.Id;
+        }
+
+        // Auditorium selection (optional)
+        int? auditoriumId = dto.AuditoriumId;
+        if ((!auditoriumId.HasValue || auditoriumId == 0) && !string.IsNullOrWhiteSpace(dto.AuditoriumLayout))
+        {
+            if (int.TryParse(dto.AuditoriumLayout, out var parsedAudId))
+            {
+                auditoriumId = parsedAudId;
+            }
+            else
+            {
+                var audEntity = await _context.Auditoriums.FirstOrDefaultAsync(a => a.VenueId == venueId && a.Name.ToLower() == dto.AuditoriumLayout.ToLower());
+                if (audEntity != null) auditoriumId = audEntity.Id;
+            }
+        }
 
         var ev = new Event
         {
             Title = dto.Title,
-            Category = dto.Category,
-            City = dto.City,
-            Venue = dto.Venue,
+            CountryId = countryId,
+            CityId = cityId,
+            VenueId = venueId,
+            AuditoriumId = auditoriumId,
             Address = dto.Address,
             StartDateUtc = dto.StartDateUtc,
             EndDateUtc = dto.EndDateUtc,
@@ -389,12 +796,21 @@ public class AdminService : IAdminService
         // If Mapped Seating, automatically generate SeatingZone & Seats for selected Auditorium
         if (ticketingType == TicketingType.Mapped)
         {
-            await CreateSeatingZoneFromLayoutAsync(ev.Id, dto.AuditoriumLayout, dto.StartingPrice);
+            await CreateSeatingZoneFromLayoutAsync(ev.Id, auditoriumId?.ToString(), dto.StartingPrice);
         }
 
         await _cacheService.ClearEventCacheAsync(ev.Id);
 
         return await GetEventDetailDtoAsync(ev.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating event {Title}", dto.Title);
+            throw;
+        }
+        finally
+        {
+        }
     }
 
     public async Task<EventDetailDto> UpdateEventAsync(int id, UpdateAdminEventDto dto)
@@ -410,21 +826,15 @@ public class AdminService : IAdminService
         Enum.TryParse<TicketingType>(dto.TicketingType, true, out var ticketingType);
         Enum.TryParse<EventStatus>(dto.Status, true, out var status);
 
-        var exists = await _context.Events.AnyAsync(e => 
-            e.Title.ToLower() == dto.Title.ToLower() && 
-            e.Venue.ToLower() == dto.Venue.ToLower() && 
-            e.StartDateUtc == dto.StartDateUtc && 
-            !e.IsDeleted);
-        if (exists)
-            throw new InvalidOperationException($"An event titled '{dto.Title}' at venue '{dto.Venue}' starting at '{dto.StartDateUtc:g}' already exists.");
+        if (dto.CountryId.HasValue && dto.CountryId.Value > 0) ev.CountryId = dto.CountryId.Value;
+        if (dto.CityId.HasValue && dto.CityId.Value > 0) ev.CityId = dto.CityId.Value;
+        if (dto.VenueId.HasValue && dto.VenueId.Value > 0) ev.VenueId = dto.VenueId.Value;
+        if (dto.AuditoriumId.HasValue) ev.AuditoriumId = dto.AuditoriumId.Value > 0 ? dto.AuditoriumId.Value : null;
 
         ev.Title = dto.Title;
-        ev.Category = dto.Category;
         ev.Status = status;
         ev.IsFeatured = dto.IsFeatured;
         ev.IsPublished = dto.IsPublished;
-        ev.City = dto.City;
-        ev.Venue = dto.Venue;
         ev.Address = dto.Address;
         ev.StartDateUtc = dto.StartDateUtc;
         ev.EndDateUtc = dto.EndDateUtc;
@@ -449,119 +859,94 @@ public class AdminService : IAdminService
 
             foreach (var tagId in validTagIds)
             {
-                ev.EventTags.Add(new EventTag { EventId = id, TagId = tagId });
+                ev.EventTags.Add(new EventTag { EventId = ev.Id, TagId = tagId });
             }
         }
 
-        // Update shows & show ticket tiers
-        if (dto.Shows is not null)
+        // Synchronize Shows and TicketTiers
+        if (dto.Shows is not null && dto.Shows.Any())
         {
             var existingShows = await _context.EventShows.Where(s => s.EventId == id && !s.IsDeleted).ToListAsync();
-            foreach (var s in existingShows)
-            {
-                s.IsDeleted = true;
-                s.DeletedAt = DateTimeOffset.UtcNow;
-            }
-            await _context.SaveChangesAsync();
+            var incomingShowIds = dto.Shows.Where(s => s.Id.HasValue).Select(s => s.Id!.Value).ToList();
 
-            if (dto.Shows.Any())
+            foreach (var exShow in existingShows.Where(s => !incomingShowIds.Contains(s.Id)))
             {
-                foreach (var sInput in dto.Shows)
+                exShow.IsDeleted = true;
+                exShow.DeletedAt = DateTimeOffset.UtcNow;
+            }
+
+            foreach (var sInput in dto.Shows)
+            {
+                EventShow currentShow;
+                if (sInput.Id.HasValue && sInput.Id.Value > 0)
                 {
-                    var show = new EventShow
+                    currentShow = existingShows.FirstOrDefault(s => s.Id == sInput.Id.Value) ?? new EventShow { EventId = id };
+                    currentShow.ShowTitle = sInput.ShowTitle;
+                    currentShow.StartTimeUtc = sInput.StartTimeUtc;
+                    currentShow.EndTimeUtc = sInput.EndTimeUtc;
+                    if (currentShow.Id == 0) _context.EventShows.Add(currentShow);
+                }
+                else
+                {
+                    currentShow = new EventShow
                     {
                         EventId = id,
                         ShowTitle = sInput.ShowTitle,
                         StartTimeUtc = sInput.StartTimeUtc,
                         EndTimeUtc = sInput.EndTimeUtc
                     };
-                    _context.EventShows.Add(show);
-                    await _context.SaveChangesAsync();
+                    _context.EventShows.Add(currentShow);
+                }
+                await _context.SaveChangesAsync();
 
-                    if (sInput.TicketTiers is not null && sInput.TicketTiers.Any())
+                if (sInput.TicketTiers is not null && sInput.TicketTiers.Any())
+                {
+                    var existingTiers = await _context.TicketTiers.Where(t => t.EventId == id && t.EventShowId == currentShow.Id && !t.IsDeleted).ToListAsync();
+                    var incomingTierIds = sInput.TicketTiers.Where(t => t.Id.HasValue).Select(t => t.Id!.Value).ToList();
+
+                    foreach (var exTier in existingTiers.Where(t => !incomingTierIds.Contains(t.Id)))
                     {
-                        int sort = 1;
-                        foreach (var tInput in sInput.TicketTiers)
+                        exTier.IsDeleted = true;
+                        exTier.DeletedAt = DateTimeOffset.UtcNow;
+                    }
+
+                    int sort = 1;
+                    foreach (var tInput in sInput.TicketTiers)
+                    {
+                        if (tInput.Id.HasValue && tInput.Id.Value > 0)
+                        {
+                            var tier = existingTiers.FirstOrDefault(t => t.Id == tInput.Id.Value);
+                            if (tier != null)
+                            {
+                                tier.Name = tInput.Name;
+                                tier.Price = tInput.Price;
+                                tier.AvailableQuantity = tInput.AvailableQuantity;
+                                if (!string.IsNullOrWhiteSpace(tInput.Description)) tier.Description = tInput.Description;
+                                if (tInput.RowRange != null) tier.RowRange = tInput.RowRange;
+                                tier.SortOrder = sort++;
+                            }
+                        }
+                        else
                         {
                             _context.TicketTiers.Add(new TicketTier
                             {
                                 EventId = id,
-                                EventShowId = show.Id,
+                                EventShowId = currentShow.Id,
                                 Name = tInput.Name,
-                                Description = tInput.Description ?? $"{tInput.Name} pass for {show.ShowTitle}",
-                                Price = tInput.Price > 0 ? tInput.Price : (dto.StartingPrice > 0 ? dto.StartingPrice : 1500m),
+                                Description = tInput.Description ?? $"{tInput.Name} pass for {currentShow.ShowTitle}",
+                                Price = tInput.Price > 0 ? tInput.Price : dto.StartingPrice,
                                 AvailableQuantity = tInput.AvailableQuantity > 0 ? tInput.AvailableQuantity : 100,
                                 SortOrder = sort++,
                                 RowRange = tInput.RowRange
                             });
                         }
                     }
-                    else if (ticketingType == TicketingType.Categorized)
-                    {
-                        var basePrice = sInput.StartingPrice ?? (dto.StartingPrice > 0 ? dto.StartingPrice : 1500m);
-                        _context.TicketTiers.Add(new TicketTier
-                        {
-                            EventId = id,
-                            EventShowId = show.Id,
-                            Name = "Standard Pass",
-                            Description = $"Standard admission pass for {show.ShowTitle}",
-                            Price = basePrice,
-                            AvailableQuantity = 150,
-                            SortOrder = 1
-                        });
-                        _context.TicketTiers.Add(new TicketTier
-                        {
-                            EventId = id,
-                            EventShowId = show.Id,
-                            Name = "VIP Pass",
-                            Description = $"VIP fast-track pass for {show.ShowTitle}",
-                            Price = basePrice * 2.25m,
-                            AvailableQuantity = 50,
-                            SortOrder = 2
-                        });
-                    }
-                }
-            }
-            else
-            {
-                var defaultShow = new EventShow
-                {
-                    EventId = id,
-                    ShowTitle = "Standard Performance",
-                    StartTimeUtc = ev.StartDateUtc,
-                    EndTimeUtc = ev.EndDateUtc
-                };
-                _context.EventShows.Add(defaultShow);
-                await _context.SaveChangesAsync();
-
-                if (ticketingType == TicketingType.Categorized)
-                {
-                    var basePrice = dto.StartingPrice > 0 ? dto.StartingPrice : 1500m;
-                    _context.TicketTiers.Add(new TicketTier
-                    {
-                        EventId = id,
-                        EventShowId = defaultShow.Id,
-                        Name = "Standard Pass",
-                        Description = "Standard admission pass",
-                        Price = basePrice,
-                        AvailableQuantity = 150,
-                        SortOrder = 1
-                    });
-                    _context.TicketTiers.Add(new TicketTier
-                    {
-                        EventId = id,
-                        EventShowId = defaultShow.Id,
-                        Name = "VIP Pass",
-                        Description = "VIP fast-track pass",
-                        Price = basePrice * 2.25m,
-                        AvailableQuantity = 50,
-                        SortOrder = 2
-                    });
                 }
             }
         }
 
         await _context.SaveChangesAsync();
+        await SyncEventPricingAsync(id);
         await _cacheService.ClearEventCacheAsync(id);
 
         return await GetEventDetailDtoAsync(id);
@@ -574,107 +959,126 @@ public class AdminService : IAdminService
 
         ev.IsDeleted = true;
         ev.DeletedAt = DateTimeOffset.UtcNow;
-        TryDeleteLocalFile(ev.Banner);
         await _context.SaveChangesAsync();
         await _cacheService.ClearEventCacheAsync(id);
+        return true;
+    }
+
+    // --- EventShows CRUD ---
+    public async Task<EventShowDto> CreateEventShowAsync(CreateEventShowDto dto)
+    {
+        var evExists = await _context.Events.AnyAsync(e => e.Id == dto.EventId && !e.IsDeleted);
+        if (!evExists)
+            throw new KeyNotFoundException($"Event '{dto.EventId}' not found.");
+
+        var show = new EventShow
+        {
+            EventId = dto.EventId,
+            ShowTitle = dto.ShowTitle.Trim(),
+            StartTimeUtc = dto.StartTimeUtc,
+            EndTimeUtc = dto.EndTimeUtc
+        };
+
+        _context.EventShows.Add(show);
+        await _context.SaveChangesAsync();
+
+        await SyncEventPricingAsync(dto.EventId);
+        await _cacheService.ClearEventCacheAsync(dto.EventId);
+
+        var tiers = await _context.TicketTiers
+            .Where(t => t.EventId == dto.EventId && t.EventShowId == show.Id && !t.IsDeleted)
+            .OrderBy(t => t.SortOrder)
+            .Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange))
+            .ToListAsync();
+
+        return new EventShowDto(show.Id, show.EventId, show.ShowTitle, show.StartTimeUtc, show.EndTimeUtc, tiers);
+    }
+
+    public async Task<EventShowDto> UpdateEventShowAsync(int id, UpdateEventShowDto dto)
+    {
+        var show = await _context.EventShows.FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted);
+        if (show is null)
+            throw new KeyNotFoundException($"Event show '{id}' not found.");
+
+        show.ShowTitle = dto.ShowTitle.Trim();
+        show.StartTimeUtc = dto.StartTimeUtc;
+        show.EndTimeUtc = dto.EndTimeUtc;
+        await _context.SaveChangesAsync();
+
+        await SyncEventPricingAsync(show.EventId);
+        await _cacheService.ClearEventCacheAsync(show.EventId);
+
+        var tiers = await _context.TicketTiers
+            .Where(t => t.EventId == show.EventId && t.EventShowId == show.Id && !t.IsDeleted)
+            .OrderBy(t => t.SortOrder)
+            .Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange))
+            .ToListAsync();
+
+        return new EventShowDto(show.Id, show.EventId, show.ShowTitle, show.StartTimeUtc, show.EndTimeUtc, tiers);
+    }
+
+    public async Task<bool> DeleteEventShowAsync(int id)
+    {
+        var show = await _context.EventShows.FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted);
+        if (show is null) return false;
+
+        show.IsDeleted = true;
+        show.DeletedAt = DateTimeOffset.UtcNow;
+        await _context.SaveChangesAsync();
+
+        await SyncEventPricingAsync(show.EventId);
+        await _cacheService.ClearEventCacheAsync(show.EventId);
         return true;
     }
 
     // --- Organizers CRUD ---
     public async Task<List<OrganizerDto>> GetOrganizersAsync()
     {
-        var list = await _context.Organizers
-            .AsNoTracking()
-            .Where(o => !o.IsDeleted)
-            .OrderBy(o => o.Name)
-            .ToListAsync();
-
-        return list.Select(o => new OrganizerDto(
-            o.Id, 
-            o.Name, 
-            o.Email, 
-            o.Phone, 
-            FileUrlHelper.FormatOrganizerLogoUrl(o.LogoUrl), 
-            o.WebsiteUrl, 
-            o.IsVerified
-        )).ToList();
+        var list = await _context.Organizers.AsNoTracking().Where(o => !o.IsDeleted).OrderBy(o => o.Name).ToListAsync();
+        return list.Select(o => new OrganizerDto(o.Id, o.Name, o.Email, o.Phone, FileUrlHelper.FormatOrganizerLogoUrl(o.LogoUrl), o.WebsiteUrl, o.IsVerified)).ToList();
     }
 
     public async Task<OrganizerDto?> GetOrganizerByIdAsync(int id)
     {
         var o = await _context.Organizers.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (o is null) return null;
-
-        return new OrganizerDto(
-            o.Id, 
-            o.Name, 
-            o.Email, 
-            o.Phone, 
-            FileUrlHelper.FormatOrganizerLogoUrl(o.LogoUrl), 
-            o.WebsiteUrl, 
-            o.IsVerified
-        );
+        return new OrganizerDto(o.Id, o.Name, o.Email, o.Phone, FileUrlHelper.FormatOrganizerLogoUrl(o.LogoUrl), o.WebsiteUrl, o.IsVerified);
     }
 
     public async Task<OrganizerDto> CreateOrganizerAsync(CreateOrganizerDto dto)
     {
-        var existingOrg = await _context.Organizers
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(o => o.Name.ToLower() == dto.Name.ToLower() || (!string.IsNullOrEmpty(dto.Email) && o.Email.ToLower() == dto.Email.ToLower()));
-
-        if (existingOrg != null)
+        try
         {
-            if (!existingOrg.IsDeleted)
-                throw new InvalidOperationException($"An organizer with the name '{dto.Name}' or email '{dto.Email}' already exists.");
+            var nameClean = dto.Name.Trim();
+            var emailClean = dto.Email.Trim().ToLower();
 
-            var fileName = FileUrlHelper.ExtractFileName(dto.LogoUrl);
-            existingOrg.IsDeleted = false;
-            existingOrg.DeletedAt = null;
-            existingOrg.Name = dto.Name;
-            existingOrg.Email = dto.Email;
-            existingOrg.Phone = dto.Phone;
-            existingOrg.LogoUrl = fileName;
-            existingOrg.WebsiteUrl = dto.WebsiteUrl;
-            existingOrg.IsVerified = dto.IsVerified;
+            var exists = await _context.Organizers.AnyAsync(o => !o.IsDeleted && (o.Name.ToLower() == nameClean.ToLower() || o.Email.ToLower() == emailClean));
+            if (exists)
+                throw new InvalidOperationException($"Organizer '{nameClean}' or email '{emailClean}' already exists.");
+
+            var organizer = new Organizer
+            {
+                Name = nameClean,
+                Email = emailClean,
+                Phone = dto.Phone,
+                LogoUrl = FileUrlHelper.ExtractFileName(dto.LogoUrl) ?? dto.LogoUrl ?? "",
+                WebsiteUrl = dto.WebsiteUrl ?? "",
+                IsVerified = dto.IsVerified
+            };
+
+            _context.Organizers.Add(organizer);
             await _context.SaveChangesAsync();
-            await _cacheService.ClearEventCacheAsync();
 
-            return new OrganizerDto(
-                existingOrg.Id, 
-                existingOrg.Name, 
-                existingOrg.Email, 
-                existingOrg.Phone, 
-                FileUrlHelper.FormatOrganizerLogoUrl(existingOrg.LogoUrl), 
-                existingOrg.WebsiteUrl, 
-                existingOrg.IsVerified
-            );
+            return new OrganizerDto(organizer.Id, organizer.Name, organizer.Email, organizer.Phone, FileUrlHelper.FormatOrganizerLogoUrl(organizer.LogoUrl), organizer.WebsiteUrl, organizer.IsVerified);
         }
-
-        var fileNameOnly = FileUrlHelper.ExtractFileName(dto.LogoUrl);
-
-        var org = new Organizer
+        catch (Exception ex)
         {
-            Name = dto.Name,
-            Email = dto.Email,
-            Phone = dto.Phone,
-            LogoUrl = fileNameOnly,
-            WebsiteUrl = dto.WebsiteUrl,
-            IsVerified = dto.IsVerified
-        };
-
-        _context.Organizers.Add(org);
-        await _context.SaveChangesAsync();
-        await _cacheService.ClearEventCacheAsync();
-
-        return new OrganizerDto(
-            org.Id, 
-            org.Name, 
-            org.Email, 
-            org.Phone, 
-            FileUrlHelper.FormatOrganizerLogoUrl(org.LogoUrl), 
-            org.WebsiteUrl, 
-            org.IsVerified
-        );
+            _logger.LogError(ex, "Error creating organizer {Name}", dto.Name);
+            throw;
+        }
+        finally
+        {
+        }
     }
 
     public async Task<OrganizerDto> UpdateOrganizerAsync(int id, UpdateOrganizerDto dto)
@@ -683,38 +1087,15 @@ public class AdminService : IAdminService
         if (org is null)
             throw new KeyNotFoundException($"Organizer '{id}' not found.");
 
-        var exists = await _context.Organizers.AnyAsync(o => 
-            o.Id != id && (o.Name.ToLower() == dto.Name.ToLower() || (!string.IsNullOrEmpty(dto.Email) && o.Email.ToLower() == dto.Email.ToLower())) && !o.IsDeleted);
-        if (exists)
-            throw new InvalidOperationException($"An organizer with the name '{dto.Name}' or email '{dto.Email}' already exists.");
-
-        var newFileNameOnly = FileUrlHelper.ExtractFileName(dto.LogoUrl);
-
-        org.Name = dto.Name;
-        org.Email = dto.Email;
+        org.Name = dto.Name.Trim();
+        org.Email = dto.Email.Trim();
         org.Phone = dto.Phone;
-
-        if (!string.Equals(org.LogoUrl, newFileNameOnly, StringComparison.OrdinalIgnoreCase))
-        {
-            TryDeleteLocalFile(org.LogoUrl);
-            org.LogoUrl = newFileNameOnly;
-        }
-
-        org.WebsiteUrl = dto.WebsiteUrl;
+        if (!string.IsNullOrWhiteSpace(dto.LogoUrl)) org.LogoUrl = FileUrlHelper.ExtractFileName(dto.LogoUrl) ?? dto.LogoUrl;
+        org.WebsiteUrl = dto.WebsiteUrl ?? "";
         org.IsVerified = dto.IsVerified;
 
         await _context.SaveChangesAsync();
-        await _cacheService.ClearEventCacheAsync();
-
-        return new OrganizerDto(
-            org.Id, 
-            org.Name, 
-            org.Email, 
-            org.Phone, 
-            FileUrlHelper.FormatOrganizerLogoUrl(org.LogoUrl), 
-            org.WebsiteUrl, 
-            org.IsVerified
-        );
+        return new OrganizerDto(org.Id, org.Name, org.Email, org.Phone, FileUrlHelper.FormatOrganizerLogoUrl(org.LogoUrl), org.WebsiteUrl, org.IsVerified);
     }
 
     public async Task<bool> DeleteOrganizerAsync(int id)
@@ -724,9 +1105,7 @@ public class AdminService : IAdminService
 
         org.IsDeleted = true;
         org.DeletedAt = DateTimeOffset.UtcNow;
-        TryDeleteLocalFile(org.LogoUrl);
         await _context.SaveChangesAsync();
-        await _cacheService.ClearEventCacheAsync();
         return true;
     }
 
@@ -743,10 +1122,7 @@ public class AdminService : IAdminService
             .OrderByDescending(a => a.Rating)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(a => new ArtistDto(
-                a.Id, a.Name, a.Genre, a.Role, a.City, a.ImageUrl, a.Bio,
-                a.Availability, a.StartingRate, a.Rating, a.ShowsDone, a.IsFeatured
-            ))
+            .Select(a => new ArtistDto(a.Id, a.Name, a.Genre, a.Role, a.City, FileUrlHelper.FormatArtistImageUrl(a.ImageUrl), a.Bio, a.Availability, a.StartingRate, a.Rating, a.ShowsDone, a.IsFeatured))
             .ToListAsync();
 
         return new PagedResult<ArtistDto>(items, totalCount, pageNumber, pageSize);
@@ -756,52 +1132,18 @@ public class AdminService : IAdminService
     {
         var a = await _context.Artists.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (a is null) return null;
-
-        return new ArtistDto(
-            a.Id, a.Name, a.Genre, a.Role, a.City, a.ImageUrl, a.Bio,
-            a.Availability, a.StartingRate, a.Rating, a.ShowsDone, a.IsFeatured
-        );
+        return new ArtistDto(a.Id, a.Name, a.Genre, a.Role, a.City, FileUrlHelper.FormatArtistImageUrl(a.ImageUrl), a.Bio, a.Availability, a.StartingRate, a.Rating, a.ShowsDone, a.IsFeatured);
     }
 
     public async Task<ArtistDto> CreateArtistAsync(CreateArtistDto dto)
     {
-        var existingArtist = await _context.Artists
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(a => a.Name.ToLower() == dto.Name.ToLower());
-
-        if (existingArtist != null)
-        {
-            if (!existingArtist.IsDeleted)
-                throw new InvalidOperationException($"An artist named '{dto.Name}' already exists.");
-
-            existingArtist.IsDeleted = false;
-            existingArtist.DeletedAt = null;
-            existingArtist.Name = dto.Name;
-            existingArtist.Genre = dto.Genre;
-            existingArtist.Role = dto.Role;
-            existingArtist.City = dto.City;
-            existingArtist.ImageUrl = dto.ImageUrl;
-            existingArtist.Bio = dto.Bio;
-            existingArtist.Availability = dto.Availability;
-            existingArtist.StartingRate = dto.StartingRate;
-            existingArtist.Rating = dto.Rating;
-            existingArtist.ShowsDone = dto.ShowsDone;
-            existingArtist.IsFeatured = dto.IsFeatured;
-            await _context.SaveChangesAsync();
-
-            return new ArtistDto(
-                existingArtist.Id, existingArtist.Name, existingArtist.Genre, existingArtist.Role, existingArtist.City, existingArtist.ImageUrl,
-                existingArtist.Bio, existingArtist.Availability, existingArtist.StartingRate, existingArtist.Rating, existingArtist.ShowsDone, existingArtist.IsFeatured
-            );
-        }
-
         var artist = new Artist
         {
-            Name = dto.Name,
+            Name = dto.Name.Trim(),
             Genre = dto.Genre,
             Role = dto.Role,
             City = dto.City,
-            ImageUrl = dto.ImageUrl,
+            ImageUrl = FileUrlHelper.ExtractFileName(dto.ImageUrl) ?? dto.ImageUrl,
             Bio = dto.Bio,
             Availability = dto.Availability,
             StartingRate = dto.StartingRate,
@@ -813,49 +1155,37 @@ public class AdminService : IAdminService
         _context.Artists.Add(artist);
         await _context.SaveChangesAsync();
 
-        return new ArtistDto(
-            artist.Id, artist.Name, artist.Genre, artist.Role, artist.City, artist.ImageUrl,
-            artist.Bio, artist.Availability, artist.StartingRate, artist.Rating, artist.ShowsDone, artist.IsFeatured
-        );
+        return new ArtistDto(artist.Id, artist.Name, artist.Genre, artist.Role, artist.City, FileUrlHelper.FormatArtistImageUrl(artist.ImageUrl), artist.Bio, artist.Availability, artist.StartingRate, artist.Rating, artist.ShowsDone, artist.IsFeatured);
     }
 
     public async Task<ArtistDto> UpdateArtistAsync(int id, UpdateArtistDto dto)
     {
-        var artist = await _context.Artists.FirstOrDefaultAsync(a => a.Id == id && !a.IsDeleted);
-        if (artist is null)
-            throw new KeyNotFoundException($"Artist '{id}' not found.");
+        var a = await _context.Artists.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        if (a is null) throw new KeyNotFoundException($"Artist '{id}' not found.");
 
-        var exists = await _context.Artists.AnyAsync(a => a.Id != id && a.Name.ToLower() == dto.Name.ToLower() && !a.IsDeleted);
-        if (exists)
-            throw new InvalidOperationException($"An artist named '{dto.Name}' already exists.");
-
-        artist.Name = dto.Name;
-        artist.Genre = dto.Genre;
-        artist.Role = dto.Role;
-        artist.City = dto.City;
-        artist.ImageUrl = dto.ImageUrl;
-        artist.Bio = dto.Bio;
-        artist.Availability = dto.Availability;
-        artist.StartingRate = dto.StartingRate;
-        artist.Rating = dto.Rating;
-        artist.ShowsDone = dto.ShowsDone;
-        artist.IsFeatured = dto.IsFeatured;
+        a.Name = dto.Name.Trim();
+        a.Genre = dto.Genre;
+        a.Role = dto.Role;
+        a.City = dto.City;
+        if (!string.IsNullOrWhiteSpace(dto.ImageUrl)) a.ImageUrl = FileUrlHelper.ExtractFileName(dto.ImageUrl) ?? dto.ImageUrl;
+        a.Bio = dto.Bio;
+        a.Availability = dto.Availability;
+        a.StartingRate = dto.StartingRate;
+        a.Rating = dto.Rating;
+        a.ShowsDone = dto.ShowsDone;
+        a.IsFeatured = dto.IsFeatured;
 
         await _context.SaveChangesAsync();
-
-        return new ArtistDto(
-            artist.Id, artist.Name, artist.Genre, artist.Role, artist.City, artist.ImageUrl,
-            artist.Bio, artist.Availability, artist.StartingRate, artist.Rating, artist.ShowsDone, artist.IsFeatured
-        );
+        return new ArtistDto(a.Id, a.Name, a.Genre, a.Role, a.City, FileUrlHelper.FormatArtistImageUrl(a.ImageUrl), a.Bio, a.Availability, a.StartingRate, a.Rating, a.ShowsDone, a.IsFeatured);
     }
 
     public async Task<bool> DeleteArtistAsync(int id)
     {
-        var artist = await _context.Artists.FirstOrDefaultAsync(a => a.Id == id && !a.IsDeleted);
-        if (artist is null) return false;
+        var a = await _context.Artists.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        if (a is null) return false;
 
-        artist.IsDeleted = true;
-        artist.DeletedAt = DateTimeOffset.UtcNow;
+        a.IsDeleted = true;
+        a.DeletedAt = DateTimeOffset.UtcNow;
         await _context.SaveChangesAsync();
         return true;
     }
@@ -863,24 +1193,27 @@ public class AdminService : IAdminService
     // --- TicketTiers CRUD ---
     public async Task<TicketTierDto> CreateTicketTierAsync(CreateTicketTierDto dto)
     {
-        var exists = await _context.TicketTiers.AnyAsync(t => t.EventId == dto.EventId && t.EventShowId == dto.EventShowId && t.Name.ToLower() == dto.Name.ToLower() && !t.IsDeleted);
-        if (exists)
-            throw new InvalidOperationException($"A ticket tier named '{dto.Name}' already exists for this show.");
+        var evExists = await _context.Events.AnyAsync(e => e.Id == dto.EventId && !e.IsDeleted);
+        if (!evExists)
+            throw new KeyNotFoundException($"Event '{dto.EventId}' not found.");
 
         var tier = new TicketTier
         {
             EventId = dto.EventId,
             EventShowId = dto.EventShowId,
-            Name = dto.Name,
-            Description = dto.Description,
+            Name = dto.Name.Trim(),
+            Description = dto.Description ?? "",
             Price = dto.Price,
+            RowRange = dto.RowRange,
             AvailableQuantity = dto.AvailableQuantity,
-            MaxPerOrder = dto.MaxPerOrder,
-            SortOrder = dto.SortOrder
+            MaxPerOrder = dto.MaxPerOrder > 0 ? dto.MaxPerOrder : 5,
+            SortOrder = dto.SortOrder > 0 ? dto.SortOrder : 1
         };
 
         _context.TicketTiers.Add(tier);
         await _context.SaveChangesAsync();
+
+        await SyncEventPricingAsync(dto.EventId);
         await _cacheService.ClearEventCacheAsync(dto.EventId);
 
         return new TicketTierDto(tier.Id, tier.EventId, tier.EventShowId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder, tier.RowRange);
@@ -892,19 +1225,18 @@ public class AdminService : IAdminService
         if (tier is null)
             throw new KeyNotFoundException($"Ticket tier '{id}' not found.");
 
-        var exists = await _context.TicketTiers.AnyAsync(t => t.Id != id && t.EventId == tier.EventId && t.EventShowId == dto.EventShowId && t.Name.ToLower() == dto.Name.ToLower() && !t.IsDeleted);
-        if (exists)
-            throw new InvalidOperationException($"A ticket tier named '{dto.Name}' already exists for this show.");
-
         tier.EventShowId = dto.EventShowId;
-        tier.Name = dto.Name;
-        tier.Description = dto.Description;
+        tier.Name = dto.Name.Trim();
+        tier.Description = dto.Description ?? "";
         tier.Price = dto.Price;
+        if (dto.RowRange != null) tier.RowRange = dto.RowRange;
         tier.AvailableQuantity = dto.AvailableQuantity;
-        tier.MaxPerOrder = dto.MaxPerOrder;
-        tier.SortOrder = dto.SortOrder;
+        tier.MaxPerOrder = dto.MaxPerOrder > 0 ? dto.MaxPerOrder : 5;
+        tier.SortOrder = dto.SortOrder > 0 ? dto.SortOrder : 1;
 
         await _context.SaveChangesAsync();
+
+        await SyncEventPricingAsync(tier.EventId);
         await _cacheService.ClearEventCacheAsync(tier.EventId);
 
         return new TicketTierDto(tier.Id, tier.EventId, tier.EventShowId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder, tier.RowRange);
@@ -918,6 +1250,8 @@ public class AdminService : IAdminService
         tier.IsDeleted = true;
         tier.DeletedAt = DateTimeOffset.UtcNow;
         await _context.SaveChangesAsync();
+
+        await SyncEventPricingAsync(tier.EventId);
         await _cacheService.ClearEventCacheAsync(tier.EventId);
         return true;
     }
@@ -933,54 +1267,37 @@ public class AdminService : IAdminService
             Cols = dto.Cols,
             Price = dto.Price,
             SortOrder = dto.SortOrder,
-            LayoutJson = dto.LayoutJson,
+            LayoutJson = dto.LayoutJson ?? "",
             TotalCapacity = dto.Rows * dto.Cols
         };
 
         GenerateSeatsForZone(zone, dto.LayoutJson);
-        if (zone.Seats.Any())
-        {
-            zone.TotalCapacity = zone.Seats.Count;
-        }
 
         _context.SeatingZones.Add(zone);
         await _context.SaveChangesAsync();
 
-        return new SeatingZoneDto(
-            zone.Id,
-            zone.EventId,
-            zone.Zone,
-            zone.Rows,
-            zone.Cols,
-            zone.Price,
-            zone.TotalCapacity,
-            zone.SortOrder,
-            zone.LayoutJson,
-            zone.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString())).ToList()
-        );
+        await SyncEventPricingAsync(dto.EventId);
+        await _cacheService.ClearEventCacheAsync(dto.EventId);
+
+        return new SeatingZoneDto(zone.Id, zone.EventId, zone.Zone, zone.Rows, zone.Cols, zone.Price, zone.TotalCapacity, zone.SortOrder, zone.LayoutJson, zone.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString(), s.Price)).ToList());
     }
 
     public async Task<SeatingZoneDto> UpdateSeatingZoneAsync(int id, UpdateSeatingZoneDto dto)
     {
-        var zone = await _context.SeatingZones
-            .Include(z => z.Seats)
-            .FirstOrDefaultAsync(z => z.Id == id && !z.IsDeleted);
-
-        if (zone is null)
-            throw new KeyNotFoundException($"Seating zone '{id}' not found.");
+        var zone = await _context.SeatingZones.Include(z => z.Seats).FirstOrDefaultAsync(z => z.Id == id && !z.IsDeleted);
+        if (zone is null) throw new KeyNotFoundException($"Zone '{id}' not found.");
 
         zone.Zone = dto.Zone;
         zone.Price = dto.Price;
         zone.SortOrder = dto.SortOrder;
-        if (!string.IsNullOrEmpty(dto.LayoutJson)) zone.LayoutJson = dto.LayoutJson;
+        if (!string.IsNullOrWhiteSpace(dto.LayoutJson)) zone.LayoutJson = dto.LayoutJson;
 
         await _context.SaveChangesAsync();
+
+        await SyncEventPricingAsync(zone.EventId);
         await _cacheService.ClearEventCacheAsync(zone.EventId);
 
-        return new SeatingZoneDto(
-            zone.Id, zone.EventId, zone.Zone, zone.Rows, zone.Cols, zone.Price, zone.TotalCapacity, zone.SortOrder, zone.LayoutJson,
-            zone.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString())).ToList()
-        );
+        return new SeatingZoneDto(zone.Id, zone.EventId, zone.Zone, zone.Rows, zone.Cols, zone.Price, zone.TotalCapacity, zone.SortOrder, zone.LayoutJson, zone.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString(), s.Price)).ToList());
     }
 
     public async Task<bool> DeleteSeatingZoneAsync(int id)
@@ -991,6 +1308,8 @@ public class AdminService : IAdminService
         zone.IsDeleted = true;
         zone.DeletedAt = DateTimeOffset.UtcNow;
         await _context.SaveChangesAsync();
+
+        await SyncEventPricingAsync(zone.EventId);
         await _cacheService.ClearEventCacheAsync(zone.EventId);
         return true;
     }
@@ -1001,18 +1320,17 @@ public class AdminService : IAdminService
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var query = _context.Bookings
-            .AsNoTracking()
+        var query = _context.Bookings.AsNoTracking()
             .Include(b => b.Event)
             .Include(b => b.TicketTier)
             .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
             .Where(b => !b.IsDeleted);
 
-        if (eventId.HasValue)
+        if (eventId.HasValue && eventId.Value > 0)
             query = query.Where(b => b.EventId == eventId.Value);
 
         if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(b => b.CustomerEmail.Contains(search) || b.BookingRef.Contains(search) || b.CustomerName.Contains(search));
+            query = query.Where(b => b.BookingRef.Contains(search) || b.CustomerEmail.Contains(search) || b.CustomerName.Contains(search));
 
         var totalCount = await query.CountAsync();
 
@@ -1020,12 +1338,7 @@ public class AdminService : IAdminService
             .OrderByDescending(b => b.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(b => new BookingDto(
-                b.Id, b.EventId, b.Event.Title, b.TicketTierId, b.TicketTier.Name, b.BookingRef,
-                b.CustomerName, b.CustomerEmail, b.CustomerPhone, b.Quantity, b.UnitPrice, b.TotalAmount,
-                b.Status.ToString(), b.PaymentStatus.ToString(), b.PaymentMethod.ToString(), b.PaidAt, b.CreatedAt,
-                b.BookingSeats.Select(bs => new SeatDto(bs.Seat.Id, bs.Seat.ZoneId, bs.Seat.Row, bs.Seat.Col, bs.Seat.Label, bs.Seat.Status.ToString())).ToList()
-            ))
+            .Select(b => MapBookingToDto(b))
             .ToListAsync();
 
         return new PagedResult<BookingDto>(items, totalCount, pageNumber, pageSize);
@@ -1033,112 +1346,103 @@ public class AdminService : IAdminService
 
     public async Task<BookingDto?> GetBookingByIdAsync(int id)
     {
-        var b = await _context.Bookings
-            .AsNoTracking()
+        var b = await _context.Bookings.AsNoTracking()
             .Include(x => x.Event)
             .Include(x => x.TicketTier)
             .Include(x => x.BookingSeats).ThenInclude(bs => bs.Seat)
             .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
-
         if (b is null) return null;
-
-        return new BookingDto(
-            b.Id, b.EventId, b.Event.Title, b.TicketTierId, b.TicketTier.Name, b.BookingRef,
-            b.CustomerName, b.CustomerEmail, b.CustomerPhone, b.Quantity, b.UnitPrice, b.TotalAmount,
-            b.Status.ToString(), b.PaymentStatus.ToString(), b.PaymentMethod.ToString(), b.PaidAt, b.CreatedAt,
-            b.BookingSeats.Select(bs => new SeatDto(bs.Seat.Id, bs.Seat.ZoneId, bs.Seat.Row, bs.Seat.Col, bs.Seat.Label, bs.Seat.Status.ToString())).ToList()
-        );
+        return MapBookingToDto(b);
     }
 
     public async Task<BookingDto> UpdateBookingStatusAsync(int id, UpdateBookingStatusDto dto)
     {
-        var b = await _context.Bookings
-            .Include(x => x.Event)
-            .Include(x => x.TicketTier)
-            .Include(x => x.BookingSeats).ThenInclude(bs => bs.Seat)
-            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        var booking = await _context.Bookings
+            .Include(b => b.Event)
+            .Include(b => b.TicketTier)
+            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+            .FirstOrDefaultAsync(b => b.Id == id && !b.IsDeleted);
 
-        if (b is null)
-            throw new KeyNotFoundException($"Booking '{id}' not found.");
+        if (booking is null) throw new KeyNotFoundException($"Booking '{id}' not found.");
 
-        if (Enum.TryParse<BookingStatus>(dto.Status, true, out var status)) b.Status = status;
-        if (Enum.TryParse<PaymentStatus>(dto.PaymentStatus, true, out var payStatus)) b.PaymentStatus = payStatus;
+        if (Enum.TryParse<BookingStatus>(dto.Status, true, out var status)) booking.Status = status;
+        if (Enum.TryParse<PaymentStatus>(dto.PaymentStatus, true, out var payStatus)) booking.PaymentStatus = payStatus;
 
         await _context.SaveChangesAsync();
-        await _cacheService.ClearEventCacheAsync(b.EventId);
-
-        return new BookingDto(
-            b.Id, b.EventId, b.Event.Title, b.TicketTierId, b.TicketTier.Name, b.BookingRef,
-            b.CustomerName, b.CustomerEmail, b.CustomerPhone, b.Quantity, b.UnitPrice, b.TotalAmount,
-            b.Status.ToString(), b.PaymentStatus.ToString(), b.PaymentMethod.ToString(), b.PaidAt, b.CreatedAt,
-            b.BookingSeats.Select(bs => new SeatDto(bs.Seat.Id, bs.Seat.ZoneId, bs.Seat.Row, bs.Seat.Col, bs.Seat.Label, bs.Seat.Status.ToString())).ToList()
-        );
+        return MapBookingToDto(booking);
     }
+
+    private static BookingDto MapBookingToDto(Booking b) => new(
+        b.Id,
+        b.EventId,
+        b.Event != null ? b.Event.Title : "",
+        b.TicketTierId,
+        b.TicketTier != null ? b.TicketTier.Name : "",
+        b.BookingRef,
+        b.CustomerName,
+        b.CustomerEmail,
+        b.CustomerPhone,
+        b.Quantity,
+        b.UnitPrice,
+        b.TotalAmount,
+        b.Status.ToString(),
+        b.PaymentStatus.ToString(),
+        b.PaymentMethod.ToString(),
+        b.PaidAt,
+        b.CreatedAt,
+        b.BookingSeats != null ? b.BookingSeats.Select(bs => new BookingSeatDto(bs.Seat.Id, bs.Seat.Label, bs.Seat.Row, bs.Seat.Col, bs.Seat.Price)).ToList() : new List<BookingSeatDto>()
+    );
 
     public async Task<bool> DeleteBookingAsync(int id)
     {
         var b = await _context.Bookings.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (b is null) return false;
-
         b.IsDeleted = true;
         b.DeletedAt = DateTimeOffset.UtcNow;
         await _context.SaveChangesAsync();
-        await _cacheService.ClearEventCacheAsync(b.EventId);
         return true;
     }
 
     // --- Tags CRUD ---
     public async Task<List<TagDto>> GetTagsAsync()
     {
-        return await _context.Tags
-            .AsNoTracking()
-            .Where(t => !t.IsDeleted)
-            .OrderBy(t => t.Name)
-            .Select(t => new TagDto(t.Id, t.Name, t.Slug))
-            .ToListAsync();
+        var list = await _context.Tags.AsNoTracking().Where(t => !t.IsDeleted).OrderBy(t => t.Name).ToListAsync();
+        return list.Select(t => new TagDto(t.Id, t.Name, t.Slug)).ToList();
     }
 
     public async Task<TagDto> CreateTagAsync(CreateTagDto dto)
     {
-        var existingTag = await _context.Tags
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(t => t.Name.ToLower() == dto.Name.ToLower() || t.Slug.ToLower() == dto.Slug.ToLower());
-
-        if (existingTag != null)
+        try
         {
-            if (!existingTag.IsDeleted)
-                throw new InvalidOperationException($"A tag with the name '{dto.Name}' or slug '{dto.Slug}' already exists.");
+            var nameClean = dto.Name.Trim();
+            var slugClean = string.IsNullOrWhiteSpace(dto.Slug) ? nameClean.ToLower().Replace(" ", "-") : dto.Slug.Trim().ToLower();
 
-            existingTag.IsDeleted = false;
-            existingTag.DeletedAt = null;
-            existingTag.Name = dto.Name;
-            existingTag.Slug = dto.Slug;
+            var exists = await _context.Tags.AnyAsync(t => !t.IsDeleted && (t.Name.ToLower() == nameClean.ToLower() || t.Slug == slugClean));
+            if (exists)
+                throw new InvalidOperationException($"Tag '{nameClean}' or slug '{slugClean}' already exists.");
+
+            var tag = new Tag { Name = nameClean, Slug = slugClean };
+            _context.Tags.Add(tag);
             await _context.SaveChangesAsync();
-            await _cacheService.ClearEventCacheAsync();
-            return new TagDto(existingTag.Id, existingTag.Name, existingTag.Slug);
+            return new TagDto(tag.Id, tag.Name, tag.Slug);
         }
-
-        var tag = new Tag { Name = dto.Name, Slug = dto.Slug };
-        _context.Tags.Add(tag);
-        await _context.SaveChangesAsync();
-        await _cacheService.ClearEventCacheAsync();
-        return new TagDto(tag.Id, tag.Name, tag.Slug);
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating tag {Name}", dto.Name);
+            throw;
+        }
+        finally
+        {
+        }
     }
 
     public async Task<TagDto> UpdateTagAsync(int id, UpdateTagDto dto)
     {
         var tag = await _context.Tags.FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted);
-        if (tag is null)
-            throw new KeyNotFoundException($"Tag '{id}' not found.");
-
-        var exists = await _context.Tags.AnyAsync(t => t.Id != id && (t.Name.ToLower() == dto.Name.ToLower() || t.Slug.ToLower() == dto.Slug.ToLower()) && !t.IsDeleted);
-        if (exists)
-            throw new InvalidOperationException($"A tag with the name '{dto.Name}' or slug '{dto.Slug}' already exists.");
-
-        tag.Name = dto.Name;
-        tag.Slug = dto.Slug;
+        if (tag is null) throw new KeyNotFoundException($"Tag '{id}' not found.");
+        tag.Name = dto.Name.Trim();
+        tag.Slug = dto.Slug.Trim().ToLower();
         await _context.SaveChangesAsync();
-        await _cacheService.ClearEventCacheAsync();
         return new TagDto(tag.Id, tag.Name, tag.Slug);
     }
 
@@ -1146,18 +1450,22 @@ public class AdminService : IAdminService
     {
         var tag = await _context.Tags.FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted);
         if (tag is null) return false;
-
         tag.IsDeleted = true;
         tag.DeletedAt = DateTimeOffset.UtcNow;
         await _context.SaveChangesAsync();
         return true;
     }
 
+    // --- Private Helpers ---
     private async Task<EventDetailDto> GetEventDetailDtoAsync(int eventId)
     {
         var ev = await _context.Events
             .AsNoTracking()
             .Include(e => e.Organizer)
+            .Include(e => e.Country)
+            .Include(e => e.City)
+            .Include(e => e.Venue)
+            .Include(e => e.Auditorium)
             .Include(e => e.Shows.Where(s => !s.IsDeleted).OrderBy(s => s.StartTimeUtc))
                 .ThenInclude(s => s.TicketTiers.Where(t => !t.IsDeleted))
             .Include(e => e.TicketTiers.Where(t => !t.IsDeleted))
@@ -1172,12 +1480,17 @@ public class AdminService : IAdminService
         return new EventDetailDto(
             ev.Id,
             ev.Title,
-            ev.Category,
             ev.Status.ToString(),
             ev.IsFeatured,
-            ev.City,
-            ev.Venue,
-            ev.Address,
+            ev.CountryId,
+            ev.Country?.Name ?? "Pakistan",
+            ev.CityId,
+            ev.City?.Name ?? "Karachi",
+            ev.VenueId,
+            ev.Venue?.Name ?? "",
+            ev.AuditoriumId,
+            ev.Auditorium?.Name,
+            ev.Address ?? ev.Venue?.Address,
             ev.StartDateUtc,
             ev.EndDateUtc,
             ev.PriceRange,
@@ -1201,135 +1514,39 @@ public class AdminService : IAdminService
         );
     }
 
-    // --- Auditorium Layouts CRUD ---
-    public async Task<List<AuditoriumLayoutDto>> GetAuditoriumLayoutsAsync(bool activeOnly = false)
+    private async Task SyncEventPricingAsync(int eventId)
     {
-        var query = _context.AuditoriumLayouts.AsNoTracking().Where(a => !a.IsDeleted);
-        if (activeOnly)
+        var tiers = await _context.TicketTiers.Where(t => t.EventId == eventId && !t.IsDeleted).ToListAsync();
+        var ev = await _context.Events.FirstOrDefaultAsync(e => e.Id == eventId && !e.IsDeleted);
+
+        if (ev == null) return;
+
+        if (tiers.Any())
         {
-            query = query.Where(a => a.IsActive);
+            var minPrice = tiers.Min(t => t.Price);
+            var maxPrice = tiers.Max(t => t.Price);
+
+            ev.StartingPrice = minPrice;
+            ev.PriceRange = minPrice == maxPrice
+                ? $"PKR {minPrice:N0}"
+                : $"PKR {minPrice:N0} - PKR {maxPrice:N0}";
         }
-
-        var list = await query.OrderBy(a => a.Name).ToListAsync();
-        return list.Select(a => new AuditoriumLayoutDto(
-            a.Id, a.Name, a.Venue, a.City, a.LayoutCode, a.TotalCapacity, a.Description, a.LayoutJson, a.IsActive
-        )).ToList();
-    }
-
-    public async Task<AuditoriumLayoutDto?> GetAuditoriumLayoutByIdAsync(int id)
-    {
-        var a = await _context.AuditoriumLayouts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
-        if (a is null) return null;
-
-        return new AuditoriumLayoutDto(
-            a.Id, a.Name, a.Venue, a.City, a.LayoutCode, a.TotalCapacity, a.Description, a.LayoutJson, a.IsActive
-        );
-    }
-
-    public async Task<AuditoriumLayoutDto> CreateAuditoriumLayoutAsync(CreateAuditoriumLayoutDto dto)
-    {
-        var layoutCode = !string.IsNullOrWhiteSpace(dto.LayoutCode)
-            ? dto.LayoutCode.Trim().ToUpperInvariant().Replace(" ", "_")
-            : dto.Name.Trim().ToUpperInvariant().Replace(" ", "_");
-
-        var existingLayout = await _context.AuditoriumLayouts
-            .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(a => a.LayoutCode.ToLower() == layoutCode.ToLower() || a.Name.ToLower() == dto.Name.ToLower());
-
-        if (existingLayout != null)
-        {
-            if (!existingLayout.IsDeleted)
-                throw new InvalidOperationException($"An auditorium layout with code '{layoutCode}' or name '{dto.Name}' already exists.");
-
-            existingLayout.IsDeleted = false;
-            existingLayout.DeletedAt = null;
-            existingLayout.Name = dto.Name;
-            existingLayout.Venue = dto.Venue;
-            existingLayout.City = dto.City;
-            existingLayout.LayoutCode = layoutCode;
-            existingLayout.TotalCapacity = dto.TotalCapacity;
-            existingLayout.Description = dto.Description;
-            existingLayout.LayoutJson = dto.LayoutJson;
-            existingLayout.IsActive = dto.IsActive;
-            await _context.SaveChangesAsync();
-
-            return new AuditoriumLayoutDto(
-                existingLayout.Id, existingLayout.Name, existingLayout.Venue, existingLayout.City, existingLayout.LayoutCode, existingLayout.TotalCapacity, existingLayout.Description, existingLayout.LayoutJson, existingLayout.IsActive
-            );
-        }
-
-        var layout = new AuditoriumLayout
-        {
-            Name = dto.Name,
-            Venue = dto.Venue,
-            City = dto.City,
-            LayoutCode = layoutCode,
-            TotalCapacity = dto.TotalCapacity,
-            Description = dto.Description,
-            LayoutJson = dto.LayoutJson,
-            IsActive = dto.IsActive
-        };
-
-        _context.AuditoriumLayouts.Add(layout);
         await _context.SaveChangesAsync();
-
-        return new AuditoriumLayoutDto(
-            layout.Id, layout.Name, layout.Venue, layout.City, layout.LayoutCode, layout.TotalCapacity, layout.Description, layout.LayoutJson, layout.IsActive
-        );
-    }
-
-    public async Task<AuditoriumLayoutDto> UpdateAuditoriumLayoutAsync(int id, UpdateAuditoriumLayoutDto dto)
-    {
-        var layout = await _context.AuditoriumLayouts.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
-        if (layout is null)
-            throw new KeyNotFoundException($"Auditorium layout with ID '{id}' not found.");
-
-        var layoutCode = !string.IsNullOrWhiteSpace(dto.LayoutCode)
-            ? dto.LayoutCode.Trim().ToUpperInvariant().Replace(" ", "_")
-            : dto.Name.Trim().ToUpperInvariant().Replace(" ", "_");
-
-        var exists = await _context.AuditoriumLayouts.AnyAsync(a => a.Id != id && (a.LayoutCode.ToLower() == layoutCode.ToLower() || a.Name.ToLower() == dto.Name.ToLower()) && !a.IsDeleted);
-        if (exists)
-            throw new InvalidOperationException($"An auditorium layout with code '{layoutCode}' or name '{dto.Name}' already exists.");
-
-        layout.Name = dto.Name;
-        layout.Venue = dto.Venue;
-        layout.City = dto.City;
-        if (!string.IsNullOrWhiteSpace(dto.LayoutCode))
-        {
-            layout.LayoutCode = dto.LayoutCode.Trim().ToUpperInvariant().Replace(" ", "_");
-        }
-        layout.TotalCapacity = dto.TotalCapacity;
-        layout.Description = dto.Description;
-        layout.LayoutJson = dto.LayoutJson;
-        layout.IsActive = dto.IsActive;
-
-        await _context.SaveChangesAsync();
-
-        return new AuditoriumLayoutDto(
-            layout.Id, layout.Name, layout.Venue, layout.City, layout.LayoutCode, layout.TotalCapacity, layout.Description, layout.LayoutJson, layout.IsActive
-        );
-    }
-
-    public async Task<bool> DeleteAuditoriumLayoutAsync(int id)
-    {
-        var layout = await _context.AuditoriumLayouts.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
-        if (layout is null) return false;
-
-        layout.IsDeleted = true;
-        layout.DeletedAt = DateTimeOffset.UtcNow;
-        await _context.SaveChangesAsync();
-        return true;
     }
 
     private async Task CreateSeatingZoneFromLayoutAsync(int eventId, string? layoutCodeOrName, decimal startingPrice)
     {
-        AuditoriumLayout? layout = null;
+        Auditorium? layout = null;
         if (!string.IsNullOrWhiteSpace(layoutCodeOrName))
         {
-            layout = await _context.AuditoriumLayouts
-                .AsNoTracking()
-                .FirstOrDefaultAsync(l => (l.LayoutCode == layoutCodeOrName || l.Name == layoutCodeOrName) && !l.IsDeleted);
+            if (int.TryParse(layoutCodeOrName, out var parsedAudId))
+            {
+                layout = await _context.Auditoriums.AsNoTracking().FirstOrDefaultAsync(l => l.Id == parsedAudId && !l.IsDeleted);
+            }
+            if (layout == null)
+            {
+                layout = await _context.Auditoriums.AsNoTracking().FirstOrDefaultAsync(l => (l.LayoutCode == layoutCodeOrName || l.Name == layoutCodeOrName) && !l.IsDeleted);
+            }
         }
 
         var zoneName = layout?.Name ?? "Main Auditorium Hall";
@@ -1353,7 +1570,6 @@ public class AdminService : IAdminService
         _context.SeatingZones.Add(zone);
         await _context.SaveChangesAsync();
 
-        // Check if event shows exist and if TicketTiers are missing, generate row-lane TicketTiers automatically!
         var shows = await _context.EventShows.Where(s => s.EventId == eventId && !s.IsDeleted).ToListAsync();
         foreach (var show in shows)
         {
@@ -1377,121 +1593,11 @@ public class AdminService : IAdminService
 
     private static void GenerateSeatsForZone(SeatingZone zone, string? layoutJson)
     {
-        if (string.IsNullOrWhiteSpace(layoutJson))
-        {
-            GenerateDefaultGridSeats(zone, zone.Rows, zone.Cols);
-            return;
-        }
-
-        if (layoutJson.TrimStart().StartsWith("{") || layoutJson.TrimStart().StartsWith("["))
-        {
-            try
-            {
-                using var doc = System.Text.Json.JsonDocument.Parse(layoutJson);
-                var root = doc.RootElement;
-                
-                // Case A: Multi-section layout (e.g. { "sections": [ { "rows": [...] } ] })
-                if (root.ValueKind == System.Text.Json.JsonValueKind.Object && root.TryGetProperty("sections", out var sectionsProp) && sectionsProp.ValueKind == System.Text.Json.JsonValueKind.Array)
-                {
-                    int rowIndex = 1;
-                    foreach (var secEl in sectionsProp.EnumerateArray())
-                    {
-                        if (secEl.TryGetProperty("rows", out var secRows) && secRows.ValueKind == System.Text.Json.JsonValueKind.Array)
-                        {
-                            foreach (var rowEl in secRows.EnumerateArray())
-                            {
-                                AddSeatsFromRowElement(zone, rowEl, rowIndex++);
-                            }
-                        }
-                    }
-                    if (zone.Seats.Any()) return;
-                }
-
-                // Case B: Direct rows array (e.g. { "rows": [...] })
-                if (root.ValueKind == System.Text.Json.JsonValueKind.Object && root.TryGetProperty("rows", out var rowsProp) && rowsProp.ValueKind == System.Text.Json.JsonValueKind.Array)
-                {
-                    int rowIndex = 1;
-                    foreach (var rowEl in rowsProp.EnumerateArray())
-                    {
-                        AddSeatsFromRowElement(zone, rowEl, rowIndex++);
-                    }
-                    if (zone.Seats.Any()) return;
-                }
-            }
-            catch
-            {
-                // Fallback to default grid below
-            }
-        }
-
-        GenerateDefaultGridSeats(zone, zone.Rows, zone.Cols);
-    }
-
-    private static void AddSeatsFromRowElement(SeatingZone zone, System.Text.Json.JsonElement rowEl, int rowIndex)
-    {
-        var rowChar = rowEl.TryGetProperty("rowChar", out var rc) ? rc.GetString() ?? $"{rowIndex}" : $"{rowIndex}";
-        var seatNumbers = new List<int>();
-
-        if (rowEl.TryGetProperty("blocks", out var blocksProp) && blocksProp.ValueKind == System.Text.Json.JsonValueKind.Array)
-        {
-            foreach (var block in blocksProp.EnumerateArray())
-            {
-                if (block.ValueKind == System.Text.Json.JsonValueKind.Array)
-                {
-                    foreach (var s in block.EnumerateArray()) if (s.TryGetInt32(out var num)) seatNumbers.Add(num);
-                }
-            }
-        }
-        if (rowEl.TryGetProperty("left", out var leftProp) && leftProp.ValueKind == System.Text.Json.JsonValueKind.Array)
-        {
-            foreach (var s in leftProp.EnumerateArray()) if (s.TryGetInt32(out var num)) seatNumbers.Add(num);
-        }
-        if (rowEl.TryGetProperty("centerLeft", out var clProp) && clProp.ValueKind == System.Text.Json.JsonValueKind.Array)
-        {
-            foreach (var s in clProp.EnumerateArray()) if (s.TryGetInt32(out var num)) seatNumbers.Add(num);
-        }
-        if (rowEl.TryGetProperty("centerRight", out var crProp) && crProp.ValueKind == System.Text.Json.JsonValueKind.Array)
-        {
-            foreach (var s in crProp.EnumerateArray()) if (s.TryGetInt32(out var num)) seatNumbers.Add(num);
-        }
-        if (rowEl.TryGetProperty("center", out var centerProp) && centerProp.ValueKind == System.Text.Json.JsonValueKind.Array)
-        {
-            foreach (var s in centerProp.EnumerateArray()) if (s.TryGetInt32(out var num)) seatNumbers.Add(num);
-        }
-        if (rowEl.TryGetProperty("right", out var rightProp) && rightProp.ValueKind == System.Text.Json.JsonValueKind.Array)
-        {
-            foreach (var s in rightProp.EnumerateArray()) if (s.TryGetInt32(out var num)) seatNumbers.Add(num);
-        }
-        if (rowEl.TryGetProperty("seats", out var seatsProp) && seatsProp.ValueKind == System.Text.Json.JsonValueKind.Array)
-        {
-            foreach (var s in seatsProp.EnumerateArray()) if (s.TryGetInt32(out var num)) seatNumbers.Add(num);
-        }
-
-        if (!seatNumbers.Any() && rowEl.TryGetProperty("count", out var countProp) && countProp.TryGetInt32(out var count))
-        {
-            for (int i = 1; i <= count; i++) seatNumbers.Add(i);
-        }
-
-        int colIndex = 1;
-        foreach (var num in seatNumbers)
-        {
-            zone.Seats.Add(new Seat
-            {
-                Zone = zone,
-                Row = rowIndex,
-                Col = colIndex++,
-                Label = $"{rowChar}{num}",
-                Status = SeatStatus.Available
-            });
-        }
-    }
-
-    private static void GenerateDefaultGridSeats(SeatingZone zone, int rows, int cols)
-    {
-        for (int r = 1; r <= rows; r++)
+        zone.Seats.Clear();
+        for (int r = 1; r <= zone.Rows; r++)
         {
             char rowChar = (char)('A' + r - 1);
-            for (int c = 1; c <= cols; c++)
+            for (int c = 1; c <= zone.Cols; c++)
             {
                 zone.Seats.Add(new Seat
                 {
@@ -1504,36 +1610,4 @@ public class AdminService : IAdminService
             }
         }
     }
-
-    private static void TryDeleteLocalFile(string? relativeUrl)
-    {
-        if (string.IsNullOrWhiteSpace(relativeUrl)) return;
-        try
-        {
-            var fileName = Path.GetFileName(relativeUrl);
-            if (string.IsNullOrEmpty(fileName)) return;
-
-            var webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-            var candidatePaths = new[]
-            {
-                Path.Combine(webRootPath, "assets", "images", "organizers", fileName),
-                Path.Combine(webRootPath, "assets", "images", "events", fileName),
-                Path.Combine(webRootPath, "uploads", fileName),
-                Path.Combine(webRootPath, relativeUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar))
-            };
-
-            foreach (var localPath in candidatePaths)
-            {
-                if (File.Exists(localPath))
-                {
-                    File.Delete(localPath);
-                }
-            }
-        }
-        catch
-        {
-            // Ignore file deletion errors safely
-        }
-    }
 }
-

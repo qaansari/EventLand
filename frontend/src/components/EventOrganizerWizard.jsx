@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Sparkles, Grid, Layers, MapPin, CheckCircle } from 'lucide-react';
 import EventCard from './EventCard';
-import { uploadApi, adminApi, auditoriumLayoutsApi } from '../services/api';
+import { uploadApi, adminApi, auditoriumLayoutsApi, locationsApi } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
@@ -13,10 +13,16 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
   const { showError, showSuccess } = useToast();
   const [tagsList, setTagsList] = useState([]);
   const [auditoriumsList, setAuditoriumsList] = useState([]);
+  const [countriesList, setCountriesList] = useState([]);
+  const [citiesList, setCitiesList] = useState([]);
+  const [venuesList, setVenuesList] = useState([]);
 
   const [eventForm, setEventForm] = useState({
     title: '',
     tagIds: [],
+    countryId: '',
+    cityId: '',
+    venueId: '',
     category: 'Concerts',
     city: 'Karachi',
     venue: '',
@@ -39,31 +45,28 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
   });
 
   useEffect(() => {
-    adminApi.tags.getAll()
-      .then(tags => setTagsList(tags || []))
-      .catch(() => setTagsList([
-        { id: 1, name: 'Concerts' },
-        { id: 2, name: 'Festivals' },
-        { id: 3, name: 'Qawwali' },
-        { id: 4, name: 'Theatre' },
-        { id: 5, name: 'Comedy' },
-        { id: 6, name: 'Food' },
-        { id: 7, name: 'Workshops' },
-        { id: 8, name: 'Corporate' }
-      ]));
+    Promise.all([
+      adminApi.tags.getAll().catch(() => []),
+      auditoriumLayoutsApi.getAll().catch(() => []),
+      locationsApi.getCountries().catch(() => []),
+      locationsApi.getCities().catch(() => []),
+      locationsApi.getVenues().catch(() => [])
+    ]).then(([tags, auds, cnts, cts, vns]) => {
+      setTagsList(tags || []);
+      const audList = auds || [];
+      setAuditoriumsList(audList);
+      setCountriesList(cnts || []);
+      const cityData = cts || [];
+      setCitiesList(cityData);
+      setVenuesList(vns || []);
 
-    auditoriumLayoutsApi.getAll()
-      .then(auds => {
-        const list = auds || [];
-        setAuditoriumsList(list);
-        if (list.length > 0) {
-          setEventForm(prev => ({
-            ...prev,
-            auditoriumLayout: prev.auditoriumLayout || list[0].layoutCode || list[0].name
-          }));
-        }
-      })
-      .catch(() => setAuditoriumsList([]));
+      if (audList.length > 0) {
+        setEventForm(prev => ({
+          ...prev,
+          auditoriumLayout: prev.auditoriumLayout || audList[0].layoutCode || audList[0].name
+        }));
+      }
+    });
   }, []);
 
   const [publishedSuccess, setPublishedSuccess] = useState(false);
@@ -297,7 +300,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
                   <SearchableSelect
                     value={eventForm.city}
                     onChange={(e) => setEventForm({ ...eventForm, city: e.target.value })}
-                    options={CITIES.filter(c => c !== 'All Cities')}
+                    options={citiesList.length > 0 ? citiesList.map(c => c.name) : CITIES.filter(c => c !== 'All Cities')}
                     placeholder="Select City..."
                   />
                 </div>

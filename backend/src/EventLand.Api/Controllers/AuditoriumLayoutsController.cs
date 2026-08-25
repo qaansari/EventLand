@@ -16,20 +16,20 @@ public class AuditoriumLayoutsController : ControllerBase
         _adminService = adminService;
     }
 
-    /// <summary>Get list of all active auditorium seating layouts for event creation.</summary>
+    /// <summary>Get list of all auditoriums / venue seating layouts for event creation.</summary>
     [HttpGet]
-    public async Task<ActionResult<List<AuditoriumLayoutDto>>> GetActiveAuditoriums()
+    public async Task<ActionResult<List<AuditoriumDto>>> GetActiveAuditoriums()
     {
-        var result = await _adminService.GetAuditoriumLayoutsAsync(activeOnly: true);
+        var result = await _adminService.GetAuditoriumsAsync();
         return Ok(result);
     }
 
-    /// <summary>Get single auditorium layout details by ID.</summary>
+    /// <summary>Get single auditorium details by ID.</summary>
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<AuditoriumLayoutDto>> GetAuditoriumById(int id)
+    public async Task<ActionResult<AuditoriumDto>> GetAuditoriumById(int id)
     {
-        var result = await _adminService.GetAuditoriumLayoutByIdAsync(id);
-        if (result == null) return NotFound(new { message = $"Auditorium layout '{id}' not found." });
+        var result = await _adminService.GetAuditoriumByIdAsync(id);
+        if (result == null) return NotFound(new { message = $"Auditorium '{id}' not found." });
         return Ok(result);
     }
 }

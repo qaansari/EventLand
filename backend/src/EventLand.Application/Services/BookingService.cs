@@ -157,13 +157,12 @@ public class BookingService : IBookingService
             b.PaymentMethod.ToString(),
             b.PaidAt,
             b.CreatedAt,
-            b.BookingSeats.Select(bs => new SeatDto(
+            b.BookingSeats.Select(bs => new BookingSeatDto(
                 bs.Seat.Id,
-                bs.Seat.ZoneId,
+                bs.Seat.Label,
                 bs.Seat.Row,
                 bs.Seat.Col,
-                bs.Seat.Label,
-                bs.Seat.Status.ToString()
+                bs.Seat.Price
             )).ToList()
         );
     }

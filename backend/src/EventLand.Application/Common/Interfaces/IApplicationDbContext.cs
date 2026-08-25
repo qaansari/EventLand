@@ -18,7 +18,10 @@ public interface IApplicationDbContext
     DbSet<Artist>      Artists      { get; }
     DbSet<Tag>         Tags         { get; }
     DbSet<EventTag>    EventTags    { get; }
-    DbSet<AuditoriumLayout> AuditoriumLayouts { get; }
+    DbSet<Country>     Countries    { get; }
+    DbSet<City>        Cities       { get; }
+    DbSet<Venue>       Venues       { get; }
+    DbSet<Auditorium>  Auditoriums  { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -40,21 +40,37 @@ public class EventService : IEventService
         var query = _context.Events
             .AsNoTracking()
             .Include(e => e.Organizer)
+            .Include(e => e.Country)
+            .Include(e => e.City)
+            .Include(e => e.Venue)
+            .Include(e => e.Auditorium)
             .Include(e => e.Shows.Where(s => !s.IsDeleted).OrderBy(s => s.StartTimeUtc))
             .Include(e => e.EventTags).ThenInclude(et => et.Tag)
             .Where(e => !e.IsDeleted && e.IsPublished);
 
-        if (!string.IsNullOrWhiteSpace(category))
-            query = query.Where(e => e.Category.ToLower() == category.ToLower());
-
         if (!string.IsNullOrWhiteSpace(city))
-            query = query.Where(e => e.City.ToLower() == city.ToLower());
+        {
+            if (int.TryParse(city, out var cityId))
+                query = query.Where(e => e.CityId == cityId);
+            else
+                query = query.Where(e => e.City != null && e.City.Name.ToLower() == city.ToLower());
+        }
 
         if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(e => e.Title.Contains(search) || e.Description.Contains(search) || e.Venue.Contains(search));
+            query = query.Where(e => e.Title.Contains(search) || e.Description.Contains(search) || (e.Venue != null && e.Venue.Name.Contains(search)));
 
         if (!string.IsNullOrWhiteSpace(tag))
-            query = query.Where(e => e.EventTags.Any(et => et.Tag.Slug.ToLower() == tag.ToLower()));
+        {
+            var tagsList = tag.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                              .Select(t => t.ToLower())
+                              .ToList();
+
+            query = query.Where(e => e.EventTags.Any(et => 
+                tagsList.Contains(et.Tag.Slug.ToLower()) || 
+                tagsList.Contains(et.Tag.Name.ToLower()) ||
+                tagsList.Contains(et.Tag.Id.ToString())
+            ));
+        }
 
         var totalCount = await query.CountAsync();
 
@@ -65,12 +81,17 @@ public class EventService : IEventService
             .Select(e => new EventSummaryDto(
                 e.Id,
                 e.Title,
-                e.Category,
                 StatusLabel(e.Status),
                 e.IsFeatured,
-                e.City,
-                e.Venue,
-                e.Address,
+                e.CountryId,
+                e.Country != null ? e.Country.Name : "Pakistan",
+                e.CityId,
+                e.City != null ? e.City.Name : "Karachi",
+                e.VenueId,
+                e.Venue != null ? e.Venue.Name : "",
+                e.AuditoriumId,
+                e.Auditorium != null ? e.Auditorium.Name : null,
+                e.Address ?? (e.Venue != null ? e.Venue.Address : null),
                 e.StartDateUtc,
                 e.EndDateUtc,
                 e.PriceRange,
@@ -101,6 +122,10 @@ public class EventService : IEventService
         var ev = await _context.Events
             .AsNoTracking()
             .Include(e => e.Organizer)
+            .Include(e => e.Country)
+            .Include(e => e.City)
+            .Include(e => e.Venue)
+            .Include(e => e.Auditorium)
             .Include(e => e.Shows.Where(s => !s.IsDeleted).OrderBy(s => s.StartTimeUtc))
                 .ThenInclude(s => s.TicketTiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder))
             .Include(e => e.TicketTiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder))
@@ -120,12 +145,17 @@ public class EventService : IEventService
     private static EventDetailDto MapToDetailDto(Event e) => new(
         e.Id,
         e.Title,
-        e.Category,
         StatusLabel(e.Status),
         e.IsFeatured,
-        e.City,
-        e.Venue,
-        e.Address,
+        e.CountryId,
+        e.Country != null ? e.Country.Name : "Pakistan",
+        e.CityId,
+        e.City != null ? e.City.Name : "Karachi",
+        e.VenueId,
+        e.Venue != null ? e.Venue.Name : "",
+        e.AuditoriumId,
+        e.Auditorium != null ? e.Auditorium.Name : null,
+        e.Address ?? (e.Venue != null ? e.Venue.Address : null),
         e.StartDateUtc,
         e.EndDateUtc,
         e.PriceRange,
@@ -142,9 +172,9 @@ public class EventService : IEventService
             s.ShowTitle,
             s.StartTimeUtc,
             s.EndTimeUtc,
-            s.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder)).ToList()
+            s.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange)).ToList()
         )).ToList(),
-        e.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder)).ToList(),
+        e.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange)).ToList(),
         e.SeatingZones.Select(z => new SeatingZoneDto(z.Id, z.EventId, z.Zone, z.Rows, z.Cols, z.Price, z.TotalCapacity, z.SortOrder, z.LayoutJson, z.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString())).ToList())).ToList(),
         e.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList()
     );

@@ -19,38 +19,38 @@ public class AdminAuditoriumLayoutsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<AuditoriumLayoutDto>>> GetAll()
+    public async Task<ActionResult<List<AuditoriumDto>>> GetAll()
     {
-        var list = await _adminService.GetAuditoriumLayoutsAsync(activeOnly: false);
+        var list = await _adminService.GetAuditoriumsAsync();
         return Ok(list);
     }
 
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<AuditoriumLayoutDto>> GetById(int id)
+    public async Task<ActionResult<AuditoriumDto>> GetById(int id)
     {
-        var layout = await _adminService.GetAuditoriumLayoutByIdAsync(id);
-        if (layout is null) return NotFound(new { message = $"Auditorium layout '{id}' not found." });
+        var layout = await _adminService.GetAuditoriumByIdAsync(id);
+        if (layout is null) return NotFound(new { message = $"Auditorium '{id}' not found." });
         return Ok(layout);
     }
 
     [HttpPost]
-    public async Task<ActionResult<AuditoriumLayoutDto>> Create([FromBody] CreateAuditoriumLayoutDto dto)
+    public async Task<ActionResult<AuditoriumDto>> Create([FromBody] CreateAuditoriumDto dto)
     {
-        var created = await _adminService.CreateAuditoriumLayoutAsync(dto);
+        var created = await _adminService.CreateAuditoriumAsync(dto);
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
     [HttpPut("{id:int}")]
-    public async Task<ActionResult<AuditoriumLayoutDto>> Update(int id, [FromBody] UpdateAuditoriumLayoutDto dto)
+    public async Task<ActionResult<AuditoriumDto>> Update(int id, [FromBody] UpdateAuditoriumDto dto)
     {
-        var updated = await _adminService.UpdateAuditoriumLayoutAsync(id, dto);
+        var updated = await _adminService.UpdateAuditoriumAsync(id, dto);
         return Ok(updated);
     }
 
     [HttpDelete("{id:int}")]
     public async Task<ActionResult> Delete(int id)
     {
-        var success = await _adminService.DeleteAuditoriumLayoutAsync(id);
+        var success = await _adminService.DeleteAuditoriumAsync(id);
         if (!success) return NotFound();
         return NoContent();
     }

@@ -1,29 +1,34 @@
 namespace EventLand.Application.Dtos;
 
 public record CreateShowTicketTierInputDto(
-    string Name,
-    decimal Price,
+    int? Id = null,
+    string Name = "Standard Pass",
+    decimal Price = 1500,
     int AvailableQuantity = 100,
     string? Description = null,
     string? RowRange = null
 );
 
 public record CreateEventShowInputDto(
-    string ShowTitle,
-    DateTimeOffset StartTimeUtc,
-    DateTimeOffset EndTimeUtc,
+    int? Id = null,
+    string ShowTitle = "Standard Performance",
+    DateTimeOffset StartTimeUtc = default,
+    DateTimeOffset EndTimeUtc = default,
     decimal? StartingPrice = null,
     List<CreateShowTicketTierInputDto>? TicketTiers = null
 );
 
 public record CreateAdminEventDto(
     string Title,
-    string Category,
     string? Status,
     bool IsFeatured,
     bool IsPublished,
-    string City,
-    string Venue,
+    int? CountryId,
+    int? CityId,
+    int? VenueId,
+    int? AuditoriumId,
+    string? City,
+    string? Venue,
     string? Address,
     DateTimeOffset StartDateUtc,
     DateTimeOffset EndDateUtc,
@@ -41,12 +46,15 @@ public record CreateAdminEventDto(
 
 public record UpdateAdminEventDto(
     string Title,
-    string Category,
     string Status,
     bool IsFeatured,
     bool IsPublished,
-    string City,
-    string Venue,
+    int? CountryId,
+    int? CityId,
+    int? VenueId,
+    int? AuditoriumId,
+    string? City,
+    string? Venue,
     string? Address,
     DateTimeOffset StartDateUtc,
     DateTimeOffset EndDateUtc,
@@ -129,7 +137,8 @@ public record CreateTicketTierDto(
     decimal Price,
     int AvailableQuantity,
     int MaxPerOrder,
-    int SortOrder
+    int SortOrder,
+    string? RowRange = null
 );
 
 public record UpdateTicketTierDto(
@@ -139,7 +148,8 @@ public record UpdateTicketTierDto(
     decimal Price,
     int AvailableQuantity,
     int MaxPerOrder,
-    int SortOrder
+    int SortOrder,
+    string? RowRange = null
 );
 
 public record CreateSeatingZoneDto(

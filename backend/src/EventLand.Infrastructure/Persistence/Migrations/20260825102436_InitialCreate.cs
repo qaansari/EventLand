@@ -41,18 +41,13 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "AuditoriumLayouts",
+                name: "Countries",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1000, 1"),
                     Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Venue = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    City = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    LayoutCode = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    TotalCapacity = table.Column<int>(type: "int", nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    LayoutJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Code = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
@@ -63,7 +58,7 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_AuditoriumLayouts", x => x.Id);
+                    table.PrimaryKey("PK_Countries", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -131,28 +126,14 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Events",
+                name: "Cities",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1000, 1"),
-                    Title = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: false),
-                    Category = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Status = table.Column<int>(type: "int", nullable: false),
-                    IsFeatured = table.Column<bool>(type: "bit", nullable: false),
-                    IsPublished = table.Column<bool>(type: "bit", nullable: false),
-                    City = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Venue = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: false),
-                    Address = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
-                    StartDateUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
-                    EndDateUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
-                    PriceRange = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    StartingPrice = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
-                    TicketingType = table.Column<int>(type: "int", nullable: false),
-                    Banner = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    ScarcityText = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
-                    OrganizerId = table.Column<int>(type: "int", nullable: false),
+                    CountryId = table.Column<int>(type: "int", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
@@ -162,13 +143,13 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Events", x => x.Id);
+                    table.PrimaryKey("PK_Cities", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Events_Organizers_OrganizerId",
-                        column: x => x.OrganizerId,
-                        principalTable: "Organizers",
+                        name: "FK_Cities_Countries_CountryId",
+                        column: x => x.CountryId,
+                        principalTable: "Countries",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -198,6 +179,132 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                         name: "FK_Users_Roles_RoleId",
                         column: x => x.RoleId,
                         principalTable: "Roles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Venues",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1000, 1"),
+                    CityId = table.Column<int>(type: "int", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Address = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Venues", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Venues_Cities_CityId",
+                        column: x => x.CityId,
+                        principalTable: "Cities",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Auditoriums",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1000, 1"),
+                    VenueId = table.Column<int>(type: "int", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    LayoutCode = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TotalCapacity = table.Column<int>(type: "int", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    LayoutJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Auditoriums", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Auditoriums_Venues_VenueId",
+                        column: x => x.VenueId,
+                        principalTable: "Venues",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Events",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1000, 1"),
+                    Title = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    IsFeatured = table.Column<bool>(type: "bit", nullable: false),
+                    IsPublished = table.Column<bool>(type: "bit", nullable: false),
+                    CountryId = table.Column<int>(type: "int", nullable: false),
+                    CityId = table.Column<int>(type: "int", nullable: false),
+                    VenueId = table.Column<int>(type: "int", nullable: false),
+                    AuditoriumId = table.Column<int>(type: "int", nullable: true),
+                    Address = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    StartDateUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    EndDateUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    PriceRange = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    StartingPrice = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    TicketingType = table.Column<int>(type: "int", nullable: false),
+                    Banner = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ScarcityText = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
+                    OrganizerId = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Events", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Events_Auditoriums_AuditoriumId",
+                        column: x => x.AuditoriumId,
+                        principalTable: "Auditoriums",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_Events_Cities_CityId",
+                        column: x => x.CityId,
+                        principalTable: "Cities",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Events_Countries_CountryId",
+                        column: x => x.CountryId,
+                        principalTable: "Countries",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Events_Organizers_OrganizerId",
+                        column: x => x.OrganizerId,
+                        principalTable: "Organizers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Events_Venues_VenueId",
+                        column: x => x.VenueId,
+                        principalTable: "Venues",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -297,6 +404,7 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
                     Price = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    RowRange = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
                     AvailableQuantity = table.Column<int>(type: "int", nullable: false),
                     SoldCount = table.Column<int>(type: "int", nullable: false),
                     MaxPerOrder = table.Column<int>(type: "int", nullable: false),
@@ -335,6 +443,7 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                     Row = table.Column<int>(type: "int", nullable: false),
                     Col = table.Column<int>(type: "int", nullable: false),
                     Label = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    Price = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: true),
                     Status = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
@@ -434,6 +543,11 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 column: "IsFeatured");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Auditoriums_VenueId",
+                table: "Auditoriums",
+                column: "VenueId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Bookings_BookingRef",
                 table: "Bookings",
                 column: "BookingRef",
@@ -470,14 +584,24 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 column: "SeatId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Events_Category",
-                table: "Events",
-                column: "Category");
+                name: "IX_Cities_CountryId",
+                table: "Cities",
+                column: "CountryId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Events_City",
+                name: "IX_Events_AuditoriumId",
                 table: "Events",
-                column: "City");
+                column: "AuditoriumId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Events_CityId",
+                table: "Events",
+                column: "CityId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Events_CountryId",
+                table: "Events",
+                column: "CountryId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Events_IsFeatured",
@@ -505,6 +629,11 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 column: "Status");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Events_VenueId",
+                table: "Events",
+                column: "VenueId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_EventShows_EventId_StartTimeUtc",
                 table: "EventShows",
                 columns: new[] { "EventId", "StartTimeUtc" });
@@ -518,13 +647,15 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 name: "IX_Organizers_Email",
                 table: "Organizers",
                 column: "Email",
-                unique: true);
+                unique: true,
+                filter: "[IsDeleted] = 0");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Roles_Name",
                 table: "Roles",
                 column: "Name",
-                unique: true);
+                unique: true,
+                filter: "[IsDeleted] = 0");
 
             migrationBuilder.CreateIndex(
                 name: "IX_SeatingZones_EventId_SortOrder",
@@ -546,7 +677,8 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 name: "IX_Tags_Slug",
                 table: "Tags",
                 column: "Slug",
-                unique: true);
+                unique: true,
+                filter: "[IsDeleted] = 0");
 
             migrationBuilder.CreateIndex(
                 name: "IX_TicketTiers_EventId_SortOrder",
@@ -562,12 +694,18 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 name: "IX_Users_Email",
                 table: "Users",
                 column: "Email",
-                unique: true);
+                unique: true,
+                filter: "[IsDeleted] = 0");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_RoleId",
                 table: "Users",
                 column: "RoleId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Venues_CityId",
+                table: "Venues",
+                column: "CityId");
         }
 
         /// <inheritdoc />
@@ -575,9 +713,6 @@ namespace EventLand.Infrastructure.Persistence.Migrations
         {
             migrationBuilder.DropTable(
                 name: "Artists");
-
-            migrationBuilder.DropTable(
-                name: "AuditoriumLayouts");
 
             migrationBuilder.DropTable(
                 name: "BookingSeats");
@@ -613,7 +748,19 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 name: "Events");
 
             migrationBuilder.DropTable(
+                name: "Auditoriums");
+
+            migrationBuilder.DropTable(
                 name: "Organizers");
+
+            migrationBuilder.DropTable(
+                name: "Venues");
+
+            migrationBuilder.DropTable(
+                name: "Cities");
+
+            migrationBuilder.DropTable(
+                name: "Countries");
         }
     }
 }
