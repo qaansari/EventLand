@@ -100,7 +100,7 @@ public class EventService : IEventService
                 FileUrlHelper.FormatEventBannerUrl(e.Banner),
                 e.ScarcityText,
                 e.OrganizerId,
-                e.Organizer.Name,
+                e.Organizer != null ? e.Organizer.Name : "EventLand Host",
                 e.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList(),
                 e.Shows.Select(s => new EventShowDto(s.Id, s.EventId, s.ShowTitle, s.StartTimeUtc, s.EndTimeUtc, new List<TicketTierDto>())).ToList()
             ))

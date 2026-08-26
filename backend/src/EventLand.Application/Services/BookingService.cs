@@ -32,7 +32,11 @@ public class BookingService : IBookingService
         if (tier is null)
             throw new KeyNotFoundException($"Ticket tier '{dto.TicketTierId}' not found for event '{dto.EventId}'.");
 
-        if (tier.AvailableQuantity - tier.SoldCount < dto.Quantity)
+        var effectiveQuantity = (dto.SelectedSeatIds != null && dto.SelectedSeatIds.Any())
+            ? dto.SelectedSeatIds.Count
+            : Math.Max(1, dto.Quantity);
+
+        if (tier.AvailableQuantity - tier.SoldCount < effectiveQuantity)
             throw new InvalidOperationException($"Not enough tickets available in tier '{tier.Name}'.");
 
         var bookingRef = $"EVL-{Random.Shared.Next(100000, 999999)}";
@@ -47,16 +51,16 @@ public class BookingService : IBookingService
             CustomerName = dto.CustomerName,
             CustomerEmail = dto.CustomerEmail,
             CustomerPhone = dto.CustomerPhone,
-            Quantity = dto.Quantity,
+            Quantity = effectiveQuantity,
             UnitPrice = tier.Price,
-            TotalAmount = tier.Price * dto.Quantity,
+            TotalAmount = tier.Price * effectiveQuantity,
             Status = BookingStatus.Confirmed,
             PaymentStatus = PaymentStatus.Paid,
             PaymentMethod = paymentMethod == PaymentMethod.None ? PaymentMethod.CreditCard : paymentMethod,
             PaidAt = DateTimeOffset.UtcNow
         };
 
-        tier.SoldCount += dto.Quantity;
+        tier.SoldCount += effectiveQuantity;
         _context.Bookings.Add(booking);
 
         if (dto.SelectedSeatIds is not null && dto.SelectedSeatIds.Any())
@@ -142,9 +146,9 @@ public class BookingService : IBookingService
         return new BookingDto(
             b.Id,
             b.EventId,
-            b.Event.Title,
+            b.Event?.Title ?? "Event",
             b.TicketTierId,
-            b.TicketTier.Name,
+            b.TicketTier?.Name ?? "Ticket Tier",
             b.BookingRef,
             b.CustomerName,
             b.CustomerEmail,

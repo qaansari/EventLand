@@ -44,13 +44,17 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
     setIsProcessing(true);
 
     try {
-      // Resolve accurate ticket tier ID
+      // Resolve accurate ticket tier ID hierarchically
       const explicitTierId = selectedSeats.find(s => s.tierId)?.tierId;
-      const showTierId = event.selectedShow?.ticketTiers?.[0]?.id;
+      const selectedShowTiers = event.selectedShow?.ticketTiers || [];
+      const firstShowTierId = selectedShowTiers[0]?.id;
+      const firstEventShowTierId = event.shows?.find(s => s.ticketTiers?.length > 0)?.ticketTiers?.[0]?.id;
       const eventTierId = event.ticketTiers?.[0]?.id;
-      const ticketTierId = explicitTierId || showTierId || eventTierId;
+      const ticketTierId = explicitTierId || firstShowTierId || firstEventShowTierId || eventTierId;
 
-      if (!ticketTierId) {
+      const isNumericEventId = typeof event.id === 'number' || (!isNaN(event.id) && !String(event.id).startsWith('custom-'));
+
+      if (!ticketTierId && isNumericEventId) {
         showError('Booking Error', 'No active ticket tier found for this event.');
         setIsProcessing(false);
         return;
@@ -59,22 +63,24 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
       const seatIds = selectedSeats.map(s => s.id).filter(id => typeof id === 'number');
       const showId = event.selectedShow?.id || selectedSeats?.[0]?.showId || null;
 
-      const dto = {
-        eventId: typeof event.id === 'number' ? event.id : parseInt(event.id, 10),
-        ticketTierId: ticketTierId,
-        customerName: formData.name.trim(),
-        customerEmail: formData.email.trim(),
-        customerPhone: formData.phone.trim(),
-        quantity: selectedSeats.length || 1,
-        paymentMethod: paymentMethod === 'jazzcash' ? 'JazzCash' : (paymentMethod === 'easypaisa' ? 'EasyPaisa' : 'CreditCard'),
-        selectedSeatIds: seatIds.length > 0 ? seatIds : null,
-        eventShowId: showId
-      };
-
-      const backendBooking = await bookingsApi.createBooking(dto);
+      let backendBooking = null;
+      if (isNumericEventId && ticketTierId) {
+        const dto = {
+          eventId: typeof event.id === 'number' ? event.id : parseInt(event.id, 10),
+          ticketTierId: ticketTierId,
+          customerName: formData.name.trim(),
+          customerEmail: formData.email.trim(),
+          customerPhone: formData.phone.trim(),
+          quantity: selectedSeats.length || 1,
+          paymentMethod: paymentMethod === 'jazzcash' ? 'JazzCash' : (paymentMethod === 'easypaisa' ? 'EasyPaisa' : 'CreditCard'),
+          selectedSeatIds: seatIds.length > 0 ? seatIds : null,
+          eventShowId: showId
+        };
+        backendBooking = await bookingsApi.createBooking(dto);
+      }
 
       const ticketObject = {
-        ticketId: backendBooking.bookingRef || ('EVL-' + Math.floor(100000 + Math.random() * 900000)),
+        ticketId: backendBooking?.bookingRef || ('EVL-' + Math.floor(100000 + Math.random() * 900000)),
         eventTitle: event.title,
         venue: event.venue,
         date: event.date || event.startDate || 'TBA',

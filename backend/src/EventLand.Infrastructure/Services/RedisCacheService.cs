@@ -147,7 +147,8 @@ public class RedisCacheService : ICacheService
         var lockKey = eventShowId.HasValue
             ? $"eventland:seats:event:{eventId}:show:{eventShowId.Value}"
             : string.Format(CacheKeys.SeatLocks, eventId);
-        var currentlyHeld = await GetAsync<Dictionary<int, string>>(lockKey) ?? new Dictionary<int, string>();
+        var existing = await GetAsync<Dictionary<int, string>>(lockKey) ?? new Dictionary<int, string>();
+        var currentlyHeld = new Dictionary<int, string>(existing);
 
         // Check if any seat is already locked by someone else
         foreach (var seatId in seatIds)
@@ -173,10 +174,11 @@ public class RedisCacheService : ICacheService
         var lockKey = eventShowId.HasValue
             ? $"eventland:seats:event:{eventId}:show:{eventShowId.Value}"
             : string.Format(CacheKeys.SeatLocks, eventId);
-        var currentlyHeld = await GetAsync<Dictionary<int, string>>(lockKey);
+        var existing = await GetAsync<Dictionary<int, string>>(lockKey);
 
-        if (currentlyHeld != null)
+        if (existing != null)
         {
+            var currentlyHeld = new Dictionary<int, string>(existing);
             foreach (var seatId in seatIds)
             {
                 currentlyHeld.Remove(seatId);

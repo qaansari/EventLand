@@ -401,8 +401,10 @@ export default function App() {
     let matchTag = true;
     if (selectedTag !== 'All') {
       const selectedSlug = selectedTag.toLowerCase();
-      matchTag = (ev.tags || []).some(t => {
-        const tName = (typeof t === 'string' ? t : (t.name || t.slug || '')).toLowerCase();
+      const rawTags = ev.tags || ev.eventTags || [];
+      matchTag = rawTags.some(t => {
+        const tObj = (typeof t === 'object' && t.tag) ? t.tag : t;
+        const tName = (typeof tObj === 'string' ? tObj : (tObj.name || tObj.slug || '')).toLowerCase();
         return tName === selectedSlug;
       });
     }

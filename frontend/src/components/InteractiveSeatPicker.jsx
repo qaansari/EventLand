@@ -129,12 +129,15 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
       if (!isPreviewMode && typeof event.id === 'number' && typeof seatId === 'number') {
         try {
           let userEmail = 'authenticated_user@eventland.com';
-          const currentUserEmail = localStorage.getItem('eventland_user_email');
-          const jwtToken = localStorage.getItem('eventland_jwt_token');
+          const savedUserRaw = localStorage.getItem('eventland_logged_user');
+          let savedUser = null;
+          if (savedUserRaw) {
+            try { savedUser = JSON.parse(savedUserRaw); } catch { savedUser = null; }
+          }
 
-          if (currentUserEmail) {
-            userEmail = currentUserEmail;
-          } else if (!jwtToken) {
+          if (savedUser?.email) {
+            userEmail = savedUser.email;
+          } else {
             userEmail = createGuestEmail();
           }
 
