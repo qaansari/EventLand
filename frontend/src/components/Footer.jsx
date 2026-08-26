@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronDown, Send, Phone, Mail } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { footerApi } from '../services/api';
 
 export default function Footer({ onSelectCity }) {
   const { showSuccess } = useToast();
@@ -8,30 +9,91 @@ export default function Footer({ onSelectCity }) {
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [subscribedToast, setSubscribedToast] = useState(false);
 
-  const faqs = [
-    {
-      q: "How do I book tickets on EventLand?",
-      a: "Browse events on EventLand, select your desired city and ticket tier or interactive seat, and pay securely via JazzCash, EasyPaisa, bank transfer, or card. Your official digital E-Ticket with QR code is generated instantly."
-    },
-    {
-      q: "What is EventLand's refund policy?",
-      a: "Tickets are non-refundable unless an event is cancelled or rescheduled. If an event is cancelled, full refunds are issued within 5 business days."
-    },
-    {
-      q: "Which major Pakistani cities are covered?",
-      a: "EventLand features live concerts, comedy shows, bazaars, and theatre across Karachi, Lahore, Islamabad, Rawalpindi, Multan, Faisalabad, and Hyderabad."
-    },
-    {
-      q: "Can I list my own event and sell tickets?",
-      a: "Yes! Event organizers can list their event using our instant 'List Your Event' portal, set ticket tiers, and start selling tickets to audiences across Pakistan immediately."
-    }
-  ];
+  // Dynamic state loaded from Database/API
+  const [footerData, setFooterData] = useState({
+    brandName: 'EventLand',
+    tagline: "Event Land is a single, user-friendly platform, we link fans, artists, and organizers for everything from comedy nights to concerts. 🎵🎭",
+    phone: '+92 307 9353185',
+    email: 'support@eventland.pk',
+    copyrightText: '© 2026 EventLand Pakistan. All rights reserved.',
+    privacyPolicyUrl: '#',
+    termsOfServiceUrl: '#',
+    organizerSupportUrl: '#',
+    faqs: [
+      {
+        q: "How do I book tickets on EventLand?",
+        a: "Browse events on EventLand, select your desired city and ticket tier or interactive seat, and pay securely via JazzCash, EasyPaisa, bank transfer, or card. Your official digital E-Ticket with QR code is generated instantly."
+      },
+      {
+        q: "What is EventLand's refund policy?",
+        a: "Tickets are non-refundable unless an event is cancelled or rescheduled. If an event is cancelled, full refunds are issued within 5 business days."
+      },
+      {
+        q: "Which major Pakistani cities are covered?",
+        a: "EventLand features live concerts, comedy shows, bazaars, and theatre across Karachi, Lahore, Islamabad, Rawalpindi, Multan, Faisalabad, and Hyderabad."
+      },
+      {
+        q: "Can I list my own event and sell tickets?",
+        a: "Yes! Event organizers can list their event using our instant 'List Your Event' portal, set ticket tiers, and start selling tickets to audiences across Pakistan immediately."
+      }
+    ],
+    majorCities: ["Karachi", "Lahore", "Islamabad", "Rawalpindi", "Multan", "Faisalabad"]
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadFooterData = () => {
+      footerApi.get()
+        .then((data) => {
+          if (isMounted && data) {
+            setFooterData((prev) => ({
+              ...prev,
+              brandName: data.brandName || prev.brandName,
+              tagline: data.tagline || prev.tagline,
+              phone: data.phone || prev.phone,
+              email: data.email || prev.email,
+              copyrightText: data.copyrightText || prev.copyrightText,
+              privacyPolicyUrl: data.privacyPolicyUrl || prev.privacyPolicyUrl,
+              termsOfServiceUrl: data.termsOfServiceUrl || prev.termsOfServiceUrl,
+              organizerSupportUrl: data.organizerSupportUrl || prev.organizerSupportUrl,
+              faqs: data.faqs && data.faqs.length > 0 ? data.faqs : prev.faqs,
+              majorCities: data.majorCities && data.majorCities.length > 0 ? data.majorCities : prev.majorCities
+            }));
+          }
+        })
+        .catch((err) => {
+          console.warn("Using fallback footer data. Backend fetch note:", err.message);
+        });
+    };
+
+    loadFooterData();
+
+    // Listen for realtime FAQ updates from admin actions
+    const handleFaqsUpdated = (e) => {
+      if (e?.detail?.faqs && Array.isArray(e.detail.faqs)) {
+        setFooterData(prev => ({
+          ...prev,
+          faqs: e.detail.faqs
+        }));
+      } else {
+        loadFooterData();
+      }
+    };
+
+    window.addEventListener('faqs-updated', handleFaqsUpdated);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('faqs-updated', handleFaqsUpdated);
+    };
+  }, []);
 
   const handleSubscribe = (e) => {
     e.preventDefault();
     if (!newsletterEmail) return;
     setSubscribedToast(true);
-    showSuccess('Subscribed 📧', `Subscribed ${newsletterEmail} to EventLand newsletter updates!`);
+    showSuccess('Subscribed 📧', `Subscribed ${newsletterEmail} to ${footerData.brandName} newsletter updates!`);
     setNewsletterEmail('');
     setTimeout(() => setSubscribedToast(false), 3000);
   };
@@ -46,15 +108,15 @@ export default function Footer({ onSelectCity }) {
       color: '#94a3b8'
     }}>
       <div className="container">
-        {/* FAQ Section */}
+        {/* FAQ Section Loaded From Database */}
         <div style={{ marginBottom: '3.5rem' }}>
           <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff', marginBottom: '1.5rem', textAlign: 'center' }}>
             Frequently Asked Questions
           </h2>
           <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {faqs.map((faq, idx) => (
+            {footerData.faqs.map((faq, idx) => (
               <div
-                key={idx}
+                key={faq.id || idx}
                 style={{
                   backgroundColor: '#10192d',
                   border: '1px solid rgba(59, 130, 246, 0.15)',
@@ -79,7 +141,7 @@ export default function Footer({ onSelectCity }) {
                     cursor: 'pointer'
                   }}
                 >
-                  <span>{faq.q}</span>
+                  <span>{faq.q || faq.question}</span>
                   <ChevronDown
                     size={18}
                     style={{
@@ -91,7 +153,7 @@ export default function Footer({ onSelectCity }) {
                 </button>
                 {openFaq === idx && (
                   <div style={{ padding: '0 1.25rem 1.25rem', color: '#94a3b8', fontSize: '0.88rem', lineHeight: 1.5 }}>
-                    {faq.a}
+                    {faq.a || faq.answer}
                   </div>
                 )}
               </div>
@@ -99,7 +161,7 @@ export default function Footer({ onSelectCity }) {
           </div>
         </div>
 
-        {/* Footer Grid */}
+        {/* Footer Grid Loaded From Database */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
@@ -120,15 +182,19 @@ export default function Footer({ onSelectCity }) {
               </span>
             </div>
             <p style={{ fontSize: '0.85rem', lineHeight: 1.5, marginBottom: '1rem' }}>
-              Pakistan's premier event ticketing, artist booking, and live entertainment discovery platform.
+              {footerData.tagline}
             </p>
             <div style={{ fontSize: '0.8rem', color: '#cbd5e1', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Phone size={14} color="#3b82f6" /> +92 331 0286867
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Mail size={14} color="#3b82f6" /> support@eventland.pk
-              </div>
+              {footerData.phone && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Phone size={14} color="#3b82f6" /> {footerData.phone}
+                </div>
+              )}
+              {footerData.email && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Mail size={14} color="#3b82f6" /> {footerData.email}
+                </div>
+              )}
             </div>
           </div>
 
@@ -136,7 +202,7 @@ export default function Footer({ onSelectCity }) {
           <div>
             <h4 style={{ color: '#fff', fontWeight: 700, marginBottom: '1rem', fontSize: '0.95rem' }}>Major Cities</h4>
             <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.88rem' }}>
-              {["Karachi", "Lahore", "Islamabad", "Rawalpindi", "Multan", "Faisalabad"].map((city) => (
+              {footerData.majorCities.map((city) => (
                 <li key={city}>
                   <a
                     href="#explore"
@@ -200,11 +266,11 @@ export default function Footer({ onSelectCity }) {
           gap: '1rem',
           fontSize: '0.8rem'
         }}>
-          <span>© 2026 EventLand Pakistan. All rights reserved.</span>
+          <span>{footerData.copyrightText}</span>
           <div style={{ display: 'flex', gap: '1.25rem' }}>
-            <a href="#" style={{ color: '#94a3b8', textDecoration: 'none' }}>Privacy Policy</a>
-            <a href="#" style={{ color: '#94a3b8', textDecoration: 'none' }}>Terms of Service</a>
-            <a href="#" style={{ color: '#94a3b8', textDecoration: 'none' }}>Organizer Support</a>
+            <a href={footerData.privacyPolicyUrl || '#'} style={{ color: '#94a3b8', textDecoration: 'none' }}>Privacy Policy</a>
+            <a href={footerData.termsOfServiceUrl || '#'} style={{ color: '#94a3b8', textDecoration: 'none' }}>Terms of Service</a>
+            <a href={footerData.organizerSupportUrl || '#'} style={{ color: '#94a3b8', textDecoration: 'none' }}>Organizer Support</a>
           </div>
         </div>
       </div>

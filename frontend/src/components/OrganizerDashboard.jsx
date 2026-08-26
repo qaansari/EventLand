@@ -145,7 +145,7 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 800, color: '#fff' }}>
             PKR {(totalRevenue / 1000000).toFixed(2)}M
           </h2>
-          <span style={{ fontSize: '0.78rem', color: '#34d399', fontWeight: 600 }}>↑ +24% vs last event</span>
+          <span style={{ fontSize: '0.78rem', color: '#60a5fa', fontWeight: 600 }}>↑ +24% vs last event</span>
         </div>
 
         <div className="glass-card" style={{ padding: '1.4rem' }}>
@@ -164,11 +164,11 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
         <div className="glass-card" style={{ padding: '1.4rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
             <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600 }}>AVAILABLE PAYOUT</span>
-            <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
-              <DollarSign size={18} color="#34d399" />
+            <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
+              <DollarSign size={18} color="#60a5fa" />
             </div>
           </div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 800, color: '#34d399' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 800, color: '#60a5fa' }}>
             PKR 850,000
           </h2>
           <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Ready for Instant Withdrawal</span>
@@ -317,18 +317,18 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
             <div style={{
               padding: '1.25rem',
               borderRadius: '14px',
-              backgroundColor: scanResult.valid ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-              border: scanResult.valid ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)',
+              backgroundColor: scanResult.valid ? 'rgba(59, 130, 246, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+              border: scanResult.valid ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)',
               animation: 'fadeIn 0.3s ease'
             }}>
               {scanResult.valid ? (
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#34d399', fontWeight: 800, fontSize: '1.1rem', marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#60a5fa', fontWeight: 800, fontSize: '1.1rem', marginBottom: '0.75rem' }}>
                     <CheckCircle size={20} /> {scanResult.status}
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.85rem', color: '#cbd5e1' }}>
                     <div>Attendee: <strong style={{ color: '#fff' }}>{scanResult.attendee}</strong></div>
-                    <div>Status: <strong style={{ color: '#34d399' }}>Verified</strong></div>
+                    <div>Status: <strong style={{ color: '#60a5fa' }}>Verified</strong></div>
                     <div>Event: <strong style={{ color: '#fff' }}>{scanResult.eventTitle}</strong></div>
                     <div>Pass Tier: <strong style={{ color: '#fbbf24' }}>{scanResult.tier}</strong></div>
                     <div style={{ gridColumn: 'span 2' }}>Assigned Seats: <strong style={{ color: '#fff' }}>{scanResult.seats}</strong></div>
@@ -376,7 +376,7 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
                   outline: 'none'
                 }}
               />
-              <span style={{ fontSize: '0.75rem', color: '#34d399', marginTop: '4px', display: 'block' }}>
+              <span style={{ fontSize: '0.75rem', color: '#60a5fa', marginTop: '4px', display: 'block' }}>
                 Max Available Balance: PKR 850,000
               </span>
             </div>

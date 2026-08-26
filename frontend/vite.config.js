@@ -1,32 +1,32 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import basicSsl from '@vitejs/plugin-basic-ssl'
+import mkcert from 'vite-plugin-mkcert'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), basicSsl()],
+  plugins: [react(), mkcert()],
   server: {
     https: true,
     port: 5174,
     proxy: {
       '/api': {
-        target: 'http://localhost:4257',
+        target: 'https://localhost:7257',
         changeOrigin: true,
         secure: false
       },
       '/hubs': {
-        target: 'http://localhost:4257',
+        target: 'https://localhost:7257',
         ws: true,
         changeOrigin: true,
         secure: false
       },
       '/uploads': {
-        target: 'http://localhost:4257',
+        target: 'https://localhost:7257',
         changeOrigin: true,
         secure: false
       },
       '/assets': {
-        target: 'http://localhost:4257',
+        target: 'https://localhost:7257',
         changeOrigin: true,
         secure: false
       }

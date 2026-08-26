@@ -86,18 +86,18 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
     onProceedToBooking(updatedEvent, 'seat-picker', []);
   };
 
-  const organizerWebsiteUrl = typeof event.organizer === 'object' 
+  const organizerWebsiteUrl = (typeof event.organizer === 'object' 
     ? event.organizer?.websiteUrl 
-    : (event.organizerWebsite || event.websiteUrl);
+    : (event.organizerWebsite || event.websiteUrl)) || 'https://www.eventland.pk';
 
-  const organizerDisplayName = typeof event.organizer === 'object'
+  const organizerDisplayName = (typeof event.organizer === 'object'
     ? event.organizer?.name
-    : (event.organizer || 'Official Event Organizer');
+    : event.organizer) || 'Event Land';
 
   const rawLogo = typeof event.organizer === 'object' ? event.organizer?.logoUrl : null;
   const organizerLogoUrl = rawLogo
     ? (rawLogo.startsWith('/') || rawLogo.startsWith('http') ? rawLogo : `/assets/images/organizers/${rawLogo}`)
-    : null;
+    : '/assets/images/organizers/org_eventland_01.png';
 
   return (
     <div className="modal-overlay">
@@ -492,7 +492,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                   <p style={{ fontSize: '0.88rem', color: '#cbd5e1', margin: 0 }}>
                     Selected Show Slot: <strong style={{ color: '#38bdf8' }}>{activeShow?.showTitle || 'Standard Performance'}</strong>
                   </p>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '0.25rem 0.65rem', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#60a5fa', background: 'rgba(59, 130, 246, 0.15)', padding: '0.25rem 0.65rem', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
                     Starting from PKR {(activeShow?.startingPrice || activeShow?.ticketTiers?.[0]?.price || event.startingPrice || 2500).toLocaleString()}
                   </span>
                 </div>

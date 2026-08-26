@@ -22,6 +22,8 @@ public interface IApplicationDbContext
     DbSet<City>        Cities       { get; }
     DbSet<Venue>       Venues       { get; }
     DbSet<Auditorium>  Auditoriums  { get; }
+    DbSet<Faq>         Faqs         { get; }
+    DbSet<FooterInfo>  FooterInfos  { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -1,4 +1,4 @@
-export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4257';
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://localhost:7257';
 export const BASE_URL = import.meta.env.VITE_API_URL || `${BACKEND_URL}/api`;
 export const SERVER_BASE = BASE_URL.replace(/\/api\/?$/, '') || BACKEND_URL;
 
@@ -284,4 +284,18 @@ export const uploadApi = {
     return await response.json();
   }
 };
+
+// --- FAQs & Footer APIs ---
+export const faqsApi = {
+  getAll: async () => request('/faqs'),
+  adminGetAll: async () => request('/admin/faqs'),
+  create: async (dto) => request('/admin/faqs', { method: 'POST', body: JSON.stringify(dto) }),
+  update: async (id, dto) => request(`/admin/faqs/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  delete: async (id) => request(`/admin/faqs/${id}`, { method: 'DELETE' })
+};
+
+export const footerApi = {
+  get: async () => request('/footer')
+};
+
 

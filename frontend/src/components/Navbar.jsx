@@ -227,15 +227,15 @@ export default function Navbar({
               onClick={() => handleNavClick('organizer')}
               className="btn"
               style={{
-                background: activeView === 'organizer' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.15)',
-                color: '#34d399',
-                border: '1px solid rgba(16, 185, 129, 0.4)',
+                background: activeView === 'organizer' ? 'rgba(59, 130, 246, 0.25)' : 'rgba(59, 130, 246, 0.15)',
+                color: '#60a5fa',
+                border: '1px solid rgba(59, 130, 246, 0.4)',
                 fontSize: '0.85rem',
                 padding: '0.5rem 0.9rem',
                 fontWeight: 700
               }}
             >
-              <Building2 size={15} color="#34d399" /> Organizer Portal
+              <Building2 size={15} color="#60a5fa" /> Organizer Portal
             </button>
           )}
 
@@ -272,12 +272,12 @@ export default function Navbar({
                 backgroundColor: currentUser.role === 'admin' 
                   ? 'rgba(139, 92, 246, 0.15)' 
                   : currentUser.role === 'organizer' 
-                  ? 'rgba(16, 185, 129, 0.15)' 
+                  ? 'rgba(59, 130, 246, 0.15)' 
                   : 'rgba(59, 130, 246, 0.15)',
                 border: currentUser.role === 'admin' 
                   ? '1px solid rgba(139, 92, 246, 0.35)' 
                   : currentUser.role === 'organizer' 
-                  ? '1px solid rgba(16, 185, 129, 0.35)' 
+                  ? '1px solid rgba(59, 130, 246, 0.35)' 
                   : '1px solid rgba(59, 130, 246, 0.35)',
                 color: '#fff',
                 borderRadius: '9999px',
@@ -291,7 +291,7 @@ export default function Navbar({
                 {currentUser.role === 'admin' ? (
                   <ShieldCheck size={13} color="#c084fc" />
                 ) : currentUser.role === 'organizer' ? (
-                  <Building2 size={13} color="#34d399" />
+                  <Building2 size={13} color="#60a5fa" />
                 ) : (
                   <User size={13} color="#60a5fa" />
                 )}

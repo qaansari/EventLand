@@ -30,7 +30,7 @@ export default function DigitalTicketModal({ ticket, onClose }) {
             <CheckCircle2 color="#3b82f6" size={22} />
             <div>
               <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fff' }}>Official Digital E-Ticket</h2>
-              <span style={{ fontSize: '0.75rem', color: '#34d399', fontWeight: 600 }}>Status: Active & Verified</span>
+              <span style={{ fontSize: '0.75rem', color: '#60a5fa', fontWeight: 600 }}>Status: Active & Verified</span>
             </div>
           </div>
           <button

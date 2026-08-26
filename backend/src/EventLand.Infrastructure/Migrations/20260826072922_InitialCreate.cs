@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace EventLand.Infrastructure.Persistence.Migrations
+namespace EventLand.Infrastructure.Migrations
 {
     /// <inheritdoc />
     public partial class InitialCreate : Migration
@@ -59,6 +59,47 @@ namespace EventLand.Infrastructure.Persistence.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Countries", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Faqs",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1000, 1"),
+                    Question = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Answer = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    DisplayOrder = table.Column<int>(type: "int", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Faqs", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "FooterInfos",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1000, 1"),
+                    BrandName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Tagline = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Phone = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Email = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Address = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CopyrightText = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    PrivacyPolicyUrl = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TermsOfServiceUrl = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    OrganizerSupportUrl = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FooterInfos", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -719,6 +760,12 @@ namespace EventLand.Infrastructure.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "EventTags");
+
+            migrationBuilder.DropTable(
+                name: "Faqs");
+
+            migrationBuilder.DropTable(
+                name: "FooterInfos");
 
             migrationBuilder.DropTable(
                 name: "Users");

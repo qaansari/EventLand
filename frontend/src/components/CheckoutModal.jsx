@@ -293,7 +293,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                   gap: '0.75rem'
                 }}
               >
-                <Smartphone color="#10b981" size={24} />
+                <Smartphone color="#60a5fa" size={24} />
                 <div>
                   <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem', display: 'block' }}>EasyPaisa</span>
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Instant Payment</span>

@@ -36,8 +36,8 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
     banner: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1200&q=80',
     description: '',
     scarcityText: 'Selling Fast',
-    organizer: '',
-    organizerContact: '',
+    organizer: 'Event Land',
+    organizerContact: 'support@eventlan.pk',
     tier1Name: 'Standard Entry',
     tier1Price: 2000,
     tier2Name: 'VIP Pass',
@@ -269,7 +269,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
 
                       {selectedAuditorium && (
                         <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <CheckCircle size={15} color="#10b981" />
+                          <CheckCircle size={15} color="#60a5fa" />
                           <span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>
                             Selected: <strong style={{ color: '#fff' }}>{selectedAuditorium.name}</strong> ({selectedAuditorium.totalCapacity} seats layout)
                           </span>

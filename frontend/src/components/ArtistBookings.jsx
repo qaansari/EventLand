@@ -133,7 +133,7 @@ export default function ArtistBookings() {
 
                 {artist.availability && (
                   <div style={{ backgroundColor: 'rgba(0,0,0,0.35)', padding: '0.6rem 0.8rem', borderRadius: '8px', marginBottom: '1.25rem', border: '1px solid rgba(255, 255, 255, 0.05)', fontSize: '0.8rem', color: '#cbd5e1' }}>
-                    <span style={{ color: '#10b981', fontWeight: 600 }}>✓ </span> {artist.availability}
+                    <span style={{ color: '#60a5fa', fontWeight: 600 }}>✓ </span> {artist.availability}
                   </div>
                 )}
 
@@ -171,7 +171,7 @@ export default function ArtistBookings() {
               alignItems: 'center'
             }}>
               <div>
-                <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 700 }}>OFFICIAL ARTIST BOOKING</span>
+                <span style={{ fontSize: '0.75rem', color: '#60a5fa', fontWeight: 700 }}>OFFICIAL ARTIST BOOKING</span>
                 <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff' }}>
                   Request Booking for {selectedArtist.name}
                 </h2>

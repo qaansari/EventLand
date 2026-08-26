@@ -222,7 +222,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
             : occupied 
               ? '#334155' 
               : isSelected 
-                ? '#10b981' 
+                ? '#3b82f6' 
                 : 'rgba(255, 255, 255, 0.1)',
           color: isDisabled 
             ? '#fca5a5' 
@@ -231,7 +231,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
               : isSelected 
                 ? '#ffffff' 
                 : '#e2e8f0',
-          boxShadow: isSelected ? '0 0 8px #10b981' : isDisabled ? '0 0 4px rgba(239, 68, 68, 0.4)' : 'none',
+          boxShadow: isSelected ? '0 0 8px #3b82f6' : isDisabled ? '0 0 4px rgba(239, 68, 68, 0.4)' : 'none',
           transition: 'all 0.12s ease',
           textDecoration: isDisabled ? 'line-through' : 'none',
           display: 'inline-flex',
@@ -363,7 +363,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               {isPreviewMode ? (
-                <span className="badge" style={{ backgroundColor: 'rgba(16, 185, 129, 0.18)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.4)', padding: '0.2rem 0.6rem', fontSize: '0.72rem', fontWeight: 800 }}>
+                <span className="badge" style={{ backgroundColor: 'rgba(59, 130, 246, 0.18)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.4)', padding: '0.2rem 0.6rem', fontSize: '0.72rem', fontWeight: 800 }}>
                   BLUEPRINT PREVIEW MODE
                 </span>
               ) : (
@@ -585,7 +585,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
                 <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255, 255, 255, 0.2)' }} /> Available
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#10b981', boxShadow: '0 0 8px #10b981' }} /> Selected
+                <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#3b82f6', boxShadow: '0 0 8px #3b82f6' }} /> Selected
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#334155' }} /> Booked / Locked
@@ -620,7 +620,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
               </div>
               <div>
                 <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block' }}>Selected Seat Test</span>
-                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: selectedSeats.length > 0 ? '#10b981' : '#64748b' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: selectedSeats.length > 0 ? '#60a5fa' : '#64748b' }}>
                   {selectedSeats.length > 0 ? selectedSeats.map(s => s.label).join(', ') : 'Click any seat above to test selection'}
                 </span>
               </div>
@@ -688,7 +688,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
             <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
               <div>
                 <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block' }}>Total Amount</span>
-                <span style={{ fontSize: '1.35rem', fontWeight: 800, color: '#10b981' }}>
+                <span style={{ fontSize: '1.35rem', fontWeight: 800, color: '#60a5fa' }}>
                   PKR {totalPrice.toLocaleString()}
                 </span>
               </div>
@@ -699,7 +699,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
                 style={{
                   padding: '0.75rem 1.6rem',
                   borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #10b981, #047857)',
+                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
                   border: 'none',
                   color: '#fff',
                   fontWeight: 700,

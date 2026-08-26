@@ -598,8 +598,9 @@ public class AdminService : IAdminService
             var organizerId = dto.OrganizerId;
             if (organizerId <= 0)
             {
-                var firstOrg = await _context.Organizers.FirstOrDefaultAsync(o => !o.IsDeleted);
-                organizerId = firstOrg?.Id ?? 1000;
+                var defaultOrg = await _context.Organizers.FirstOrDefaultAsync(o => o.Name == "Event Land" && !o.IsDeleted)
+                    ?? await _context.Organizers.FirstOrDefaultAsync(o => !o.IsDeleted);
+                organizerId = defaultOrg?.Id ?? 1000;
             }
 
         // Country selection (Default: Pakistan)

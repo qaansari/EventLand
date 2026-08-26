@@ -32,9 +32,11 @@ import {
   Save,
   Clock,
   FileText,
-  Upload
+  Upload,
+  HelpCircle,
+  GripVertical
 } from 'lucide-react';
-import { adminApi, locationsApi, uploadApi, getEventImageUrl, getOrganizerImageUrl } from '../services/api';
+import { adminApi, locationsApi, uploadApi, faqsApi, getEventImageUrl, getOrganizerImageUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
@@ -100,7 +102,7 @@ function FileUploadField({ label, value, onChange, placeholder = "Image URL or u
       {value && (
         <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <img src={value} alt="Preview" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.2)' }} onError={(e) => e.target.style.display = 'none'} />
-          <span style={{ fontSize: '0.75rem', color: '#34d399' }}>✓ Image ready</span>
+          <span style={{ fontSize: '0.75rem', color: '#60a5fa' }}>✓ Image ready</span>
         </div>
       )}
     </div>
@@ -127,6 +129,7 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [countriesList, setCountriesList] = useState([]);
   const [citiesList, setCitiesList] = useState([]);
   const [venuesList, setVenuesList] = useState([]);
+  const [faqsList, setFaqsList] = useState([]);
 
   // Form Modal States
   const [showEventModal, setShowEventModal] = useState(false);
@@ -137,7 +140,20 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showTagModal, setShowTagModal] = useState(false);
   const [showAuditoriumModal, setShowAuditoriumModal] = useState(false);
+  const [showFaqModal, setShowFaqModal] = useState(false);
   const [previewAuditorium, setPreviewAuditorium] = useState(null);
+
+  const defaultFaqForm = {
+    id: null,
+    question: '',
+    answer: '',
+    displayOrder: 1,
+    isActive: true
+  };
+
+  const [faqForm, setFaqForm] = useState(defaultFaqForm);
+  const [draggedFaqIndex, setDraggedFaqIndex] = useState(null);
+  const [dragOverFaqIndex, setDragOverFaqIndex] = useState(null);
 
   // --- Initial Form States ---
   const defaultEventForm = {
@@ -263,7 +279,7 @@ export default function AdminDashboard({ onSelectEvent }) {
     if (isInitial) setLoading(true);
     setErrorMsg('');
     try {
-      const [orgs, evs, arts, bks, rls, usrs, tgs, auds, cnts, cts, vns] = await Promise.all([
+      const [orgs, evs, arts, bks, rls, usrs, tgs, auds, cnts, cts, vns, faqs] = await Promise.all([
         adminApi.organizers.getAll().catch(() => []),
         adminApi.events.getAll(1, 50).catch(() => ({ items: [] })),
         adminApi.artists.getAll(1, 50).catch(() => ({ items: [] })),
@@ -274,7 +290,8 @@ export default function AdminDashboard({ onSelectEvent }) {
         locationsApi.getAuditoriums().catch(() => []),
         locationsApi.getCountries().catch(() => []),
         locationsApi.getCities().catch(() => []),
-        locationsApi.getVenues().catch(() => [])
+        locationsApi.getVenues().catch(() => []),
+        faqsApi.adminGetAll().catch(() => [])
       ]);
 
       const rawOrgs = Array.isArray(orgs) ? orgs : (orgs?.items || []);
@@ -299,6 +316,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       setCountriesList(cnts || []);
       setCitiesList(cts || []);
       setVenuesList(vns || []);
+      setFaqsList(faqs || []);
     } catch (err) {
       console.error('Error fetching admin data:', err);
       setErrorMsg(err.message || 'Failed to load backend data.');
@@ -1350,6 +1368,156 @@ export default function AdminDashboard({ onSelectEvent }) {
     }
   };
 
+  // --- CRUD: FAQS ---
+  const handleSaveFaq = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    const question = faqForm.question ? faqForm.question.trim() : '';
+    const answer = faqForm.answer ? faqForm.answer.trim() : '';
+    const displayOrder = parseInt(faqForm.displayOrder, 10) || 1;
+
+    if (!question || !answer) {
+      const msg = 'Please enter both question and answer.';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
+      return;
+    }
+
+    // Validate unique display order number
+    const isDuplicateOrder = faqsList.some(f =>
+      f.id !== faqForm.id && (f.displayOrder === displayOrder || f.DisplayOrder === displayOrder)
+    );
+    if (isDuplicateOrder) {
+      const msg = `Display Order #${displayOrder} is already in use by another FAQ. Please assign a unique display order number.`;
+      setErrorMsg(msg);
+      showError('Duplicate Display Order', msg);
+      return;
+    }
+
+    try {
+      if (faqForm.id) {
+        await faqsApi.update(faqForm.id, {
+          question,
+          answer,
+          displayOrder,
+          isActive: faqForm.isActive
+        });
+        const msg = `FAQ updated successfully!`;
+        setSuccessMsg(msg);
+        showSuccess('FAQ Updated ✏️', msg);
+      } else {
+        await faqsApi.create({
+          question,
+          answer,
+          displayOrder
+        });
+        const msg = `New FAQ created successfully!`;
+        setSuccessMsg(msg);
+        showSuccess('FAQ Created ✨', msg);
+      }
+      setShowFaqModal(false);
+      setFaqForm(defaultFaqForm);
+      window.dispatchEvent(new CustomEvent('faqs-updated'));
+      fetchBackendData();
+    } catch (err) {
+      const msg = err.message || 'Failed to save FAQ.';
+      setErrorMsg(msg);
+      showError('Save Failed', msg);
+    }
+  };
+
+  // --- DRAG AND DROP REORDER FOR FAQS ---
+  const handleFaqDragStart = (e, index) => {
+    setDraggedFaqIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleFaqDragOver = (e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverFaqIndex !== index) {
+      setDragOverFaqIndex(index);
+    }
+  };
+
+  const handleFaqDrop = async (e, targetIndex) => {
+    e.preventDefault();
+    if (draggedFaqIndex === null || draggedFaqIndex === targetIndex) {
+      setDraggedFaqIndex(null);
+      setDragOverFaqIndex(null);
+      return;
+    }
+
+    const updatedList = [...faqsList];
+    const [movedItem] = updatedList.splice(draggedFaqIndex, 1);
+    updatedList.splice(targetIndex, 0, movedItem);
+
+    // Re-assign displayOrder sequentially (1, 2, 3...)
+    const reorderedList = updatedList.map((faq, idx) => ({
+      ...faq,
+      displayOrder: idx + 1
+    }));
+
+    setFaqsList(reorderedList);
+    setDraggedFaqIndex(null);
+    setDragOverFaqIndex(null);
+
+    // Dispatch realtime event immediately so footer updates without page reload
+    window.dispatchEvent(new CustomEvent('faqs-updated', { detail: { faqs: reorderedList } }));
+
+    // Persist new display order sequence to database
+    try {
+      await Promise.all(
+        reorderedList.map(faq =>
+          faqsApi.update(faq.id, {
+            question: faq.q || faq.question,
+            answer: faq.a || faq.answer,
+            displayOrder: faq.displayOrder,
+            isActive: faq.isActive ?? true
+          })
+        )
+      );
+      showSuccess('Order Saved 🔄', 'FAQ sequence reordered and saved successfully!');
+    } catch (err) {
+      showError('Save Order Error', err.message || 'Failed to save reordered sequence.');
+      fetchBackendData();
+    }
+  };
+
+  const handleFaqDragEnd = () => {
+    setDraggedFaqIndex(null);
+    setDragOverFaqIndex(null);
+  };
+
+  const handleEditFaq = (faq) => {
+    setFaqForm({
+      id: faq.id,
+      question: faq.q || faq.question || '',
+      answer: faq.a || faq.answer || '',
+      displayOrder: faq.displayOrder || 1,
+      isActive: faq.isActive ?? true
+    });
+    setShowFaqModal(true);
+  };
+
+  const handleDeleteFaq = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this FAQ?')) return;
+    try {
+      await faqsApi.delete(id);
+      const msg = 'FAQ deleted successfully.';
+      setSuccessMsg(msg);
+      showSuccess('FAQ Deleted 🗑️', msg);
+      window.dispatchEvent(new CustomEvent('faqs-updated'));
+      fetchBackendData();
+    } catch (err) {
+      const msg = err.message || 'Delete failed.';
+      setErrorMsg(msg);
+      showError('Delete Failed', msg);
+    }
+  };
+
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1rem' }}>
       {/* Header */}
@@ -1519,7 +1687,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'venues' ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'venues' ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1537,7 +1705,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'cities' ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'cities' ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1555,7 +1723,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'countries' ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'countries' ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1583,6 +1751,24 @@ export default function AdminDashboard({ onSelectEvent }) {
           }}
         >
           <Tag size={18} /> Tags ({tagsList.length})
+        </button>
+
+        <button
+          onClick={() => setActiveAdminTab('faqs')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'faqs' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <HelpCircle size={18} /> FAQs ({faqsList.length})
         </button>
       </div>
 
@@ -1963,7 +2149,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>Event Categories & Tags</h3>
             <button
               onClick={() => { setTagForm(defaultTagForm); setShowTagModal(true); }}
-              style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #10b981, #047857)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <Plus size={16} /> Create Tag
             </button>
@@ -1981,7 +2167,7 @@ export default function AdminDashboard({ onSelectEvent }) {
               <tbody>
                 {tagsList.map(t => (
                   <tr key={t.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                    <td style={{ padding: '1rem', fontWeight: 700, color: '#34d399' }}>{t.name}</td>
+                    <td style={{ padding: '1rem', fontWeight: 700, color: '#60a5fa' }}>{t.name}</td>
                     <td style={{ padding: '1rem', color: '#94a3b8' }}>{t.slug}</td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -2062,7 +2248,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
                     <button
                       onClick={() => setPreviewAuditorium(aud)}
-                      style={{ padding: '0.5rem 0.85rem', background: 'rgba(16, 185, 129, 0.18)', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: '6px', color: '#34d399', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600 }}
+                      style={{ padding: '0.5rem 0.85rem', background: 'rgba(59, 130, 246, 0.18)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '6px', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600 }}
                     >
                       <Eye size={14} /> Preview Chart
                     </button>
@@ -2102,16 +2288,15 @@ export default function AdminDashboard({ onSelectEvent }) {
             </div>
             <button
               onClick={() => {
-                const defaultCity = citiesList[0]?.id || 1000;
-                const matchedCity = citiesList.find(c => c.id === defaultCity);
+                const matchedCity = citiesList[0];
                 setVenueForm({
                   ...defaultVenueForm,
-                  cityId: defaultCity,
+                  cityId: matchedCity?.id || '',
                   countryId: matchedCity?.countryId || (countriesList[0]?.id || 1000)
                 });
                 setShowVenueModal(true);
               }}
-              style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <Plus size={18} /> Add New Venue
             </button>
@@ -2144,7 +2329,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                         <td style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.address || '—'}</td>
                         <td style={{ padding: '1rem', color: '#94a3b8' }}>{audCount} auditoriums</td>
                         <td style={{ padding: '1rem' }}>
-                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: v.isActive !== false ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: v.isActive !== false ? '#34d399' : '#f87171' }}>
+                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: v.isActive !== false ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: v.isActive !== false ? '#60a5fa' : '#f87171' }}>
                             {v.isActive !== false ? 'Active' : 'Inactive'}
                           </span>
                         </td>
@@ -2179,7 +2364,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             </div>
             <button
               onClick={() => { setCityForm({ ...defaultCityForm, countryId: countriesList[0]?.id || 1000 }); setShowCityModal(true); }}
-              style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <Plus size={18} /> Add New City
             </button>
@@ -2210,7 +2395,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                         <td style={{ padding: '1rem', color: '#94a3b8' }}>🌍 {c.countryName || matchedCountry?.name || 'Pakistan'}</td>
                         <td style={{ padding: '1rem', color: '#94a3b8' }}>{venueCount} venues</td>
                         <td style={{ padding: '1rem' }}>
-                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: c.isActive !== false ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: c.isActive !== false ? '#34d399' : '#f87171' }}>
+                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: c.isActive !== false ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: c.isActive !== false ? '#60a5fa' : '#f87171' }}>
                             {c.isActive !== false ? 'Active' : 'Inactive'}
                           </span>
                         </td>
@@ -2245,7 +2430,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             </div>
             <button
               onClick={() => { setCountryForm(defaultCountryForm); setShowCountryModal(true); }}
-              style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <Plus size={18} /> Add New Country
             </button>
@@ -2275,7 +2460,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                         <td style={{ padding: '1rem', color: '#38bdf8', fontFamily: 'monospace', fontWeight: 700 }}>{c.code}</td>
                         <td style={{ padding: '1rem', color: '#94a3b8' }}>{cityCount} cities</td>
                         <td style={{ padding: '1rem' }}>
-                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: c.isActive !== false ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: c.isActive !== false ? '#34d399' : '#f87171' }}>
+                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: c.isActive !== false ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: c.isActive !== false ? '#60a5fa' : '#f87171' }}>
                             {c.isActive !== false ? 'Active' : 'Inactive'}
                           </span>
                         </td>
@@ -2291,6 +2476,168 @@ export default function AdminDashboard({ onSelectEvent }) {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* --- TAB 11: FAQS MANAGEMENT --- */}
+      {activeAdminTab === 'faqs' && (
+        <div className="glass-panel" style={{ padding: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.25rem' }}>
+                Frequently Asked Questions (FAQs)
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                Manage website FAQs. Drag cards using the handle to instantly reorder sequence.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setFaqForm(defaultFaqForm);
+                setShowFaqModal(true);
+              }}
+              style={{
+                padding: '0.65rem 1.25rem',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                border: 'none',
+                color: '#fff',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <Plus size={16} /> Add New FAQ
+            </button>
+          </div>
+
+          {faqsList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
+              <HelpCircle size={40} style={{ opacity: 0.5, marginBottom: '1rem' }} />
+              <p>No FAQs created in the database yet.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {faqsList.map((faq, idx) => {
+                const isDragging = draggedFaqIndex === idx;
+                const isDragOver = dragOverFaqIndex === idx;
+
+                return (
+                  <div
+                    key={faq.id || idx}
+                    draggable
+                    onDragStart={(e) => handleFaqDragStart(e, idx)}
+                    onDragOver={(e) => handleFaqDragOver(e, idx)}
+                    onDrop={(e) => handleFaqDrop(e, idx)}
+                    onDragEnd={handleFaqDragEnd}
+                    style={{
+                      background: isDragging 
+                        ? 'rgba(59, 130, 246, 0.15)' 
+                        : 'rgba(15, 23, 42, 0.6)',
+                      border: isDragOver 
+                        ? '2px dashed #60a5fa' 
+                        : '1px solid rgba(59, 130, 246, 0.2)',
+                      borderRadius: '12px',
+                      padding: '1.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '1rem',
+                      opacity: isDragging ? 0.4 : 1,
+                      cursor: 'grab',
+                      transition: 'all 0.2s ease',
+                      boxShadow: isDragOver ? '0 0 15px rgba(59, 130, 246, 0.4)' : 'none'
+                    }}
+                  >
+                    {/* Drag Handle */}
+                    <div 
+                      style={{ 
+                        color: '#64748b', 
+                        cursor: 'grab',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '0.25rem'
+                      }}
+                      title="Drag to reorder FAQ sequence"
+                    >
+                      <GripVertical size={20} />
+                    </div>
+
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                        <span style={{
+                          background: '#1e293b',
+                          color: '#60a5fa',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          padding: '0.25rem 0.6rem',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(59, 130, 246, 0.3)'
+                        }}>
+                          Order #{faq.displayOrder ?? idx + 1}
+                        </span>
+                        <span style={{
+                          backgroundColor: faq.isActive !== false ? 'rgba(59, 130, 246, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                          color: faq.isActive !== false ? '#60a5fa' : '#f87171',
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: 600
+                        }}>
+                          {faq.isActive !== false ? 'Active' : 'Disabled'}
+                        </span>
+                      </div>
+                      <h4 style={{ color: '#fff', fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+                        {faq.q || faq.question}
+                      </h4>
+                      <p style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                        {faq.a || faq.answer}
+                      </p>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        onClick={() => handleEditFaq(faq)}
+                        style={{
+                          padding: '0.4rem 0.8rem',
+                          background: 'rgba(59, 130, 246, 0.2)',
+                          border: 'none',
+                          borderRadius: '6px',
+                          color: '#60a5fa',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                        title="Edit FAQ"
+                      >
+                        <Edit3 size={14} /> Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteFaq(faq.id)}
+                        style={{
+                          padding: '0.4rem 0.8rem',
+                          background: 'rgba(239, 68, 68, 0.2)',
+                          border: 'none',
+                          borderRadius: '6px',
+                          color: '#f87171',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                        title="Delete FAQ"
+                      >
+                        <Trash2 size={14} /> Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -2799,7 +3146,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                     {/* SECTION 6: Description & Visibility */}
                     <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <FileText size={15} /> 6. Description & Visibility Settings
                       </div>
 
@@ -2809,7 +3156,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                           Featured Event
                         </label>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f8fafc', fontSize: '0.875rem', cursor: 'pointer', fontWeight: 600 }}>
-                          <input type="checkbox" checked={eventForm.isPublished} onChange={e => setEventForm({ ...eventForm, isPublished: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: '#10b981' }} />
+                          <input type="checkbox" checked={eventForm.isPublished} onChange={e => setEventForm({ ...eventForm, isPublished: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: '#3b82f6' }} />
                           Published / Active
                         </label>
                       </div>
@@ -3158,7 +3505,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                   value={tagForm.slug} 
                   onChange={e => setTagForm({ ...tagForm, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })} 
                   placeholder="e.g. qawwali-concerts"
-                  style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#34d399', fontFamily: 'monospace' }} 
+                  style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#60a5fa', fontFamily: 'monospace' }} 
                 />
                 <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem', display: 'block' }}>
                   URL-friendly slug (e.g. concerts, sufi-rock, tech-workshops)
@@ -3166,7 +3513,7 @@ export default function AdminDashboard({ onSelectEvent }) {
               </div>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowTagModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #10b981, #047857)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Tag...' : 'Save Tag'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Tag...' : 'Save Tag'}</button>
               </div>
             </form>
           </div>
@@ -3213,9 +3560,9 @@ export default function AdminDashboard({ onSelectEvent }) {
                   style={{
                     padding: '0.35rem 0.75rem',
                     borderRadius: '8px',
-                    background: 'rgba(16, 185, 129, 0.18)',
-                    border: '1px solid rgba(16, 185, 129, 0.4)',
-                    color: '#34d399',
+                    background: 'rgba(59, 130, 246, 0.18)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    color: '#60a5fa',
                     fontSize: '0.75rem',
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -3380,7 +3727,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                   <label style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: 600 }}>
                     Layout JSON Configuration (Rows, Sections & Aisles)
                   </label>
-                  <span style={{ fontSize: '0.75rem', color: '#10b981' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#60a5fa' }}>
                     ✓ JSON Schema Valid
                   </span>
                 </div>
@@ -3394,7 +3741,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                     background: 'rgba(2, 6, 23, 0.85)',
                     border: '1px solid rgba(59, 130, 246, 0.3)',
                     borderRadius: '8px',
-                    color: '#34d399',
+                    color: '#60a5fa',
                     fontFamily: 'monospace',
                     fontSize: '0.8rem',
                     lineHeight: 1.4
@@ -3435,7 +3782,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowCountryModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Country...' : 'Save Country'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Country...' : 'Save Country'}</button>
               </div>
             </form>
           </div>
@@ -3474,7 +3821,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowCityModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving City...' : 'Save City'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving City...' : 'Save City'}</button>
               </div>
             </form>
           </div>
@@ -3547,13 +3894,95 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                   <button type="button" onClick={() => setShowVenueModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                  <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #10b981, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Venue...' : 'Save Venue'}</button>
+                  <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Venue...' : 'Save Venue'}</button>
                 </div>
               </form>
             </div>
           </div>
         );
       })()}
+
+      {/* --- MODAL: CREATE / EDIT FAQ --- */}
+      {showFaqModal && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '540px', padding: '2rem', position: 'relative' }}>
+            <button
+              onClick={() => setShowFaqModal(false)}
+              style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255, 255, 255, 0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <X size={18} />
+            </button>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>
+              {faqForm.id ? 'Edit FAQ' : 'Add New FAQ'}
+            </h3>
+            <form onSubmit={handleSaveFaq} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                  Question *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. How do I book tickets on EventLand?"
+                  value={faqForm.question}
+                  onChange={e => setFaqForm({ ...faqForm, question: e.target.value })}
+                  style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                  Answer *
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  placeholder="Provide a clear, detailed answer..."
+                  value={faqForm.answer}
+                  onChange={e => setFaqForm({ ...faqForm, answer: e.target.value })}
+                  style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    Display Order
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={faqForm.displayOrder}
+                    onChange={e => setFaqForm({ ...faqForm, displayOrder: parseInt(e.target.value, 10) || 1 })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', marginTop: '1.2rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#fff', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={faqForm.isActive}
+                      onChange={e => setFaqForm({ ...faqForm, isActive: e.target.checked })}
+                      style={{ width: '16px', height: '16px', accentColor: '#3b82f6' }}
+                    />
+                    Active on Website
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button type="button" onClick={() => setShowFaqModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>
+                  {isSaving ? 'Saving FAQ...' : (faqForm.id ? 'Update FAQ' : 'Save FAQ')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* --- BLUEPRINT PREVIEW MODAL --- */}
       {previewAuditorium && (
