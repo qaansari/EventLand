@@ -82,10 +82,12 @@ export default function Footer({ onSelectCity }) {
     };
 
     window.addEventListener('faqs-updated', handleFaqsUpdated);
+    window.addEventListener('footer-updated', loadFooterData);
 
     return () => {
       isMounted = false;
       window.removeEventListener('faqs-updated', handleFaqsUpdated);
+      window.removeEventListener('footer-updated', loadFooterData);
     };
   }, []);
 

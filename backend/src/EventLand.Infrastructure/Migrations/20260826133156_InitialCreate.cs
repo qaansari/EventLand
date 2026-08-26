@@ -81,7 +81,7 @@ namespace EventLand.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "FooterInfos",
+                name: "FooterInfo",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
@@ -99,7 +99,7 @@ namespace EventLand.Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_FooterInfos", x => x.Id);
+                    table.PrimaryKey("PK_FooterInfo", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -765,7 +765,7 @@ namespace EventLand.Infrastructure.Migrations
                 name: "Faqs");
 
             migrationBuilder.DropTable(
-                name: "FooterInfos");
+                name: "FooterInfo");
 
             migrationBuilder.DropTable(
                 name: "Users");

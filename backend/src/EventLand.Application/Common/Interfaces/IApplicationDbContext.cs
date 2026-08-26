@@ -23,7 +23,7 @@ public interface IApplicationDbContext
     DbSet<Venue>       Venues       { get; }
     DbSet<Auditorium>  Auditoriums  { get; }
     DbSet<Faq>         Faqs         { get; }
-    DbSet<FooterInfo>  FooterInfos  { get; }
+    DbSet<FooterInfo>  FooterInfo   { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

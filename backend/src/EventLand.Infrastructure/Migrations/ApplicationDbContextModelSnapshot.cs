@@ -629,7 +629,7 @@ namespace EventLand.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("FooterInfos");
+                    b.ToTable("FooterInfo", (string)null);
                 });
 
             modelBuilder.Entity("EventLand.Domain.Entities.Organizer", b =>

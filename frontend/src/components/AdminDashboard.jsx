@@ -36,7 +36,7 @@ import {
   HelpCircle,
   GripVertical
 } from 'lucide-react';
-import { adminApi, locationsApi, uploadApi, faqsApi, getEventImageUrl, getOrganizerImageUrl } from '../services/api';
+import { adminApi, locationsApi, uploadApi, faqsApi, footerApi, getEventImageUrl, getOrganizerImageUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
@@ -141,7 +141,22 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [showTagModal, setShowTagModal] = useState(false);
   const [showAuditoriumModal, setShowAuditoriumModal] = useState(false);
   const [showFaqModal, setShowFaqModal] = useState(false);
+  const [showFooterModal, setShowFooterModal] = useState(false);
   const [previewAuditorium, setPreviewAuditorium] = useState(null);
+
+  const defaultFooterForm = {
+    brandName: 'EventLand',
+    tagline: 'Event Land is a single, user-friendly platform, we link fans, artists, and organizers for everything from comedy nights to concerts. 🎵🎭',
+    phone: '+92 307 9353185',
+    email: 'support@eventland.pk',
+    address: 'Karachi, Pakistan',
+    copyrightText: '© 2026 EventLand Pakistan. All rights reserved.',
+    privacyPolicyUrl: '#',
+    termsOfServiceUrl: '#',
+    organizerSupportUrl: '#'
+  };
+
+  const [footerForm, setFooterForm] = useState(defaultFooterForm);
 
   const defaultFaqForm = {
     id: null,
@@ -279,7 +294,7 @@ export default function AdminDashboard({ onSelectEvent }) {
     if (isInitial) setLoading(true);
     setErrorMsg('');
     try {
-      const [orgs, evs, arts, bks, rls, usrs, tgs, auds, cnts, cts, vns, faqs] = await Promise.all([
+      const [orgs, evs, arts, bks, rls, usrs, tgs, auds, cnts, cts, vns, faqs, ftr] = await Promise.all([
         adminApi.organizers.getAll().catch(() => []),
         adminApi.events.getAll(1, 50).catch(() => ({ items: [] })),
         adminApi.artists.getAll(1, 50).catch(() => ({ items: [] })),
@@ -291,7 +306,8 @@ export default function AdminDashboard({ onSelectEvent }) {
         locationsApi.getCountries().catch(() => []),
         locationsApi.getCities().catch(() => []),
         locationsApi.getVenues().catch(() => []),
-        faqsApi.adminGetAll().catch(() => [])
+        faqsApi.adminGetAll().catch(() => []),
+        footerApi.get().catch(() => null)
       ]);
 
       const rawOrgs = Array.isArray(orgs) ? orgs : (orgs?.items || []);
@@ -317,6 +333,19 @@ export default function AdminDashboard({ onSelectEvent }) {
       setCitiesList(cts || []);
       setVenuesList(vns || []);
       setFaqsList(faqs || []);
+      if (ftr) {
+        setFooterForm({
+          brandName: ftr.brandName || 'EventLand',
+          tagline: ftr.tagline || '',
+          phone: ftr.phone || '',
+          email: ftr.email || '',
+          address: ftr.address || '',
+          copyrightText: ftr.copyrightText || '',
+          privacyPolicyUrl: ftr.privacyPolicyUrl || '#',
+          termsOfServiceUrl: ftr.termsOfServiceUrl || '#',
+          organizerSupportUrl: ftr.organizerSupportUrl || '#'
+        });
+      }
     } catch (err) {
       console.error('Error fetching admin data:', err);
       setErrorMsg(err.message || 'Failed to load backend data.');
@@ -1518,6 +1547,26 @@ export default function AdminDashboard({ onSelectEvent }) {
     }
   };
 
+  const handleSaveFooterInfo = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setIsSaving(true);
+    try {
+      await footerApi.update(footerForm);
+      const msg = 'Footer information updated successfully!';
+      setSuccessMsg(msg);
+      showSuccess('Footer Updated 📝', msg);
+      setShowFooterModal(false);
+      window.dispatchEvent(new CustomEvent('footer-updated'));
+      fetchBackendData();
+    } catch (err) {
+      const msg = err.message || 'Failed to update footer info.';
+      setErrorMsg(msg);
+      showError('Save Failed', msg);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem 1rem' }}>
       {/* Header */}
@@ -1769,6 +1818,27 @@ export default function AdminDashboard({ onSelectEvent }) {
           }}
         >
           <HelpCircle size={18} /> FAQs ({faqsList.length})
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveAdminTab('footer-info');
+            setShowFooterModal(true);
+          }}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'footer-info' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <FileText size={18} /> Footer Info
         </button>
       </div>
 
@@ -2638,6 +2708,71 @@ export default function AdminDashboard({ onSelectEvent }) {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* --- TAB: FOOTER INFO MANAGEMENT --- */}
+      {activeAdminTab === 'footer-info' && (
+        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <FileText size={22} color="#3b82f6" /> Footer Info Settings
+              </h3>
+              <p style={{ fontSize: '0.875rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                Single-row site configuration stored in database table <code>FooterInfo</code>
+              </p>
+            </div>
+            <button
+              onClick={() => setShowFooterModal(true)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                border: 'none',
+                borderRadius: '10px',
+                color: '#fff',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <Edit3 size={18} /> Edit Footer Info
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>Brand Name</span>
+              <div style={{ fontSize: '1.1rem', color: '#fff', fontWeight: 600, marginTop: '0.25rem' }}>{footerForm.brandName || 'EventLand'}</div>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>Phone</span>
+              <div style={{ fontSize: '1.1rem', color: '#3b82f6', fontWeight: 600, marginTop: '0.25rem' }}>{footerForm.phone || 'N/A'}</div>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>Email</span>
+              <div style={{ fontSize: '1.1rem', color: '#3b82f6', fontWeight: 600, marginTop: '0.25rem' }}>{footerForm.email || 'N/A'}</div>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>Address</span>
+              <div style={{ fontSize: '0.95rem', color: '#cbd5e1', marginTop: '0.25rem' }}>{footerForm.address || 'N/A'}</div>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', gridColumn: 'span 2' }}>
+              <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>Tagline</span>
+              <div style={{ fontSize: '0.95rem', color: '#cbd5e1', marginTop: '0.25rem' }}>{footerForm.tagline}</div>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', gridColumn: 'span 2' }}>
+              <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>Copyright Text</span>
+              <div style={{ fontSize: '0.95rem', color: '#cbd5e1', marginTop: '0.25rem' }}>{footerForm.copyrightText}</div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -3977,6 +4112,152 @@ export default function AdminDashboard({ onSelectEvent }) {
                 </button>
                 <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>
                   {isSaving ? 'Saving FAQ...' : (faqForm.id ? 'Update FAQ' : 'Save FAQ')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL: EDIT FOOTER INFO --- */}
+      {showFooterModal && (
+        <div className="modal-overlay" onClick={() => setShowFooterModal(false)}>
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', padding: '2rem', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+            <button
+              onClick={() => setShowFooterModal(false)}
+              style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255, 255, 255, 0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <X size={18} />
+            </button>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <FileText color="#3b82f6" size={24} /> Edit Footer Info
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1.5rem' }}>
+              Update site branding, tagline, contact information, and policy URLs stored in table <code>FooterInfo</code>.
+            </p>
+
+            <form onSubmit={handleSaveFooterInfo} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    Brand Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={footerForm.brandName || ''}
+                    onChange={e => setFooterForm({ ...footerForm, brandName: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    value={footerForm.phone || ''}
+                    onChange={e => setFooterForm({ ...footerForm, phone: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    Support Email
+                  </label>
+                  <input
+                    type="email"
+                    value={footerForm.email || ''}
+                    onChange={e => setFooterForm({ ...footerForm, email: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    Physical Address
+                  </label>
+                  <input
+                    type="text"
+                    value={footerForm.address || ''}
+                    onChange={e => setFooterForm({ ...footerForm, address: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                  Brand Tagline
+                </label>
+                <textarea
+                  rows={3}
+                  value={footerForm.tagline || ''}
+                  onChange={e => setFooterForm({ ...footerForm, tagline: e.target.value })}
+                  style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', resize: 'vertical' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                  Copyright Text
+                </label>
+                <input
+                  type="text"
+                  value={footerForm.copyrightText || ''}
+                  onChange={e => setFooterForm({ ...footerForm, copyrightText: e.target.value })}
+                  style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    Privacy Policy URL
+                  </label>
+                  <input
+                    type="text"
+                    value={footerForm.privacyPolicyUrl || ''}
+                    onChange={e => setFooterForm({ ...footerForm, privacyPolicyUrl: e.target.value })}
+                    style={{ width: '100%', padding: '0.6rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    Terms of Service URL
+                  </label>
+                  <input
+                    type="text"
+                    value={footerForm.termsOfServiceUrl || ''}
+                    onChange={e => setFooterForm({ ...footerForm, termsOfServiceUrl: e.target.value })}
+                    style={{ width: '100%', padding: '0.6rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    Organizer Support URL
+                  </label>
+                  <input
+                    type="text"
+                    value={footerForm.organizerSupportUrl || ''}
+                    onChange={e => setFooterForm({ ...footerForm, organizerSupportUrl: e.target.value })}
+                    style={{ width: '100%', padding: '0.6rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1.25rem' }}>
+                <button type="button" onClick={() => setShowFooterModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>
+                  {isSaving ? 'Updating...' : 'Save Footer Info'}
                 </button>
               </div>
             </form>

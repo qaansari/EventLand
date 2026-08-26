@@ -31,7 +31,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Venue>       Venues       => Set<Venue>();
     public DbSet<Auditorium>  Auditoriums  => Set<Auditorium>();
     public DbSet<Faq>         Faqs         => Set<Faq>();
-    public DbSet<FooterInfo>  FooterInfos  => Set<FooterInfo>();
+    public DbSet<FooterInfo>  FooterInfo   => Set<FooterInfo>();
 
     // ── Model Configuration ──────────────────────────────────────────────────
     protected override void OnModelCreating(ModelBuilder modelBuilder)

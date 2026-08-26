@@ -20,7 +20,7 @@ public class FooterController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetFooterInfo()
     {
-        var footer = await _context.FooterInfos.AsNoTracking().FirstOrDefaultAsync();
+        var footer = await _context.FooterInfo.AsNoTracking().FirstOrDefaultAsync();
         if (footer == null)
         {
             footer = new Domain.Entities.FooterInfo();
@@ -55,4 +55,42 @@ public class FooterController : ControllerBase
             majorCities = cities
         });
     }
+
+    [HttpPut]
+    public async Task<IActionResult> UpdateFooterInfo([FromBody] UpdateFooterInfoDto dto)
+    {
+        var footer = await _context.FooterInfo.FirstOrDefaultAsync();
+        if (footer == null)
+        {
+            footer = new Domain.Entities.FooterInfo();
+            _context.FooterInfo.Add(footer);
+        }
+
+        if (dto.BrandName != null) footer.BrandName = dto.BrandName;
+        if (dto.Tagline != null) footer.Tagline = dto.Tagline;
+        if (dto.Phone != null) footer.Phone = dto.Phone;
+        if (dto.Email != null) footer.Email = dto.Email;
+        if (dto.Address != null) footer.Address = dto.Address;
+        if (dto.CopyrightText != null) footer.CopyrightText = dto.CopyrightText;
+        if (dto.PrivacyPolicyUrl != null) footer.PrivacyPolicyUrl = dto.PrivacyPolicyUrl;
+        if (dto.TermsOfServiceUrl != null) footer.TermsOfServiceUrl = dto.TermsOfServiceUrl;
+        if (dto.OrganizerSupportUrl != null) footer.OrganizerSupportUrl = dto.OrganizerSupportUrl;
+        footer.UpdatedAt = System.DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return Ok(footer);
+    }
+}
+
+public class UpdateFooterInfoDto
+{
+    public string? BrandName { get; set; }
+    public string? Tagline { get; set; }
+    public string? Phone { get; set; }
+    public string? Email { get; set; }
+    public string? Address { get; set; }
+    public string? CopyrightText { get; set; }
+    public string? PrivacyPolicyUrl { get; set; }
+    public string? TermsOfServiceUrl { get; set; }
+    public string? OrganizerSupportUrl { get; set; }
 }

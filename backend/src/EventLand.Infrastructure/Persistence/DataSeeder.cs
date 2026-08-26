@@ -78,7 +78,7 @@ public static class DataSeeder
             defaultOrg = new Organizer
             {
                 Name = "Event Land",
-                Email = "support@eventlan.pk",
+                Email = "support@eventland.pk",
                 Phone = "+92 307 9353185",
                 LogoUrl = "org_eventland_01.png",
                 WebsiteUrl = "https://www.eventland.pk",
@@ -89,7 +89,7 @@ public static class DataSeeder
         }
         else
         {
-            defaultOrg.Email = "support@eventlan.pk";
+            defaultOrg.Email = "support@eventland.pk";
             defaultOrg.Phone = "+92 307 9353185";
             defaultOrg.WebsiteUrl = "https://www.eventland.pk";
             defaultOrg.LogoUrl = "org_eventland_01.png";
@@ -147,9 +147,9 @@ public static class DataSeeder
         }
 
         // 7. Default Footer Info Seeding
-        if (!await context.FooterInfos.AnyAsync())
+        if (!await context.FooterInfo.AnyAsync())
         {
-            context.FooterInfos.Add(new FooterInfo
+            context.FooterInfo.Add(new FooterInfo
             {
                 BrandName = "EventLand",
                 Tagline = "Event Land is a single, user-friendly platform, we link fans, artists, and organizers for everything from comedy nights to concerts. 🎵🎭",

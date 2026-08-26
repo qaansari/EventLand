@@ -295,7 +295,8 @@ export const faqsApi = {
 };
 
 export const footerApi = {
-  get: async () => request('/footer')
+  get: async () => request('/footer'),
+  update: async (dto) => request('/footer', { method: 'PUT', body: JSON.stringify(dto) })
 };
 
 

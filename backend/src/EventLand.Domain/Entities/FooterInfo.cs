@@ -1,7 +1,9 @@
 namespace EventLand.Domain.Entities;
 
 using System;
+using System.ComponentModel.DataAnnotations.Schema;
 
+[Table("FooterInfo")]
 public class FooterInfo
 {
     public int Id { get; set; }
@@ -16,3 +18,4 @@ public class FooterInfo
     public string OrganizerSupportUrl { get; set; } = "#";
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
+

@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EventLand.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260826072922_InitialCreate")]
+    [Migration("20260826133156_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -632,7 +632,7 @@ namespace EventLand.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("FooterInfos");
+                    b.ToTable("FooterInfo", (string)null);
                 });
 
             modelBuilder.Entity("EventLand.Domain.Entities.Organizer", b =>
