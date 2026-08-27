@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using EventLand.Application.Common.Interfaces;
 using EventLand.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,6 +14,7 @@ public record UpdateFaqDto(string Question, string Answer, int DisplayOrder = 0,
 
 [ApiController]
 [Route("api/admin/faqs")]
+[Authorize(Roles = "SuperAdmin,Admin")]
 public class AdminFaqsController : ControllerBase
 {
     private readonly IApplicationDbContext _context;

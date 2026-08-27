@@ -1,8 +1,15 @@
 namespace EventLand.Api.Controllers;
 
+using System;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using EventLand.Application.Common;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using SkiaSharp;
 
 [ApiController]
 [Route("api/upload")]
@@ -11,7 +18,8 @@ using Microsoft.AspNetCore.Mvc;
 public class UploadController : ControllerBase
 {
     private readonly IWebHostEnvironment _environment;
-    private const long MaxFileSizeInBytes = 10 * 1024 * 1024; // 10 MB
+    private const long MaxFileSizeInBytes = 25 * 1024 * 1024; // Allow uploads up to 25 MB before compression
+    private const long OneMbInBytes = 1 * 1024 * 1024; // 1 MB target threshold
 
     public UploadController(IWebHostEnvironment environment)
     {
@@ -32,7 +40,7 @@ public class UploadController : ControllerBase
 
         if (file.Length > MaxFileSizeInBytes)
         {
-            return BadRequest(new { message = "File size exceeds the 10 MB limit." });
+            return BadRequest(new { message = "File size exceeds maximum upload limit." });
         }
 
         // Strict extension & content-type validation: webp, jpg, jpeg, png ONLY
@@ -53,6 +61,7 @@ public class UploadController : ControllerBase
         var subFolder = (type?.ToLowerInvariant()) switch
         {
             "organizer" or "organizers" => Path.Combine("assets", "images", "organizers"),
+            "user" or "users" => Path.Combine("assets", "images", "users"),
             _ => Path.Combine("assets", "images", "events")
         };
 
@@ -64,7 +73,6 @@ public class UploadController : ControllerBase
             Directory.CreateDirectory(targetFolder);
         }
 
-        // Format name according to rule: org_[organizernamewithoutspace]_[last2digits].[ext] or ev_[eventnamewithoutspace]_[last2digits].[ext]
         var targetFileName = FileUrlHelper.FormatEntityImageFileName(type ?? "events", name, id ?? 1, extension);
         var basePattern = Path.GetFileNameWithoutExtension(targetFileName);
 
@@ -86,8 +94,43 @@ public class UploadController : ControllerBase
 
         var filePath = Path.Combine(targetFolder, targetFileName);
 
-        using (var stream = new FileStream(filePath, FileMode.Create))
+        // Check if uploaded file is greater than 1 MB. If so, compress using free SkiaSharp library (MIT License)
+        if (file.Length > OneMbInBytes)
         {
+            try
+            {
+                using var inputStream = file.OpenReadStream();
+                using var originalBitmap = SKBitmap.Decode(inputStream);
+
+                if (originalBitmap != null)
+                {
+                    var format = extension switch
+                    {
+                        ".png" => SKEncodedImageFormat.Png,
+                        ".webp" => SKEncodedImageFormat.Webp,
+                        _ => SKEncodedImageFormat.Jpeg
+                    };
+
+                    byte[] compressedBytes = CompressBitmapToUnder1Mb(originalBitmap, format);
+                    await System.IO.File.WriteAllBytesAsync(filePath, compressedBytes);
+                }
+                else
+                {
+                    // Fallback to direct stream copy if bitmap decoding fails
+                    using var stream = new FileStream(filePath, FileMode.Create);
+                    await file.CopyToAsync(stream);
+                }
+            }
+            catch
+            {
+                // Fallback safely to direct stream copy
+                using var stream = new FileStream(filePath, FileMode.Create);
+                await file.CopyToAsync(stream);
+            }
+        }
+        else
+        {
+            using var stream = new FileStream(filePath, FileMode.Create);
             await file.CopyToAsync(stream);
         }
 
@@ -95,5 +138,47 @@ public class UploadController : ControllerBase
         var fileUrl = $"/{relativePath}/{targetFileName}";
 
         return Ok(new { url = fileUrl, fileName = targetFileName });
+    }
+
+    private static byte[] CompressBitmapToUnder1Mb(SKBitmap originalBitmap, SKEncodedImageFormat format)
+    {
+        int quality = 85;
+        byte[] result = Array.Empty<byte>();
+
+        // If dimensions are larger than 2400px, resize proportionally first
+        SKBitmap bitmapToEncode = originalBitmap;
+        bool wasResized = false;
+        if (originalBitmap.Width > 2400 || originalBitmap.Height > 2400)
+        {
+            float scale = Math.Min(2400f / originalBitmap.Width, 2400f / originalBitmap.Height);
+            int newWidth = Math.Max(1, (int)(originalBitmap.Width * scale));
+            int newHeight = Math.Max(1, (int)(originalBitmap.Height * scale));
+            bitmapToEncode = originalBitmap.Resize(new SKImageInfo(newWidth, newHeight), SKFilterQuality.High) ?? originalBitmap;
+            wasResized = bitmapToEncode != originalBitmap;
+        }
+
+        try
+        {
+            using var image = SKImage.FromBitmap(bitmapToEncode);
+            while (quality >= 30)
+            {
+                using var data = image.Encode(format, quality);
+                if (data != null)
+                {
+                    result = data.ToArray();
+                    if (result.Length <= 1 * 1024 * 1024) break;
+                }
+                quality -= 10;
+            }
+        }
+        finally
+        {
+            if (wasResized && bitmapToEncode != null)
+            {
+                bitmapToEncode.Dispose();
+            }
+        }
+
+        return result;
     }
 }

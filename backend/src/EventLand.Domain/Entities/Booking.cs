@@ -16,6 +16,10 @@ public class Booking : BaseEntity
     public int          TicketTierId    { get; set; }
     public TicketTier   TicketTier      { get; set; } = null!;
 
+    // Owning user account (nullable: preserves guest-checkout capability at the DB level)
+    public int?         UserId          { get; set; }
+    public User?        User            { get; set; }
+
     // Human-readable booking reference
     public string       BookingRef      { get; set; } = string.Empty;
 
@@ -30,10 +34,19 @@ public class Booking : BaseEntity
     public decimal      TotalAmount     { get; set; }
 
     // Status & payment
-    public BookingStatus  Status          { get; set; } = BookingStatus.Confirmed;
+    public BookingStatus  Status          { get; set; } = BookingStatus.Pending;
     public PaymentStatus  PaymentStatus   { get; set; } = PaymentStatus.Pending;
     public PaymentMethod  PaymentMethod   { get; set; } = PaymentMethod.None;
     public DateTimeOffset? PaidAt         { get; set; }
+
+    // PayPro Pakistan integration & timer fields
+    public string?        PayProInvoiceId   { get; set; }
+    public string?        PayProConnectUrl { get; set; }
+    public DateTimeOffset? PaymentExpiresAt { get; set; }
+
+    // Refund tracking
+    public DateTimeOffset? RefundedAt      { get; set; }
+    public string?        RefundReason    { get; set; }
 
     // Navigation
     public ICollection<BookingSeat> BookingSeats { get; set; } = new List<BookingSeat>();

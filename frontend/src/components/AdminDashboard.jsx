@@ -36,13 +36,14 @@ import {
   HelpCircle,
   GripVertical
 } from 'lucide-react';
-import { adminApi, locationsApi, uploadApi, faqsApi, footerApi, getEventImageUrl, getOrganizerImageUrl } from '../services/api';
+import { adminApi, locationsApi, uploadApi, faqsApi, footerApi, paymentsApi, getEventImageUrl, getOrganizerImageUrl, getUserImageUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
 import EventCard from './EventCard';
 import InteractiveSeatPicker from './InteractiveSeatPicker';
 import { parseAuditoriumLayout, createBlankLayoutJson } from '../data/auditoriumLayouts';
+import { exportAuditoriumChartPdf } from '../utils/pdfChartExporter';
 
 // --- File Upload Component Helper ---
 function FileUploadField({ label, value, onChange, placeholder = "Image URL or upload file...", type = "events", entityName = null, entityId = null }) {
@@ -244,12 +245,12 @@ export default function AdminDashboard({ onSelectEvent }) {
 
   const defaultUserForm = {
     id: null,
-    firstName: '',
-    lastName: '',
+    fullName: '',
     email: '',
     password: '',
     roleId: 2,
-    phoneNumber: '+92 300 0000000'
+    phoneNumber: '+92 300 0000000',
+    imageUrl: ''
   };
 
   const defaultRoleForm = {
@@ -366,8 +367,13 @@ export default function AdminDashboard({ onSelectEvent }) {
     setSuccessMsg('');
 
     const title = eventForm.title ? eventForm.title.trim() : '';
-    const venue = eventForm.venue ? eventForm.venue.trim() : '';
-    const orgId = parseInt(eventForm.organizerId, 10) || (organizersList[0]?.id || 1);
+    const orgId = parseInt(eventForm.organizerId, 10) || (organizersList[0]?.id || 1000);
+    
+    // Resolve venue automatically from venueId, auditorium layout, or form input
+    const selVenueObj = venuesList.find(v => String(v.id) === String(eventForm.venueId));
+    const selAudiObj = auditoriumsList.find(a => a.layoutCode === eventForm.auditoriumLayout || a.name === eventForm.auditoriumLayout || String(a.id) === String(eventForm.auditoriumId));
+    const resolvedVenueName = eventForm.venue?.trim() || selVenueObj?.name || selAudiObj?.venue || selAudiObj?.name || 'Arts Council of Pakistan';
+    const venue = resolvedVenueName;
 
     if (!title) {
       const msg = 'Please enter an event title.';
@@ -822,6 +828,8 @@ export default function AdminDashboard({ onSelectEvent }) {
           fullName: userForm.fullName,
           roleId: parseInt(userForm.roleId, 10),
           phoneNumber: userForm.phoneNumber,
+          imageUrl: userForm.imageUrl || null,
+          password: userForm.password || null,
           isActive: true
         };
         await adminApi.users.update(userForm.id, payload);
@@ -834,7 +842,8 @@ export default function AdminDashboard({ onSelectEvent }) {
           password: userForm.password,
           fullName: userForm.fullName,
           roleId: parseInt(userForm.roleId, 10),
-          phoneNumber: userForm.phoneNumber
+          phoneNumber: userForm.phoneNumber,
+          imageUrl: userForm.imageUrl || null
         };
         await adminApi.users.create(payload);
         const msg = 'User account created successfully!';
@@ -852,13 +861,15 @@ export default function AdminDashboard({ onSelectEvent }) {
   };
 
   const handleEditUser = (u) => {
+    const matchedRole = rolesList.find(r => (r.name || '').toLowerCase() === (u.role || '').toLowerCase());
     setUserForm({
       id: u.id,
       email: u.email || '',
       password: '',
       fullName: u.fullName || '',
-      roleId: u.roleId || (rolesList[0]?.id || ''),
-      phoneNumber: u.phoneNumber || ''
+      roleId: matchedRole ? matchedRole.id : (u.roleId || rolesList[0]?.id || 2),
+      phoneNumber: u.phoneNumber || '',
+      imageUrl: u.imageUrl || ''
     });
     setShowUserModal(true);
   };
@@ -2130,7 +2141,21 @@ export default function AdminDashboard({ onSelectEvent }) {
               <tbody>
                 {usersList.map(u => (
                   <tr key={u.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                    <td style={{ padding: '1rem', fontWeight: 600, color: '#f8fafc' }}>{u.fullName}</td>
+                    <td style={{ padding: '1rem', fontWeight: 600, color: '#f8fafc' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        {u.imageUrl ? (
+                          <img src={getUserImageUrl(u.imageUrl)} alt="" style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(236, 72, 153, 0.4)' }} />
+                        ) : (
+                          <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.85rem' }}>
+                            {u.fullName ? u.fullName.charAt(0).toUpperCase() : 'U'}
+                          </div>
+                        )}
+                        <div>
+                          <div>{u.fullName}</div>
+                          {u.phoneNumber && <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{u.phoneNumber}</div>}
+                        </div>
+                      </div>
+                    </td>
                     <td style={{ padding: '1rem', color: '#94a3b8' }}>{u.email}</td>
                     <td style={{ padding: '1rem' }}>
                       <span style={{ padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', fontWeight: 600 }}>
@@ -3541,12 +3566,28 @@ export default function AdminDashboard({ onSelectEvent }) {
                 <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Email *</label>
                 <input type="email" required disabled={Boolean(userForm.id)} value={userForm.email} onChange={e => setUserForm({ ...userForm, email: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
               </div>
-              {!userForm.id && (
+              {!userForm.id ? (
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Password *</label>
                   <input type="password" required value={userForm.password} onChange={e => setUserForm({ ...userForm, password: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
                 </div>
+              ) : (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                    New Password <span style={{ color: '#ec4899', fontSize: '0.75rem' }}>(Super Admin Direct Update - Leave blank to keep current)</span>
+                  </label>
+                  <input type="password" placeholder="Enter new password to update directly..." value={userForm.password} onChange={e => setUserForm({ ...userForm, password: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(236, 72, 153, 0.3)', borderRadius: '8px', color: '#fff' }} />
+                </div>
               )}
+              <FileUploadField
+                label="User Profile Image (Optional)"
+                value={userForm.imageUrl}
+                onChange={(url) => setUserForm({ ...userForm, imageUrl: url })}
+                placeholder="Upload user image or enter URL..."
+                type="users"
+                entityName={userForm.fullName}
+                entityId={userForm.id}
+              />
               <div>
                 <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Assign Role *</label>
                 <SearchableSelect

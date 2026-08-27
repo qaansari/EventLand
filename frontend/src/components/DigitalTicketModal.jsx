@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { X, Download, CheckCircle2, ShieldCheck, ScanLine } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
+import { exportTicketPdf } from '../utils/ticketPdfExporter';
 
 export default function DigitalTicketModal({ ticket, onClose }) {
   const { showSuccess } = useToast();
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scannerStatus, setScannerStatus] = useState('idle'); // idle, scanning, verified
+
+  const isPaid = ticket?.paymentStatus === 'Paid' || ticket?.paymentStatus === 'PAID' || !ticket?.paymentStatus;
 
   const handleSimulateScan = () => {
     setIsScannerOpen(true);
@@ -27,10 +30,12 @@ export default function DigitalTicketModal({ ticket, onClose }) {
           alignItems: 'center'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <CheckCircle2 color="#3b82f6" size={22} />
+            <CheckCircle2 color={isPaid ? "#3b82f6" : "#f59e0b"} size={22} />
             <div>
               <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#fff' }}>Official Digital E-Ticket</h2>
-              <span style={{ fontSize: '0.75rem', color: '#60a5fa', fontWeight: 600 }}>Status: Active & Verified</span>
+              <span style={{ fontSize: '0.75rem', color: isPaid ? '#60a5fa' : '#fbbf24', fontWeight: 600 }}>
+                Status: {isPaid ? 'Active & Verified (Paid)' : 'Unpaid Invoice - E-Ticket Locked'}
+              </span>
             </div>
           </div>
           <button
@@ -62,50 +67,85 @@ export default function DigitalTicketModal({ ticket, onClose }) {
             boxShadow: '0 15px 30px rgba(0, 0, 0, 0.5)',
             position: 'relative'
           }}>
-            {/* Ticket Header Banner */}
+            {/* Ticket Brand Header */}
             <div style={{
-              backgroundColor: '#3b82f6',
+              background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
               color: '#ffffff',
               padding: '0.85rem 1.25rem',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              fontWeight: 800
+              borderBottom: '1px solid rgba(255,255,255,0.1)'
             }}>
-              <span>EVENTLAND PASS</span>
-              <span style={{ fontSize: '0.8rem', background: '#ffffff', color: '#1d4ed8', padding: '0.2rem 0.6rem', borderRadius: '9999px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <span style={{ width: '28px', height: '28px', background: '#3b82f6', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.9rem', color: '#fff' }}>E</span>
+                <div>
+                  <span style={{ fontWeight: 900, letterSpacing: '-0.02em', fontSize: '1rem', color: '#fff', display: 'block', lineHeight: 1 }}>EVENTLAND PAKISTAN</span>
+                  <span style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Official E-Ticket Pass</span>
+                </div>
+              </div>
+              <span style={{ fontSize: '0.72rem', background: '#2563eb', color: '#ffffff', padding: '0.2rem 0.6rem', borderRadius: '9999px', fontWeight: 800 }}>
                 CONFIRMED
               </span>
             </div>
 
+            {/* Event Show Banner Image */}
+            {ticket.banner && (
+              <div style={{ height: '140px', width: '100%', overflow: 'hidden', position: 'relative', background: '#1e293b' }}>
+                <img src={ticket.banner} alt={ticket.eventTitle} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(15,23,42,0.95), transparent)', padding: '0.75rem 1.25rem' }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#fff', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                    {ticket.eventTitle}
+                  </h3>
+                </div>
+              </div>
+            )}
+
             {/* Main Pass Body */}
-            <div style={{ padding: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', marginBottom: '0.5rem' }}>
-                {ticket.eventTitle}
-              </h3>
-              <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1.25rem' }}>
-                {ticket.venue}
+            <div style={{ padding: '1.25rem' }}>
+              {!ticket.banner && (
+                <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#fff', marginBottom: '0.35rem' }}>
+                  {ticket.eventTitle}
+                </h3>
+              )}
+              <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginBottom: '1rem', fontWeight: 600 }}>
+                📍 {ticket.venue}
               </p>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem', backgroundColor: 'rgba(0,0,0,0.3)', padding: '1rem', borderRadius: '12px' }}>
+              {/* Show Schedule Box */}
+              <div style={{ background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <span style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8' }}>PASS HOLDER</span>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>{ticket.attendeeName}</span>
+                  <span style={{ display: 'block', fontSize: '0.65rem', color: '#60a5fa', fontWeight: 800, textTransform: 'uppercase' }}>📅 SHOW DATE</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff' }}>{ticket.date || 'Jan 10, 2027'}</span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ display: 'block', fontSize: '0.65rem', color: '#60a5fa', fontWeight: 800, textTransform: 'uppercase' }}>⏰ SHOW TIME</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#60a5fa' }}>{ticket.time || ticket.showTitle || '8:00 PM PKT'}</span>
+                </div>
+              </div>
+
+              {/* Grid Specifications */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem', backgroundColor: 'rgba(0,0,0,0.3)', padding: '0.85rem', borderRadius: '12px' }}>
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>PASS HOLDER</span>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#fff' }}>{ticket.attendeeName}</span>
                 </div>
                 <div>
-                  <span style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8' }}>DATE & TIME</span>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>{ticket.date}</span>
-                </div>
-                <div>
-                  <span style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8' }}>SEATS / ZONES</span>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#60a5fa' }}>
-                    {ticket.seats.map((s) => s.id.split('-').pop()).join(', ')}
+                  <span style={{ display: 'block', fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>RESERVED SEATS / TIERS</span>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#60a5fa' }}>
+                    {ticket.seats.map((s) => s.label || (typeof s.id === 'string' ? s.id.split('-').pop() : s.id)).join(', ')}
                   </span>
                 </div>
                 <div>
-                  <span style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8' }}>TOTAL PAID</span>
-                  <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>
+                  <span style={{ display: 'block', fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>TOTAL PAID (PKR)</span>
+                  <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#34d399' }}>
                     PKR {ticket.totalPaid.toLocaleString()}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>🕒 BOOKED AT</span>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#cbd5e1' }}>
+                    {ticket.bookingTime || 'Aug 27, 2026'}
                   </span>
                 </div>
               </div>
@@ -150,7 +190,10 @@ export default function DigitalTicketModal({ ticket, onClose }) {
           {/* Action Buttons */}
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
             <button
-              onClick={() => showSuccess('Ticket Saved 📥', `Ticket #${ticket.ticketId} saved to downloads!`)}
+              onClick={() => {
+                exportTicketPdf(ticket);
+                showSuccess('E-Ticket Exported 📥', `E-Ticket #${ticket.ticketId || ticket.id || 'PASS'} generated successfully!`);
+              }}
               className="btn btn-primary"
               style={{ flexGrow: 1 }}
             >

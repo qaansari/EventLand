@@ -16,6 +16,13 @@ export function getEventImageUrl(bannerUrl) {
   return `${SERVER_BASE}/assets/images/events/${fileName}`;
 }
 
+export function getUserImageUrl(imageUrl) {
+  if (!imageUrl) return '';
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl;
+  const fileName = imageUrl.split('/').pop().split('\\').pop();
+  return `${SERVER_BASE}/assets/images/users/${fileName}`;
+}
+
 async function request(endpoint, options = {}) {
   const token = localStorage.getItem('eventland_jwt_token');
 
@@ -74,7 +81,11 @@ export const authApi = {
     }
     return data;
   },
-  getMe: async () => request('/auth/me')
+  getMe: async () => request('/auth/me'),
+  changePassword: async (oldPassword, newPassword) => request('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ oldPassword, newPassword })
+  })
 };
 
 // --- Public Events API ---
@@ -245,6 +256,14 @@ export const locationsApi = {
 // --- Public Tags API ---
 export const tagsApi = {
   getAll: async () => request('/tags')
+};
+
+// --- PayPro Pakistan & Refund Payments API ---
+export const paymentsApi = {
+  getPaymentStatus: async (bookingRef) => request(`/payments/status/${bookingRef}`),
+  createInvoice: async (dto) => request('/payments/create-invoice', { method: 'POST', body: JSON.stringify(dto) }),
+  confirmPayment: async (payload) => request('/payments/confirm', { method: 'POST', body: JSON.stringify(payload) }),
+  processRefund: async (dto) => request('/payments/refund', { method: 'POST', body: JSON.stringify(dto) })
 };
 
 // --- File & Image Upload API ---

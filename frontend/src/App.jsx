@@ -654,7 +654,7 @@ export default function App() {
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1', marginBottom: '0.25rem' }}>
                         <span>Seats/Tiers:</span>
-                        <strong style={{ color: '#60a5fa' }}>{t.seats.map((s) => s.id.split('-').pop()).join(', ')}</strong>
+                        <strong style={{ color: '#60a5fa' }}>{t.seats.map((s) => s.label || (typeof s.id === 'string' ? s.id.split('-').pop() : s.id)).join(', ')}</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1' }}>
                         <span>Amount Paid:</span>

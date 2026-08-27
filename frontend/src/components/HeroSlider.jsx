@@ -132,7 +132,7 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <MapPin size={16} color="#60a5fa" />
-                <span>{current.venue.split(',')[0]}</span>
+                <span>{current?.venue ? String(current.venue).split(',')[0] : (current?.cityName || current?.city || 'Arts Council of Pakistan')}</span>
               </div>
             </div>
 

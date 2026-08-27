@@ -114,7 +114,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#94a3b8', fontSize: '0.86rem', marginBottom: '0.5rem', fontWeight: 500 }}>
             <MapPin size={15} color="#3b82f6" />
-            <span>{event.city} • {event.venue ? event.venue.split(',')[0] : 'Venue'}</span>
+            <span>{(event?.cityName || event?.city || 'Karachi')} • {(event?.venueName || event?.venue) ? String(event.venueName || event.venue).split(',')[0] : 'Arts Council of Pakistan'}</span>
           </div>
 
           <h3 style={{

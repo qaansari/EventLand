@@ -32,6 +32,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Auditorium>  Auditoriums  => Set<Auditorium>();
     public DbSet<Faq>         Faqs         => Set<Faq>();
     public DbSet<FooterInfo>  FooterInfo   => Set<FooterInfo>();
+    public DbSet<RefundRecord> RefundRecords => Set<RefundRecord>();
 
     // ── Model Configuration ──────────────────────────────────────────────────
     protected override void OnModelCreating(ModelBuilder modelBuilder)

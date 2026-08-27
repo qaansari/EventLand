@@ -2,6 +2,13 @@ namespace EventLand.Application.Dtos;
 
 public record LoginRequestDto(string Email, string Password);
 
+public record RegisterRequestDto(
+    string FullName,
+    string Email,
+    string Password,
+    string? PhoneNumber = null
+);
+
 public record LoginResponseDto(
     string Token,
     UserDto User,
@@ -13,5 +20,12 @@ public record UserDto(
     string Email,
     string FullName,
     string Role,
-    DateTimeOffset? LastLoginAt
+    DateTimeOffset? LastLoginAt,
+    string? ImageUrl = null
 );
+
+public record ChangePasswordDto(
+    string OldPassword,
+    string NewPassword
+);
+

@@ -205,7 +205,7 @@ export default function Navbar({
                 position: 'absolute',
                 top: '2px',
                 right: '2px',
-                backgroundColor: '#3b82f6',
+                backgroundColor: '#2563eb',
                 color: '#ffffff',
                 borderRadius: '50%',
                 width: '18px',
@@ -295,7 +295,7 @@ export default function Navbar({
                 ) : (
                   <User size={13} color="#60a5fa" />
                 )}
-                {currentUser.name.split(' ')[0]}
+                {(currentUser?.name || currentUser?.fullName || 'User').split(' ')[0]}
               </span>
               <button
                 onClick={onLogout}

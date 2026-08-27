@@ -15,8 +15,13 @@ public static class DataSeeder
 {
     public static async Task SeedAsync(ApplicationDbContext context)
     {
-        // Apply schema migrations automatically
-        await context.Database.MigrateAsync();
+        // Apply schema. If migrations have been generated, apply them (production path);
+        // otherwise create the schema directly from the model so a fresh clone runs
+        // without a manual "dotnet ef migrations add" step.
+        if (context.Database.GetMigrations().Any())
+            await context.Database.MigrateAsync();
+        else
+            await context.Database.EnsureCreatedAsync();
 
         var passwordHasher = new PasswordHasher<User>();
 

@@ -97,6 +97,7 @@ public static class DependencyInjection
         services.AddScoped<IEventService, EventService>();
         services.AddScoped<IBookingService, BookingService>();
         services.AddScoped<IArtistService, ArtistService>();
+        services.AddScoped<IPayProPaymentService, PayProPaymentService>();
 
         return services;
     }

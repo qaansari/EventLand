@@ -59,6 +59,15 @@ public sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
                .HasForeignKey(b => b.TicketTierId)
                .OnDelete(DeleteBehavior.Restrict);
 
+        // Optional owning user. SetNull keeps historical bookings if the user is removed.
+        builder.HasOne(b => b.User)
+               .WithMany()
+               .HasForeignKey(b => b.UserId)
+               .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasIndex(b => b.UserId)
+               .HasDatabaseName("IX_Bookings_UserId");
+
         builder.HasMany(b => b.BookingSeats)
                .WithOne(bs => bs.Booking)
                .HasForeignKey(bs => bs.BookingId)

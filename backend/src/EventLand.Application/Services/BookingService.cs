@@ -18,72 +18,134 @@ public class BookingService : IBookingService
         _cacheService = cacheService;
     }
 
-    public async Task<BookingDto> CreateBookingAsync(CreateBookingDto dto)
+    public async Task<BookingDto> CreateBookingAsync(CreateBookingDto dto, int? userId = null, string? userEmail = null)
     {
         var ev = await _context.Events
+            .AsNoTracking()
             .FirstOrDefaultAsync(e => e.Id == dto.EventId && !e.IsDeleted);
 
         if (ev is null)
             throw new KeyNotFoundException($"Event with ID '{dto.EventId}' not found.");
 
         var tier = await _context.TicketTiers
+            .AsNoTracking()
             .FirstOrDefaultAsync(t => t.Id == dto.TicketTierId && t.EventId == dto.EventId && !t.IsDeleted);
 
         if (tier is null)
             throw new KeyNotFoundException($"Ticket tier '{dto.TicketTierId}' not found for event '{dto.EventId}'.");
 
-        var effectiveQuantity = (dto.SelectedSeatIds != null && dto.SelectedSeatIds.Any())
-            ? dto.SelectedSeatIds.Count
-            : Math.Max(1, dto.Quantity);
+        // Deduplicate any repeated seat ids the client may have sent.
+        var seatIds = dto.SelectedSeatIds?.Where(id => id > 0).Distinct().ToList() ?? new List<int>();
+        var isSeated = seatIds.Count > 0;
 
-        if (tier.AvailableQuantity - tier.SoldCount < effectiveQuantity)
-            throw new InvalidOperationException($"Not enough tickets available in tier '{tier.Name}'.");
+        var effectiveQuantity = isSeated ? seatIds.Count : Math.Max(1, dto.Quantity);
 
-        var bookingRef = $"EVL-{Random.Shared.Next(100000, 999999)}";
+        if (tier.MaxPerOrder > 0 && effectiveQuantity > tier.MaxPerOrder)
+            throw new InvalidOperationException($"You may book at most {tier.MaxPerOrder} ticket(s) per order for '{tier.Name}'.");
+
+        // ── Pricing ──────────────────────────────────────────────────────────
+        // Seated events price per seat (seat override → zone price → tier price);
+        // general-admission events price by tier.
+        decimal unitPrice;
+        decimal totalAmount;
+        List<Seat> seats = new();
+
+        if (isSeated)
+        {
+            seats = await _context.Seats
+                .AsNoTracking()
+                .Include(s => s.Zone)
+                .Where(s => seatIds.Contains(s.Id) && !s.IsDeleted)
+                .ToListAsync();
+
+            if (seats.Count != seatIds.Count)
+                throw new InvalidOperationException("One or more selected seats could not be found.");
+
+            if (seats.Any(s => s.Zone == null || s.Zone.EventId != dto.EventId))
+                throw new InvalidOperationException("One or more selected seats do not belong to this event.");
+
+            totalAmount = seats.Sum(s => s.Price ?? s.Zone!.Price);
+            unitPrice = Math.Round(totalAmount / effectiveQuantity, 2);
+        }
+        else
+        {
+            unitPrice = tier.Price;
+            totalAmount = tier.Price * effectiveQuantity;
+        }
 
         Enum.TryParse<PaymentMethod>(dto.PaymentMethod, true, out var paymentMethod);
+
+        // Authenticated identity is authoritative over any client-supplied email.
+        var effectiveEmail = string.IsNullOrWhiteSpace(userEmail) ? dto.CustomerEmail : userEmail;
 
         var booking = new Booking
         {
             EventId = dto.EventId,
             TicketTierId = dto.TicketTierId,
-            BookingRef = bookingRef,
+            UserId = userId,
+            BookingRef = $"EVL-{Random.Shared.Next(100000, 999999)}",
             CustomerName = dto.CustomerName,
-            CustomerEmail = dto.CustomerEmail,
+            CustomerEmail = effectiveEmail,
             CustomerPhone = dto.CustomerPhone,
             Quantity = effectiveQuantity,
-            UnitPrice = tier.Price,
-            TotalAmount = tier.Price * effectiveQuantity,
-            Status = BookingStatus.Confirmed,
-            PaymentStatus = PaymentStatus.Paid,
-            PaymentMethod = paymentMethod == PaymentMethod.None ? PaymentMethod.CreditCard : paymentMethod,
-            PaidAt = DateTimeOffset.UtcNow
+            UnitPrice = unitPrice,
+            TotalAmount = totalAmount,
+            // Pending until payment is confirmed via the PayPro invoice/IPN flow.
+            Status = BookingStatus.Pending,
+            PaymentStatus = PaymentStatus.Pending,
+            PaymentMethod = paymentMethod,
+            // Give abandoned bookings a reclaim window even before an invoice is generated.
+            PaymentExpiresAt = DateTimeOffset.UtcNow.AddMinutes(60)
         };
 
-        tier.SoldCount += effectiveQuantity;
-        _context.Bookings.Add(booking);
-
-        if (dto.SelectedSeatIds is not null && dto.SelectedSeatIds.Any())
-        {
-            var seats = await _context.Seats
-                .Where(s => dto.SelectedSeatIds.Contains(s.Id) && !s.IsDeleted)
-                .ToListAsync();
-
-            foreach (var seat in seats)
+        // Built once, outside the retryable delegate: re-adding the same entity
+        // references on a transient-failure retry is a no-op, so no duplicate rows.
+        var bookingSeats = seatIds
+            .Select(seatId => new BookingSeat
             {
-                seat.Status = SeatStatus.Booked;
-                _context.BookingSeats.Add(new BookingSeat
-                {
-                    Booking = booking,
-                    Seat = seat,
-                    EventShowId = dto.EventShowId
-                });
+                Booking = booking,
+                SeatId = seatId,
+                EventShowId = dto.EventShowId
+            })
+            .ToList();
+
+        // ── Atomic reservation ───────────────────────────────────────────────
+        // EnableRetryOnFailure requires explicit transactions to run inside an
+        // execution strategy. All availability guards run as conditional UPDATEs
+        // so the database is the single source of truth against oversell / double-book.
+        var strategy = _context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            var reserved = await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE TicketTiers SET SoldCount = SoldCount + {effectiveQuantity} WHERE Id = {tier.Id} AND IsDeleted = 0 AND (SoldCount + {effectiveQuantity}) <= AvailableQuantity");
+
+            if (reserved == 0)
+                throw new InvalidOperationException($"Not enough tickets available in tier '{tier.Name}'.");
+
+            foreach (var seatId in seatIds)
+            {
+                // Flip only if still Available AND still belongs to this event.
+                var flipped = await _context.Database.ExecuteSqlInterpolatedAsync(
+                    $"UPDATE Seats SET Status = {(int)SeatStatus.Reserved} WHERE Id = {seatId} AND Status = {(int)SeatStatus.Available} AND IsDeleted = 0 AND ZoneId IN (SELECT Id FROM SeatingZones WHERE EventId = {dto.EventId} AND IsDeleted = 0)");
+
+                if (flipped == 0)
+                    throw new InvalidOperationException("One or more selected seats are no longer available. Please choose different seats.");
             }
 
-            await _cacheService.ReleaseSeatsAsync(dto.EventId, dto.SelectedSeatIds, dto.EventShowId);
-        }
+            _context.Bookings.Add(booking);
+            foreach (var bs in bookingSeats)
+                _context.BookingSeats.Add(bs);
 
-        await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        });
+
+        // Release the ephemeral (Redis) hold now that the DB reservation is authoritative.
+        if (isSeated)
+            await _cacheService.ReleaseSeatsAsync(dto.EventId, seatIds, dto.EventShowId);
+
         await _cacheService.ClearEventCacheAsync(dto.EventId);
 
         return await GetBookingByIdAsync(booking.Id)

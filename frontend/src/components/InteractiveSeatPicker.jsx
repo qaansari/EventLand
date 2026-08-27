@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Ticket, Calendar, Layers, ZoomIn, ZoomOut, RotateCcw, Maximize2, ShieldAlert } from 'lucide-react';
+import { X, Ticket, Calendar, Layers, ZoomIn, ZoomOut, RotateCcw, Maximize2, ShieldAlert, Download } from 'lucide-react';
 import { seatHoldApi, eventsApi, auditoriumLayoutsApi } from '../services/api';
 import { parseAuditoriumLayout } from '../data/auditoriumLayouts';
+import { exportAuditoriumChartPdf } from '../utils/pdfChartExporter';
 
 const createGuestEmail = () => `guest_${Math.floor(100000 + Math.random() * 900000)}@eventland.pk`;
 
@@ -333,6 +334,69 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
     );
   };
 
+  // Match current auditorium against dbAuditoriums list if available
+  const matchedDbAuditorium = useMemo(() => {
+    if (!dbAuditoriums || dbAuditoriums.length === 0) return null;
+    const searchTarget = (currentZone?.zone || event.auditoriumName || event.auditoriumLayout || event.title || '').toLowerCase();
+    return dbAuditoriums.find(a => 
+      (a.name && searchTarget.includes(a.name.toLowerCase())) || 
+      (a.layoutCode && searchTarget.includes(a.layoutCode.toLowerCase()))
+    );
+  }, [dbAuditoriums, currentZone?.zone, event.auditoriumName, event.auditoriumLayout, event.title]);
+
+  const rawAudi = currentZone?.zone || event.auditoriumName || event.auditorium || matchedDbAuditorium?.name || event.auditoriumLayout || 'Main Auditorium';
+  const auditoriumName = (rawAudi && !rawAudi.toLowerCase().includes('undefined')) ? rawAudi : 'Main Auditorium';
+
+  let rawVenue = event.venueName || (event.venue ? event.venue.split(',')[0].trim() : '') || matchedDbAuditorium?.venue || matchedDbAuditorium?.venueName || '';
+  if (rawVenue.toLowerCase().includes('undefined')) rawVenue = '';
+
+  let rawCity = event.cityName || event.city || (event.venue && event.venue.includes(',') ? event.venue.split(',')[1].trim() : '') || matchedDbAuditorium?.city || matchedDbAuditorium?.cityName || '';
+  if (rawCity.toLowerCase().includes('undefined')) rawCity = '';
+
+  // Smart Catalog Fallback when venue or city are unspecified in blueprint preview
+  if (!rawVenue || !rawCity) {
+    const nameLower = auditoriumName.toLowerCase();
+    if (nameLower.includes('ac auditorium') || nameLower.includes('arts council')) {
+      rawVenue = rawVenue || 'Arts Council of Pakistan';
+      rawCity = rawCity || 'Karachi';
+    } else if (nameLower.includes('alhamra')) {
+      rawVenue = rawVenue || 'Alhamra Arts Council';
+      rawCity = rawCity || 'Lahore';
+    } else if (nameLower.includes('pnca')) {
+      rawVenue = rawVenue || 'PNCA';
+      rawCity = rawCity || 'Islamabad';
+    } else if (nameLower.includes('open air')) {
+      rawVenue = rawVenue || 'Bagh-e-Jinnah Open Air Theatre';
+      rawCity = rawCity || 'Lahore';
+    } else {
+      rawVenue = rawVenue || 'Arts Council of Pakistan';
+      rawCity = rawCity || 'Karachi';
+    }
+  }
+
+  const venueName = rawVenue;
+  const cityName = rawCity;
+  const countryName = (event.countryName || event.country || matchedDbAuditorium?.country || 'Pakistan');
+
+  const handleDownloadPdf = () => {
+    exportAuditoriumChartPdf({
+      auditoriumName,
+      venueName,
+      cityName,
+      countryName,
+      showName: isPreviewMode ? '' : (activeShow?.showTitle || ''),
+      showDate: isPreviewMode ? '' : (activeShow?.startTimeUtc 
+        ? new Date(activeShow.startTimeUtc).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+        : (event.startDateUtc ? new Date(event.startDateUtc).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '')),
+      resolvedBlueprint,
+      currentZone: {
+        ...currentZone,
+        rows: Math.max(currentZone?.rows || 11, 11)
+      },
+      eventTitle: isPreviewMode ? '' : (event.title || '')
+    });
+  };
+
   return (
     <div className="modal-overlay" style={{ zIndex: 1100 }}>
       <div 
@@ -371,22 +435,43 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
                 </span>
               ) : (
                 <span style={{ fontSize: '0.75rem', color: '#60a5fa', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {currentZone.zone || 'Auditorium Seating Chart'}
+                  {auditoriumName}
                 </span>
               )}
             </div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#f8fafc', marginTop: '0.15rem' }}>
               {event.title}
             </h2>
-            {event.venue && (
-              <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                📍 {event.venue}
-              </span>
-            )}
+            <span style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.15rem' }}>
+              📍 <strong style={{ color: '#f8fafc' }}>{auditoriumName}</strong> • {venueName}, {cityName}, {countryName}
+            </span>
           </div>
 
-          {/* Zoom & View Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {/* Zoom & View Controls + PDF Export */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.45rem 0.95rem',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                border: '1px solid rgba(96, 165, 250, 0.4)',
+                color: '#ffffff',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 2px 10px rgba(37, 99, 235, 0.35)',
+                whiteSpace: 'nowrap'
+              }}
+              title="Download Seating Chart in PDF format with White Background"
+            >
+              <Download size={15} /> Download Chart (PDF)
+            </button>
+
             <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(30, 41, 59, 0.8)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '0.15rem' }}>
               <button
                 type="button"

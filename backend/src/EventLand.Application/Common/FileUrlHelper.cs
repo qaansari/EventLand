@@ -92,8 +92,28 @@ public static class FileUrlHelper
     }
 
     /// <summary>
+    /// Formats a user avatar URL for API responses.
+    /// </summary>
+    public static string FormatUserImageUrl(string? imageUrl)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl)) return string.Empty;
+
+        var trimmed = imageUrl.Trim();
+
+        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
+            trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("/"))
+        {
+            return trimmed;
+        }
+
+        return $"/assets/images/users/{trimmed}";
+    }
+
+    /// <summary>
     /// Generates structured image filename following strict naming convention:
     /// Organizers: org_[name]_[last2digitsofId].[ext] (e.g. org_eventland_01.png)
+    /// Users: usr_[name]_[last2digitsofId].[ext] (e.g. usr_qamaransari_01.png)
     /// Events: ev_[name]_[last2digitsofId].[ext] (e.g. ev_suffinight_01.jpg)
     /// </summary>
     public static string FormatEntityImageFileName(string type, string? entityName, int entityId, string extension)
@@ -104,6 +124,7 @@ public static class FileUrlHelper
         string prefix = (type?.ToLowerInvariant()) switch
         {
             "organizer" or "organizers" => "org",
+            "user" or "users" => "usr",
             _ => "ev"
         };
 
@@ -115,7 +136,12 @@ public static class FileUrlHelper
 
         if (string.IsNullOrWhiteSpace(cleanName))
         {
-            cleanName = prefix == "org" ? "organizer" : "event";
+            cleanName = prefix switch
+            {
+                "org" => "organizer",
+                "usr" => "user",
+                _ => "event"
+            };
         }
 
         int lastTwoDigits = Math.Abs(entityId % 100);

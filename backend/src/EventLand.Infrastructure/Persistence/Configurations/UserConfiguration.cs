@@ -31,6 +31,9 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.PhoneNumber)
                .HasMaxLength(20);
 
+        builder.Property(u => u.ImageUrl)
+               .HasMaxLength(500);
+
         builder.HasOne(u => u.Role)
                .WithMany(r => r.Users)
                .HasForeignKey(u => u.RoleId)

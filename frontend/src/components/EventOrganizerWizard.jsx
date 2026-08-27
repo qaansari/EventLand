@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Grid, Layers, MapPin, CheckCircle } from 'lucide-react';
+import { Sparkles, Grid, Layers, MapPin, CheckCircle, Download } from 'lucide-react';
 import EventCard from './EventCard';
 import { uploadApi, adminApi, auditoriumLayoutsApi, locationsApi } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
 import { CITIES } from '../data/mockEvents';
+import { exportAuditoriumChartPdf } from '../utils/pdfChartExporter';
+import { parseAuditoriumLayout } from '../data/auditoriumLayouts';
 
 const makePreviewId = () => `user-created-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
@@ -115,8 +117,10 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
   };
 
   const handleFormSubmit = (e) => {
-    e.preventDefault();
-    if (!eventForm.title || !eventForm.venue || !eventForm.date) {
+    const selAudi = auditoriumsList.find(a => a.layoutCode === eventForm.auditoriumLayout || a.name === eventForm.auditoriumLayout);
+    const resolvedVenue = eventForm.venue?.trim() || selAudi?.venue || selAudi?.name || 'Arts Council of Pakistan';
+
+    if (!eventForm.title || !resolvedVenue || !eventForm.date) {
       showError('Validation Error', 'Please fill out Title, Venue, and Date before submitting.');
       return;
     }
@@ -268,11 +272,46 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
                       />
 
                       {selectedAuditorium && (
-                        <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <CheckCircle size={15} color="#60a5fa" />
-                          <span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>
-                            Selected: <strong style={{ color: '#fff' }}>{selectedAuditorium.name}</strong> ({selectedAuditorium.totalCapacity} seats layout)
-                          </span>
+                        <div style={{ marginTop: '0.75rem', padding: '0.65rem 0.85rem', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <CheckCircle size={15} color="#60a5fa" />
+                            <span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>
+                              Selected: <strong style={{ color: '#fff' }}>{selectedAuditorium.name}</strong> ({selectedAuditorium.totalCapacity} seats layout)
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const parsedBlueprint = parseAuditoriumLayout(selectedAuditorium.layoutJson);
+                              exportAuditoriumChartPdf({
+                                auditoriumName: selectedAuditorium.name || 'Main Auditorium',
+                                venueName: selectedAuditorium.venue || (eventForm.venue ? eventForm.venue.split(',')[0].trim() : '') || 'Alhamra Cultural Complex',
+                                cityName: selectedAuditorium.city || eventForm.city || 'Lahore',
+                                countryName: 'Pakistan',
+                                showName: '',
+                                showDate: eventForm.startDate ? new Date(eventForm.startDate).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '',
+                                resolvedBlueprint: parsedBlueprint,
+                                currentZone: { zone: selectedAuditorium.name, totalCapacity: selectedAuditorium.totalCapacity },
+                                eventTitle: ''
+                              });
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              padding: '0.35rem 0.75rem',
+                              borderRadius: '6px',
+                              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                              border: '1px solid rgba(96, 165, 250, 0.4)',
+                              color: '#fff',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Download size={14} /> Download Chart (PDF)
+                          </button>
                         </div>
                       )}
                     </>

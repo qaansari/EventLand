@@ -30,12 +30,29 @@ builder.Services.AddSwaggerGen(c =>
 // Register Infrastructure & Application Services (Includes DbContext, Auth, Redis/MemoryCache)
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
-// Configure CORS for Frontend & WebSockets
+// Configure CORS for Frontend & WebSockets.
+// Origins are read from configuration ("Cors:AllowedOrigins"); falls back to local dev origins.
+// Credentials are allowed (required by SignalR), so wildcard origins cannot be used.
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>();
+
+if (allowedOrigins is null || allowedOrigins.Length == 0)
+{
+    allowedOrigins = new[]
+    {
+        "http://localhost:5173",
+        "https://localhost:5173",
+        "http://localhost:4173",
+        "https://localhost:4173"
+    };
+}
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.SetIsOriginAllowed(_ => true)
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();

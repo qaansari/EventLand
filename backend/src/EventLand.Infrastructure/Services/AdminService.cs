@@ -452,7 +452,7 @@ public class AdminService : IAdminService
             .OrderByDescending(u => u.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(u => new UserDto(u.Id, u.Email, u.FullName, u.Role.Name, u.LastLoginAt))
+            .Select(u => new UserDto(u.Id, u.Email, u.FullName, u.Role.Name, u.LastLoginAt, FileUrlHelper.FormatUserImageUrl(u.ImageUrl)))
             .ToListAsync();
 
         return new PagedResult<UserDto>(items, totalCount, pageNumber, pageSize);
@@ -461,7 +461,7 @@ public class AdminService : IAdminService
     public async Task<UserDto?> GetUserByIdAsync(int id)
     {
         var u = await _context.Users.AsNoTracking().Include(x => x.Role).FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
-        return u is null ? null : new UserDto(u.Id, u.Email, u.FullName, u.Role.Name, u.LastLoginAt);
+        return u is null ? null : new UserDto(u.Id, u.Email, u.FullName, u.Role.Name, u.LastLoginAt, FileUrlHelper.FormatUserImageUrl(u.ImageUrl));
     }
 
     public async Task<UserDto> CreateUserAsync(CreateUserDto dto)
@@ -480,6 +480,7 @@ public class AdminService : IAdminService
             FullName = dto.FullName.Trim(),
             RoleId = dto.RoleId,
             PhoneNumber = dto.PhoneNumber,
+            ImageUrl = FileUrlHelper.ExtractFileName(dto.ImageUrl) ?? dto.ImageUrl,
             IsActive = true
         };
 
@@ -488,7 +489,7 @@ public class AdminService : IAdminService
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
-        return new UserDto(user.Id, user.Email, user.FullName, role.Name, null);
+        return new UserDto(user.Id, user.Email, user.FullName, role.Name, null, FileUrlHelper.FormatUserImageUrl(user.ImageUrl));
     }
 
     public async Task<UserDto> UpdateUserAsync(int id, UpdateUserDto dto)
@@ -506,8 +507,20 @@ public class AdminService : IAdminService
         user.PhoneNumber = dto.PhoneNumber;
         user.IsActive = dto.IsActive;
 
+        if (dto.ImageUrl != null)
+        {
+            user.ImageUrl = FileUrlHelper.ExtractFileName(dto.ImageUrl) ?? dto.ImageUrl;
+        }
+
+        // Direct Password Update by Super Admin (without asking old password)
+        if (!string.IsNullOrWhiteSpace(dto.Password))
+        {
+            var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<User>();
+            user.PasswordHash = hasher.HashPassword(user, dto.Password);
+        }
+
         await _context.SaveChangesAsync();
-        return new UserDto(user.Id, user.Email, user.FullName, role.Name, user.LastLoginAt);
+        return new UserDto(user.Id, user.Email, user.FullName, role.Name, user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl));
     }
 
     public async Task<bool> DeleteUserAsync(int id)

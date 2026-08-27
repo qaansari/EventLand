@@ -23,7 +23,7 @@ public interface IArtistService
 
 public interface IBookingService
 {
-    Task<BookingDto> CreateBookingAsync(CreateBookingDto dto);
+    Task<BookingDto> CreateBookingAsync(CreateBookingDto dto, int? userId = null, string? userEmail = null);
     Task<BookingDto?> GetBookingByIdAsync(int id);
     Task<BookingDto?> GetBookingByRefAsync(string bookingRef);
     Task<PagedResult<BookingDto>> GetBookingsByEmailAsync(string email, int pageNumber = 1, int pageSize = 10);

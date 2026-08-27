@@ -18,12 +18,27 @@ public class AuthController : ControllerBase
         _authService = authService;
     }
 
-    /// <summary>Authenticate Super Admin or Admin user and return JWT bearer token.</summary>
+    /// <summary>Authenticate a user and return JWT bearer token.</summary>
     [HttpPost("login")]
     public async Task<ActionResult<LoginResponseDto>> Login([FromBody] LoginRequestDto dto)
     {
         var response = await _authService.LoginAsync(dto);
         return Ok(response);
+    }
+
+    /// <summary>Self-register a new customer account and return a JWT bearer token (auto-login).</summary>
+    [HttpPost("register")]
+    public async Task<ActionResult<LoginResponseDto>> Register([FromBody] RegisterRequestDto dto)
+    {
+        try
+        {
+            var response = await _authService.RegisterAsync(dto);
+            return Ok(response);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     /// <summary>Get current authenticated user profile.</summary>
@@ -39,5 +54,29 @@ public class AuthController : ControllerBase
         if (user == null) return NotFound();
 
         return Ok(user);
+    }
+
+    /// <summary>Change current user's password (requires old password verification).</summary>
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!int.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        try
+        {
+            await _authService.ChangePasswordAsync(userId, dto);
+            return Ok(new { message = "Password updated successfully." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
     }
 }

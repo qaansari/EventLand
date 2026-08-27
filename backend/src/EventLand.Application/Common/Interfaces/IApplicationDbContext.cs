@@ -2,6 +2,7 @@ namespace EventLand.Application.Common.Interfaces;
 
 using EventLand.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 public interface IApplicationDbContext
 {
@@ -24,6 +25,9 @@ public interface IApplicationDbContext
     DbSet<Auditorium>  Auditoriums  { get; }
     DbSet<Faq>         Faqs         { get; }
     DbSet<FooterInfo>  FooterInfo   { get; }
+    DbSet<RefundRecord> RefundRecords { get; }
+
+    DatabaseFacade Database { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
