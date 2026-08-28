@@ -1,0 +1,24 @@
+# .NET / Visual Studio
+bin/
+obj/
+publish/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Frontend
+node_modules/
+dist/
+*.local
+
+# Environment / secrets
+.env
+.env.*
+*.pfx
+appsettings.Production.json
+
+# OS
+.DS_Store
+Thumbs.db

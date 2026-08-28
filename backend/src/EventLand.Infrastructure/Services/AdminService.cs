@@ -9,6 +9,15 @@ using EventLand.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+// -----------------------------------------------------------------------------
+// TODO (decomposition plan): AdminService currently mixes ~12 admin aggregates
+// (locations, venues, auditoriums, layouts, zones, events, shows, tiers,
+// organizers, artists, tags, bookings, users, roles, FAQs, footer) in a single
+// class. Target shape: extract one service per aggregate (e.g.
+// EventAdminService, BookingAdminService, LocationAdminService, UserAdminService)
+// and have this class delegate to them. Controllers should depend on the
+// aggregate services directly. This keeps each class < 300 LOC and unit-testable.
+// -----------------------------------------------------------------------------
 public class AdminService : IAdminService
 {
     private readonly IApplicationDbContext _context;

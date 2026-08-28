@@ -16,7 +16,7 @@ public static class FileUrlHelper
         var trimmed = inputPath.Trim();
 
         // If it's a relative path or full URL pointing to assets/images/... or uploads/...
-        if (trimmed.Contains("/assets/", StringComparison.OrdinalIgnoreCase) || 
+        if (trimmed.Contains("/assets/", StringComparison.OrdinalIgnoreCase) ||
             trimmed.Contains("/uploads/", StringComparison.OrdinalIgnoreCase) ||
             trimmed.Contains('\\'))
         {
@@ -42,7 +42,7 @@ public static class FileUrlHelper
 
         var trimmed = logoUrl.Trim();
 
-        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
+        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
             trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
             trimmed.StartsWith("/"))
         {
@@ -62,7 +62,7 @@ public static class FileUrlHelper
 
         var trimmed = bannerUrl.Trim();
 
-        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
+        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
             trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
             trimmed.StartsWith("/"))
         {
@@ -81,7 +81,7 @@ public static class FileUrlHelper
 
         var trimmed = imageUrl.Trim();
 
-        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
+        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
             trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
             trimmed.StartsWith("/"))
         {
@@ -100,7 +100,7 @@ public static class FileUrlHelper
 
         var trimmed = imageUrl.Trim();
 
-        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
+        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
             trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
             trimmed.StartsWith("/"))
         {
@@ -112,9 +112,10 @@ public static class FileUrlHelper
 
     /// <summary>
     /// Generates structured image filename following strict naming convention:
-    /// Organizers: org_[name]_[last2digitsofId].[ext] (e.g. org_eventland_01.png)
-    /// Users: usr_[name]_[last2digitsofId].[ext] (e.g. usr_qamaransari_01.png)
-    /// Events: ev_[name]_[last2digitsofId].[ext] (e.g. ev_suffinight_01.jpg)
+    /// Organizers: org_[name]_[fullId].[ext] (e.g. org_eventland_42.png)
+    /// Users:      usr_[name]_[fullId].[ext] (e.g. usr_qamaransari_7.png)
+    /// Events:     ev_[name]_[fullId].[ext] (e.g. ev_suffinight_123.jpg)
+    /// The full entity id is embedded (not modulo) so filenames never collide across ids.
     /// </summary>
     public static string FormatEntityImageFileName(string type, string? entityName, int entityId, string extension)
     {
@@ -144,8 +145,9 @@ public static class FileUrlHelper
             };
         }
 
-        int lastTwoDigits = Math.Abs(entityId % 100);
-        string idSuffix = lastTwoDigits.ToString("D2");
+        // Use the full id so ids that share the same last-two digits (e.g. 1 and 101)
+        // produce distinct filenames. No modulo, no truncation.
+        string idSuffix = Math.Abs(entityId).ToString();
 
         return $"{prefix}_{cleanName}_{idSuffix}{extension}";
     }

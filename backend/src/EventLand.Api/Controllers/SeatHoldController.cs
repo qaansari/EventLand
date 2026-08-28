@@ -2,6 +2,7 @@ namespace EventLand.Api.Controllers;
 
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 
@@ -21,8 +22,9 @@ public class SeatHoldController : ControllerBase
         _hubContext = hubContext;
     }
 
-    /// <summary>Hold seats for 10 minutes in Redis for checkout.</summary>
+    /// <summary>Hold seats for 10 minutes in Redis for checkout. Requires authentication.</summary>
     [HttpPost("hold")]
+    [Authorize]
     public async Task<ActionResult<HoldSeatsResponseDto>> HoldSeats([FromBody] HoldSeatsRequestDto dto)
     {
         if (dto.SeatIds == null || !dto.SeatIds.Any())
@@ -41,9 +43,8 @@ public class SeatHoldController : ControllerBase
             ));
         }
 
-        // Broadcast live SignalR WebSocket notification
-        var groupKey = dto.EventShowId.HasValue ? $"event-{dto.EventId}-show-{dto.EventShowId.Value}" : $"event-{dto.EventId}";
-        await _hubContext.Clients.Group(groupKey)
+        // Broadcast live SignalR WebSocket notification to the hub group clients actually join.
+        await _hubContext.Clients.Group(Hubs.SeatingHub.GetGroupName(dto.EventId))
             .SeatsHeld(dto.EventId, dto.SeatIds, dto.CustomerEmail);
 
         return Ok(new HoldSeatsResponseDto(
@@ -54,16 +55,16 @@ public class SeatHoldController : ControllerBase
         ));
     }
 
-    /// <summary>Release held seats back to available state.</summary>
+    /// <summary>Release held seats back to available state. Requires authentication.</summary>
     [HttpPost("release")]
+    [Authorize]
     public async Task<ActionResult> ReleaseSeats([FromBody] HoldSeatsRequestDto dto)
     {
         if (dto.SeatIds != null && dto.SeatIds.Any())
         {
             await _cacheService.ReleaseSeatsAsync(dto.EventId, dto.SeatIds, dto.EventShowId);
 
-            var groupKey = dto.EventShowId.HasValue ? $"event-{dto.EventId}-show-{dto.EventShowId.Value}" : $"event-{dto.EventId}";
-            await _hubContext.Clients.Group(groupKey)
+            await _hubContext.Clients.Group(Hubs.SeatingHub.GetGroupName(dto.EventId))
                 .SeatsReleased(dto.EventId, dto.SeatIds);
         }
 

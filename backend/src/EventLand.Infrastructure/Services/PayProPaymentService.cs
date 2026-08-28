@@ -82,6 +82,17 @@ public class PayProPaymentService : IPayProPaymentService
 
         if (statusUpper == "PAID" || statusUpper == "SUCCESS" || statusUpper == "00")
         {
+            // Amount verification: reject callbacks whose paid amount does not cover the
+            // booking total. This is a defense-in-depth check on top of signature
+            // verification performed by the caller.
+            if (decimal.TryParse(payload.AmountPaid, out var amountPaid) && amountPaid < booking.TotalAmount)
+            {
+                _logger.LogWarning(
+                    "PayPro IPN rejected for {BookingRef}: paid {Paid} is less than payable {Payable}.",
+                    booking.BookingRef, amountPaid, booking.TotalAmount);
+                return false;
+            }
+
             booking.PaymentStatus = PaymentStatus.Paid;
             booking.Status = BookingStatus.Confirmed;
             booking.PaidAt = DateTimeOffset.UtcNow;

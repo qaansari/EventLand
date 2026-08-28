@@ -61,6 +61,9 @@ public static class DependencyInjection
 
         services.AddSingleton<ICacheService, RedisCacheService>();
 
+        // Background job: expire pending bookings whose PayPro window has elapsed (every 60s)
+        services.AddHostedService<PendingBookingExpiryService>();
+
         // Auth & Security
         services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
@@ -68,7 +71,12 @@ public static class DependencyInjection
         services.AddScoped<IAdminService, AdminService>();
 
         // JWT Authentication registration
-        var secretKey = configuration["Jwt:SecretKey"] ?? "SuperSecretKeyForEventLandApi2026!MustBe32BytesOrLonger";
+        var secretKey = configuration["Jwt:SecretKey"];
+        if (string.IsNullOrWhiteSpace(secretKey) || Encoding.UTF8.GetByteCount(secretKey) < 32)
+            throw new InvalidOperationException(
+                "Configuration 'Jwt:SecretKey' is missing or too short. Provide a secret of at least 32 bytes " +
+                "via user-secrets or the Jwt__SecretKey environment variable.");
+
         var issuer = configuration["Jwt:Issuer"] ?? "EventLandApi";
         var audience = configuration["Jwt:Audience"] ?? "EventLandClients";
 

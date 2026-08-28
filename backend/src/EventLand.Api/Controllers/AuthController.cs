@@ -5,6 +5,7 @@ using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -20,6 +21,7 @@ public class AuthController : ControllerBase
 
     /// <summary>Authenticate a user and return JWT bearer token.</summary>
     [HttpPost("login")]
+    [EnableRateLimiting("login")]
     public async Task<ActionResult<LoginResponseDto>> Login([FromBody] LoginRequestDto dto)
     {
         var response = await _authService.LoginAsync(dto);
@@ -28,6 +30,7 @@ public class AuthController : ControllerBase
 
     /// <summary>Self-register a new customer account and return a JWT bearer token (auto-login).</summary>
     [HttpPost("register")]
+    [EnableRateLimiting("login")]
     public async Task<ActionResult<LoginResponseDto>> Register([FromBody] RegisterRequestDto dto)
     {
         try

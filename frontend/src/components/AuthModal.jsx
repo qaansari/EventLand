@@ -35,12 +35,15 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
           setLoading(false);
           return;
         }
-        // General customer registration simulation
+        // Register with live .NET Backend API (auto-login: returns JWT)
+        const authData = await authApi.register(name.trim(), email.trim(), password);
         showSuccess('Account Created! 🎉', `Welcome to EventLand, ${name.trim()}!`);
         onLoginSuccess({
-          name: name.trim(),
-          email: email.trim(),
-          role: 'customer'
+          id: authData.user?.id,
+          name: authData.user?.fullName || name.trim(),
+          email: authData.user?.email || email.trim(),
+          role: 'customer',
+          token: authData.token
         });
       } else {
         // Authenticate with live .NET Backend API

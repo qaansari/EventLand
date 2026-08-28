@@ -26,9 +26,12 @@ public class AuthService : IAuthService
 
     public async Task<LoginResponseDto> LoginAsync(LoginRequestDto dto)
     {
+        // Emails are matched case-insensitively to stay consistent with RegisterAsync,
+        // which checks duplicates with ToLower().
+        var normalizedEmail = (dto.Email ?? string.Empty).Trim().ToLower();
         var user = await _context.Users
             .Include(u => u.Role)
-            .FirstOrDefaultAsync(u => u.Email == dto.Email && !u.IsDeleted);
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail && !u.IsDeleted);
 
         if (user is null || !user.IsActive)
             throw new UnauthorizedAccessException("Invalid email or password.");
@@ -113,6 +116,9 @@ public class AuthService : IAuthService
 
     public async Task ChangePasswordAsync(int userId, ChangePasswordDto dto)
     {
+        if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 8)
+            throw new InvalidOperationException("New password must be at least 8 characters long.");
+
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted);
         if (user is null || !user.IsActive)
             throw new KeyNotFoundException("User account not found.");

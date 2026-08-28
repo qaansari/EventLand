@@ -18,6 +18,17 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
 
   const current = featuredEvents[currentIndex];
 
+  // API events carry startDateUtc/startingPrice; mock events carried date/time/priceRange.
+  const dateLabel = current.date || (current.startDateUtc
+    ? new Date(current.startDateUtc).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '');
+  const timeLabel = current.time || (current.startDateUtc
+    ? new Date(current.startDateUtc).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    : '');
+  const priceLabel = current.priceRange || (current.startingPrice
+    ? `PKR ${Number(current.startingPrice).toLocaleString()}`
+    : '');
+
   const handlePrev = () => {
     setCurrentIndex((prev) => (prev === 0 ? featuredEvents.length - 1 : prev - 1));
   };
@@ -128,7 +139,7 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <Calendar size={16} color="#60a5fa" />
-                <span>{current.date} ({current.time})</span>
+                <span>{dateLabel}{timeLabel ? ` (${timeLabel})` : ''}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                 <MapPin size={16} color="#60a5fa" />
@@ -143,7 +154,7 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
                 className="btn btn-primary"
                 style={{ padding: '0.78rem 1.6rem', fontSize: 'clamp(0.88rem, 2vw, 1.02rem)' }}
               >
-                <Ticket size={18} /> Book Tickets from {current.priceRange}
+                <Ticket size={18} /> {priceLabel ? `Book Tickets from ${priceLabel}` : 'Book Tickets'}
               </button>
 
               <button

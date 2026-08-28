@@ -59,16 +59,21 @@ public class EventService : IEventService
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(e => e.Title.Contains(search) || e.Description.Contains(search) || (e.Venue != null && e.Venue.Name.Contains(search)));
 
+        // "category" and "tag" both filter by attached tags (slug/name/id). They are kept as
+        // separate query parameters for backwards compatibility with the frontend.
+        var tagFilters = new List<string>();
         if (!string.IsNullOrWhiteSpace(tag))
-        {
-            var tagsList = tag.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                              .Select(t => t.ToLower())
-                              .ToList();
+            tagFilters.AddRange(tag.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(t => t.ToLower()));
+        if (!string.IsNullOrWhiteSpace(category))
+            tagFilters.AddRange(category.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(c => c.ToLower()));
+        tagFilters = tagFilters.Distinct().ToList();
 
-            query = query.Where(e => e.EventTags.Any(et => 
-                tagsList.Contains(et.Tag.Slug.ToLower()) || 
-                tagsList.Contains(et.Tag.Name.ToLower()) ||
-                tagsList.Contains(et.Tag.Id.ToString())
+        if (tagFilters.Count > 0)
+        {
+            query = query.Where(e => e.EventTags.Any(et =>
+                tagFilters.Contains(et.Tag.Slug.ToLower()) ||
+                tagFilters.Contains(et.Tag.Name.ToLower()) ||
+                tagFilters.Contains(et.Tag.Id.ToString())
             ));
         }
 
@@ -132,7 +137,7 @@ public class EventService : IEventService
             .Include(e => e.SeatingZones.Where(z => !z.IsDeleted).OrderBy(z => z.SortOrder))
                 .ThenInclude(z => z.Seats.Where(s => !s.IsDeleted).OrderBy(s => s.Row).ThenBy(s => s.Col))
             .Include(e => e.EventTags).ThenInclude(et => et.Tag)
-            .FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted);
+            .FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted && e.IsPublished);
 
         if (ev is null) return null;
 

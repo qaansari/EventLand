@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar, MapPin, Sparkles, ShieldCheck, Ticket, Layers, Grid, Globe, Clock, Eye } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { formatEventDateRange, formatEventStartTime } from '../utils/dateUtils';
-import { getEventImageUrl, eventsApi } from '../services/api';
+import { getEventImageUrl, getOrganizerImageUrl, eventsApi } from '../services/api';
 import InteractiveSeatPicker from './InteractiveSeatPicker';
 
 export default function EventDetailModal({ event: initialEvent, onClose, onProceedToBooking }) {
@@ -95,9 +95,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
     : event.organizer) || 'Event Land';
 
   const rawLogo = typeof event.organizer === 'object' ? event.organizer?.logoUrl : null;
-  const organizerLogoUrl = rawLogo
-    ? (rawLogo.startsWith('/') || rawLogo.startsWith('http') ? rawLogo : `/assets/images/organizers/${rawLogo}`)
-    : '/assets/images/organizers/org_eventland_01.png';
+  const organizerLogoUrl = getOrganizerImageUrl(rawLogo) || '/assets/images/organizers/org_eventland_01.png';
 
   return (
     <div className="modal-overlay">

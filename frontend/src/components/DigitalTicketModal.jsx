@@ -8,7 +8,11 @@ export default function DigitalTicketModal({ ticket, onClose }) {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scannerStatus, setScannerStatus] = useState('idle'); // idle, scanning, verified
 
-  const isPaid = ticket?.paymentStatus === 'Paid' || ticket?.paymentStatus === 'PAID' || !ticket?.paymentStatus;
+  // Paid when the status says so; tickets loaded via booking lookup carry a paymentMethod
+  // but no explicit paymentStatus, so treat those as paid too.
+  const isPaid = ticket?.paymentStatus === 'Paid'
+    || ticket?.paymentStatus === 'PAID'
+    || (!ticket?.paymentStatus && !!ticket?.paymentMethod);
 
   const handleSimulateScan = () => {
     setIsScannerOpen(true);
@@ -133,13 +137,13 @@ export default function DigitalTicketModal({ ticket, onClose }) {
                 <div>
                   <span style={{ display: 'block', fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>RESERVED SEATS / TIERS</span>
                   <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#60a5fa' }}>
-                    {ticket.seats.map((s) => s.label || (typeof s.id === 'string' ? s.id.split('-').pop() : s.id)).join(', ')}
+                    {(ticket.seats || []).map((s) => s.label || (typeof s.id === 'string' ? s.id.split('-').pop() : s.id)).join(', ') || 'General Admission'}
                   </span>
                 </div>
                 <div>
                   <span style={{ display: 'block', fontSize: '0.68rem', color: '#94a3b8', fontWeight: 700 }}>TOTAL PAID (PKR)</span>
                   <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#34d399' }}>
-                    PKR {ticket.totalPaid.toLocaleString()}
+                    PKR {(ticket.totalPaid ?? 0).toLocaleString()}
                   </span>
                 </div>
                 <div>
@@ -230,7 +234,7 @@ export default function DigitalTicketModal({ ticket, onClose }) {
               ) : (
                 <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', padding: '0.85rem', borderRadius: '10px', color: '#60a5fa', fontWeight: 700 }}>
                   <ShieldCheck size={28} style={{ display: 'block', margin: '0 auto 0.4rem' }} />
-                  ENTRY APPROVED - TICKET VALID FOR {ticket.attendeeName} ({ticket.seats.length} SEATS)
+                  ENTRY APPROVED - TICKET VALID FOR {ticket.attendeeName} ({(ticket.seats || []).length} SEATS)
                 </div>
               )}
             </div>

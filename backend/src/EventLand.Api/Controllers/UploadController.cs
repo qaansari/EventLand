@@ -28,7 +28,7 @@ public class UploadController : ControllerBase
 
     [HttpPost]
     public async Task<IActionResult> UploadFile(
-        IFormFile? file, 
+        IFormFile? file,
         [FromQuery] string? type = "events",
         [FromQuery] string? name = null,
         [FromQuery] int? id = null)
@@ -73,17 +73,68 @@ public class UploadController : ControllerBase
             Directory.CreateDirectory(targetFolder);
         }
 
-        var targetFileName = FileUrlHelper.FormatEntityImageFileName(type ?? "events", name, id ?? 1, extension);
+        // Use full entity id so ids sharing last-two-digits (e.g. 1 and 101) never collide.
+        // When no id is supplied, generate a Guid-based suffix for uniqueness.
+        string targetFileName;
+        if (id.HasValue)
+        {
+            targetFileName = FileUrlHelper.FormatEntityImageFileName(type ?? "events", name, id.Value, extension);
+        }
+        else
+        {
+            var guidSuffix = Guid.NewGuid().ToString("N")[..8];
+            // Reuse the same prefix/cleanName logic but with a Guid suffix
+            var tmpName = FileUrlHelper.FormatEntityImageFileName(type ?? "events", name, 0, extension);
+            var tmpBase = Path.GetFileNameWithoutExtension(tmpName);
+            // tmpBase is like "ev_name_0" — replace trailing "_0" with Guid
+            var baseWithoutId = tmpBase[..tmpBase.LastIndexOf('_')];
+            targetFileName = $"{baseWithoutId}_{guidSuffix}{extension}";
+        }
+
         var basePattern = Path.GetFileNameWithoutExtension(targetFileName);
 
-        // Delete any existing image variants for this entity to replace the file cleanly
+        // Validate basePattern does not contain path separators (defense against traversal)
+        if (basePattern.Contains('/') || basePattern.Contains('\\') || basePattern.Contains(".."))
+        {
+            return BadRequest(new { message = "Invalid file name pattern." });
+        }
+
+        // Delete any existing image for the same entity and same extension only.
+        // Previously used $"{basePattern}.*" which would delete all extensions; now
+        // we scope to the same extension to avoid removing unrelated variants.
         try
         {
-            foreach (var existingFile in Directory.GetFiles(targetFolder, $"{basePattern}.*"))
+            var existingFile = Path.Combine(targetFolder, targetFileName);
+            if (System.IO.File.Exists(existingFile))
             {
-                if (System.IO.File.Exists(existingFile))
+                System.IO.File.Delete(existingFile);
+            }
+            else
+            {
+                // Fallback: if the stored file has a different extension but same base,
+                // only remove it when the extension matches the new upload's extension.
+                // This handles the case where the old file was uploaded as .jpg and the
+                // new one is .jpg — we already handled that above. For cross-extension
+                // cleanup we intentionally do NOT delete, to avoid surprising data loss.
+                // If strict replacement across extensions is desired, enumerate with
+                // $"{basePattern}.*" and filter by extension == this extension.
+                foreach (var candidate in Directory.GetFiles(targetFolder, $"{basePattern}.*"))
                 {
-                    System.IO.File.Delete(existingFile);
+                    if (!string.Equals(Path.GetExtension(candidate), extension, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var candidateBase = Path.GetFileNameWithoutExtension(candidate);
+                    if (!string.Equals(candidateBase, basePattern, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    if (System.IO.File.Exists(candidate))
+                    {
+                        System.IO.File.Delete(candidate);
+                    }
                 }
             }
         }

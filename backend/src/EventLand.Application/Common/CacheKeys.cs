@@ -9,5 +9,9 @@ public static class CacheKeys
     public const string ArtistDetail   = "artist:detail:{0}";
     public const string TagsList       = "tags:all";
     public const string OrganizersList = "organizers:all";
-    public const string SeatLocks      = "seatlock:event:{0}";
+
+    // Per-seat hold keys: eventland:seats:event:{eventId}[:show:{showId}]:seat:{seatId}
+    public const string SeatHoldsPrefix     = "eventland:seats:";
+    public const string SeatHoldKey         = "eventland:seats:event:{0}:seat:{1}";
+    public const string SeatHoldKeyForShow  = "eventland:seats:event:{0}:show:{1}:seat:{2}";
 }

@@ -138,64 +138,115 @@ public class RedisCacheService : ICacheService
         if (eventId.HasValue)
         {
             await RemoveAsync(string.Format(CacheKeys.EventDetail, eventId.Value));
+            // Remove per-seat hold keys for this event (with and without show scope)
+            await RemoveByPrefixAsync($"eventland:seats:event:{eventId.Value}");
+            // Also evict any legacy dictionary-based entries keyed as seatlock:event:{id}
+            await RemoveByPrefixAsync($"seatlock:event:{eventId.Value}");
+        }
+        else
+        {
+            // Full cache clear: also drop every seat hold key
+            await RemoveByPrefixAsync(CacheKeys.SeatHoldsPrefix);
+            await RemoveByPrefixAsync("seatlock:");
         }
     }
 
     // --- Redis Real-Time Seat Holding ---
+    // Holds are stored as one key per seat so concurrent callers cannot overwrite each
+    // other's locks (the old Dictionary-per-event Get+Set was a race). Each seat key gets
+    // its own TTL and is released individually.
+    private static string SeatLockKey(int eventId, int seatId, int? eventShowId) =>
+        eventShowId.HasValue
+            ? string.Format(CacheKeys.SeatHoldKeyForShow, eventId, eventShowId.Value, seatId)
+            : string.Format(CacheKeys.SeatHoldKey, eventId, seatId);
+
+    private static string SeatLockPrefix(int eventId, int? eventShowId) =>
+        eventShowId.HasValue
+            ? $"eventland:seats:event:{eventId}:show:{eventShowId.Value}:seat:"
+            : $"eventland:seats:event:{eventId}:seat:";
+
+    // In-process gate per event/show so the check-then-set sequence is atomic within a
+    // single instance. Cross-instance atomicity comes from the per-seat keys themselves:
+    // two callers can only ever conflict on a single seat, never clobber an entire
+    // dictionary. A true Redis SET NX would be ideal; IDistributedCache does not expose
+    // it, so this is the best achievable with the current abstraction.
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _holdGates = new();
+
     public async Task<bool> HoldSeatsAsync(int eventId, List<int> seatIds, string email, TimeSpan holdDuration, int? eventShowId = null)
     {
-        var lockKey = eventShowId.HasValue
-            ? $"eventland:seats:event:{eventId}:show:{eventShowId.Value}"
-            : string.Format(CacheKeys.SeatLocks, eventId);
-        var existing = await GetAsync<Dictionary<int, string>>(lockKey) ?? new Dictionary<int, string>();
-        var currentlyHeld = new Dictionary<int, string>(existing);
+        if (seatIds is null || seatIds.Count == 0) return true;
 
-        // Check if any seat is already locked by someone else
-        foreach (var seatId in seatIds)
+        var gateKey = SeatLockPrefix(eventId, eventShowId);
+        var gate = _holdGates.GetOrAdd(gateKey, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync();
+
+        var acquired = new List<int>();
+        try
         {
-            if (currentlyHeld.TryGetValue(seatId, out var existingEmail) && existingEmail != email)
+            foreach (var seatId in seatIds.Distinct())
             {
-                return false; // Seat already held by another user
+                var key = SeatLockKey(eventId, seatId, eventShowId);
+                var existingEmail = await GetAsync<string>(key);
+
+                if (!string.IsNullOrEmpty(existingEmail) && existingEmail != email)
+                {
+                    // Seat locked by someone else - roll back any locks acquired in this call.
+                    foreach (var acquiredSeat in acquired)
+                    {
+                        await RemoveAsync(SeatLockKey(eventId, acquiredSeat, eventShowId));
+                    }
+                    return false;
+                }
+
+                await SetAsync(key, email, holdDuration);
+                acquired.Add(seatId);
             }
-        }
 
-        // Lock seats for this email
-        foreach (var seatId in seatIds)
+            return true;
+        }
+        finally
         {
-            currentlyHeld[seatId] = email;
+            gate.Release();
         }
-
-        await SetAsync(lockKey, currentlyHeld, holdDuration);
-        return true;
     }
 
     public async Task ReleaseSeatsAsync(int eventId, List<int> seatIds, int? eventShowId = null)
     {
-        var lockKey = eventShowId.HasValue
-            ? $"eventland:seats:event:{eventId}:show:{eventShowId.Value}"
-            : string.Format(CacheKeys.SeatLocks, eventId);
-        var existing = await GetAsync<Dictionary<int, string>>(lockKey);
-
-        if (existing != null)
+        foreach (var seatId in seatIds)
         {
-            var currentlyHeld = new Dictionary<int, string>(existing);
-            foreach (var seatId in seatIds)
-            {
-                currentlyHeld.Remove(seatId);
-            }
-            await SetAsync(lockKey, currentlyHeld, TimeSpan.FromMinutes(10));
+            await RemoveAsync(SeatLockKey(eventId, seatId, eventShowId));
         }
     }
 
     public async Task<List<int>> GetHeldSeatIdsAsync(int eventId, int? eventShowId = null)
     {
-        var lockKey = eventShowId.HasValue
-            ? $"eventland:seats:event:{eventId}:show:{eventShowId.Value}"
-            : string.Format(CacheKeys.SeatLocks, eventId);
-        var currentlyHeld = await GetAsync<Dictionary<int, string>>(lockKey);
+        // NOTE: keys created by other app instances are not present in _knownKeys. A
+        // production multi-instance solution would SCAN Redis (pattern: prefix + "*") via
+        // IConnectionMultiplexer; IDistributedCache does not expose SCAN, so we rely on
+        // the in-process registry plus per-key TTL expiry as a safety net.
+        var prefix = SeatLockPrefix(eventId, eventShowId);
+        var seatIds = new List<int>();
 
-        if (currentlyHeld == null) return new List<int>();
+        foreach (var key in _knownKeys.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList())
+        {
+            var seatPart = key.Substring(prefix.Length);
+            if (!int.TryParse(seatPart, out var seatId))
+            {
+                continue;
+            }
 
-        return currentlyHeld.Keys.ToList();
+            // Verify the hold is still alive (registry may contain keys whose TTL already
+            // expired in Redis/MemoryCache). Prune stale entries while we scan.
+            var holder = await GetAsync<string>(key);
+            if (string.IsNullOrEmpty(holder))
+            {
+                _knownKeys.TryRemove(key, out _);
+                continue;
+            }
+
+            seatIds.Add(seatId);
+        }
+
+        return seatIds;
     }
 }

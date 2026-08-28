@@ -545,6 +545,12 @@ export default function AdminDashboard({ onSelectEvent }) {
       };
     });
 
+    // Pre-select the tags already attached to this event (eventTags may carry {tagId} or nested {tag:{id}}).
+    const existingTagIds = (fullEv.eventTags || [])
+      .map(et => et?.tagId ?? et?.tag?.id ?? et?.id)
+      .filter(id => id != null)
+      .map(id => String(id));
+
     setEventForm({
       id: fullEv.id,
       title: fullEv.title || '',

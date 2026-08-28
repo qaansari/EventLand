@@ -42,11 +42,14 @@ public class GlobalExceptionHandlerMiddleware
 
         context.Response.StatusCode = (int)statusCode;
 
+        // Client-facing errors (4xx) carry the exception message; 500s return a generic
+        // message so stack details never reach the caller.
         var response = new
         {
             statusCode = context.Response.StatusCode,
-            message = exception.Message,
-            detail = statusCode == HttpStatusCode.InternalServerError ? "An unexpected error occurred processing your request." : exception.Message
+            message = statusCode == HttpStatusCode.InternalServerError
+                ? "An unexpected error occurred processing your request."
+                : exception.Message
         };
 
         return context.Response.WriteAsync(JsonSerializer.Serialize(response));

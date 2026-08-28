@@ -59,7 +59,7 @@ export function exportAuditoriumChartPdf({
 
   const renderPrintRow = (rSpec) => {
     const rowChar = rSpec.rowChar;
-    let rowContentHtml = '';
+    let rowContentHtml;
 
     if (rSpec.blocks && Array.isArray(rSpec.blocks)) {
       rowContentHtml = `<div style="display: flex; gap: 10px; align-items: center; justify-content: center;">` +
@@ -95,7 +95,7 @@ export function exportAuditoriumChartPdf({
   };
 
   // Generate complete grid HTML
-  let gridHtml = '';
+  let gridHtml;
   if (resolvedBlueprint?.sections) {
     gridHtml = resolvedBlueprint.sections.map(sec => `
       <div style="margin-bottom: 14px; text-align: center;">

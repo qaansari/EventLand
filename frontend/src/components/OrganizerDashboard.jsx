@@ -1,32 +1,47 @@
-import React, { useState } from 'react';
-import { 
-  Building2, 
-  PlusCircle, 
-  Ticket, 
-  TrendingUp, 
-  QrCode, 
-  DollarSign, 
-  CheckCircle, 
-  Calendar, 
-  MapPin, 
-  Users, 
-  Download, 
-  ScanLine, 
+import React, { useState, useEffect } from 'react';
+import {
+  Building2,
+  PlusCircle,
+  Ticket,
+  TrendingUp,
+  QrCode,
+  DollarSign,
+  CheckCircle,
+  Calendar,
+  MapPin,
+  Users,
+  Download,
+  ScanLine,
   AlertCircle,
   FileSpreadsheet
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
+import { adminApi } from '../services/api';
 
-export default function OrganizerDashboard({ events, onNavigateToCreate, onSelectEvent }) {
+// TODO: Wire to backend /admin/bookings and organizer endpoints
+export default function OrganizerDashboard({ events, onNavigateToCreate, onSelectEvent, currentUser = null }) {
   const { showSuccess, showError, showInfo } = useToast();
   const [activeTab, setActiveTab] = useState('my-events'); // 'my-events', 'scanner', 'payouts'
-  
-  // Gatekeeper Scanner Simulator State
+
+  // Fetch real bookings for organizer/admin roles; fall back to empty on failure.
+  const [bookings, setBookings] = useState([]);
+  useEffect(() => {
+    if (currentUser && (currentUser.role === 'organizer' || currentUser.role === 'admin')) {
+      adminApi.bookings.getAll(1, 50)
+        .then(res => setBookings(res.items || res || []))
+        .catch(err => {
+          console.warn('Could not load organizer bookings from backend:', err);
+          setBookings([]);
+        });
+    }
+  }, [currentUser]);
+
+  // Scanner Simulator State
   const [scanTicketInput, setScanTicketInput] = useState('');
   const [scanResult, setScanResult] = useState(null);
 
-  // Mock Payout Request State
+  // Payout Request State (backend payouts endpoint not implemented yet)
   const [payoutForm, setPayoutForm] = useState({
     amount: '450000',
     method: 'Bank Transfer',

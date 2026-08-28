@@ -849,7 +849,8 @@
       "EventLand.Application/1.0.0": {
         "dependencies": {
           "EventLand.Domain": "1.0.0",
-          "Microsoft.EntityFrameworkCore": "10.0.11"
+          "Microsoft.EntityFrameworkCore": "10.0.11",
+          "Microsoft.EntityFrameworkCore.Relational": "10.0.11"
         },
         "runtime": {
           "EventLand.Application.dll": {

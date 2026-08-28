@@ -3,16 +3,16 @@ import { X, CreditCard, Smartphone, ShieldCheck, Clock, AlertTriangle, ExternalL
 import { bookingsApi, paymentsApi, getEventImageUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 
-export default function CheckoutModal({ event, selectedSeats, onClose, onBookingSuccess }) {
-  const { showSuccess, showError } = useToast();
+export default function CheckoutModal({ event, selectedSeats, onClose, onBookingSuccess, onInvoiceCreated }) {
+  const { showSuccess, showError, showWarning } = useToast();
   const [step, setStep] = useState(1); // 1: Info, 2: Payment & Timer, 3: PayPro Invoice OTC / Redirect
-  
+
   // Authorization / Verified User check
   const loggedUserRaw = localStorage.getItem('eventland_logged_user');
   const loggedUser = loggedUserRaw ? JSON.parse(loggedUserRaw) : null;
 
   const [formData, setFormData] = useState({
-    name: loggedUser?.fullName || '',
+    name: loggedUser?.name || loggedUser?.fullName || '',
     email: loggedUser?.email || '',
     phone: loggedUser?.phone || '',
     cnic: ''
@@ -128,19 +128,46 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
       const bookingId = backendBooking?.id || 1000;
       const bookingRef = backendBooking?.bookingRef || (`EVL-` + Math.floor(100000 + Math.random() * 900000));
 
+      // The booking amount computed server-side is the source of truth for what is payable;
+      // client-side promo/group discounts are display-only until a server-side coupon engine exists.
+      const payableAmount = backendBooking?.totalAmount ?? totalAmount;
+      if (backendBooking && (groupDiscount > 0 || discount > 0) && Number(payableAmount) !== totalAmount) {
+        showWarning('Promo Notice', 'Promo/group discounts are not yet applied server-side — the invoice uses the full booking amount.');
+      }
+
       const payProRes = await paymentsApi.createInvoice({
         bookingId: bookingId,
         bookingRef: bookingRef,
         customerName: formData.name,
         customerEmail: formData.email,
         customerPhone: formData.phone,
-        amount: totalAmount,
+        amount: payableAmount,
         issueDate: new Date().toISOString(),
         dueDate: new Date(Date.now() + 3600000).toISOString()
       });
 
       setInvoiceData(payProRes);
       setStep(3); // Show PayPro Payment Invoice & OTC Details
+
+      // Record the unpaid invoice so the user can leave and pay later from "My Tickets".
+      if (onInvoiceCreated) {
+        onInvoiceCreated({
+          bookingRef: payProRes?.bookingRef || bookingRef,
+          bookingId: backendBooking?.id ?? bookingId,
+          invoiceId: payProRes?.invoiceId,
+          otcVoucherCode: payProRes?.otcVoucherCode,
+          connectUrl: payProRes?.connectUrl,
+          amount: payableAmount,
+          eventTitle: event.title,
+          showTitle: event.selectedShow?.showTitle || null,
+          customerName: formData.name,
+          customerEmail: formData.email,
+          paymentStatus: 'Pending',
+          expiresAt: new Date(Date.now() + 3600000).toISOString(),
+          createdAt: new Date().toISOString()
+        });
+      }
+
       showSuccess('Invoice Created', 'PayPro Pakistan Payment Invoice generated. Complete payment within 60 minutes.');
     } catch (err) {
       console.error('Booking/PayPro error:', err);
@@ -156,12 +183,14 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
       const invoiceId = invoiceData?.invoiceId || `PP-EVL-${createdBooking?.bookingRef || '1001'}`;
       const bookingRef = createdBooking?.bookingRef || invoiceData?.bookingRef || 'EVL-100001';
 
-      // Call PayPro IPN confirmation endpoint
+      // Call PayPro IPN confirmation endpoint — the paid amount must cover the
+      // server-computed booking total, otherwise the backend rejects the confirmation.
+      const confirmAmount = createdBooking?.totalAmount ?? totalAmount;
       await paymentsApi.confirmPayment({
         invoiceId: invoiceId,
         bookingRef: bookingRef,
-        amountPayable: String(totalAmount),
-        amountPaid: String(totalAmount),
+        amountPayable: String(confirmAmount),
+        amountPaid: String(confirmAmount),
         status: 'PAID',
         transactionId: `TXN-PAYPRO-${Date.now()}`,
         paymentDate: new Date().toISOString(),
@@ -308,7 +337,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
 
         {/* Step 1: Buyer Info & Verification */}
         {step === 1 && (
-          <form onSubmit={() => setStep(2)} style={{ padding: '1.5rem' }}>
+          <form onSubmit={(e) => { e.preventDefault(); setStep(2); }} style={{ padding: '1.5rem' }}>
             {!loggedUser && (
               <div style={{ marginBottom: '1.25rem', padding: '0.85rem 1rem', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '10px', color: '#f87171', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <AlertTriangle size={18} color="#f87171" />

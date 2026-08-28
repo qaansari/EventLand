@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import Navbar from './components/Navbar';
 import HeroSlider from './components/HeroSlider';
 import EventCard from './components/EventCard';
@@ -7,17 +7,28 @@ import EventDetailModal from './components/EventDetailModal';
 import InteractiveSeatPicker from './components/InteractiveSeatPicker';
 import CheckoutModal from './components/CheckoutModal';
 import DigitalTicketModal from './components/DigitalTicketModal';
-import ArtistBookings from './components/ArtistBookings';
-import EventOrganizerWizard from './components/EventOrganizerWizard';
-import AiEventAssistant from './components/AiEventAssistant';
-import AdminDashboard from './components/AdminDashboard';
-import OrganizerDashboard from './components/OrganizerDashboard';
 import AuthModal from './components/AuthModal';
 import Footer from './components/Footer';
 import { Ticket, MapPin, Trash2, Search, RefreshCw } from 'lucide-react';
-import { eventsApi, bookingsApi, tagsApi, locationsApi } from './services/api';
+import { eventsApi, bookingsApi, tagsApi, locationsApi, adminApi } from './services/api';
 import { useToast } from './context/ToastContext';
 import './App.css';
+
+// Code-split heavy / role-gated views into separate chunks
+const ArtistBookings = lazy(() => import('./components/ArtistBookings'));
+const EventOrganizerWizard = lazy(() => import('./components/EventOrganizerWizard'));
+const AiEventAssistant = lazy(() => import('./components/AiEventAssistant'));
+const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
+const OrganizerDashboard = lazy(() => import('./components/OrganizerDashboard'));
+
+const LazyFallback = (
+  <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#94a3b8' }}>
+    <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
+    <p>Loading view...</p>
+  </div>
+);
+
+const PAGE_SIZE = 12;
 
 export default function App() {
   const { showSuccess, showInfo, showError, showWarning } = useToast();
@@ -28,17 +39,27 @@ export default function App() {
   const [cities, setCities] = useState([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
 
+  // Pagination state for the explore events grid
+  const [pageNumber, setPageNumber] = useState(1);
+  const [totalEvents, setTotalEvents] = useState(null); // null = backend did not report totalCount
+  const [lastPageCount, setLastPageCount] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   // Fetch live events, tags, countries, and cities from .NET Backend API on mount
   useEffect(() => {
     setLoadingEvents(true);
     Promise.all([
-      eventsApi.getEvents({ pageSize: 100 }).catch(() => ({ items: [] })),
+      eventsApi.getEvents({ pageNumber: 1, pageSize: PAGE_SIZE }).catch(() => ({ items: [] })),
       tagsApi.getAll().catch(() => []),
       locationsApi.getCountries().catch(() => []),
       locationsApi.getCities().catch(() => [])
     ])
       .then(([resEvents, resTags, resCountries, resCities]) => {
-        setEvents(resEvents.items || []);
+        const items = resEvents.items || [];
+        setEvents(items);
+        setPageNumber(1);
+        setLastPageCount(items.length);
+        setTotalEvents(typeof resEvents.totalCount === 'number' ? resEvents.totalCount : null);
         setTags(Array.isArray(resTags) ? resTags : (resTags?.items || []));
         setCountries(Array.isArray(resCountries) ? resCountries : (resCountries?.items || []));
         setCities(Array.isArray(resCities) ? resCities : (resCities?.items || []));
@@ -49,6 +70,27 @@ export default function App() {
       })
       .finally(() => setLoadingEvents(false));
   }, []);
+
+  const hasMoreEvents = totalEvents !== null
+    ? events.length < totalEvents
+    : lastPageCount >= PAGE_SIZE;
+
+  const handleLoadMore = async () => {
+    const nextPage = pageNumber + 1;
+    setLoadingMore(true);
+    try {
+      const res = await eventsApi.getEvents({ pageNumber: nextPage, pageSize: PAGE_SIZE });
+      const items = res.items || [];
+      setEvents(prev => [...prev, ...items.filter(i => !prev.some(p => p.id === i.id))]);
+      setLastPageCount(items.length);
+      if (typeof res.totalCount === 'number') setTotalEvents(res.totalCount);
+      setPageNumber(nextPage);
+    } catch (err) {
+      showError('Load Failed', err.message || 'Could not load more events.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const [activeView, setActiveView] = useState('explore'); // explore, artists, ai-assistant, organizer-wizard, my-tickets, organizer, admin
   const [userRole, setUserRole] = useState('customer'); // customer, organizer, admin
@@ -114,6 +156,7 @@ export default function App() {
     setUserRole('customer');
     setActiveView('explore');
     localStorage.removeItem('eventland_logged_user');
+    localStorage.removeItem('eventland_jwt_token');
     showInfo('Logged Out', 'You have been logged out successfully.');
   };
 
@@ -335,19 +378,24 @@ export default function App() {
     }
   };
 
-  const handleProceedFromSeatPicker = (selectedSeats) => {
+  const handleProceedFromSeatPicker = (selectedSeats, selectedShowId) => {
     const event = activeSeatPickerEvent;
     setActiveSeatPickerEvent(null);
 
+    // Attach the chosen show so checkout books against the correct show slot.
+    const eventWithShow = (selectedShowId && event?.shows?.length)
+      ? { ...event, selectedShow: event.shows.find(s => s.id === selectedShowId) || event.selectedShow }
+      : event;
+
     if (!currentUser) {
-      setPendingBookingData({ event, targetFlow: 'checkout', seats: selectedSeats });
+      setPendingBookingData({ event: eventWithShow, targetFlow: 'checkout', seats: selectedSeats });
       setAuthModalRole('customer');
       setIsAuthModalOpen(true);
       showWarning('Authentication Required', 'Please sign in or create an account to finalize your seats.');
       return;
     }
 
-    setCheckoutData({ event, seats: selectedSeats });
+    setCheckoutData({ event: eventWithShow, seats: selectedSeats });
   };
 
   const handleBookingSuccess = (newTicket) => {
@@ -357,20 +405,21 @@ export default function App() {
     showSuccess('Booking Confirmed! 🎟️', `Pass #${newTicket.ticketId} issued successfully for ${newTicket.eventTitle}.`);
   };
 
-  const handlePublishNewEvent = (newEvent) => {
-    const existingCustom = localStorage.getItem('eventland_custom_events');
-    let customList = [];
-    if (existingCustom) {
-      try {
-        customList = JSON.parse(existingCustom);
-      } catch {
-        customList = [];
-      }
+  const handlePublishNewEvent = async (newEvent) => {
+    // Backend API is the source of truth for new events. Fall back to
+    // optimistic local state only when the API is unreachable (offline).
+    let created = null;
+    try {
+      created = await adminApi.events.create(newEvent);
+    } catch (err) {
+      console.warn('Backend event creation failed, falling back to local state:', err);
     }
-    customList = [newEvent, ...customList];
-    localStorage.setItem('eventland_custom_events', JSON.stringify(customList));
 
-    setEvents([newEvent, ...events]);
+    const eventToList = (created && typeof created === 'object' && !Array.isArray(created))
+      ? { ...newEvent, ...created }
+      : newEvent;
+
+    setEvents([eventToList, ...events]);
     setActiveView('explore');
     showSuccess('Event Live! 🎉', `"${newEvent.title}" published successfully and is now live on EventLand.`);
   };
@@ -394,37 +443,49 @@ export default function App() {
     }
   };
 
-  // Filter & Sort Events
-  const filteredEvents = events.filter((ev) => {
-    const matchCity = selectedCity === 'All Cities' || (ev.city && ev.city.toLowerCase() === selectedCity.toLowerCase());
-    
-    let matchTag = true;
-    if (selectedTag !== 'All') {
-      const selectedSlug = selectedTag.toLowerCase();
-      const rawTags = ev.tags || ev.eventTags || [];
-      matchTag = rawTags.some(t => {
-        const tObj = (typeof t === 'object' && t.tag) ? t.tag : t;
-        const tName = (typeof tObj === 'string' ? tObj : (tObj.name || tObj.slug || '')).toLowerCase();
-        return tName === selectedSlug;
-      });
-    }
+  // Filter & Sort Events — memoized so typing in search does not re-scan the
+  // list on every render, and debounced so each keystroke does not re-filter.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-    const matchSearch =
-      !searchQuery ||
-      ev.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (ev.venue && ev.venue.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (ev.city && ev.city.toLowerCase().includes(searchQuery.toLowerCase()));
+  const sortedEvents = useMemo(() => {
+    const needle = debouncedSearch.trim().toLowerCase();
+    const citySel = selectedCity.toLowerCase();
+    const tagSel = selectedTag.toLowerCase();
 
-    return matchCity && matchTag && matchSearch;
-  });
+    const filtered = events.filter((ev) => {
+      const matchCity = selectedCity === 'All Cities' || (ev.city && ev.city.toLowerCase() === citySel);
 
-  const sortedEvents = [...filteredEvents].sort((a, b) => {
-    if (sortBy === 'price-asc') return a.startingPrice - b.startingPrice;
-    if (sortBy === 'price-desc') return b.startingPrice - a.startingPrice;
-    return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
-  });
+      let matchTag = true;
+      if (selectedTag !== 'All') {
+        const rawTags = ev.tags || ev.eventTags || [];
+        matchTag = rawTags.some(t => {
+          const tObj = (typeof t === 'object' && t.tag) ? t.tag : t;
+          const tName = (typeof tObj === 'string' ? tObj : (tObj.name || tObj.slug || '')).toLowerCase();
+          return tName === tagSel;
+        });
+      }
 
-  const featuredEvents = events.filter((e) => e.isFeatured);
+      const matchSearch =
+        !needle ||
+        ev.title.toLowerCase().includes(needle) ||
+        (ev.venue && ev.venue.toLowerCase().includes(needle)) ||
+        (ev.city && ev.city.toLowerCase().includes(needle));
+
+      return matchCity && matchTag && matchSearch;
+    });
+
+    return filtered.sort((a, b) => {
+      if (sortBy === 'price-asc') return a.startingPrice - b.startingPrice;
+      if (sortBy === 'price-desc') return b.startingPrice - a.startingPrice;
+      return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
+    });
+  }, [events, selectedCity, selectedTag, debouncedSearch, sortBy]);
+
+  const featuredEvents = useMemo(() => events.filter((e) => e.isFeatured), [events]);
 
   return (
     <div className="app">
@@ -481,7 +542,12 @@ export default function App() {
             </div>
 
             {/* Event Cards Grid */}
-            {sortedEvents.length === 0 ? (
+            {loadingEvents ? (
+              <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#94a3b8' }}>
+                <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
+                <p>Loading events...</p>
+              </div>
+            ) : sortedEvents.length === 0 ? (
               <div className="glass-card" style={{ padding: '4rem 2rem', textAlign: 'center' }}>
                 <Ticket size={48} color="#94a3b8" style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
                 <h3 style={{ fontSize: '1.3rem', color: '#fff', marginBottom: '0.5rem' }}>No events found</h3>
@@ -500,42 +566,65 @@ export default function App() {
                 </button>
               </div>
             ) : (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '2rem',
-                maxWidth: '1200px',
-                width: '100%',
-                margin: '0 auto'
-              }}>
-                {sortedEvents.map((ev) => (
-                  <EventCard
-                    key={ev.id}
-                    event={ev}
-                    onSelect={handleSelectEventForDetail}
-                    isSaved={savedEventIds.includes(ev.id)}
-                    onToggleSave={handleToggleSave}
-                  />
-                ))}
-              </div>
+              <>
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2rem',
+                  maxWidth: '1200px',
+                  width: '100%',
+                  margin: '0 auto'
+                }}>
+                  {sortedEvents.map((ev) => (
+                    <EventCard
+                      key={ev.id}
+                      event={ev}
+                      onSelect={handleSelectEventForDetail}
+                      isSaved={savedEventIds.includes(ev.id)}
+                      onToggleSave={handleToggleSave}
+                    />
+                  ))}
+                </div>
+                {hasMoreEvents && (
+                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '2rem' }}>
+                    <button
+                      onClick={handleLoadMore}
+                      disabled={loadingMore}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.75rem 1.6rem', fontWeight: 700 }}
+                    >
+                      {loadingMore ? 'Loading...' : 'Load More Events'}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
 
         {/* View: Artist Bookings */}
-        {activeView === 'artists' && <ArtistBookings />}
+        {activeView === 'artists' && (
+          <Suspense fallback={LazyFallback}>
+            <ArtistBookings cities={cities} />
+          </Suspense>
+        )}
 
         {/* View: AI Event Matchmaker Assistant */}
         {activeView === 'ai-assistant' && (
-          <AiEventAssistant events={events} onSelectEvent={handleSelectEventForDetail} />
+          <Suspense fallback={LazyFallback}>
+            <AiEventAssistant events={events} onSelectEvent={handleSelectEventForDetail} />
+          </Suspense>
         )}
 
         {/* View: List Your Event Wizard */}
         {activeView === 'organizer-wizard' && (
-          <EventOrganizerWizard
-            onPublishEvent={handlePublishNewEvent}
-            onCancel={() => setActiveView('explore')}
-          />
+          <Suspense fallback={LazyFallback}>
+            <EventOrganizerWizard
+              onPublishEvent={handlePublishNewEvent}
+              onCancel={() => setActiveView('explore')}
+              cities={cities}
+            />
+          </Suspense>
         )}
 
         {/* View: My Tickets Dashboard */}
@@ -677,21 +766,26 @@ export default function App() {
         )}
         {/* View: Admin Console Dashboard */}
         {activeView === 'admin' && (
-          <AdminDashboard
-            events={events}
-            onToggleFeature={handleToggleFeature}
-            onDeleteEvent={handleDeleteEvent}
-            onSelectEvent={handleSelectEventForDetail}
-          />
+          <Suspense fallback={LazyFallback}>
+            <AdminDashboard
+              events={events}
+              onToggleFeature={handleToggleFeature}
+              onDeleteEvent={handleDeleteEvent}
+              onSelectEvent={handleSelectEventForDetail}
+            />
+          </Suspense>
         )}
 
         {/* View: Organizer Command Center */}
         {activeView === 'organizer' && (
-          <OrganizerDashboard
-            events={events}
-            onNavigateToCreate={() => setActiveView('organizer-wizard')}
-            onSelectEvent={handleSelectEventForDetail}
-          />
+          <Suspense fallback={LazyFallback}>
+            <OrganizerDashboard
+              currentUser={currentUser}
+              events={events}
+              onNavigateToCreate={() => setActiveView('organizer-wizard')}
+              onSelectEvent={handleSelectEventForDetail}
+            />
+          </Suspense>
         )}
       </main>
 
@@ -730,6 +824,7 @@ export default function App() {
 
       {isAuthModalOpen && (
         <AuthModal
+          initialMode="login"
           initialRole={authModalRole}
           onClose={() => setIsAuthModalOpen(false)}
           onLoginSuccess={handleLoginSuccess}

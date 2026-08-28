@@ -26,7 +26,11 @@ public record BookingDto(
     string PaymentMethod,
     DateTimeOffset? PaidAt,
     DateTimeOffset CreatedAt,
-    List<BookingSeatDto> SelectedSeats
+    List<BookingSeatDto> SelectedSeats,
+    // PayPro invoice details so an unpaid booking can be resumed and paid later.
+    string? PayProInvoiceId = null,
+    string? PayProConnectUrl = null,
+    DateTimeOffset? PaymentExpiresAt = null
 );
 
 public record CreateBookingDto(

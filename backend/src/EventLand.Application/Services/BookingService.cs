@@ -78,12 +78,20 @@ public class BookingService : IBookingService
         // Authenticated identity is authoritative over any client-supplied email.
         var effectiveEmail = string.IsNullOrWhiteSpace(userEmail) ? dto.CustomerEmail : userEmail;
 
+        // Collision-safe booking reference: CSPRNG + uniqueness check before insert.
+        // The unique index on BookingRef remains the final backstop against the race window.
+        string bookingRef;
+        do
+        {
+            bookingRef = $"EVL-{System.Security.Cryptography.RandomNumberGenerator.GetInt32(100000, 1000000)}";
+        } while (await _context.Bookings.AnyAsync(b => b.BookingRef == bookingRef));
+
         var booking = new Booking
         {
             EventId = dto.EventId,
             TicketTierId = dto.TicketTierId,
             UserId = userId,
-            BookingRef = $"EVL-{Random.Shared.Next(100000, 999999)}",
+            BookingRef = bookingRef,
             CustomerName = dto.CustomerName,
             CustomerEmail = effectiveEmail,
             CustomerPhone = dto.CustomerPhone,
@@ -229,7 +237,10 @@ public class BookingService : IBookingService
                 bs.Seat.Row,
                 bs.Seat.Col,
                 bs.Seat.Price
-            )).ToList()
+            )).ToList(),
+            b.PayProInvoiceId,
+            b.PayProConnectUrl,
+            b.PaymentExpiresAt
         );
     }
 }

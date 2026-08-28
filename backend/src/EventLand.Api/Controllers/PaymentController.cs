@@ -135,12 +135,25 @@ public class PaymentController : ControllerBase
 
     /// <summary>
     /// Client confirmation endpoint (for instant payment verification).
-    /// Requires an authenticated user; verification is re-checked server-side against PayPro.
+    /// Requires an authenticated user who owns the booking (or an admin);
+    /// verification is re-checked server-side against PayPro.
     /// </summary>
     [HttpPost("confirm")]
     [Authorize]
     public async Task<IActionResult> ConfirmPayment([FromBody] PayProIpnPayloadDto payload)
     {
+        // Ownership check: only the booking owner (or an admin) may confirm payment.
+        var booking = await _context.Bookings.AsNoTracking()
+            .FirstOrDefaultAsync(b => (b.PayProInvoiceId == payload.InvoiceId || b.BookingRef == payload.BookingRef) && !b.IsDeleted);
+
+        if (booking is null)
+            return NotFound(new { message = $"Booking for invoice '{payload.InvoiceId}' not found." });
+
+        var userEmail = GetAuthenticatedEmail();
+        var isAdmin = User.IsInRole("SuperAdmin") || User.IsInRole("Admin");
+        if (!isAdmin && !string.Equals(booking.CustomerEmail, userEmail, StringComparison.OrdinalIgnoreCase))
+            return StatusCode(403, new { message = "You are not authorized to confirm payment for this booking." });
+
         var processed = await _paymentService.ProcessIpnCallbackAsync(payload);
         return Ok(new { success = processed });
     }

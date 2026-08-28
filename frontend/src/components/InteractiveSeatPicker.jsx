@@ -1,10 +1,20 @@
 import { useState, useEffect, useMemo } from 'react';
 import { X, Ticket, Calendar, Layers, ZoomIn, ZoomOut, RotateCcw, Maximize2, ShieldAlert, Download } from 'lucide-react';
-import { seatHoldApi, eventsApi, auditoriumLayoutsApi } from '../services/api';
+import { seatHoldApi, eventsApi, auditoriumLayoutsApi, BACKEND_URL } from '../services/api';
 import { parseAuditoriumLayout } from '../data/auditoriumLayouts';
 import { exportAuditoriumChartPdf } from '../utils/pdfChartExporter';
 
-const createGuestEmail = () => `guest_${Math.floor(100000 + Math.random() * 900000)}@eventland.pk`;
+// Stable per-session guest identity so all seat holds from this browser share one owner
+// (a fresh random email per click fragmented the hold map and broke releases).
+const getGuestEmail = () => {
+  const KEY = 'eventland_guest_session';
+  let guest = sessionStorage.getItem(KEY);
+  if (!guest) {
+    guest = `guest_${Math.floor(100000 + Math.random() * 900000)}@eventland.pk`;
+    sessionStorage.setItem(KEY, guest);
+  }
+  return guest;
+};
 
 export default function InteractiveSeatPicker({ event: initialEvent, onClose, onProceedToCheckout, isPreview = false }) {
   const isPreviewMode = isPreview || !onProceedToCheckout || String(initialEvent?.id || '').startsWith('preview-');
@@ -94,6 +104,77 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
     }
   }, [event.id, selectedShowId, isPreviewMode]);
 
+  // Real-time SignalR updates: SeatsHeld / SeatsReleased -> merge into redisHeldSeats.
+  // Uses a dynamic import so the app still builds when @microsoft/signalr is not
+  // installed yet; the warning above will prompt the install.
+  useEffect(() => {
+    if (isPreviewMode || typeof event.id !== 'number') return undefined;
+
+    let cancelled = false;
+    let conn = null;
+
+    const start = async () => {
+      try {
+        const sig = await import('@microsoft/signalr');
+        const token = localStorage.getItem('eventland_jwt_token') || '';
+        const builder = new sig.HubConnectionBuilder()
+          .withUrl(`${BACKEND_URL}/hubs/seating`, {
+            accessTokenFactory: () => token,
+            transport: sig.HttpTransportType.WebSockets | sig.HttpTransportType.LongPolling,
+          })
+          .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
+          .configureLogging(sig.LogLevel.Warning)
+          .build();
+
+        const apply = (payload) => {
+          let held = payload;
+          try {
+            if (typeof payload === 'string') held = JSON.parse(payload);
+          } catch { /* already an array/object */ }
+          const seats = Array.isArray(held) ? held : (held?.seatIds || held?.seats || []);
+          if (!Array.isArray(seats) || seats.length === 0) return;
+          const ids = seats.map(s => (typeof s === 'object' && s !== null ? (s.id ?? s.seatId ?? s.label) : s)).filter(Boolean);
+          setRedisHeldSeats(prev => [...new Set([...prev, ...ids])]);
+        };
+
+        const applyReleased = (payload) => {
+          let rel = payload;
+          try {
+            if (typeof payload === 'string') rel = JSON.parse(payload);
+          } catch { /* */ }
+          const seats = Array.isArray(rel) ? rel : (rel?.seatIds || rel?.seats || []);
+          const ids = seats.map(s => (typeof s === 'object' && s !== null ? (s.id ?? s.seatId ?? s.label) : s)).filter(Boolean);
+          if (ids.length === 0) return;
+          const idsSet = new Set(ids.map(String));
+          setRedisHeldSeats(prev => prev.filter(x => !idsSet.has(String(x))));
+        };
+
+        builder.on('SeatsHeld', apply);
+        builder.on('seatsHeld', apply);
+        builder.on('SeatsReleased', applyReleased);
+        builder.on('seatsReleased', applyReleased);
+
+        await builder.start();
+        if (cancelled) { await builder.stop().catch(() => {}); return; }
+        conn = builder;
+
+        // Rejoin event group (hub method: JoinEventGroup(int eventId)).
+        await conn.invoke('JoinEventGroup', event.id).catch(() => {});
+      } catch (err) {
+        // Expected when @microsoft/signalr is not installed; log once.
+        console.warn('SignalR seating client not active:', err?.message || err);
+      }
+    };
+
+    start();
+    return () => {
+      cancelled = true;
+      if (conn) {
+        conn.invoke('LeaveEventGroup', event.id).catch(() => {}).finally(() => conn.stop().catch(() => {}));
+      }
+    };
+  }, [event.id, isPreviewMode]);
+
   const isOccupied = (seatId) => {
     if (!seatId) return false;
     return redisHeldSeats.includes(seatId);
@@ -139,7 +220,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
           if (savedUser?.email) {
             userEmail = savedUser.email;
           } else {
-            userEmail = createGuestEmail();
+            userEmail = getGuestEmail();
           }
 
           await seatHoldApi.holdSeats(event.id, [seatId], userEmail, selectedShowId);
@@ -149,6 +230,10 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
   };
 
   const totalPrice = selectedSeats.reduce((sum, s) => sum + (Number(s.price) || Number(activeShowPrice) || 1500), 0);
+
+  // Compare row letters as base-26 numbers so multi-character rows (AA, AB, ...) order correctly.
+  const rowValue = (row) => String(row).trim().toUpperCase().split('')
+    .reduce((acc, ch) => acc * 26 + (ch.charCodeAt(0) - 64), 0);
 
   // Helper to resolve row-wise price, tier ID and tier name
   const getRowSeatInfo = (rowChar, seatObj) => {
@@ -175,9 +260,10 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
         if (clean.includes('-')) {
           const parts = clean.split('-').map(x => x.trim());
           if (parts.length === 2 && parts[0] && parts[1]) {
-            const start = parts[0];
-            const end = parts[1];
-            if (rowUpper >= start && rowUpper <= end) return true;
+            const start = rowValue(parts[0]);
+            const end = rowValue(parts[1]);
+            const current = rowValue(rowUpper);
+            if (current >= start && current <= end) return true;
           }
         }
       }
@@ -335,14 +421,15 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
   };
 
   // Match current auditorium against dbAuditoriums list if available
+  const zoneName = currentZone?.zone;
   const matchedDbAuditorium = useMemo(() => {
     if (!dbAuditoriums || dbAuditoriums.length === 0) return null;
-    const searchTarget = (currentZone?.zone || event.auditoriumName || event.auditoriumLayout || event.title || '').toLowerCase();
-    return dbAuditoriums.find(a => 
-      (a.name && searchTarget.includes(a.name.toLowerCase())) || 
+    const searchTarget = (zoneName || event.auditoriumName || event.auditoriumLayout || event.title || '').toLowerCase();
+    return dbAuditoriums.find(a =>
+      (a.name && searchTarget.includes(a.name.toLowerCase())) ||
       (a.layoutCode && searchTarget.includes(a.layoutCode.toLowerCase()))
     );
-  }, [dbAuditoriums, currentZone?.zone, event.auditoriumName, event.auditoriumLayout, event.title]);
+  }, [dbAuditoriums, zoneName, event.auditoriumName, event.auditoriumLayout, event.title]);
 
   const rawAudi = currentZone?.zone || event.auditoriumName || event.auditorium || matchedDbAuditorium?.name || event.auditoriumLayout || 'Main Auditorium';
   const auditoriumName = (rawAudi && !rawAudi.toLowerCase().includes('undefined')) ? rawAudi : 'Main Auditorium';
@@ -583,7 +670,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
           }}>
             {/* Row Tier Price Legend */}
             {(effectiveTiers.filter(t => t.rowRange).length > 0) && (
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '1.25rem', padding: '0.5rem 1rem', background: 'rgba(30, 41, 59, 0.7)', borderRadius: '9999px', border: '1px solid rgba(255, 255, 255, 0.1)', display: 'inline-flex' }}>
+              <div style={{ display: 'inline-flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '1.25rem', padding: '0.5rem 1rem', background: 'rgba(30, 41, 59, 0.7)', borderRadius: '9999px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
                 {effectiveTiers.filter(t => t.rowRange).map((t, idx) => (
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem' }}>
                     <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: idx === 0 ? '#f59e0b' : idx === 1 ? '#a855f7' : '#3b82f6' }} />

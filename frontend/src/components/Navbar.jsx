@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { MapPin, Search, PlusCircle, User, Sparkles, Music, Calendar, Menu, X, ShieldCheck, Building2, LogIn, LogOut } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
-import { CITIES } from '../data/mockEvents';
 
 export default function Navbar({ 
   selectedCity, 
@@ -20,7 +19,10 @@ export default function Navbar({
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const cityOptions = ['All Cities', ...(cities || []).map(c => typeof c === 'string' ? c : c.name)];
+  const cityOptions = useMemo(
+    () => ['All Cities', ...(cities || []).map(c => typeof c === 'string' ? c : c.name).filter(Boolean)],
+    [cities]
+  );
 
   const handleNavClick = (view) => {
     onNavigate(view);
@@ -112,7 +114,7 @@ export default function Navbar({
             <SearchableSelect
               value={selectedCity}
               onChange={(e) => onSelectCity(e.target.value)}
-              options={cityOptions.length > 1 ? cityOptions : CITIES}
+              options={cityOptions}
               icon={MapPin}
               placeholder="City..."
             />
@@ -381,7 +383,7 @@ export default function Navbar({
               <SearchableSelect
                 value={selectedCity}
                 onChange={(e) => onSelectCity(e.target.value)}
-                options={CITIES}
+                options={cityOptions}
                 icon={MapPin}
                 placeholder="Select City..."
               />
@@ -422,21 +424,25 @@ export default function Navbar({
               <User size={18} color="#3b82f6" /> My Digital Tickets ({savedTicketsCount})
             </button>
 
-            <button
-              onClick={() => handleNavClick('organizer')}
-              className="btn btn-secondary"
-              style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
-            >
-              <Building2 size={18} color="#3b82f6" /> Organizer Portal
-            </button>
+            {currentUser && (currentUser.role === 'organizer' || currentUser.role === 'admin') && (
+              <button
+                onClick={() => handleNavClick('organizer')}
+                className="btn btn-secondary"
+                style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
+              >
+                <Building2 size={18} color="#3b82f6" /> Organizer Portal
+              </button>
+            )}
 
-            <button
-              onClick={() => handleNavClick('admin')}
-              className="btn btn-secondary"
-              style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
-            >
-              <ShieldCheck size={18} color="#3b82f6" /> Admin Console
-            </button>
+            {currentUser && currentUser.role === 'admin' && (
+              <button
+                onClick={() => handleNavClick('admin')}
+                className="btn btn-secondary"
+                style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
+              >
+                <ShieldCheck size={18} color="#3b82f6" /> Admin Console
+              </button>
+            )}
 
             <button
               onClick={() => handleNavClick('organizer-wizard')}

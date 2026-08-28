@@ -81,6 +81,16 @@ export const authApi = {
     }
     return data;
   },
+  register: async (fullName, email, password, phoneNumber = null) => {
+    const data = await request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ fullName, email, password, phoneNumber })
+    });
+    if (data.token) {
+      localStorage.setItem('eventland_jwt_token', data.token);
+    }
+    return data;
+  },
   getMe: async () => request('/auth/me'),
   changePassword: async (oldPassword, newPassword) => request('/auth/change-password', {
     method: 'POST',

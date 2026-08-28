@@ -23,7 +23,8 @@ public class JwtTokenGenerator : IJwtTokenGenerator
 
     public (string Token, DateTimeOffset ExpiresAt) GenerateToken(User user)
     {
-        var secretKey = _configuration["Jwt:SecretKey"] ?? "SuperSecretKeyForEventLandApi2026!MustBe32BytesOrLonger";
+        var secretKey = _configuration["Jwt:SecretKey"]
+            ?? throw new InvalidOperationException("Configuration 'Jwt:SecretKey' is required to issue JWT tokens.");
         var issuer = _configuration["Jwt:Issuer"] ?? "EventLandApi";
         var audience = _configuration["Jwt:Audience"] ?? "EventLandClients";
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));

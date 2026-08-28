@@ -5,13 +5,12 @@ import { uploadApi, adminApi, auditoriumLayoutsApi, locationsApi } from '../serv
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
-import { CITIES } from '../data/mockEvents';
 import { exportAuditoriumChartPdf } from '../utils/pdfChartExporter';
 import { parseAuditoriumLayout } from '../data/auditoriumLayouts';
 
 const makePreviewId = () => `user-created-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
+export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities = [] }) {
   const { showError, showSuccess } = useToast();
   const [tagsList, setTagsList] = useState([]);
   const [auditoriumsList, setAuditoriumsList] = useState([]);
@@ -339,7 +338,11 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel }) {
                   <SearchableSelect
                     value={eventForm.city}
                     onChange={(e) => setEventForm({ ...eventForm, city: e.target.value })}
-                    options={citiesList.length > 0 ? citiesList.map(c => c.name) : CITIES.filter(c => c !== 'All Cities')}
+                    options={
+                      citiesList.length > 0
+                        ? citiesList.map(c => (typeof c === 'string' ? c : c.name))
+                        : (cities || []).map(c => (typeof c === 'string' ? c : c.name)).filter(Boolean)
+                    }
                     placeholder="Select City..."
                   />
                 </div>

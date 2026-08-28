@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Star, X } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
-import { CITIES } from '../data/mockEvents';
-import { artistsApi } from '../services/api';
+import { artistsApi, locationsApi } from '../services/api';
 import { useToast } from '../context/ToastContext';
 
-export default function ArtistBookings() {
+export default function ArtistBookings({ cities: citiesProp = [] }) {
   const { showSuccess } = useToast();
   const [artists, setArtists] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +32,23 @@ export default function ArtistBookings() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // Cities come from App (locationsApi) via prop; fetch them here as a
+  // fallback if the component is ever mounted without the prop.
+  const [cityOptions, setCityOptions] = useState([]);
+  useEffect(() => {
+    const fromProp = (citiesProp || []).map(c => typeof c === 'string' ? c : c.name).filter(Boolean);
+    if (fromProp.length > 0) {
+      setCityOptions(fromProp);
+      return;
+    }
+    locationsApi.getCities()
+      .then(res => {
+        const list = Array.isArray(res) ? res : (res?.items || []);
+        setCityOptions(list.map(c => typeof c === 'string' ? c : c.name).filter(Boolean));
+      })
+      .catch(() => setCityOptions([]));
+  }, [citiesProp]);
 
   const handleSubmitInquiry = (e) => {
     e.preventDefault();
@@ -294,7 +310,7 @@ export default function ArtistBookings() {
                     <SearchableSelect
                       value={inquiryForm.city}
                       onChange={(e) => setInquiryForm({ ...inquiryForm, city: e.target.value })}
-                      options={CITIES.filter(c => c !== 'All Cities')}
+                      options={cityOptions.length > 0 ? cityOptions : ['Karachi', 'Lahore', 'Islamabad', 'Rawalpindi']}
                       placeholder="Select City..."
                     />
                   </div>
