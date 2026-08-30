@@ -31,7 +31,9 @@ public class Booking : BaseEntity
     // Ticket details
     public int          Quantity        { get; set; } = 1;
     public decimal      UnitPrice       { get; set; }
-    public decimal      TotalAmount     { get; set; }
+    public decimal      TotalAmount     { get; set; } // Base ticket subtotal
+    public decimal      GatewayFee      { get; set; } // PayFast commission fee
+    public decimal      GrossAmount     { get; set; } // TotalAmount + GatewayFee
 
     // Status & payment
     public BookingStatus  Status          { get; set; } = BookingStatus.Pending;
@@ -39,10 +41,10 @@ public class Booking : BaseEntity
     public PaymentMethod  PaymentMethod   { get; set; } = PaymentMethod.None;
     public DateTimeOffset? PaidAt         { get; set; }
 
-    // PayPro Pakistan integration & timer fields
-    public string?        PayProInvoiceId   { get; set; }
-    public string?        PayProConnectUrl { get; set; }
-    public DateTimeOffset? PaymentExpiresAt { get; set; }
+    // PayFast Pakistan integration & timer fields
+    public string?        PayFastTransactionId { get; set; }
+    public string?        PayFastUrl           { get; set; }
+    public DateTimeOffset? PaymentExpiresAt    { get; set; }
 
     // Refund tracking
     public DateTimeOffset? RefundedAt      { get; set; }

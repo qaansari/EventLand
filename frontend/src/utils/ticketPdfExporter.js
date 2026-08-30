@@ -17,7 +17,7 @@ export function exportTicketPdf({
   attendeeEmail = 'ali@example.com',
   phone = '0300 1234567',
   seats = [],
-  paymentMethod = 'PAYPRO PAKISTAN',
+  paymentMethod = 'PAYFAST PAKISTAN',
   paymentStatus = 'Paid',
   totalPaid = 1500,
   bookingTime = ''
@@ -118,15 +118,17 @@ export function exportTicketPdf({
     /* Event Show Banner Image */
     .banner-container {
       width: 100%;
-      height: 180px;
       position: relative;
-      overflow: hidden;
-      background-color: #1e293b;
+      background-color: #0b1329;
+      text-align: center;
+      border-bottom: 1px solid #e2e8f0;
     }
     .banner-img {
       width: 100%;
-      height: 100%;
-      object-fit: cover;
+      max-height: 250px;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto;
     }
     .banner-overlay {
       position: absolute;

@@ -21,15 +21,17 @@ public record BookingDto(
     int Quantity,
     decimal UnitPrice,
     decimal TotalAmount,
+    decimal GatewayFee,
+    decimal GrossAmount,
     string Status,
     string PaymentStatus,
     string PaymentMethod,
     DateTimeOffset? PaidAt,
     DateTimeOffset CreatedAt,
     List<BookingSeatDto> SelectedSeats,
-    // PayPro invoice details so an unpaid booking can be resumed and paid later.
-    string? PayProInvoiceId = null,
-    string? PayProConnectUrl = null,
+    // PayFast checkout details so an unpaid booking can be resumed and paid later.
+    string? PayFastTransactionId = null,
+    string? PayFastUrl = null,
     DateTimeOffset? PaymentExpiresAt = null
 );
 

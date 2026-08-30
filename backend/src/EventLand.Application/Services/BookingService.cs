@@ -226,6 +226,8 @@ public class BookingService : IBookingService
             b.Quantity,
             b.UnitPrice,
             b.TotalAmount,
+            b.GatewayFee,
+            b.GrossAmount > 0 ? b.GrossAmount : b.TotalAmount,
             b.Status.ToString(),
             b.PaymentStatus.ToString(),
             b.PaymentMethod.ToString(),
@@ -238,8 +240,8 @@ public class BookingService : IBookingService
                 bs.Seat.Col,
                 bs.Seat.Price
             )).ToList(),
-            b.PayProInvoiceId,
-            b.PayProConnectUrl,
+            b.PayFastTransactionId,
+            b.PayFastUrl,
             b.PaymentExpiresAt
         );
     }

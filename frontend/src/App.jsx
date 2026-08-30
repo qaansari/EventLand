@@ -7,6 +7,7 @@ import EventDetailModal from './components/EventDetailModal';
 import InteractiveSeatPicker from './components/InteractiveSeatPicker';
 import CheckoutModal from './components/CheckoutModal';
 import DigitalTicketModal from './components/DigitalTicketModal';
+import UnpaidInvoicesModal from './components/UnpaidInvoicesModal';
 import AuthModal from './components/AuthModal';
 import Footer from './components/Footer';
 import { Ticket, MapPin, Trash2, Search, RefreshCw } from 'lucide-react';
@@ -327,7 +328,7 @@ export default function App() {
       } else if (selectedCity !== 'All Cities') {
         document.title = `Events in ${selectedCity} | Event Land`;
       } else {
-        document.title = `Event Land - Discover Concerts, Festivals & Live Events`;
+        document.title = `Event Land - Discover | Book | Experience`;
       }
     }
   }, [
@@ -819,6 +820,17 @@ export default function App() {
         <DigitalTicketModal
           ticket={activeTicketView}
           onClose={() => setActiveTicketView(null)}
+        />
+      )}
+
+      {activeView === 'unpaid-invoices' && (
+        <UnpaidInvoicesModal
+          currentUser={currentUser}
+          onClose={() => setActiveView('explore')}
+          onPaymentSuccess={(ticket) => {
+            setSavedTickets(prev => [ticket, ...prev]);
+            setActiveTicketView(ticket);
+          }}
         />
       )}
 

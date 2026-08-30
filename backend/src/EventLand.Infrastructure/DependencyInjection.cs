@@ -5,6 +5,7 @@ using EventLand.Application.Common.Interfaces;
 using EventLand.Application.Interfaces;
 using EventLand.Application.Services;
 using EventLand.Domain.Entities;
+using EventLand.Infrastructure.Common;
 using EventLand.Infrastructure.Persistence;
 using EventLand.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -102,10 +103,11 @@ public static class DependencyInjection
         });
 
         // Application public services
+        services.Configure<PayFastOptions>(configuration.GetSection(PayFastOptions.SectionName));
         services.AddScoped<IEventService, EventService>();
         services.AddScoped<IBookingService, BookingService>();
         services.AddScoped<IArtistService, ArtistService>();
-        services.AddScoped<IPayProPaymentService, PayProPaymentService>();
+        services.AddScoped<IPayFastPaymentService, PayFastPaymentService>();
 
         return services;
     }

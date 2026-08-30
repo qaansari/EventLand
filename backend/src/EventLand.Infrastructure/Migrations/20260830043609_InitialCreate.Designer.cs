@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EventLand.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260827064104_InitialCreate")]
+    [Migration("20260830043609_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -205,10 +205,25 @@ namespace EventLand.Infrastructure.Migrations
                     b.Property<int>("EventId")
                         .HasColumnType("int");
 
+                    b.Property<decimal>("GatewayFee")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("GrossAmount")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
                     b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("PayFastTransactionId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PayFastUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("PaymentExpiresAt")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<int>("PaymentMethod")
@@ -219,6 +234,12 @@ namespace EventLand.Infrastructure.Migrations
 
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
+
+                    b.Property<string>("RefundReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("RefundedAt")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
@@ -240,6 +261,9 @@ namespace EventLand.Infrastructure.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("BookingRef")
@@ -253,6 +277,9 @@ namespace EventLand.Infrastructure.Migrations
                         .HasDatabaseName("IX_Bookings_EventId");
 
                     b.HasIndex("TicketTierId");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_Bookings_UserId");
 
                     b.HasIndex("EventId", "Status")
                         .HasDatabaseName("IX_Bookings_EventId_Status");
@@ -697,6 +724,114 @@ namespace EventLand.Infrastructure.Migrations
                     b.ToTable("Organizers");
                 });
 
+            modelBuilder.Entity("EventLand.Domain.Entities.PaymentFeeConfig", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
+
+                    b.Property<decimal>("CommissionPercentage")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PaymentMethodCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PaymentFeeConfigs");
+                });
+
+            modelBuilder.Entity("EventLand.Domain.Entities.RefundRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PayFastRefundId")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ProcessedByEmail")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("ProcessedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId");
+
+                    b.ToTable("RefundRecords");
+                });
+
             modelBuilder.Entity("EventLand.Domain.Entities.Role", b =>
                 {
                     b.Property<int>("Id")
@@ -1130,9 +1265,16 @@ namespace EventLand.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("EventLand.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Event");
 
                     b.Navigation("TicketTier");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("EventLand.Domain.Entities.BookingSeat", b =>
@@ -1242,6 +1384,17 @@ namespace EventLand.Infrastructure.Migrations
                     b.Navigation("Event");
 
                     b.Navigation("Tag");
+                });
+
+            modelBuilder.Entity("EventLand.Domain.Entities.RefundRecord", b =>
+                {
+                    b.HasOne("EventLand.Domain.Entities.Booking", "Booking")
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
                 });
 
             modelBuilder.Entity("EventLand.Domain.Entities.Seat", b =>

@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Periodically expires pending bookings whose payment window has elapsed.
-/// Runs every 60 seconds and delegates to <see cref="IPayProPaymentService.CheckAndExpirePendingBookingsAsync"/>.
+/// Runs every 60 seconds and delegates to <see cref="IPayFastPaymentService.CheckAndExpirePendingBookingsAsync"/>.
 /// Exceptions are logged and swallowed so the host keeps running.
 /// </summary>
 public sealed class PendingBookingExpiryService : BackgroundService
@@ -72,7 +72,7 @@ public sealed class PendingBookingExpiryService : BackgroundService
     private async Task RunOnceAsync(CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();
-        var paymentService = scope.ServiceProvider.GetRequiredService<IPayProPaymentService>();
+        var paymentService = scope.ServiceProvider.GetRequiredService<IPayFastPaymentService>();
 
         try
         {

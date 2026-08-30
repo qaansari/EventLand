@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { MapPin, Search, PlusCircle, User, Sparkles, Music, Calendar, Menu, X, ShieldCheck, Building2, LogIn, LogOut } from 'lucide-react';
+import { MapPin, Search, PlusCircle, User, Sparkles, Music, Calendar, Menu, X, ShieldCheck, Building2, LogIn, LogOut, FileText } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
 export default function Navbar({ 
@@ -221,6 +221,20 @@ export default function Navbar({
                 {savedTicketsCount}
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => handleNavClick('unpaid-invoices')}
+            className="btn"
+            style={{
+              position: 'relative',
+              background: activeView === 'unpaid-invoices' ? 'rgba(245, 158, 11, 0.18)' : 'transparent',
+              color: activeView === 'unpaid-invoices' ? '#fbbf24' : '#cbd5e1',
+              fontSize: '0.88rem',
+              padding: '0.55rem 0.9rem'
+            }}
+          >
+            <FileText size={15} color="#fbbf24" /> Unpaid Invoices
           </button>
 
           {/* Special Console Button for Organizers */}

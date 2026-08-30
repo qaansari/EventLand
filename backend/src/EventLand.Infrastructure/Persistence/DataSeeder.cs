@@ -168,5 +168,37 @@ public static class DataSeeder
             });
             await context.SaveChangesAsync();
         }
+
+        // 8. Default PayFast Commission Fee Configurations Seeding
+        if (!await context.PaymentFeeConfigs.AnyAsync())
+        {
+            context.PaymentFeeConfigs.AddRange(
+                new PaymentFeeConfig
+                {
+                    PaymentMethodCode = "bank_wallet",
+                    DisplayName = "Online Bank Transfer & Wallets",
+                    CommissionPercentage = 2.53m,
+                    Description = "PayFast fee for 1Link Instant Bank Transfer, JazzCash, and EasyPaisa wallet payments.",
+                    IsActive = true
+                },
+                new PaymentFeeConfig
+                {
+                    PaymentMethodCode = "card_domestic",
+                    DisplayName = "Debit / Credit Card (Domestic)",
+                    CommissionPercentage = 3.39m,
+                    Description = "PayFast fee for Visa, MasterCard, and UnionPay issued by Pakistani banks.",
+                    IsActive = true
+                },
+                new PaymentFeeConfig
+                {
+                    PaymentMethodCode = "card_international",
+                    DisplayName = "International Cards",
+                    CommissionPercentage = 4.025m,
+                    Description = "PayFast fee for overseas and foreign currency cards.",
+                    IsActive = true
+                }
+            );
+            await context.SaveChangesAsync();
+        }
     }
 }

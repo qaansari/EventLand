@@ -5,10 +5,8 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
-using EventLand.Domain.Entities;
 using EventLand.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,10 +14,10 @@ using Microsoft.EntityFrameworkCore;
 [Route("api/payments")]
 public class PaymentController : ControllerBase
 {
-    private readonly IPayProPaymentService _paymentService;
+    private readonly IPayFastPaymentService _paymentService;
     private readonly ApplicationDbContext _context;
 
-    public PaymentController(IPayProPaymentService paymentService, ApplicationDbContext context)
+    public PaymentController(IPayFastPaymentService paymentService, ApplicationDbContext context)
     {
         _paymentService = paymentService;
         _context = context;
@@ -35,7 +33,39 @@ public class PaymentController : ControllerBase
     }
 
     /// <summary>
-    /// Checks invoice payment status and remaining timer (Max 60 Minutes).
+    /// Gets active payment gateway commission fee configurations for checkout calculation.
+    /// </summary>
+    [HttpGet("fee-configs")]
+    public async Task<IActionResult> GetFeeConfigurations()
+    {
+        var feeConfigs = await _paymentService.GetFeeConfigurationsAsync();
+        return Ok(feeConfigs);
+    }
+
+    /// <summary>
+    /// Updates a payment gateway commission fee configuration (Admins only).
+    /// </summary>
+    [HttpPut("fee-configs/{id}")]
+    [Authorize(Roles = "SuperAdmin,Admin")]
+    public async Task<IActionResult> UpdateFeeConfiguration(int id, [FromBody] UpdatePaymentFeeConfigDto dto)
+    {
+        try
+        {
+            var updated = await _paymentService.UpdateFeeConfigurationAsync(id, dto);
+            return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Checks invoice/checkout payment status and remaining timer (Max 60 Minutes).
     /// </summary>
     [HttpGet("status/{bookingRef}")]
     public async Task<IActionResult> GetPaymentStatus(string bookingRef)
@@ -59,8 +89,10 @@ public class PaymentController : ControllerBase
             paymentStatus = booking.PaymentStatus.ToString(),
             paymentMethod = booking.PaymentMethod.ToString(),
             totalAmount = booking.TotalAmount,
-            payProInvoiceId = booking.PayProInvoiceId,
-            connectUrl = booking.PayProConnectUrl,
+            gatewayFee = booking.GatewayFee,
+            grossAmount = booking.GrossAmount > 0 ? booking.GrossAmount : booking.TotalAmount,
+            payFastTransactionId = booking.PayFastTransactionId,
+            payFastUrl = booking.PayFastUrl,
             expiresAt = expiresAt,
             remainingSeconds = remainingSeconds,
             isExpired = remainingSeconds <= 0 && booking.PaymentStatus.ToString() == "Pending",
@@ -69,12 +101,12 @@ public class PaymentController : ControllerBase
     }
 
     /// <summary>
-    /// Generates PayPro Pakistan invoice for a ticket booking.
+    /// Generates PayFast Pakistan checkout link and calculates gateway commission fee.
     /// Only logged-in, active users may purchase, and only for their own bookings.
     /// </summary>
-    [HttpPost("create-invoice")]
+    [HttpPost("create-checkout")]
     [Authorize]
-    public async Task<IActionResult> CreateInvoice([FromBody] PayProInvoiceRequestDto dto)
+    public async Task<IActionResult> CreateCheckout([FromBody] PayFastCheckoutRequestDto dto)
     {
         var userEmail = GetAuthenticatedEmail();
         if (string.IsNullOrWhiteSpace(userEmail))
@@ -89,7 +121,6 @@ public class PaymentController : ControllerBase
             return BadRequest(new { message = "Only active, verified users are authorized to purchase tickets." });
         }
 
-        // Authorization: a user may only pay for their own booking.
         var booking = await _context.Bookings.AsNoTracking()
             .FirstOrDefaultAsync(b => b.Id == dto.BookingId && !b.IsDeleted);
         if (booking is null)
@@ -103,7 +134,7 @@ public class PaymentController : ControllerBase
 
         try
         {
-            var res = await _paymentService.CreateInvoiceAsync(dto);
+            var res = await _paymentService.CreateCheckoutAsync(dto);
             return Ok(res);
         }
         catch (Exception ex)
@@ -113,13 +144,13 @@ public class PaymentController : ControllerBase
     }
 
     /// <summary>
-    /// Public PayPro Pakistan IPN Callback Webhook.
-    /// Asynchronously notified by PayPro upon payment completion, expiry, or cancellation.
+    /// Public PayFast Pakistan IPN Callback Webhook.
+    /// Asynchronously notified by PayFast upon payment completion, expiry, or cancellation.
     /// </summary>
-    [HttpPost("paypro-ipn")]
-    public async Task<IActionResult> PayProIpnCallback([FromBody] PayProIpnPayloadDto payload)
+    [HttpPost("payfast-ipn")]
+    public async Task<IActionResult> PayFastIpnCallback([FromBody] PayFastIpnPayloadDto payload)
     {
-        if (payload is null || string.IsNullOrWhiteSpace(payload.InvoiceId))
+        if (payload is null || (string.IsNullOrWhiteSpace(payload.TransactionId) && string.IsNullOrWhiteSpace(payload.BookingRef)))
         {
             return BadRequest(new { message = "Invalid IPN payload." });
         }
@@ -127,7 +158,7 @@ public class PaymentController : ControllerBase
         var processed = await _paymentService.ProcessIpnCallbackAsync(payload);
         if (processed)
         {
-            return Ok(new { success = true, message = "IPN processed successfully." });
+            return Ok(new { success = true, message = "PayFast IPN processed successfully." });
         }
 
         return BadRequest(new { success = false, message = "Failed to process IPN callback." });
@@ -136,18 +167,17 @@ public class PaymentController : ControllerBase
     /// <summary>
     /// Client confirmation endpoint (for instant payment verification).
     /// Requires an authenticated user who owns the booking (or an admin);
-    /// verification is re-checked server-side against PayPro.
+    /// verification is re-checked server-side against PayFast.
     /// </summary>
     [HttpPost("confirm")]
     [Authorize]
-    public async Task<IActionResult> ConfirmPayment([FromBody] PayProIpnPayloadDto payload)
+    public async Task<IActionResult> ConfirmPayment([FromBody] PayFastIpnPayloadDto payload)
     {
-        // Ownership check: only the booking owner (or an admin) may confirm payment.
         var booking = await _context.Bookings.AsNoTracking()
-            .FirstOrDefaultAsync(b => (b.PayProInvoiceId == payload.InvoiceId || b.BookingRef == payload.BookingRef) && !b.IsDeleted);
+            .FirstOrDefaultAsync(b => (b.PayFastTransactionId == payload.TransactionId || b.BookingRef == payload.BookingRef) && !b.IsDeleted);
 
         if (booking is null)
-            return NotFound(new { message = $"Booking for invoice '{payload.InvoiceId}' not found." });
+            return NotFound(new { message = $"Booking for transaction '{payload.TransactionId}' not found." });
 
         var userEmail = GetAuthenticatedEmail();
         var isAdmin = User.IsInRole("SuperAdmin") || User.IsInRole("Admin");

@@ -1,6 +1,7 @@
 namespace EventLand.Infrastructure.Services;
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using EventLand.Application.Common.Interfaces;
@@ -8,26 +9,31 @@ using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using EventLand.Domain.Entities;
 using EventLand.Domain.Enums;
+using EventLand.Infrastructure.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
-public class PayProPaymentService : IPayProPaymentService
+public class PayFastPaymentService : IPayFastPaymentService
 {
     private readonly IApplicationDbContext _context;
     private readonly ICacheService _cacheService;
-    private readonly ILogger<PayProPaymentService> _logger;
+    private readonly ILogger<PayFastPaymentService> _logger;
+    private readonly PayFastOptions _payFastOptions;
 
-    public PayProPaymentService(
+    public PayFastPaymentService(
         IApplicationDbContext context,
         ICacheService cacheService,
-        ILogger<PayProPaymentService> logger)
+        ILogger<PayFastPaymentService> logger,
+        IOptions<PayFastOptions> payFastOptions)
     {
         _context = context;
         _cacheService = cacheService;
         _logger = logger;
+        _payFastOptions = payFastOptions.Value;
     }
 
-    public async Task<PayProInvoiceResponseDto> CreateInvoiceAsync(PayProInvoiceRequestDto request)
+    public async Task<PayFastCheckoutResponseDto> CreateCheckoutAsync(PayFastCheckoutRequestDto request)
     {
         var booking = await _context.Bookings
             .FirstOrDefaultAsync(b => b.Id == request.BookingId && !b.IsDeleted);
@@ -35,61 +41,79 @@ public class PayProPaymentService : IPayProPaymentService
         if (booking is null)
             throw new KeyNotFoundException($"Booking with ID '{request.BookingId}' not found.");
 
-        var payProInvoiceId = $"PP-EVL-{booking.BookingRef}";
-        var expirationWindow = DateTimeOffset.UtcNow.AddMinutes(60); // Max 1 Hour Seat Timer
+        // Lookup fee configuration by method code, defaulting to 2.53% if not found
+        var methodCode = (request.PaymentMethodCode ?? "bank_wallet").ToLowerInvariant();
+        var feeConfig = await _context.PaymentFeeConfigs
+            .AsNoTracking()
+            .FirstOrDefaultAsync(f => f.PaymentMethodCode.ToLower() == methodCode && f.IsActive && !f.IsDeleted);
 
-        var connectUrl = $"https://connect.paypro.com.pk/1pay/invoice/{payProInvoiceId}?amt={request.Amount}&ref={booking.BookingRef}";
-        var otcVoucherCode = $"9200{booking.BookingRef.Replace("EVL-", "")}";
+        decimal commissionRate = feeConfig?.CommissionPercentage ?? (methodCode switch
+        {
+            "card_international" => 4.025m,
+            "card_domestic" => 3.39m,
+            _ => 2.53m
+        });
 
-        booking.PayProInvoiceId = payProInvoiceId;
-        booking.PayProConnectUrl = connectUrl;
+        // Gateway Fee calculation based on payment method category
+        var gatewayFee = Math.Round(booking.TotalAmount * (commissionRate / 100m), 2);
+        var grossAmount = booking.TotalAmount + gatewayFee;
+
+        var transactionId = $"PF-EVL-{booking.BookingRef}";
+        var expirationWindow = DateTimeOffset.UtcNow.AddMinutes(60);
+
+        var checkoutUrl = string.IsNullOrWhiteSpace(_payFastOptions.CheckoutUrl)
+            ? $"https://checkout.payfast.co.za/eng/process?token={transactionId}&amt={grossAmount}&ref={booking.BookingRef}"
+            : $"{_payFastOptions.CheckoutUrl}?token={transactionId}&amt={grossAmount}&ref={booking.BookingRef}";
+
+        booking.PayFastTransactionId = transactionId;
+        booking.PayFastUrl = checkoutUrl;
+        booking.GatewayFee = gatewayFee;
+        booking.GrossAmount = grossAmount;
         booking.PaymentExpiresAt = expirationWindow;
         booking.PaymentStatus = PaymentStatus.Pending;
         booking.Status = BookingStatus.Pending;
 
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Generated PayPro Pakistan Invoice {InvoiceId} for Booking {BookingRef}, expiring at {ExpiresAt}", 
-            payProInvoiceId, booking.BookingRef, expirationWindow);
+        _logger.LogInformation("Generated PayFast Pakistan Checkout {TransactionId} for Booking {BookingRef}. Subtotal: PKR {Subtotal}, Fee ({FeeRate}%): PKR {Fee}, Total Payable: PKR {GrossAmount}", 
+            transactionId, booking.BookingRef, booking.TotalAmount, commissionRate, gatewayFee, grossAmount);
 
-        return new PayProInvoiceResponseDto(
+        return new PayFastCheckoutResponseDto(
             Success: true,
-            InvoiceId: payProInvoiceId,
+            TransactionId: transactionId,
             BookingRef: booking.BookingRef,
-            Amount: request.Amount,
-            ConnectUrl: connectUrl,
-            OtcVoucherCode: otcVoucherCode,
+            BaseAmount: booking.TotalAmount,
+            GatewayFee: gatewayFee,
+            GrossAmount: grossAmount,
+            CheckoutUrl: checkoutUrl,
             Status: "UNPAID",
-            Message: "PayPro Pakistan invoice generated successfully. Complete payment within 60 minutes."
+            Message: $"PayFast checkout generated. Complete payment of PKR {grossAmount} within 60 minutes."
         );
     }
 
-    public async Task<bool> ProcessIpnCallbackAsync(PayProIpnPayloadDto payload)
+    public async Task<bool> ProcessIpnCallbackAsync(PayFastIpnPayloadDto payload)
     {
         var booking = await _context.Bookings
             .Include(b => b.TicketTier)
             .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
-            .FirstOrDefaultAsync(b => (b.PayProInvoiceId == payload.InvoiceId || b.BookingRef == payload.BookingRef) && !b.IsDeleted);
+            .FirstOrDefaultAsync(b => (b.PayFastTransactionId == payload.TransactionId || b.BookingRef == payload.BookingRef) && !b.IsDeleted);
 
         if (booking is null)
         {
-            _logger.LogWarning("PayPro IPN Received for unknown InvoiceId: {InvoiceId}, BookingRef: {BookingRef}", 
-                payload.InvoiceId, payload.BookingRef);
+            _logger.LogWarning("PayFast IPN Received for unknown TransactionId: {TransactionId}, BookingRef: {BookingRef}", 
+                payload.TransactionId, payload.BookingRef);
             return false;
         }
 
         var statusUpper = (payload.Status ?? "").ToUpperInvariant();
 
-        if (statusUpper == "PAID" || statusUpper == "SUCCESS" || statusUpper == "00")
+        if (statusUpper == "PAID" || statusUpper == "SUCCESS" || statusUpper == "00" || statusUpper == "COMPLETE")
         {
-            // Amount verification: reject callbacks whose paid amount does not cover the
-            // booking total. This is a defense-in-depth check on top of signature
-            // verification performed by the caller.
-            if (decimal.TryParse(payload.AmountPaid, out var amountPaid) && amountPaid < booking.TotalAmount)
+            if (decimal.TryParse(payload.AmountPaid, out var amountPaid) && amountPaid < booking.GrossAmount)
             {
                 _logger.LogWarning(
-                    "PayPro IPN rejected for {BookingRef}: paid {Paid} is less than payable {Payable}.",
-                    booking.BookingRef, amountPaid, booking.TotalAmount);
+                    "PayFast IPN rejected for {BookingRef}: paid {Paid} is less than required payable {Payable}.",
+                    booking.BookingRef, amountPaid, booking.GrossAmount);
                 return false;
             }
 
@@ -114,7 +138,7 @@ public class PayProPaymentService : IPayProPaymentService
             await _context.SaveChangesAsync();
             await _cacheService.ClearEventCacheAsync(booking.EventId);
 
-            _logger.LogInformation("Booking {BookingRef} successfully PAID via PayPro IPN.", booking.BookingRef);
+            _logger.LogInformation("Booking {BookingRef} successfully PAID via PayFast IPN.", booking.BookingRef);
             return true;
         }
         else if (statusUpper == "EXPIRED" || statusUpper == "CANCELLED" || statusUpper == "FAILED")
@@ -144,7 +168,7 @@ public class PayProPaymentService : IPayProPaymentService
             await _context.SaveChangesAsync();
             await _cacheService.ClearEventCacheAsync(booking.EventId);
 
-            _logger.LogInformation("Booking {BookingRef} marked EXPIRED/CANCELLED via PayPro IPN. Seats returned to pool.", booking.BookingRef);
+            _logger.LogInformation("Booking {BookingRef} marked EXPIRED/CANCELLED via PayFast IPN. Seats returned to pool.", booking.BookingRef);
             return true;
         }
 
@@ -191,10 +215,10 @@ public class PayProPaymentService : IPayProPaymentService
         var refundRecord = new RefundRecord
         {
             BookingId = booking.Id,
-            Amount = request.Amount > 0 ? request.Amount : booking.TotalAmount,
+            Amount = request.Amount > 0 ? request.Amount : (booking.GrossAmount > 0 ? booking.GrossAmount : booking.TotalAmount),
             Reason = request.Reason ?? "Customer Requested Refund",
             Status = "Processed",
-            PayProRefundId = $"RF-PP-{booking.BookingRef}",
+            PayFastRefundId = $"RF-PF-{booking.BookingRef}",
             ProcessedByUserId = adminUserId,
             ProcessedByEmail = adminEmail ?? "admin@eventland.pk",
             ProcessedAt = DateTimeOffset.UtcNow
@@ -204,7 +228,7 @@ public class PayProPaymentService : IPayProPaymentService
         await _context.SaveChangesAsync();
         await _cacheService.ClearEventCacheAsync(booking.EventId);
 
-        _logger.LogInformation("Successfully executed refund of PKR {Amount} for Booking {BookingRef}", 
+        _logger.LogInformation("Successfully executed PayFast refund of PKR {Amount} for Booking {BookingRef}", 
             refundRecord.Amount, booking.BookingRef);
 
         return new ProcessRefundResponseDto(
@@ -255,5 +279,54 @@ public class PayProPaymentService : IPayProPaymentService
 
         await _context.SaveChangesAsync();
         _logger.LogInformation("Expired {Count} pending bookings exceeding 1-hour payment timer.", expiredBookings.Count);
+    }
+
+    public async Task<List<PaymentFeeConfigDto>> GetFeeConfigurationsAsync()
+    {
+        var configs = await _context.PaymentFeeConfigs
+            .AsNoTracking()
+            .Where(f => !f.IsDeleted)
+            .OrderBy(f => f.Id)
+            .ToListAsync();
+
+        return configs.Select(f => new PaymentFeeConfigDto(
+            f.Id,
+            f.PaymentMethodCode,
+            f.DisplayName,
+            f.CommissionPercentage,
+            f.Description,
+            f.IsActive,
+            f.UpdatedAt
+        )).ToList();
+    }
+
+    public async Task<PaymentFeeConfigDto> UpdateFeeConfigurationAsync(int id, UpdatePaymentFeeConfigDto dto)
+    {
+        var config = await _context.PaymentFeeConfigs
+            .FirstOrDefaultAsync(f => f.Id == id && !f.IsDeleted);
+
+        if (config is null)
+            throw new KeyNotFoundException($"Payment fee configuration with ID '{id}' not found.");
+
+        config.CommissionPercentage = dto.CommissionPercentage;
+        if (dto.IsActive.HasValue) config.IsActive = dto.IsActive.Value;
+        if (!string.IsNullOrWhiteSpace(dto.DisplayName)) config.DisplayName = dto.DisplayName;
+        if (!string.IsNullOrWhiteSpace(dto.Description)) config.Description = dto.Description;
+        config.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Updated PayFast fee config ID {Id} ({Code}): Commission set to {Rate}%", 
+            config.Id, config.PaymentMethodCode, config.CommissionPercentage);
+
+        return new PaymentFeeConfigDto(
+            config.Id,
+            config.PaymentMethodCode,
+            config.DisplayName,
+            config.CommissionPercentage,
+            config.Description,
+            config.IsActive,
+            config.UpdatedAt
+        );
     }
 }

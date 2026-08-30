@@ -268,10 +268,12 @@ export const tagsApi = {
   getAll: async () => request('/tags')
 };
 
-// --- PayPro Pakistan & Refund Payments API ---
+// --- PayFast Pakistan & Fee Configurations API ---
 export const paymentsApi = {
+  getFeeConfigs: async () => request('/payments/fee-configs'),
+  updateFeeConfig: async (id, dto) => request(`/payments/fee-configs/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   getPaymentStatus: async (bookingRef) => request(`/payments/status/${bookingRef}`),
-  createInvoice: async (dto) => request('/payments/create-invoice', { method: 'POST', body: JSON.stringify(dto) }),
+  createCheckout: async (dto) => request('/payments/create-checkout', { method: 'POST', body: JSON.stringify(dto) }),
   confirmPayment: async (payload) => request('/payments/confirm', { method: 'POST', body: JSON.stringify(payload) }),
   processRefund: async (dto) => request('/payments/refund', { method: 'POST', body: JSON.stringify(dto) })
 };

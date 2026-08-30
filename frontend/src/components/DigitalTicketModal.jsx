@@ -95,23 +95,20 @@ export default function DigitalTicketModal({ ticket, onClose }) {
 
             {/* Event Show Banner Image */}
             {ticket.banner && (
-              <div style={{ height: '140px', width: '100%', overflow: 'hidden', position: 'relative', background: '#1e293b' }}>
-                <img src={ticket.banner} alt={ticket.eventTitle} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, rgba(15,23,42,0.95), transparent)', padding: '0.75rem 1.25rem' }}>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#fff', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
-                    {ticket.eventTitle}
-                  </h3>
-                </div>
+              <div style={{ width: '100%', position: 'relative', background: '#070c18', borderBottom: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                <img
+                  src={ticket.banner}
+                  alt={ticket.eventTitle}
+                  style={{ width: '100%', height: 'auto', maxHeight: '280px', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+                />
               </div>
             )}
 
             {/* Main Pass Body */}
             <div style={{ padding: '1.25rem' }}>
-              {!ticket.banner && (
-                <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#fff', marginBottom: '0.35rem' }}>
-                  {ticket.eventTitle}
-                </h3>
-              )}
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#fff', marginBottom: '0.35rem' }}>
+                {ticket.eventTitle}
+              </h3>
               <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginBottom: '1rem', fontWeight: 600 }}>
                 📍 {ticket.venue}
               </p>

@@ -34,7 +34,8 @@ import {
   FileText,
   Upload,
   HelpCircle,
-  GripVertical
+  GripVertical,
+  CreditCard
 } from 'lucide-react';
 import { adminApi, locationsApi, uploadApi, faqsApi, footerApi, paymentsApi, getEventImageUrl, getOrganizerImageUrl, getUserImageUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -42,8 +43,10 @@ import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
 import EventCard from './EventCard';
 import InteractiveSeatPicker from './InteractiveSeatPicker';
+import DigitalTicketModal from './DigitalTicketModal';
 import { parseAuditoriumLayout, createBlankLayoutJson } from '../data/auditoriumLayouts';
 import { exportAuditoriumChartPdf } from '../utils/pdfChartExporter';
+import { exportTicketPdf } from '../utils/ticketPdfExporter';
 
 // --- File Upload Component Helper ---
 function FileUploadField({ label, value, onChange, placeholder = "Image URL or upload file...", type = "events", entityName = null, entityId = null }) {
@@ -131,6 +134,7 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [citiesList, setCitiesList] = useState([]);
   const [venuesList, setVenuesList] = useState([]);
   const [faqsList, setFaqsList] = useState([]);
+  const [feeConfigsList, setFeeConfigsList] = useState([]);
 
   // Form Modal States
   const [showEventModal, setShowEventModal] = useState(false);
@@ -143,7 +147,16 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [showAuditoriumModal, setShowAuditoriumModal] = useState(false);
   const [showFaqModal, setShowFaqModal] = useState(false);
   const [showFooterModal, setShowFooterModal] = useState(false);
+  const [showFeeConfigModal, setShowFeeConfigModal] = useState(false);
+  const [editingFeeConfig, setEditingFeeConfig] = useState(null);
   const [previewAuditorium, setPreviewAuditorium] = useState(null);
+
+  // Bookings & E-Tickets Filtering States
+  const [bookingEventFilter, setBookingEventFilter] = useState('All');
+  const [bookingShowFilter, setBookingShowFilter] = useState('All');
+  const [bookingStatusFilter, setBookingStatusFilter] = useState('All');
+  const [bookingSearch, setBookingSearch] = useState('');
+  const [adminPreviewTicket, setAdminPreviewTicket] = useState(null);
 
   const defaultFooterForm = {
     brandName: 'EventLand',
@@ -295,7 +308,7 @@ export default function AdminDashboard({ onSelectEvent }) {
     if (isInitial) setLoading(true);
     setErrorMsg('');
     try {
-      const [orgs, evs, arts, bks, rls, usrs, tgs, auds, cnts, cts, vns, faqs, ftr] = await Promise.all([
+      const [orgs, evs, arts, bks, rls, usrs, tgs, auds, cnts, cts, vns, faqs, ftr, fees] = await Promise.all([
         adminApi.organizers.getAll().catch(() => []),
         adminApi.events.getAll(1, 50).catch(() => ({ items: [] })),
         adminApi.artists.getAll(1, 50).catch(() => ({ items: [] })),
@@ -308,8 +321,11 @@ export default function AdminDashboard({ onSelectEvent }) {
         locationsApi.getCities().catch(() => []),
         locationsApi.getVenues().catch(() => []),
         faqsApi.adminGetAll().catch(() => []),
-        footerApi.get().catch(() => null)
+        footerApi.get().catch(() => null),
+        paymentsApi.getFeeConfigs().catch(() => [])
       ]);
+
+      if (Array.isArray(fees)) setFeeConfigsList(fees);
 
       const rawOrgs = Array.isArray(orgs) ? orgs : (orgs?.items || []);
       const normalizedOrgs = rawOrgs.map(o => ({
@@ -1857,6 +1873,24 @@ export default function AdminDashboard({ onSelectEvent }) {
         >
           <FileText size={18} /> Footer Info
         </button>
+
+        <button
+          onClick={() => setActiveAdminTab('payment-fees')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'payment-fees' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <CreditCard size={18} /> PayFast Gateway Fees ({feeConfigsList.length})
+        </button>
       </div>
 
       {/* --- TAB 1: EVENTS MANAGEMENT --- */}
@@ -2073,48 +2107,276 @@ export default function AdminDashboard({ onSelectEvent }) {
         </div>
       )}
 
-      {/* --- TAB 4: BOOKINGS MANAGEMENT --- */}
+      {/* --- TAB 4: BOOKINGS & E-TICKETS MANAGEMENT --- */}
       {activeAdminTab === 'bookings' && (
         <div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1.5rem' }}>Customer Bookings Log</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Ticket size={22} color="#3b82f6" /> Issued Bookings & E-Tickets Log
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.2rem' }}>
+                Filter customer bookings by Event and Show Slot, preview QR passes, and export official PDF E-Tickets.
+              </p>
+            </div>
+
+            <button
+              onClick={fetchBackendData}
+              disabled={loading}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.82rem', padding: '0.55rem 0.9rem', borderRadius: '8px' }}
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh Bookings
+            </button>
+          </div>
+
+          {/* Filtering Bar */}
+          <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '14px', padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'center' }}>
+            {/* Search Input */}
+            <div style={{ position: 'relative' }}>
+              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                Search Bookings
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  type="text"
+                  placeholder="Ref #, Name, or Email..."
+                  value={bookingSearch}
+                  onChange={e => setBookingSearch(e.target.value)}
+                  style={{ width: '100%', padding: '0.55rem 0.75rem 0.55rem 2.2rem', backgroundColor: '#1e293b', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem', outline: 'none' }}
+                />
+              </div>
+            </div>
+
+            {/* Event Filter */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                Filter by Event
+              </label>
+              <SearchableSelect
+                value={bookingEventFilter}
+                onChange={e => {
+                  setBookingEventFilter(e.target.value);
+                  setBookingShowFilter('All'); // Reset show slot on event change
+                }}
+                options={['All', ...eventsList.map(ev => ev.title || `Event #${ev.id}`)]}
+                placeholder="All Events"
+              />
+            </div>
+
+            {/* Show Slot Filter */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                Filter by Show Slot
+              </label>
+              {(() => {
+                const selectedEv = eventsList.find(ev => ev.title === bookingEventFilter || String(ev.id) === String(bookingEventFilter));
+                const showOpts = selectedEv
+                  ? ['All', ...(selectedEv.shows || selectedEv.eventShows || []).map(s => s.showTitle || `Slot #${s.id}`)]
+                  : ['All'];
+                return (
+                  <SearchableSelect
+                    value={bookingShowFilter}
+                    onChange={e => setBookingShowFilter(e.target.value)}
+                    options={showOpts}
+                    placeholder="All Show Slots"
+                  />
+                );
+              })()}
+            </div>
+
+            {/* Payment Status Filter */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                Filter by Status
+              </label>
+              <SearchableSelect
+                value={bookingStatusFilter}
+                onChange={e => setBookingStatusFilter(e.target.value)}
+                options={['All', 'Paid', 'Pending', 'Confirmed', 'Cancelled']}
+                placeholder="All Statuses"
+              />
+            </div>
+          </div>
+
+          {/* Bookings Table */}
           <div className="glass-card" style={{ overflowX: 'auto', borderRadius: '16px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                  <th style={{ padding: '1rem' }}>Customer</th>
-                  <th style={{ padding: '1rem' }}>Event</th>
-                  <th style={{ padding: '1rem' }}>Amount</th>
-                  <th style={{ padding: '1rem' }}>Status</th>
-                  <th style={{ padding: '1rem' }}>Actions</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8' }}>Booking Ref</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8' }}>Customer</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8' }}>Event & Show Slot</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8' }}>Amount</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8' }}>Status</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {bookingsList.map(b => (
-                  <tr key={b.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                    <td style={{ padding: '1rem', color: '#f8fafc' }}>
-                      <div style={{ fontWeight: 600 }}>{b.customerName}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{b.customerEmail}</div>
-                    </td>
-                    <td style={{ padding: '1rem', color: '#94a3b8' }}>{b.eventTitle}</td>
-                    <td style={{ padding: '1rem', color: '#4ade80', fontWeight: 600 }}>PKR {b.totalAmount}</td>
-                    <td style={{ padding: '1rem' }}>
-                      <SearchableSelect
-                        value={b.status || 'Confirmed'}
-                        onChange={(e) => handleUpdateBookingStatus(b.id, e.target.value)}
-                        options={['Confirmed', 'Completed', 'Cancelled', 'Pending']}
-                        style={{ width: '130px' }}
-                      />
-                    </td>
-                    <td style={{ padding: '1rem' }}>
-                      <button
-                        onClick={() => handleDeleteBooking(b.id)}
-                        style={{ padding: '0.4rem 0.75rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer' }}
-                      >
-                        <Trash2 size={14} /> Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {(() => {
+                  const filtered = bookingsList.filter(b => {
+                    const matchedEv = eventsList.find(e => String(e.id) === String(b.eventId) || e.title === b.eventTitle);
+                    const shows = matchedEv?.shows || matchedEv?.eventShows || [];
+                    const matchedShow = shows.find(s => String(s.id) === String(b.eventShowId) || s.showTitle === b.showTitle);
+
+                    if (bookingEventFilter !== 'All') {
+                      if (b.eventTitle !== bookingEventFilter && String(b.eventId) !== String(bookingEventFilter) && matchedEv?.title !== bookingEventFilter) {
+                        return false;
+                      }
+                    }
+
+                    if (bookingShowFilter !== 'All') {
+                      if (b.showTitle !== bookingShowFilter && String(b.eventShowId) !== String(bookingShowFilter) && matchedShow?.showTitle !== bookingShowFilter) {
+                        return false;
+                      }
+                    }
+
+                    if (bookingStatusFilter !== 'All') {
+                      const isPaid = b.paymentStatus === 'Paid' || b.paymentStatus === 'PAID' || b.paymentStatus === 1 || b.status === 'Confirmed';
+                      if (bookingStatusFilter === 'Paid' && !isPaid) return false;
+                      if (bookingStatusFilter === 'Pending' && isPaid) return false;
+                      if (bookingStatusFilter === 'Confirmed' && b.status !== 'Confirmed') return false;
+                      if (bookingStatusFilter === 'Cancelled' && b.status !== 'Cancelled') return false;
+                    }
+
+                    if (bookingSearch.trim()) {
+                      const q = bookingSearch.toLowerCase();
+                      const ref = (b.bookingRef || `EVL-${b.id}`).toLowerCase();
+                      const name = (b.customerName || '').toLowerCase();
+                      const email = (b.customerEmail || '').toLowerCase();
+                      const eventT = (b.eventTitle || '').toLowerCase();
+                      if (!ref.includes(q) && !name.includes(q) && !email.includes(q) && !eventT.includes(q)) {
+                        return false;
+                      }
+                    }
+
+                    return true;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={6} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                          No bookings found matching selected filters.
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return filtered.map(b => {
+                    const matchedEvent = eventsList.find(e => String(e.id) === String(b.eventId) || e.title === b.eventTitle) || {};
+                    const shows = matchedEvent.shows || matchedEvent.eventShows || [];
+                    const matchedShow = shows.find(s => String(s.id) === String(b.eventShowId) || s.showTitle === b.showTitle);
+
+                    let dateStr = b.showDate || matchedEvent.date;
+                    let timeStr = b.showTime || matchedShow?.showTitle;
+                    if (!dateStr && matchedEvent.startDateUtc) {
+                      const dt = new Date(matchedEvent.startDateUtc);
+                      if (!isNaN(dt.getTime())) {
+                        dateStr = dt.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                        timeStr = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) + ' PKT';
+                      }
+                    }
+
+                    const ticketObj = {
+                      ticketId: b.bookingRef || `EVL-${b.id}`,
+                      eventTitle: b.eventTitle || matchedEvent.title || 'Live Concert Experience',
+                      banner: getEventImageUrl(b.banner || matchedEvent.banner),
+                      venue: b.venueName || matchedEvent.venue || matchedEvent.venueName || 'Arts Council of Pakistan, Karachi',
+                      cityName: b.cityName || matchedEvent.city || matchedEvent.cityName || 'Karachi',
+                      date: dateStr || 'Saturday, 10th January 2027',
+                      time: timeStr || '08:00 PM PKT',
+                      showTitle: matchedShow?.showTitle || b.showTitle || 'Main Show Slot',
+                      attendeeName: b.customerName || 'Customer',
+                      attendeeEmail: b.customerEmail || '',
+                      phone: b.customerPhone || '',
+                      seats: b.seats || (b.selectedSeatIds ? b.selectedSeatIds.map(id => ({ label: `Seat ${id}` })) : [{ label: `${b.quantity || 1} Ticket Pass` }]),
+                      paymentMethod: b.paymentMethod || 'PAYFAST PAKFAST',
+                      paymentStatus: (b.paymentStatus === 'Paid' || b.paymentStatus === 'PAID' || b.paymentStatus === 1 || b.status === 'Confirmed') ? 'Paid' : 'Pending',
+                      totalPaid: b.grossAmount || b.totalAmount || 1500,
+                      bookingTime: b.createdAt ? new Date(b.createdAt).toLocaleDateString('en-US') : ''
+                    };
+
+                    const isPaid = ticketObj.paymentStatus === 'Paid';
+
+                    return (
+                      <tr key={b.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                        <td style={{ padding: '1rem', color: '#f8fafc', fontWeight: 600 }}>
+                          <span style={{ color: '#38bdf8' }}>#{ticketObj.ticketId}</span>
+                          <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{ticketObj.bookingTime || 'Direct Booking'}</div>
+                        </td>
+
+                        <td style={{ padding: '1rem', color: '#f8fafc' }}>
+                          <div style={{ fontWeight: 600 }}>{b.customerName}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{b.customerEmail}</div>
+                          {b.customerPhone && <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{b.customerPhone}</div>}
+                        </td>
+
+                        <td style={{ padding: '1rem', color: '#94a3b8' }}>
+                          <div style={{ fontWeight: 600, color: '#fff' }}>{ticketObj.eventTitle}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#38bdf8' }}>
+                            {ticketObj.showTitle ? `Slot: ${ticketObj.showTitle}` : ticketObj.date}
+                          </div>
+                        </td>
+
+                        <td style={{ padding: '1rem', color: '#60a5fa', fontWeight: 700 }}>
+                          PKR {ticketObj.totalPaid.toLocaleString()}
+                        </td>
+
+                        <td style={{ padding: '1rem' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                            <span className="badge" style={{ backgroundColor: isPaid ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)', color: isPaid ? '#60a5fa' : '#fbbf24', fontWeight: 800, width: 'fit-content' }}>
+                              {isPaid ? 'Paid & Confirmed' : 'Pending / Unpaid'}
+                            </span>
+                            <SearchableSelect
+                              value={b.status || 'Confirmed'}
+                              onChange={(e) => handleUpdateBookingStatus(b.id, e.target.value)}
+                              options={['Confirmed', 'Completed', 'Cancelled', 'Pending']}
+                              style={{ width: '120px', fontSize: '0.75rem' }}
+                            />
+                          </div>
+                        </td>
+
+                        <td style={{ padding: '1rem', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                            {/* Export E-Ticket PDF Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                exportTicketPdf(ticketObj);
+                                showSuccess('PDF Ticket Exported', `E-Ticket #${ticketObj.ticketId} downloaded successfully!`);
+                              }}
+                              style={{ padding: '0.4rem 0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                              title="Export Official PDF E-Ticket"
+                            >
+                              <Download size={13} /> PDF
+                            </button>
+
+                            {/* View Digital Pass Preview Button */}
+                            <button
+                              type="button"
+                              onClick={() => setAdminPreviewTicket(ticketObj)}
+                              style={{ padding: '0.4rem 0.75rem', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '6px', color: '#60a5fa', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                              title="View Digital QR Pass Preview"
+                            >
+                              <Eye size={13} /> View Pass
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteBooking(b.id)}
+                              style={{ padding: '0.4rem 0.6rem', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '6px', color: '#f87171', cursor: 'pointer' }}
+                              title="Delete Booking Record"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  });
+                })()}
               </tbody>
             </table>
           </div>
@@ -2739,6 +3001,71 @@ export default function AdminDashboard({ onSelectEvent }) {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* --- TAB: PAYFAST GATEWAY FEES MANAGEMENT --- */}
+      {activeAdminTab === 'payment-fees' && (
+        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '16px', padding: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CreditCard size={22} color="#3b82f6" /> PayFast Gateway Commission Fee Settings
+              </h3>
+              <p style={{ fontSize: '0.875rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                Dynamic commission percentages stored in database table <code>PaymentFeeConfigs</code>. Values are automatically reflected during customer checkout.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+            {feeConfigsList.map(fee => (
+              <div key={fee.id} style={{ backgroundColor: '#0f172a', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#38bdf8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                      {fee.paymentMethodCode}
+                    </span>
+                    <span className="badge" style={{ backgroundColor: fee.isActive ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: fee.isActive ? '#60a5fa' : '#f87171', fontWeight: 800 }}>
+                      {fee.isActive ? 'Active' : 'Disabled'}
+                    </span>
+                  </div>
+                  <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fff', marginBottom: '0.4rem' }}>
+                    {fee.displayName}
+                  </h4>
+                  <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginBottom: '1rem', minHeight: '38px' }}>
+                    {fee.description || 'PayFast Commission Fee Configuration'}
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', backgroundColor: 'rgba(255,255,255,0.04)', padding: '0.75rem', borderRadius: '10px', marginBottom: '1rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Commission Rate:</span>
+                    <strong style={{ fontSize: '1.4rem', color: '#60a5fa' }}>{fee.commissionPercentage}%</strong>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingFeeConfig({ ...fee });
+                    setShowFeeConfigModal(true);
+                  }}
+                  style={{
+                    padding: '0.65rem',
+                    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: '#fff',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem'
+                  }}
+                >
+                  <Edit3 size={15} /> Edit Commission Rate
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -4310,6 +4637,75 @@ export default function AdminDashboard({ onSelectEvent }) {
             </form>
           </div>
         </div>
+      )}
+
+      {/* --- EDIT PAYFAST FEE CONFIG MODAL --- */}
+      {showFeeConfigModal && editingFeeConfig && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(3, 7, 18, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}>
+          <div style={{ background: '#0f172a', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '20px', width: '100%', maxWidth: '480px', padding: '1.75rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <CreditCard size={20} color="#3b82f6" /> Edit PayFast Commission Fee
+              </h3>
+              <button onClick={() => setShowFeeConfigModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={20} /></button>
+            </div>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setIsSaving(true);
+              try {
+                await paymentsApi.updateFeeConfig(editingFeeConfig.id, {
+                  commissionPercentage: parseFloat(editingFeeConfig.commissionPercentage),
+                  displayName: editingFeeConfig.displayName,
+                  description: editingFeeConfig.description,
+                  isActive: editingFeeConfig.isActive
+                });
+                showSuccess('Fee Updated', `Commission rate updated to ${editingFeeConfig.commissionPercentage}%`);
+                setShowFeeConfigModal(false);
+                fetchBackendData();
+              } catch (err) {
+                showError('Update Failed', err.message || 'Could not update fee configuration.');
+              } finally {
+                setIsSaving(false);
+              }
+            }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Category Code</label>
+                <input type="text" disabled value={editingFeeConfig.paymentMethodCode} style={{ width: '100%', padding: '0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#94a3b8', fontSize: '0.9rem' }} />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Display Label *</label>
+                <input type="text" required value={editingFeeConfig.displayName} onChange={e => setEditingFeeConfig({ ...editingFeeConfig, displayName: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.9rem' }} />
+              </div>
+
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Commission Fee Percentage (%) *</label>
+                <input type="number" step="0.001" min="0" max="100" required value={editingFeeConfig.commissionPercentage} onChange={e => setEditingFeeConfig({ ...editingFeeConfig, commissionPercentage: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: '#1e293b', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '8px', color: '#60a5fa', fontWeight: 800, fontSize: '1.1rem' }} />
+              </div>
+
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Description</label>
+                <textarea rows={2} value={editingFeeConfig.description || ''} onChange={e => setEditingFeeConfig({ ...editingFeeConfig, description: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }} />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button type="button" onClick={() => setShowFeeConfigModal(false)} className="btn btn-secondary" style={{ width: '35%' }}>Cancel</button>
+                <button type="submit" disabled={isSaving} className="btn btn-primary" style={{ width: '65%', padding: '0.75rem' }}>
+                  {isSaving ? 'Saving...' : 'Update Fee Config'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- ADMIN DIGITAL TICKET PREVIEW MODAL --- */}
+      {adminPreviewTicket && (
+        <DigitalTicketModal
+          ticket={adminPreviewTicket}
+          onClose={() => setAdminPreviewTicket(null)}
+        />
       )}
 
       {/* --- BLUEPRINT PREVIEW MODAL --- */}
