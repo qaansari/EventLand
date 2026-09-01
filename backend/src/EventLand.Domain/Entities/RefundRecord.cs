@@ -14,7 +14,6 @@ public class RefundRecord : BaseEntity
     public string         Reason          { get; set; } = string.Empty;
     public string         Status          { get; set; } = "Processed"; // Pending, Approved, Processed, Rejected
 
-    public string?        PayFastRefundId  { get; set; }
     public int?           ProcessedByUserId { get; set; }
     public string?        ProcessedByEmail { get; set; }
 

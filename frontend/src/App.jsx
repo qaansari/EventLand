@@ -47,31 +47,43 @@ export default function App() {
   const [lastPageCount, setLastPageCount] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // Fetch live events, tags, countries, and cities from .NET Backend API on mount
+  const [selectedCity, setSelectedCity] = useState('All Cities');
+  const [selectedTag, setSelectedTag] = useState('All');
+
+  // Fetch live tags, countries, and cities on mount
   useEffect(() => {
-    setLoadingEvents(true);
     Promise.all([
-      eventsApi.getEvents({ pageNumber: 1, pageSize: PAGE_SIZE }).catch(() => ({ items: [] })),
       tagsApi.getAll().catch(() => []),
       locationsApi.getCountries().catch(() => []),
       locationsApi.getCities().catch(() => [])
-    ])
-      .then(([resEvents, resTags, resCountries, resCities]) => {
+    ]).then(([resTags, resCountries, resCities]) => {
+      setTags(Array.isArray(resTags) ? resTags : (resTags?.items || []));
+      setCountries(Array.isArray(resCountries) ? resCountries : (resCountries?.items || []));
+      setCities(Array.isArray(resCities) ? resCities : (resCities?.items || []));
+    }).catch(console.error);
+  }, []);
+
+  // Fetch events from backend API whenever selectedTag or selectedCity changes
+  useEffect(() => {
+    setLoadingEvents(true);
+    eventsApi.getEvents({
+      category: selectedTag !== 'All' ? selectedTag : null,
+      city: selectedCity !== 'All Cities' ? selectedCity : null,
+      pageNumber: 1,
+      pageSize: PAGE_SIZE
+    })
+      .then(resEvents => {
         const items = resEvents.items || [];
         setEvents(items);
         setPageNumber(1);
         setLastPageCount(items.length);
         setTotalEvents(typeof resEvents.totalCount === 'number' ? resEvents.totalCount : null);
-        setTags(Array.isArray(resTags) ? resTags : (resTags?.items || []));
-        setCountries(Array.isArray(resCountries) ? resCountries : (resCountries?.items || []));
-        setCities(Array.isArray(resCities) ? resCities : (resCities?.items || []));
       })
       .catch(err => {
-        console.error('Could not connect to backend API:', err);
-        setEvents([]);
+        console.error('Could not load events from API:', err);
       })
       .finally(() => setLoadingEvents(false));
-  }, []);
+  }, [selectedTag, selectedCity]);
 
   const hasMoreEvents = totalEvents !== null
     ? events.length < totalEvents
@@ -81,7 +93,12 @@ export default function App() {
     const nextPage = pageNumber + 1;
     setLoadingMore(true);
     try {
-      const res = await eventsApi.getEvents({ pageNumber: nextPage, pageSize: PAGE_SIZE });
+      const res = await eventsApi.getEvents({
+        category: selectedTag !== 'All' ? selectedTag : null,
+        city: selectedCity !== 'All Cities' ? selectedCity : null,
+        pageNumber: nextPage,
+        pageSize: PAGE_SIZE
+      });
       const items = res.items || [];
       setEvents(prev => [...prev, ...items.filter(i => !prev.some(p => p.id === i.id))]);
       setLastPageCount(items.length);
@@ -96,8 +113,6 @@ export default function App() {
 
   const [activeView, setActiveView] = useState('explore'); // explore, artists, ai-assistant, organizer-wizard, my-tickets, organizer, admin
   const [userRole, setUserRole] = useState('customer'); // customer, organizer, admin
-  const [selectedCity, setSelectedCity] = useState('All Cities');
-  const [selectedTag, setSelectedTag] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('featured');
 
@@ -497,9 +512,13 @@ export default function App() {
             if (typeof t === 'string') evTagNames.push(t);
             else if (typeof t === 'object' && t !== null) {
               if (t.name) evTagNames.push(t.name);
+              if (t.slug) evTagNames.push(t.slug);
               if (t.tagName) evTagNames.push(t.tagName);
               if (t.tag && typeof t.tag === 'string') evTagNames.push(t.tag);
-              if (t.tag && typeof t.tag === 'object' && t.tag.name) evTagNames.push(t.tag.name);
+              if (t.tag && typeof t.tag === 'object') {
+                if (t.tag.name) evTagNames.push(t.tag.name);
+                if (t.tag.slug) evTagNames.push(t.tag.slug);
+              }
             }
           });
         }

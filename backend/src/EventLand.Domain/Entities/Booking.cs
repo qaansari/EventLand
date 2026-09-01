@@ -5,7 +5,7 @@ using EventLand.Domain.Enums;
 
 /// <summary>
 /// A ticket booking placed by a customer for a specific event and ticket tier.
-/// Uses 4-digit integer ID scheme.
+/// Uses direct manual bank transfer workflow without external gateway fees.
 /// </summary>
 public class Booking : BaseEntity
 {
@@ -31,9 +31,7 @@ public class Booking : BaseEntity
     // Ticket details
     public int          Quantity        { get; set; } = 1;
     public decimal      UnitPrice       { get; set; }
-    public decimal      TotalAmount     { get; set; } // Base ticket subtotal
-    public decimal      GatewayFee      { get; set; } // PayFast commission fee
-    public decimal      GrossAmount     { get; set; } // TotalAmount + GatewayFee
+    public decimal      TotalAmount     { get; set; } // Canonical total ticket amount
 
     // Status & payment
     public BookingStatus  Status          { get; set; } = BookingStatus.Pending;
@@ -41,14 +39,19 @@ public class Booking : BaseEntity
     public PaymentMethod  PaymentMethod   { get; set; } = PaymentMethod.None;
     public DateTimeOffset? PaidAt         { get; set; }
 
-    // PayFast Pakistan integration & timer fields
-    public string?        PayFastTransactionId { get; set; }
-    public string?        PayFastUrl           { get; set; }
+    // Direct Bank Transfer & Verification fields
+    public string?        BankTransactionRef   { get; set; }
+    public string?        PaymentProofUrl      { get; set; }
+    public int?           VerifiedByAdminId    { get; set; }
+    public string?        VerifiedByAdminEmail { get; set; }
+    public DateTimeOffset? VerifiedAt          { get; set; }
+
+    // 30-Minute hold expiry window
     public DateTimeOffset? PaymentExpiresAt    { get; set; }
 
     // Refund tracking
-    public DateTimeOffset? RefundedAt      { get; set; }
-    public string?        RefundReason    { get; set; }
+    public DateTimeOffset? RefundedAt          { get; set; }
+    public string?        RefundReason         { get; set; }
 
     // Navigation
     public ICollection<BookingSeat> BookingSeats { get; set; } = new List<BookingSeat>();

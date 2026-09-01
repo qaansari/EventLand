@@ -21,18 +21,19 @@ public record BookingDto(
     int Quantity,
     decimal UnitPrice,
     decimal TotalAmount,
-    decimal GatewayFee,
-    decimal GrossAmount,
     string Status,
     string PaymentStatus,
     string PaymentMethod,
     DateTimeOffset? PaidAt,
     DateTimeOffset CreatedAt,
     List<BookingSeatDto> SelectedSeats,
-    // PayFast checkout details so an unpaid booking can be resumed and paid later.
-    string? PayFastTransactionId = null,
-    string? PayFastUrl = null,
-    DateTimeOffset? PaymentExpiresAt = null
+    // Bank Transfer Details
+    string? BankTransactionRef = null,
+    string? PaymentProofUrl = null,
+    DateTimeOffset? VerifiedAt = null,
+    DateTimeOffset? PaymentExpiresAt = null,
+    string? EventBanner = null,
+    string? EventVenue = null
 );
 
 public record CreateBookingDto(
@@ -45,4 +46,21 @@ public record CreateBookingDto(
     string PaymentMethod,
     List<int>? SelectedSeatIds,
     int? EventShowId = null
+);
+
+public record SubmitBankPaymentProofDto(
+    string BankTransactionRef,
+    string? PaymentProofUrl = null
+);
+
+public record ConfirmBankPaymentDto(
+    int? BookingId = null,
+    string? BookingRef = null,
+    string? Notes = null
+);
+
+public record RejectBankPaymentDto(
+    int? BookingId = null,
+    string? BookingRef = null,
+    string? Reason = null
 );

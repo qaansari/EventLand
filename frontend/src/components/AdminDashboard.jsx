@@ -35,9 +35,11 @@ import {
   Upload,
   HelpCircle,
   GripVertical,
-  CreditCard
+  CreditCard,
+  MessageSquare,
+  Lock
 } from 'lucide-react';
-import { adminApi, locationsApi, uploadApi, faqsApi, footerApi, paymentsApi, getEventImageUrl, getOrganizerImageUrl, getUserImageUrl } from '../services/api';
+import { adminApi, locationsApi, uploadApi, faqsApi, footerApi, paymentsApi, bankAccountsApi, bookingsApi, getEventImageUrl, getOrganizerImageUrl, getUserImageUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
@@ -135,6 +137,11 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [venuesList, setVenuesList] = useState([]);
   const [faqsList, setFaqsList] = useState([]);
   const [feeConfigsList, setFeeConfigsList] = useState([]);
+  const [bankAccountsList, setBankAccountsList] = useState([]);
+
+  const loggedUserRaw = localStorage.getItem('eventland_logged_user');
+  const loggedUser = loggedUserRaw ? JSON.parse(loggedUserRaw) : null;
+  const isSuperAdmin = !loggedUser || loggedUser?.role?.toLowerCase() === 'superadmin' || loggedUser?.role?.toLowerCase() === 'admin' || loggedUser?.roleId === 1;
 
   // Form Modal States
   const [showEventModal, setShowEventModal] = useState(false);
@@ -148,8 +155,10 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [showFaqModal, setShowFaqModal] = useState(false);
   const [showFooterModal, setShowFooterModal] = useState(false);
   const [showFeeConfigModal, setShowFeeConfigModal] = useState(false);
+  const [showBankAccountModal, setShowBankAccountModal] = useState(false);
   const [editingFeeConfig, setEditingFeeConfig] = useState(null);
   const [previewAuditorium, setPreviewAuditorium] = useState(null);
+  const [previewProofModal, setPreviewProofModal] = useState(null);
 
   // Bookings & E-Tickets Filtering States
   const [bookingEventFilter, setBookingEventFilter] = useState('All');
@@ -281,6 +290,23 @@ export default function AdminDashboard({ onSelectEvent }) {
   const defaultCountryForm = { id: null, name: '', code: '', isActive: true };
   const defaultCityForm = { id: null, countryId: '', name: '', isActive: true };
   const defaultVenueForm = { id: null, countryId: '', cityId: '', name: '', address: '', description: '', isActive: true };
+  const defaultBankAccountForm = {
+    id: null,
+    bankName: '',
+    accountTitle: '',
+    accountNumber: '',
+    iban: '',
+    branchCode: '',
+    branchName: '',
+    qrCodeImageUrl: '',
+    instructions: 'Please transfer the exact booking amount via Mobile Banking App, Raast ID, or ATM. Mention your Booking Ref in transfer remarks.',
+    isActive: true,
+    displayOrder: 1,
+    maintenanceNotice: '',
+    maintenanceStartUtc: '',
+    maintenanceEndUtc: '',
+    isMaintenanceMode: false
+  };
 
   // Form Binding States
   const [eventForm, setEventForm] = useState(defaultEventForm);
@@ -294,6 +320,7 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [countryForm, setCountryForm] = useState(defaultCountryForm);
   const [cityForm, setCityForm] = useState(defaultCityForm);
   const [venueForm, setVenueForm] = useState(defaultVenueForm);
+  const [bankAccountForm, setBankAccountForm] = useState(defaultBankAccountForm);
 
   const [showCountryModal, setShowCountryModal] = useState(false);
   const [showCityModal, setShowCityModal] = useState(false);
@@ -308,7 +335,7 @@ export default function AdminDashboard({ onSelectEvent }) {
     if (isInitial) setLoading(true);
     setErrorMsg('');
     try {
-      const [orgs, evs, arts, bks, rls, usrs, tgs, auds, cnts, cts, vns, faqs, ftr, fees] = await Promise.all([
+      const [orgs, evs, arts, bks, rls, usrs, tgs, auds, cnts, cts, vns, faqs, ftr, banks] = await Promise.all([
         adminApi.organizers.getAll().catch(() => []),
         adminApi.events.getAll(1, 50).catch(() => ({ items: [] })),
         adminApi.artists.getAll(1, 50).catch(() => ({ items: [] })),
@@ -322,10 +349,10 @@ export default function AdminDashboard({ onSelectEvent }) {
         locationsApi.getVenues().catch(() => []),
         faqsApi.adminGetAll().catch(() => []),
         footerApi.get().catch(() => null),
-        paymentsApi.getFeeConfigs().catch(() => [])
+        bankAccountsApi.adminGetAll().catch(() => [])
       ]);
 
-      if (Array.isArray(fees)) setFeeConfigsList(fees);
+      if (Array.isArray(banks)) setBankAccountsList(banks);
 
       const rawOrgs = Array.isArray(orgs) ? orgs : (orgs?.items || []);
       const normalizedOrgs = rawOrgs.map(o => ({
@@ -1588,15 +1615,130 @@ export default function AdminDashboard({ onSelectEvent }) {
       const msg = 'Footer information updated successfully!';
       setSuccessMsg(msg);
       showSuccess('Footer Updated 📝', msg);
-      setShowFooterModal(false);
-      window.dispatchEvent(new CustomEvent('footer-updated'));
-      fetchBackendData();
     } catch (err) {
       const msg = err.message || 'Failed to update footer info.';
       setErrorMsg(msg);
       showError('Save Failed', msg);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // --- CRUD: BANK ACCOUNTS (SUPER ADMIN ONLY) ---
+  const handleSaveBankAccount = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (!bankAccountForm.bankName || !bankAccountForm.accountTitle || !bankAccountForm.accountNumber || !bankAccountForm.iban) {
+      const msg = 'Please fill out Bank Name, Account Title, Account Number, and IBAN.';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
+      return;
+    }
+
+    try {
+      const payload = {
+        ...bankAccountForm,
+        maintenanceNotice: bankAccountForm.maintenanceNotice?.trim() || null,
+        maintenanceStartUtc: bankAccountForm.maintenanceStartUtc ? new Date(bankAccountForm.maintenanceStartUtc).toISOString() : null,
+        maintenanceEndUtc: bankAccountForm.maintenanceEndUtc ? new Date(bankAccountForm.maintenanceEndUtc).toISOString() : null,
+        isMaintenanceMode: Boolean(bankAccountForm.isMaintenanceMode)
+      };
+
+      if (bankAccountForm.id) {
+        await bankAccountsApi.adminUpdate(bankAccountForm.id, payload);
+        showSuccess('Bank Account Updated 🏦', `Saved changes to ${bankAccountForm.bankName}`);
+      } else {
+        await bankAccountsApi.adminCreate(payload);
+        showSuccess('Bank Account Created 🏦', `Added ${bankAccountForm.bankName} (${bankAccountForm.accountTitle})`);
+      }
+      setShowBankAccountModal(false);
+      setBankAccountForm(defaultBankAccountForm);
+      fetchBackendData();
+    } catch (err) {
+      showError('Save Failed', err.message || 'Failed to save bank account.');
+    }
+  };
+
+  const handleEditBankAccount = (acc) => {
+    // Format UTC ISO string to local datetime-local input string YYYY-MM-DDTHH:mm
+    const toInputDate = (isoStr) => {
+      if (!isoStr) return '';
+      try {
+        const d = new Date(isoStr);
+        if (isNaN(d.getTime())) return '';
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      } catch {
+        return '';
+      }
+    };
+
+    setBankAccountForm({
+      id: acc.id,
+      bankName: acc.bankName || '',
+      accountTitle: acc.accountTitle || '',
+      accountNumber: acc.accountNumber || '',
+      iban: acc.iban || '',
+      branchCode: acc.branchCode || '',
+      branchName: acc.branchName || '',
+      qrCodeImageUrl: acc.qrCodeImageUrl || '',
+      instructions: acc.instructions || '',
+      isActive: acc.isActive ?? true,
+      displayOrder: acc.displayOrder || 1,
+      maintenanceNotice: acc.maintenanceNotice || '',
+      maintenanceStartUtc: toInputDate(acc.maintenanceStartUtc),
+      maintenanceEndUtc: toInputDate(acc.maintenanceEndUtc),
+      isMaintenanceMode: acc.isMaintenanceMode ?? false
+    });
+    setShowBankAccountModal(true);
+  };
+
+  const handleDeleteBankAccount = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this bank account?')) return;
+    try {
+      await bankAccountsApi.adminDelete(id);
+      showSuccess('Bank Account Deleted', 'Account removed successfully.');
+      fetchBackendData();
+    } catch (err) {
+      showError('Delete Failed', err.message || 'Failed to delete bank account.');
+    }
+  };
+
+  const handleToggleActiveBankAccount = async (id) => {
+    try {
+      await bankAccountsApi.adminToggleActive(id);
+      showSuccess('Status Updated', 'Active bank account toggled.');
+      fetchBackendData();
+    } catch (err) {
+      showError('Update Failed', err.message || 'Failed to toggle active status.');
+    }
+  };
+
+  // --- BOOKING VERIFICATION & CONFIRMATION ---
+  const handleConfirmBankPayment = async (bookingId, bookingRef) => {
+    if (!window.confirm(`Confirm payment for Booking #${bookingRef}? This will permanently reserve seats and issue the official E-Ticket with QR code.`)) {
+      return;
+    }
+    try {
+      await bookingsApi.confirmBankPayment(bookingId);
+      showSuccess('Payment Confirmed! 🎟️', `Booking #${bookingRef} verified and official E-Ticket pass generated!`);
+      fetchBackendData();
+    } catch (err) {
+      showError('Confirmation Failed', err.message || 'Failed to verify payment.');
+    }
+  };
+
+  const handleRejectBankPayment = async (bookingId, bookingRef) => {
+    const reason = window.prompt(`Enter reason for rejecting payment for Booking #${bookingRef}:`, 'Transfer could not be verified in bank statement.');
+    if (reason === null) return;
+    try {
+      await bookingsApi.rejectBankPayment(bookingId, { reason });
+      showWarning('Payment Rejected', `Booking #${bookingRef} rejected and held seats released.`);
+      fetchBackendData();
+    } catch (err) {
+      showError('Rejection Failed', err.message || 'Failed to reject booking.');
     }
   };
 
@@ -1874,23 +2016,25 @@ export default function AdminDashboard({ onSelectEvent }) {
           <FileText size={18} /> Footer Info
         </button>
 
-        <button
-          onClick={() => setActiveAdminTab('payment-fees')}
-          style={{
-            padding: '0.75rem 1.25rem',
-            borderRadius: '10px',
-            border: 'none',
-            background: activeAdminTab === 'payment-fees' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
-            color: '#ffffff',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <CreditCard size={18} /> PayFast Gateway Fees ({feeConfigsList.length})
-        </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => setActiveAdminTab('bank-accounts')}
+            style={{
+              padding: '0.75rem 1.25rem',
+              borderRadius: '10px',
+              border: 'none',
+              background: activeAdminTab === 'bank-accounts' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
+              color: '#ffffff',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <Building2 size={18} /> Bank Accounts ({bankAccountsList.length})
+          </button>
+        )}
       </div>
 
       {/* --- TAB 1: EVENTS MANAGEMENT --- */}
@@ -2293,9 +2437,9 @@ export default function AdminDashboard({ onSelectEvent }) {
                       attendeeEmail: b.customerEmail || '',
                       phone: b.customerPhone || '',
                       seats: b.seats || (b.selectedSeatIds ? b.selectedSeatIds.map(id => ({ label: `Seat ${id}` })) : [{ label: `${b.quantity || 1} Ticket Pass` }]),
-                      paymentMethod: b.paymentMethod || 'PAYFAST PAKFAST',
+                      paymentMethod: b.paymentMethod || 'Direct Bank Transfer',
                       paymentStatus: (b.paymentStatus === 'Paid' || b.paymentStatus === 'PAID' || b.paymentStatus === 1 || b.status === 'Confirmed') ? 'Paid' : 'Pending',
-                      totalPaid: b.grossAmount || b.totalAmount || 1500,
+                      totalPaid: b.totalAmount || 1500,
                       bookingTime: b.createdAt ? new Date(b.createdAt).toLocaleDateString('en-US') : ''
                     };
 
@@ -2326,43 +2470,173 @@ export default function AdminDashboard({ onSelectEvent }) {
                         </td>
 
                         <td style={{ padding: '1rem' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                             <span className="badge" style={{ backgroundColor: isPaid ? 'rgba(13, 148, 136, 0.2)' : 'rgba(245, 158, 11, 0.2)', color: isPaid ? '#2dd4bf' : '#fbbf24', fontWeight: 800, width: 'fit-content' }}>
-                              {isPaid ? 'Paid & Confirmed' : 'Pending / Unpaid'}
+                              {isPaid ? 'Paid & Confirmed ✓' : (b.bankTransactionRef ? 'Pending Verification ⏳' : 'Unpaid')}
                             </span>
-                            <SearchableSelect
-                              value={b.status || 'Confirmed'}
-                              onChange={(e) => handleUpdateBookingStatus(b.id, e.target.value)}
-                              options={['Confirmed', 'Completed', 'Cancelled', 'Pending']}
-                              style={{ width: '120px', fontSize: '0.75rem' }}
-                            />
+                            {b.bankTransactionRef && (
+                              <div style={{ fontSize: '0.72rem', color: '#2dd4bf', fontWeight: 600 }}>
+                                TID: {b.bankTransactionRef}
+                              </div>
+                            )}
+                            {b.paymentProofUrl ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.2rem' }}>
+                                <div
+                                  onClick={() => setPreviewProofModal({
+                                    url: b.paymentProofUrl,
+                                    id: b.id,
+                                    bookingRef: ticketObj.ticketId,
+                                    customerName: b.customerName,
+                                    customerEmail: b.customerEmail,
+                                    customerPhone: b.customerPhone,
+                                    totalAmount: ticketObj.totalPaid,
+                                    bankTransactionRef: b.bankTransactionRef,
+                                    eventTitle: ticketObj.eventTitle,
+                                    seatsText: (b.seats || []).map(s => s.label || s.id).join(', ') || `${b.quantity || 1} Seats`
+                                  })}
+                                  style={{
+                                    cursor: 'pointer',
+                                    position: 'relative',
+                                    borderRadius: '8px',
+                                    overflow: 'hidden',
+                                    border: '1px solid rgba(45, 212, 191, 0.4)',
+                                    width: '100px',
+                                    height: '65px',
+                                    background: '#0f172a',
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+                                  }}
+                                  title="Click to view full receipt screenshot"
+                                >
+                                  <img
+                                    src={b.paymentProofUrl}
+                                    alt="Receipt Slip"
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewProofModal({
+                                    url: b.paymentProofUrl,
+                                    id: b.id,
+                                    bookingRef: ticketObj.ticketId,
+                                    customerName: b.customerName,
+                                    customerEmail: b.customerEmail,
+                                    customerPhone: b.customerPhone,
+                                    totalAmount: ticketObj.totalPaid,
+                                    bankTransactionRef: b.bankTransactionRef,
+                                    eventTitle: ticketObj.eventTitle,
+                                    seatsText: (b.seats || []).map(s => s.label || s.id).join(', ') || `${b.quantity || 1} Seats`
+                                  })}
+                                  style={{ background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', fontSize: '0.72rem', padding: '0.25rem 0.5rem', cursor: 'pointer', width: 'fit-content', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600 }}
+                                >
+                                  <Eye size={12} /> View Screenshot
+                                </button>
+                              </div>
+                            ) : (
+                              <span style={{ fontSize: '0.7rem', color: '#64748b', fontStyle: 'italic' }}>No slip uploaded</span>
+                            )}
                           </div>
                         </td>
 
                         <td style={{ padding: '1rem', textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                            {/* Export E-Ticket PDF Button */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                exportTicketPdf(ticketObj);
-                                showSuccess('PDF Ticket Exported', `E-Ticket #${ticketObj.ticketId} downloaded successfully!`);
-                              }}
-                              style={{ padding: '0.4rem 0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
-                              title="Export Official PDF E-Ticket"
-                            >
-                              <Download size={13} /> PDF
-                            </button>
+                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap', alignItems: 'center' }}>
+                            {/* View Payment Proof Slip Screenshot Action Button */}
+                            {b.paymentProofUrl ? (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewProofModal({
+                                  url: b.paymentProofUrl,
+                                  id: b.id,
+                                  bookingRef: ticketObj.ticketId,
+                                  customerName: b.customerName,
+                                  customerEmail: b.customerEmail,
+                                  customerPhone: b.customerPhone,
+                                  totalAmount: ticketObj.totalPaid,
+                                  bankTransactionRef: b.bankTransactionRef,
+                                  eventTitle: ticketObj.eventTitle,
+                                  seatsText: (b.seats || []).map(s => s.label || s.id).join(', ') || `${b.quantity || 1} Seats`
+                                })}
+                                style={{ padding: '0.4rem 0.75rem', background: 'rgba(56, 189, 248, 0.18)', border: '1px solid rgba(56, 189, 248, 0.4)', borderRadius: '6px', color: '#38bdf8', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                                title="View Customer Payment Proof Screenshot"
+                              >
+                                <Eye size={13} /> View Slip
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => alert(`No payment receipt image was uploaded for booking #${ticketObj.ticketId}.\nCustomer TID: ${b.bankTransactionRef || 'N/A'}`)}
+                                style={{ padding: '0.4rem 0.6rem', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', color: '#64748b', fontSize: '0.78rem', cursor: 'pointer', opacity: 0.7 }}
+                                title="No Payment Proof Image Uploaded"
+                              >
+                                No Slip
+                              </button>
+                            )}
 
-                            {/* View Digital Pass Preview Button */}
-                            <button
-                              type="button"
-                              onClick={() => setAdminPreviewTicket(ticketObj)}
-                              style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.15)', border: '1px solid rgba(13, 148, 136, 0.3)', borderRadius: '6px', color: '#2dd4bf', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
-                              title="View Digital QR Pass Preview"
-                            >
-                              <Eye size={13} /> View Pass
-                            </button>
+                            {/* If Unpaid/Pending: Admin Verification Actions */}
+                            {!isPaid && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleConfirmBankPayment(b.id, ticketObj.ticketId)}
+                                  style={{ padding: '0.4rem 0.75rem', background: 'linear-gradient(135deg, #059669, #047857)', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                                  title="Verify Bank Transfer & Issue Ticket"
+                                >
+                                  <Check size={13} /> Verify & Issue
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRejectBankPayment(b.id, ticketObj.ticketId)}
+                                  style={{ padding: '0.4rem 0.6rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', fontSize: '0.78rem', cursor: 'pointer' }}
+                                  title="Reject Payment & Release Seats"
+                                >
+                                  <X size={13} /> Reject
+                                </button>
+
+                                {b.customerPhone && (
+                                  <a
+                                    href={`https://api.whatsapp.com/send?phone=${b.customerPhone.replace(/[^0-9]/g, '')}&text=${encodeURIComponent(`Hello ${b.customerName}, this is EventLand Support regarding your booking #${ticketObj.ticketId} for ${ticketObj.eventTitle}.`)}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{ padding: '0.4rem 0.6rem', background: 'rgba(37, 211, 102, 0.15)', border: '1px solid rgba(37, 211, 102, 0.4)', borderRadius: '6px', color: '#25d366', fontSize: '0.78rem', display: 'flex', alignItems: 'center', textDecoration: 'none' }}
+                                    title="Message Customer on WhatsApp"
+                                  >
+                                    <MessageSquare size={13} />
+                                  </a>
+                                )}
+                              </>
+                            )}
+
+                            {/* Export E-Ticket PDF Button (Locked if Unpaid) */}
+                            {isPaid ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  exportTicketPdf(ticketObj);
+                                  showSuccess('PDF Ticket Exported', `E-Ticket #${ticketObj.ticketId} downloaded successfully!`);
+                                }}
+                                style={{ padding: '0.4rem 0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                                title="Export Official PDF E-Ticket"
+                              >
+                                <Download size={13} /> PDF
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: '0.72rem', color: '#64748b', background: 'rgba(255, 255, 255, 0.04)', padding: '0.35rem 0.6rem', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <Lock size={12} /> Ticket Locked
+                              </span>
+                            )}
+
+                            {/* View Digital Pass Preview Button (Locked if Unpaid) */}
+                            {isPaid && (
+                              <button
+                                type="button"
+                                onClick={() => setAdminPreviewTicket(ticketObj)}
+                                style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.15)', border: '1px solid rgba(13, 148, 136, 0.3)', borderRadius: '6px', color: '#2dd4bf', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                                title="View Digital QR Pass Preview"
+                              >
+                                <Eye size={13} /> View Pass
+                              </button>
+                            )}
 
                             <button
                               type="button"
@@ -3002,71 +3276,6 @@ export default function AdminDashboard({ onSelectEvent }) {
               })}
             </div>
           )}
-        </div>
-      )}
-
-      {/* --- TAB: PAYFAST GATEWAY FEES MANAGEMENT --- */}
-      {activeAdminTab === 'payment-fees' && (
-        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(13, 148, 136, 0.2)', borderRadius: '16px', padding: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-            <div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <CreditCard size={22} color="#0d9488" /> PayFast Gateway Commission Fee Settings
-              </h3>
-              <p style={{ fontSize: '0.875rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-                Dynamic commission percentages stored in database table <code>PaymentFeeConfigs</code>. Values are automatically reflected during customer checkout.
-              </p>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-            {feeConfigsList.map(fee => (
-              <div key={fee.id} style={{ backgroundColor: '#0f172a', border: '1px solid rgba(13, 148, 136, 0.25)', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2dd4bf', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                      {fee.paymentMethodCode}
-                    </span>
-                    <span className="badge" style={{ backgroundColor: fee.isActive ? 'rgba(13, 148, 136, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: fee.isActive ? '#2dd4bf' : '#f87171', fontWeight: 800 }}>
-                      {fee.isActive ? 'Active' : 'Disabled'}
-                    </span>
-                  </div>
-                  <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fff', marginBottom: '0.4rem' }}>
-                    {fee.displayName}
-                  </h4>
-                  <p style={{ fontSize: '0.82rem', color: '#94a3b8', marginBottom: '1rem', minHeight: '38px' }}>
-                    {fee.description || 'PayFast Commission Fee Configuration'}
-                  </p>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', backgroundColor: 'rgba(255,255,255,0.04)', padding: '0.75rem', borderRadius: '10px', marginBottom: '1rem' }}>
-                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Commission Rate:</span>
-                    <strong style={{ fontSize: '1.4rem', color: '#2dd4bf' }}>{fee.commissionPercentage}%</strong>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingFeeConfig({ ...fee });
-                    setShowFeeConfigModal(true);
-                  }}
-                  style={{
-                    padding: '0.65rem',
-                    background: 'linear-gradient(135deg, #0d9488, #059669)',
-                    border: 'none',
-                    borderRadius: '8px',
-                    color: '#fff',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.4rem'
-                  }}
-                >
-                  <Edit3 size={15} /> Edit Commission Rate
-                </button>
-              </div>
-            ))}
-          </div>
         </div>
       )}
 
@@ -4640,63 +4849,454 @@ export default function AdminDashboard({ onSelectEvent }) {
         </div>
       )}
 
-      {/* --- EDIT PAYFAST FEE CONFIG MODAL --- */}
-      {showFeeConfigModal && editingFeeConfig && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(3, 7, 18, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}>
-          <div style={{ background: '#0f172a', border: '1px solid rgba(13, 148, 136, 0.3)', borderRadius: '20px', width: '100%', maxWidth: '480px', padding: '1.75rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <CreditCard size={20} color="#0d9488" /> Edit PayFast Commission Fee
+      {/* --- TAB: BANK ACCOUNTS (SUPER ADMIN ONLY) --- */}
+      {activeAdminTab === 'bank-accounts' && isSuperAdmin && (
+        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '16px', padding: '2rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Building2 size={22} color="#2dd4bf" /> Bank Accounts Management (Super Admin)
               </h3>
-              <button onClick={() => setShowFeeConfigModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={20} /></button>
+              <p style={{ fontSize: '0.875rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                Configure receiving bank accounts for customer direct transfer checkout. The active account is displayed on checkout.
+              </p>
             </div>
+            <button
+              onClick={() => {
+                setBankAccountForm(defaultBankAccountForm);
+                setShowBankAccountModal(true);
+              }}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #0d9488, #0f766e)',
+                border: 'none',
+                borderRadius: '10px',
+                color: '#fff',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}
+            >
+              <Plus size={18} /> Add New Bank Account
+            </button>
+          </div>
 
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              setIsSaving(true);
-              try {
-                await paymentsApi.updateFeeConfig(editingFeeConfig.id, {
-                  commissionPercentage: parseFloat(editingFeeConfig.commissionPercentage),
-                  displayName: editingFeeConfig.displayName,
-                  description: editingFeeConfig.description,
-                  isActive: editingFeeConfig.isActive
-                });
-                showSuccess('Fee Updated', `Commission rate updated to ${editingFeeConfig.commissionPercentage}%`);
-                setShowFeeConfigModal(false);
-                fetchBackendData();
-              } catch (err) {
-                showError('Update Failed', err.message || 'Could not update fee configuration.');
-              } finally {
-                setIsSaving(false);
-              }
-            }}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Category Code</label>
-                <input type="text" disabled value={editingFeeConfig.paymentMethodCode} style={{ width: '100%', padding: '0.75rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#94a3b8', fontSize: '0.9rem' }} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+            {bankAccountsList.map(acc => (
+              <div key={acc.id} style={{
+                backgroundColor: '#0f172a',
+                border: `1px solid ${acc.isActive ? 'rgba(13, 148, 136, 0.5)' : 'rgba(255, 255, 255, 0.1)'}`,
+                borderRadius: '16px',
+                padding: '1.5rem',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                boxShadow: acc.isActive ? '0 10px 30px rgba(13, 148, 136, 0.15)' : 'none'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff' }}>
+                      {acc.bankName}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActiveBankAccount(acc.id)}
+                      style={{
+                        background: acc.isActive ? 'rgba(13, 148, 136, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                        color: acc.isActive ? '#2dd4bf' : '#f87171',
+                        border: `1px solid ${acc.isActive ? 'rgba(13, 148, 136, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+                        borderRadius: '9999px',
+                        padding: '0.25rem 0.75rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                      title="Click to toggle active receiving account"
+                    >
+                      {acc.isActive ? '✓ Active (Checkout)' : 'Inactive'}
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', background: 'rgba(255, 255, 255, 0.03)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)', marginBottom: '1rem' }}>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Account Title</span>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>{acc.accountTitle}</div>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Account Number</span>
+                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#2dd4bf' }}>{acc.accountNumber}</div>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>IBAN</span>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1' }}>{acc.iban}</div>
+                    </div>
+                    {acc.branchName && (
+                      <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                        Branch: {acc.branchName} {acc.branchCode ? `(${acc.branchCode})` : ''}
+                      </div>
+                    )}
+                  </div>
+
+                  {acc.instructions && (
+                    <p style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic', marginBottom: '0.75rem' }}>
+                      "{acc.instructions}"
+                    </p>
+                  )}
+
+                  {/* Maintenance Notice on Card */}
+                  {acc.maintenanceNotice && (
+                    <div style={{
+                      background: acc.isUnderMaintenance ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                      border: `1px solid ${acc.isUnderMaintenance ? 'rgba(239, 68, 68, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`,
+                      borderRadius: '10px',
+                      padding: '0.65rem 0.85rem',
+                      marginBottom: '1rem',
+                      fontSize: '0.78rem'
+                    }}>
+                      <div style={{ fontWeight: 700, color: acc.isUnderMaintenance ? '#fca5a5' : '#fbbf24', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <span>⚠️ {acc.isUnderMaintenance ? 'Maintenance Active (Seat Selection Paused)' : 'Scheduled Maintenance Notice'}</span>
+                      </div>
+                      <div style={{ color: '#cbd5e1' }}>{acc.maintenanceNotice}</div>
+                      {(acc.maintenanceStartUtc || acc.maintenanceEndUtc) && (
+                        <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                          Range: {acc.maintenanceStartUtc ? new Date(acc.maintenanceStartUtc).toLocaleString() : 'Now'} → {acc.maintenanceEndUtc ? new Date(acc.maintenanceEndUtc).toLocaleString() : 'Ongoing'}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '1rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleEditBankAccount(acc)}
+                    style={{ flex: 1, padding: '0.6rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '8px', color: '#2dd4bf', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                  >
+                    <Edit3 size={14} /> Edit Account
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteBankAccount(acc.id)}
+                    style={{ padding: '0.6rem 0.85rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', color: '#f87171', cursor: 'pointer' }}
+                    title="Delete Bank Account"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL: ADD / EDIT BANK ACCOUNT --- */}
+      {showBankAccountModal && (
+        <div className="modal-overlay" onClick={() => setShowBankAccountModal(false)}>
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', padding: '2rem', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+            <button
+              onClick={() => setShowBankAccountModal(false)}
+              style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255, 255, 255, 0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <X size={18} />
+            </button>
+            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f8fafc', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Building2 color="#2dd4bf" size={24} /> {bankAccountForm.id ? 'Edit Bank Account' : 'Add New Bank Account'}
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1.5rem' }}>
+              Enter receiving bank details and optional maintenance downtime notifications.
+            </p>
+
+            <form onSubmit={handleSaveBankAccount} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#cbd5e1', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    Bank Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Meezan Bank Limited"
+                    value={bankAccountForm.bankName}
+                    onChange={e => setBankAccountForm({ ...bankAccountForm, bankName: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#cbd5e1', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    Account Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. EventLand Official Pvt Ltd"
+                    value={bankAccountForm.accountTitle}
+                    onChange={e => setBankAccountForm({ ...bankAccountForm, accountTitle: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#cbd5e1', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    Account Number *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 0102030405060701"
+                    value={bankAccountForm.accountNumber}
+                    onChange={e => setBankAccountForm({ ...bankAccountForm, accountNumber: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#cbd5e1', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    IBAN Number *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. PK64MEZN0001020304050607"
+                    value={bankAccountForm.iban}
+                    onChange={e => setBankAccountForm({ ...bankAccountForm, iban: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#cbd5e1', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    Branch Code
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 0102"
+                    value={bankAccountForm.branchCode || ''}
+                    onChange={e => setBankAccountForm({ ...bankAccountForm, branchCode: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#cbd5e1', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    Branch Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Clifton Branch, Karachi"
+                    value={bankAccountForm.branchName || ''}
+                    onChange={e => setBankAccountForm({ ...bankAccountForm, branchName: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
               </div>
 
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Display Label *</label>
-                <input type="text" required value={editingFeeConfig.displayName} onChange={e => setEditingFeeConfig({ ...editingFeeConfig, displayName: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.9rem' }} />
+              <FileUploadField
+                label="Bank Account QR Code Image"
+                value={bankAccountForm.qrCodeImageUrl || ''}
+                onChange={url => setBankAccountForm({ ...bankAccountForm, qrCodeImageUrl: url })}
+                type="qrcode"
+                entityName={bankAccountForm.bankName}
+                entityId={bankAccountForm.id}
+                placeholder="Upload QR code image or enter image URL..."
+              />
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#cbd5e1', marginBottom: '0.25rem', fontWeight: 600 }}>
+                  Transfer Instructions for Buyer
+                </label>
+                <textarea
+                  rows={2}
+                  value={bankAccountForm.instructions || ''}
+                  onChange={e => setBankAccountForm({ ...bankAccountForm, instructions: e.target.value })}
+                  style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
+                />
               </div>
 
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Commission Fee Percentage (%) *</label>
-                <input type="number" step="0.001" min="0" max="100" required value={editingFeeConfig.commissionPercentage} onChange={e => setEditingFeeConfig({ ...editingFeeConfig, commissionPercentage: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: '#1e293b', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '8px', color: '#2dd4bf', fontWeight: 800, fontSize: '1.1rem' }} />
+              {/* Maintenance Notification Section */}
+              <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '12px', padding: '1rem', marginTop: '0.5rem' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#fca5a5', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span>⚠️ Bank Channel Maintenance & Downtime Notification</span>
+                </h4>
+                <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginBottom: '0.75rem' }}>
+                  If bank channels or 1Link are undergoing maintenance, enter a description and optional time window. When active, authorized buyers cannot select seats until maintenance completes. Leave description empty for normal smooth bookings.
+                </p>
+
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', color: '#cbd5e1', marginBottom: '0.25rem', fontWeight: 600 }}>
+                    Maintenance Notice / Description (Leave empty if channels are operational)
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. Bank 1Link channel is undergoing scheduled maintenance from 02:00 AM to 05:00 AM. Ticket bookings are temporarily paused."
+                    value={bankAccountForm.maintenanceNotice || ''}
+                    onChange={e => setBankAccountForm({ ...bankAccountForm, maintenanceNotice: e.target.value })}
+                    style={{ width: '100%', padding: '0.65rem 0.75rem', background: 'rgba(0, 0, 0, 0.4)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', color: '#fff', fontSize: '0.82rem' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.2rem' }}>
+                      Maintenance Start Date & Time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={bankAccountForm.maintenanceStartUtc || ''}
+                      onChange={e => setBankAccountForm({ ...bankAccountForm, maintenanceStartUtc: e.target.value })}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '0.8rem' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.2rem' }}>
+                      Maintenance End Date & Time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={bankAccountForm.maintenanceEndUtc || ''}
+                      onChange={e => setBankAccountForm({ ...bankAccountForm, maintenanceEndUtc: e.target.value })}
+                      style={{ width: '100%', padding: '0.5rem 0.75rem', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', color: '#fff', fontSize: '0.8rem' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <input
+                    type="checkbox"
+                    id="acc-maintenance-force"
+                    checked={bankAccountForm.isMaintenanceMode}
+                    onChange={e => setBankAccountForm({ ...bankAccountForm, isMaintenanceMode: e.target.checked })}
+                    style={{ width: '16px', height: '16px', accentColor: '#ef4444' }}
+                  />
+                  <label htmlFor="acc-maintenance-force" style={{ color: '#fca5a5', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>
+                    Force Enable Maintenance Mode Now (Pauses seat booking immediately)
+                  </label>
+                </div>
               </div>
 
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Description</label>
-                <textarea rows={2} value={editingFeeConfig.description || ''} onChange={e => setEditingFeeConfig({ ...editingFeeConfig, description: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  id="acc-active"
+                  checked={bankAccountForm.isActive}
+                  onChange={e => setBankAccountForm({ ...bankAccountForm, isActive: e.target.checked })}
+                  style={{ width: '16px', height: '16px', accentColor: '#0d9488' }}
+                />
+                <label htmlFor="acc-active" style={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}>
+                  Set as Active Account for Checkout
+                </label>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button type="button" onClick={() => setShowFeeConfigModal(false)} className="btn btn-secondary" style={{ width: '35%' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} className="btn btn-primary" style={{ width: '65%', padding: '0.75rem' }}>
-                  {isSaving ? 'Saving...' : 'Update Fee Config'}
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button type="button" onClick={() => setShowBankAccountModal(false)} className="btn btn-secondary" style={{ flex: 1, padding: '0.75rem' }}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1, padding: '0.75rem', fontWeight: 700 }}>
+                  {bankAccountForm.id ? 'Save Changes' : 'Create Bank Account'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL: PAYMENT PROOF RECEIPT PREVIEW & VERIFICATION --- */}
+      {previewProofModal && (
+        <div className="modal-overlay" onClick={() => setPreviewProofModal(null)}>
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '680px', padding: '1.75rem', position: 'relative' }}>
+            <button
+              onClick={() => setPreviewProofModal(null)}
+              style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255, 255, 255, 0.1)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <X size={18} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+              <ShieldCheck size={26} color="#0d9488" />
+              <div>
+                <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff', margin: 0 }}>
+                  Bank Transfer Verification & Receipt Slip
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: '#2dd4bf', fontWeight: 600 }}>
+                  Booking #{typeof previewProofModal === 'object' ? previewProofModal.bookingRef : 'Ref'} {typeof previewProofModal === 'object' && previewProofModal.eventTitle ? `• ${previewProofModal.eventTitle}` : ''}
+                </span>
+              </div>
+            </div>
+
+            {/* Metadata Summary Grid if object passed */}
+            {typeof previewProofModal === 'object' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', backgroundColor: 'rgba(0,0,0,0.4)', padding: '1rem', borderRadius: '12px', marginBottom: '1.25rem', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>CUSTOMER NAME</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff' }}>{previewProofModal.customerName}</span>
+                </div>
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>BANK TRANSACTION ID (TID)</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#2dd4bf' }}>{previewProofModal.bankTransactionRef || 'N/A'}</span>
+                </div>
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>TOTAL AMOUNT</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#34d399' }}>PKR {(previewProofModal.totalAmount || 0).toLocaleString()}</span>
+                </div>
+                <div>
+                  <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>RESERVED SEATS</span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#cbd5e1' }}>{previewProofModal.seatsText}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Screenshot Display Box */}
+            <div style={{ background: '#091121', padding: '0.75rem', borderRadius: '14px', border: '1px solid rgba(13, 148, 136, 0.3)', textAlign: 'center', marginBottom: '1.25rem' }}>
+              <img
+                src={typeof previewProofModal === 'object' ? previewProofModal.url : previewProofModal}
+                alt="Payment Receipt Slip"
+                style={{ maxWidth: '100%', maxHeight: '60vh', objectFit: 'contain', borderRadius: '8px' }}
+              />
+            </div>
+
+            {/* Verification Actions */}
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              {typeof previewProofModal === 'object' && previewProofModal.id && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const id = previewProofModal.id;
+                      const ref = previewProofModal.bookingRef;
+                      setPreviewProofModal(null);
+                      handleConfirmBankPayment(id, ref);
+                    }}
+                    style={{ padding: '0.75rem 1.25rem', background: 'linear-gradient(135deg, #059669, #047857)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '0.88rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    <Check size={16} /> Verify & Issue E-Ticket
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const id = previewProofModal.id;
+                      const ref = previewProofModal.bookingRef;
+                      setPreviewProofModal(null);
+                      handleRejectBankPayment(id, ref);
+                    }}
+                    style={{ padding: '0.75rem 1rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', color: '#f87171', fontSize: '0.88rem', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    <X size={16} /> Reject Payment
+                  </button>
+                </>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setPreviewProofModal(null)}
+                className="btn btn-secondary"
+                style={{ padding: '0.75rem 1.25rem' }}
+              >
+                Close Preview
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -121,13 +121,16 @@ var app = builder.Build();
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 app.UseMiddleware<SecurityHeadersMiddleware>();
 
-// Enable Swagger & Swagger UI (Served at application root http://localhost:4257/)
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+// Enable Swagger & Swagger UI only in Development (Served at application root http://localhost:4257/)
+if (app.Environment.IsDevelopment())
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "EventLand API v1");
-    c.RoutePrefix = string.Empty;
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "EventLand API v1");
+        c.RoutePrefix = string.Empty;
+    });
+}
 
 app.UseStaticFiles();
 app.UseCors("AllowFrontend");

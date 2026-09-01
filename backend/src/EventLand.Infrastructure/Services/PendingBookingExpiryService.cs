@@ -1,14 +1,17 @@
 namespace EventLand.Infrastructure.Services;
 
 using EventLand.Application.Interfaces;
+using EventLand.Domain.Entities;
+using EventLand.Domain.Enums;
+using EventLand.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
-/// Periodically expires pending bookings whose payment window has elapsed.
-/// Runs every 60 seconds and delegates to <see cref="IPayFastPaymentService.CheckAndExpirePendingBookingsAsync"/>.
-/// Exceptions are logged and swallowed so the host keeps running.
+/// Periodically expires pending bookings whose 30-minute direct bank transfer payment window has elapsed.
+/// Runs every 60 seconds, returns held seats to the pool, and updates booking status to Cancelled/Expired.
 /// </summary>
 public sealed class PendingBookingExpiryService : BackgroundService
 {
@@ -27,9 +30,8 @@ public sealed class PendingBookingExpiryService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("PendingBookingExpiryService started. Interval: {Interval}", Interval);
+        _logger.LogInformation("PendingBookingExpiryService started. Check interval: {Interval}", Interval);
 
-        // Small initial delay so startup seeding/migrations can finish first.
         try
         {
             await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
@@ -72,16 +74,56 @@ public sealed class PendingBookingExpiryService : BackgroundService
     private async Task RunOnceAsync(CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();
-        var paymentService = scope.ServiceProvider.GetRequiredService<IPayFastPaymentService>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var cacheService = scope.ServiceProvider.GetService<ICacheService>();
 
-        try
+        var cutoff = DateTimeOffset.UtcNow;
+
+        // Batch limit: process at most 200 expired bookings per tick to bound memory usage.
+        // Remaining expired bookings will be picked up on subsequent ticks.
+        var expiredBookings = await context.Bookings
+            .Include(b => b.TicketTier)
+            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+            .Where(b => b.PaymentStatus == PaymentStatus.Pending && b.PaymentExpiresAt != null && b.PaymentExpiresAt <= cutoff && !b.IsDeleted)
+            .OrderBy(b => b.PaymentExpiresAt) // Process oldest expired first
+            .Take(200)
+            .ToListAsync(cancellationToken);
+
+        if (expiredBookings.Count == 0) return;
+
+        foreach (var booking in expiredBookings)
         {
-            await paymentService.CheckAndExpirePendingBookingsAsync();
-            _logger.LogDebug("Pending booking expiry sweep completed at {UtcNow:O}.", DateTimeOffset.UtcNow);
+            booking.PaymentStatus = PaymentStatus.Expired;
+            booking.Status = BookingStatus.Cancelled;
+
+            if (booking.TicketTier != null)
+            {
+                booking.TicketTier.SoldCount = Math.Max(0, booking.TicketTier.SoldCount - booking.Quantity);
+            }
+
+            foreach (var bs in booking.BookingSeats)
+            {
+                if (bs.Seat != null)
+                {
+                    bs.Seat.Status = SeatStatus.Available;
+                }
+            }
+
+            var seatIds = booking.BookingSeats.Select(bs => bs.SeatId).ToList();
+            if (seatIds.Count > 0 && cacheService != null)
+            {
+                try
+                {
+                    await cacheService.ReleaseSeatsAsync(booking.EventId, seatIds, null);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not release cache lock for booking {BookingRef}", booking.BookingRef);
+                }
+            }
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to expire pending bookings.");
-        }
+
+        await context.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation("Expired {Count} pending bookings exceeding 30-minute hold window. Seats returned to pool.", expiredBookings.Count);
     }
 }

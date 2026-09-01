@@ -8,24 +8,26 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 /// <summary>
-/// Database Initializer.
-/// Applies EF Core migrations automatically on startup and seeds Countries, Cities, Venues, Auditoriums, Roles, and SuperAdmin.
+/// Database Initializer & Seeder.
+/// Applies EF Core migrations automatically on startup and seeds default Roles, SuperAdmin User, "Event Land" Organizer, Tags, Country & Cities, FAQs, Footer Info, and Bank Account.
 /// </summary>
 public static class DataSeeder
 {
     public static async Task SeedAsync(ApplicationDbContext context)
     {
-        // Apply schema. If migrations have been generated, apply them (production path);
-        // otherwise create the schema directly from the model so a fresh clone runs
-        // without a manual "dotnet ef migrations add" step.
+        // Apply schema. If migrations exist, run MigrateAsync.
         if (context.Database.GetMigrations().Any())
+        {
             await context.Database.MigrateAsync();
+        }
         else
+        {
             await context.Database.EnsureCreatedAsync();
+        }
 
         var passwordHasher = new PasswordHasher<User>();
 
-        // 1. Roles Seeding
+        // 1. Default Roles Seeding
         if (!await context.Roles.AnyAsync())
         {
             context.Roles.AddRange(
@@ -39,7 +41,7 @@ public static class DataSeeder
 
         var superAdminRole = await context.Roles.FirstAsync(r => r.Name == "SuperAdmin");
 
-        // 2. SuperAdmin User Seeding
+        // 2. Default SuperAdmin User Seeding
         if (!await context.Users.AnyAsync(u => u.Email == "admin@eventland.pk" && !u.IsDeleted))
         {
             var superAdmin = new User
@@ -54,10 +56,11 @@ public static class DataSeeder
             await context.SaveChangesAsync();
         }
 
-        // 3. Country & Cities Seeding (Default: Pakistan -> Karachi, Lahore, Islamabad)
-        if (!await context.Countries.AnyAsync())
+        // 3. Default Country & Major Cities Seeding (Pakistan -> Karachi, Lahore, Islamabad)
+        var pakistan = await context.Countries.FirstOrDefaultAsync(c => c.Code == "PK" || c.Name == "Pakistan");
+        if (pakistan == null)
         {
-            var pakistan = new Country
+            pakistan = new Country
             {
                 Name = "Pakistan",
                 Code = "PK",
@@ -65,18 +68,25 @@ public static class DataSeeder
             };
             context.Countries.Add(pakistan);
             await context.SaveChangesAsync();
-
-            context.Cities.AddRange(
-                new City { CountryId = pakistan.Id, Name = "Karachi", IsActive = true },
-                new City { CountryId = pakistan.Id, Name = "Lahore", IsActive = true },
-                new City { CountryId = pakistan.Id, Name = "Islamabad", IsActive = true }
-            );
-            await context.SaveChangesAsync();
         }
 
+        var defaultCities = new[] { "Karachi", "Lahore", "Islamabad" };
+        foreach (var cityName in defaultCities)
+        {
+            var cityExists = await context.Cities.AnyAsync(c => c.CountryId == pakistan.Id && c.Name.ToLower() == cityName.ToLower() && !c.IsDeleted);
+            if (!cityExists)
+            {
+                context.Cities.Add(new City
+                {
+                    CountryId = pakistan.Id,
+                    Name = cityName,
+                    IsActive = true
+                });
+            }
+        }
+        await context.SaveChangesAsync();
 
-
-        // 4. Default Organizer Seeding ("Event Land")
+        // 4. Default "Event Land" Organizer Seeding
         var defaultOrg = await context.Organizers.FirstOrDefaultAsync(o => o.Name == "Event Land" && !o.IsDeleted);
         if (defaultOrg == null)
         {
@@ -122,7 +132,7 @@ public static class DataSeeder
                 new Faq
                 {
                     Question = "How do I book tickets on EventLand?",
-                    Answer = "Browse events on EventLand, select your desired city and ticket tier or interactive seat, and pay securely via JazzCash, EasyPaisa, bank transfer, or card. Your official digital E-Ticket with QR code is generated instantly.",
+                    Answer = "Browse events on EventLand, select your desired city and ticket tier or interactive seat, and complete your booking via direct bank transfer. Once payment is verified by our team, your official digital E-Ticket with QR code is generated instantly.",
                     DisplayOrder = 1,
                     IsActive = true
                 },
@@ -166,38 +176,6 @@ public static class DataSeeder
                 TermsOfServiceUrl = "#",
                 OrganizerSupportUrl = "#"
             });
-            await context.SaveChangesAsync();
-        }
-
-        // 8. Default PayFast Commission Fee Configurations Seeding
-        if (!await context.PaymentFeeConfigs.AnyAsync())
-        {
-            context.PaymentFeeConfigs.AddRange(
-                new PaymentFeeConfig
-                {
-                    PaymentMethodCode = "bank_wallet",
-                    DisplayName = "Online Bank Transfer & Wallets",
-                    CommissionPercentage = 2.53m,
-                    Description = "PayFast fee for 1Link Instant Bank Transfer, JazzCash, and EasyPaisa wallet payments.",
-                    IsActive = true
-                },
-                new PaymentFeeConfig
-                {
-                    PaymentMethodCode = "card_domestic",
-                    DisplayName = "Debit / Credit Card (Domestic)",
-                    CommissionPercentage = 3.39m,
-                    Description = "PayFast fee for Visa, MasterCard, and UnionPay issued by Pakistani banks.",
-                    IsActive = true
-                },
-                new PaymentFeeConfig
-                {
-                    PaymentMethodCode = "card_international",
-                    DisplayName = "International Cards",
-                    CommissionPercentage = 4.025m,
-                    Description = "PayFast fee for overseas and foreign currency cards.",
-                    IsActive = true
-                }
-            );
             await context.SaveChangesAsync();
         }
     }

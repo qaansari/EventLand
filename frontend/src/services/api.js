@@ -137,7 +137,19 @@ export const bookingsApi = {
   }),
   getBookingById: async (id) => request(`/bookings/${id}`),
   getBookingByRef: async (ref) => request(`/bookings/ref/${ref}`),
-  getBookingsByEmail: async (email, pageNumber = 1, pageSize = 10) => request(`/bookings/user/${email}?pageNumber=${pageNumber}&pageSize=${pageSize}`)
+  getBookingsByEmail: async (email, pageNumber = 1, pageSize = 10) => request(`/bookings/user/${email}?pageNumber=${pageNumber}&pageSize=${pageSize}`),
+  submitPaymentProof: async (id, dto) => request(`/bookings/${id}/submit-proof`, {
+    method: 'POST',
+    body: JSON.stringify(dto)
+  }),
+  confirmBankPayment: async (id, dto = {}) => request(`/bookings/${id}/confirm-bank-payment`, {
+    method: 'POST',
+    body: JSON.stringify(dto)
+  }),
+  rejectBankPayment: async (id, dto = {}) => request(`/bookings/${id}/reject-bank-payment`, {
+    method: 'POST',
+    body: JSON.stringify(dto)
+  })
 };
 
 // --- Seat Hold API ---
@@ -268,13 +280,9 @@ export const tagsApi = {
   getAll: async () => request('/tags')
 };
 
-// --- PayFast Pakistan & Fee Configurations API ---
+// --- Payments & Refunds API ---
 export const paymentsApi = {
-  getFeeConfigs: async () => request('/payments/fee-configs'),
-  updateFeeConfig: async (id, dto) => request(`/payments/fee-configs/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   getPaymentStatus: async (bookingRef) => request(`/payments/status/${bookingRef}`),
-  createCheckout: async (dto) => request('/payments/create-checkout', { method: 'POST', body: JSON.stringify(dto) }),
-  confirmPayment: async (payload) => request('/payments/confirm', { method: 'POST', body: JSON.stringify(payload) }),
   processRefund: async (dto) => request('/payments/refund', { method: 'POST', body: JSON.stringify(dto) })
 };
 
@@ -328,6 +336,17 @@ export const faqsApi = {
 export const footerApi = {
   get: async () => request('/footer'),
   update: async (dto) => request('/footer', { method: 'PUT', body: JSON.stringify(dto) })
+};
+
+// --- Bank Accounts API (Public & Super Admin) ---
+export const bankAccountsApi = {
+  getActive: async () => request('/bank-accounts/active'),
+  adminGetAll: async () => request('/admin/bank-accounts'),
+  adminGetById: async (id) => request(`/admin/bank-accounts/${id}`),
+  adminCreate: async (dto) => request('/admin/bank-accounts', { method: 'POST', body: JSON.stringify(dto) }),
+  adminUpdate: async (id, dto) => request(`/admin/bank-accounts/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  adminDelete: async (id) => request(`/admin/bank-accounts/${id}`, { method: 'DELETE' }),
+  adminToggleActive: async (id) => request(`/admin/bank-accounts/${id}/toggle-active`, { method: 'PUT' })
 };
 
 

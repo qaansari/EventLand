@@ -30,26 +30,27 @@ export default function Navbar({
   };
 
   return (
-    <header style={{
+    <header className="navbar-header" style={{
       position: 'sticky',
       top: 0,
       zIndex: 50,
-      backgroundColor: 'rgba(6, 16, 23, 0.94)',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      borderBottom: '1px solid rgba(13, 148, 136, 0.25)',
-      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)'
+      backgroundColor: 'rgba(6, 16, 23, 0.88)',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      borderBottom: '1px solid rgba(13, 148, 136, 0.35)',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6), 0 0 20px rgba(13, 148, 136, 0.15)'
     }}>
       <div className="container" style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        height: '76px',
+        height: '78px',
         gap: '1rem',
         whiteSpace: 'nowrap'
       }}>
         {/* Brand Logo & Tagline */}
         <div 
+          className="navbar-brand"
           onClick={() => {
             if (currentRole === 'organizer') handleNavClick('organizer');
             else if (currentRole === 'admin') handleNavClick('admin');
@@ -61,9 +62,11 @@ export default function Navbar({
             gap: '0.75rem',
             cursor: 'pointer',
             flexShrink: 0,
-            whiteSpace: 'nowrap'
+            whiteSpace: 'nowrap',
+            transition: 'transform 0.25s ease'
           }}
         >
+
           <img
             src="/logo-icon.png"
             alt="EventLand Logo"
@@ -71,7 +74,7 @@ export default function Navbar({
               height: '44px',
               width: 'auto',
               objectFit: 'contain',
-              filter: 'drop-shadow(0 0 12px rgba(13, 148, 136, 0.5))',
+              filter: 'drop-shadow(0 0 14px rgba(13, 148, 136, 0.6))',
               flexShrink: 0
             }}
           />
@@ -83,9 +86,10 @@ export default function Navbar({
               letterSpacing: '-0.02em',
               color: '#fff',
               lineHeight: 1.1,
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
+              textTransform: 'capitalize'
             }}>
-              EVENT <span style={{ color: '#10b981' }}>LAND</span>
+              Event <span style={{ color: '#10b981' }}>Land</span>
             </div>
             <div style={{
               fontFamily: 'var(--font-body)',
@@ -103,13 +107,13 @@ export default function Navbar({
         </div>
 
         {/* Desktop City Selector & Search Bar */}
-        <div style={{
+        <div className="navbar-search-bar desktop-only" style={{
           display: 'flex',
           alignItems: 'center',
           gap: '0.75rem',
           flexShrink: 1,
           whiteSpace: 'nowrap'
-        }} className="desktop-only">
+        }}>
           <div style={{ width: '150px', flexShrink: 0 }}>
             <SearchableSelect
               value={selectedCity}
@@ -120,8 +124,8 @@ export default function Navbar({
             />
           </div>
 
-          <div style={{ position: 'relative', width: '190px', flexShrink: 1 }}>
-            <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+          <div style={{ position: 'relative', width: '200px', flexShrink: 1 }}>
+            <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
               placeholder="Search events..."
@@ -129,14 +133,15 @@ export default function Navbar({
               onChange={(e) => onSearchChange(e.target.value)}
               style={{
                 width: '100%',
-                backgroundColor: 'rgba(255, 255, 255, 0.06)',
+                backgroundColor: 'rgba(255, 255, 255, 0.07)',
                 color: '#f8fafc',
-                border: '1px solid rgba(13, 148, 136, 0.25)',
+                border: '1px solid rgba(13, 148, 136, 0.3)',
                 borderRadius: '9999px',
-                padding: '0.5rem 1rem 0.5rem 2.2rem',
+                padding: '0.55rem 1rem 0.55rem 2.4rem',
                 fontSize: '0.85rem',
                 outline: 'none',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                transition: 'all 0.25s ease'
               }}
             />
           </div>
@@ -146,7 +151,7 @@ export default function Navbar({
         <nav style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.4rem',
+          gap: '0.45rem',
           flexShrink: 0,
           whiteSpace: 'nowrap'
         }} className="desktop-only">
@@ -154,10 +159,12 @@ export default function Navbar({
             onClick={() => handleNavClick('explore')}
             className={`btn ${activeView === 'explore' ? 'btn-secondary' : ''}`}
             style={{
-              background: activeView === 'explore' ? 'rgba(13, 148, 136, 0.18)' : 'transparent',
+              background: activeView === 'explore' ? 'rgba(13, 148, 136, 0.22)' : 'transparent',
               color: activeView === 'explore' ? '#2dd4bf' : '#cbd5e1',
               fontSize: '0.88rem',
-              padding: '0.55rem 0.9rem'
+              padding: '0.55rem 0.95rem',
+              boxShadow: activeView === 'explore' ? '0 0 16px rgba(13, 148, 136, 0.3)' : 'none',
+              border: activeView === 'explore' ? '1px solid rgba(45, 212, 191, 0.35)' : '1px solid transparent'
             }}
           >
             <Calendar size={15} /> Explore
@@ -167,10 +174,12 @@ export default function Navbar({
             onClick={() => handleNavClick('artists')}
             className="btn"
             style={{
-              background: activeView === 'artists' ? 'rgba(13, 148, 136, 0.18)' : 'transparent',
+              background: activeView === 'artists' ? 'rgba(13, 148, 136, 0.22)' : 'transparent',
               color: activeView === 'artists' ? '#2dd4bf' : '#cbd5e1',
               fontSize: '0.88rem',
-              padding: '0.55rem 0.9rem'
+              padding: '0.55rem 0.95rem',
+              boxShadow: activeView === 'artists' ? '0 0 16px rgba(13, 148, 136, 0.3)' : 'none',
+              border: activeView === 'artists' ? '1px solid rgba(45, 212, 191, 0.35)' : '1px solid transparent'
             }}
           >
             <Music size={15} /> Artists
@@ -431,11 +440,11 @@ export default function Navbar({
             </button>
 
             <button
-              onClick={() => handleNavClick('my-tickets')}
+              onClick={() => handleNavClick('unpaid-invoices')}
               className="btn btn-secondary"
               style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
             >
-              <User size={18} color="#0d9488" /> My Digital Tickets ({savedTicketsCount})
+              <FileText size={18} color="#fbbf24" /> Unpaid Invoices
             </button>
 
             {currentUser && (currentUser.role === 'organizer' || currentUser.role === 'admin') && (
@@ -461,10 +470,33 @@ export default function Navbar({
             <button
               onClick={() => handleNavClick('organizer-wizard')}
               className="btn btn-primary"
-              style={{ padding: '0.85rem 1rem', marginTop: '0.5rem' }}
+              style={{ padding: '0.85rem 1rem', marginTop: '0.25rem', justifyContent: 'center' }}
             >
               <PlusCircle size={18} /> List Your Event Live
             </button>
+
+            {currentUser ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '10px', marginTop: '0.5rem', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#fff', fontWeight: 600, fontSize: '0.88rem' }}>
+                  <User size={18} color="#2dd4bf" />
+                  <span>{(currentUser?.name || currentUser?.fullName || 'User').split(' ')[0]} ({currentUser?.role})</span>
+                </div>
+                <button
+                  onClick={() => { onLogout(); setIsMobileMenuOpen(false); }}
+                  style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', color: '#f87171', padding: '0.4rem 0.75rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <LogOut size={14} /> Sign Out
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => { onOpenAuthModal && onOpenAuthModal(); setIsMobileMenuOpen(false); }}
+                className="btn btn-primary"
+                style={{ padding: '0.85rem 1rem', marginTop: '0.5rem', justifyContent: 'center', background: 'linear-gradient(135deg, #0d9488, #059669)' }}
+              >
+                <LogIn size={18} /> Sign In to Account
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -98,6 +98,15 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
     description: eventForm.description || 'Provide a compelling description of your concert or festival.',
     organizer: eventForm.organizer || 'Organizer Name',
     scarcityText: eventForm.scarcityText || 'New Listing - Selling Fast',
+    tagIds: (eventForm.tagIds || []).map(id => typeof id === 'string' ? parseInt(id, 10) : id).filter(Boolean),
+    eventTags: (eventForm.tagIds || []).map(id => {
+      const found = tagsList.find(t => t.id == id || t.name === id);
+      return found ? { id: found.id, name: found.name, slug: found.slug } : null;
+    }).filter(Boolean),
+    tags: (eventForm.tagIds || []).map(id => {
+      const found = tagsList.find(t => t.id == id || t.name === id);
+      return found ? { id: found.id, name: found.name, slug: found.slug } : null;
+    }).filter(Boolean),
     ticketTiers: eventForm.ticketingType === 'categorized' ? [
       { id: 't1', name: eventForm.tier1Name, price: Number(eventForm.tier1Price || 2000), description: 'Standard admission pass' },
       { id: 't2', name: eventForm.tier2Name, price: Number(eventForm.tier2Price || 4500), description: 'Fast track VIP entry pass' }

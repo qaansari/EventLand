@@ -62,7 +62,7 @@ public static class DependencyInjection
 
         services.AddSingleton<ICacheService, RedisCacheService>();
 
-        // Background job: expire pending bookings whose PayPro window has elapsed (every 60s)
+        // Background job: expire pending bookings whose 30-minute direct bank transfer hold window has elapsed (every 60s)
         services.AddHostedService<PendingBookingExpiryService>();
 
         // Auth & Security
@@ -103,11 +103,11 @@ public static class DependencyInjection
         });
 
         // Application public services
-        services.Configure<PayFastOptions>(configuration.GetSection(PayFastOptions.SectionName));
         services.AddScoped<IEventService, EventService>();
         services.AddScoped<IBookingService, BookingService>();
         services.AddScoped<IArtistService, ArtistService>();
-        services.AddScoped<IPayFastPaymentService, PayFastPaymentService>();
+        services.AddScoped<IBankAccountService, BankAccountService>();
+        services.AddScoped<INotificationService, NotificationService>();
 
         return services;
     }

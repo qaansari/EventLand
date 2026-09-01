@@ -75,7 +75,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
   return (
     <div className="modal-overlay">
       <div 
-        className="modal-content glass-card" 
+        className="auth-modal-content modal-content glass-card" 
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '440px', padding: '2rem', position: 'relative' }}
       >
@@ -146,7 +146,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <form onSubmit={handleSubmit} className="auth-form-group" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {isSignUp && (
             <div>
               <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.375rem' }}>
@@ -156,7 +156,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
                 <User size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
                 <input
                   type="text"
-                  placeholder="e.g. Qamar Ansari"
+                  placeholder="Qamar Ansari"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   style={{
@@ -182,7 +182,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
               <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
               <input
                 type="email"
-                placeholder="Enter your email (e.g. admin@eventland.pk)"
+                placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required

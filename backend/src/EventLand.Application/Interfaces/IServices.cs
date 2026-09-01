@@ -27,4 +27,7 @@ public interface IBookingService
     Task<BookingDto?> GetBookingByIdAsync(int id);
     Task<BookingDto?> GetBookingByRefAsync(string bookingRef);
     Task<PagedResult<BookingDto>> GetBookingsByEmailAsync(string email, int pageNumber = 1, int pageSize = 10);
+    Task<BookingDto> SubmitPaymentProofAsync(int id, SubmitBankPaymentProofDto dto);
+    Task<BookingDto> ConfirmBankPaymentAsync(int id, ConfirmBankPaymentDto dto, int? adminId = null, string? adminEmail = null);
+    Task<BookingDto> RejectBankPaymentAsync(int id, RejectBankPaymentDto dto, int? adminId = null, string? adminEmail = null);
 }

@@ -62,6 +62,8 @@ public class UploadController : ControllerBase
         {
             "organizer" or "organizers" => Path.Combine("assets", "images", "organizers"),
             "user" or "users" => Path.Combine("assets", "images", "users"),
+            "artist" or "artists" => Path.Combine("assets", "images", "artists"),
+            "qrcode" or "qr_code" or "qr_codes" or "bank" or "bankaccount" or "bankaccounts" => Path.Combine("assets", "images", "qr_codes"),
             _ => Path.Combine("assets", "images", "events")
         };
 

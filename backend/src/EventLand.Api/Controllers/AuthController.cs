@@ -24,8 +24,15 @@ public class AuthController : ControllerBase
     [EnableRateLimiting("login")]
     public async Task<ActionResult<LoginResponseDto>> Login([FromBody] LoginRequestDto dto)
     {
-        var response = await _authService.LoginAsync(dto);
-        return Ok(response);
+        try
+        {
+            var response = await _authService.LoginAsync(dto);
+            return Ok(response);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
     }
 
     /// <summary>Self-register a new customer account and return a JWT bearer token (auto-login).</summary>

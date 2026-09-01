@@ -33,7 +33,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Faq>         Faqs         => Set<Faq>();
     public DbSet<FooterInfo>  FooterInfo   => Set<FooterInfo>();
     public DbSet<RefundRecord> RefundRecords => Set<RefundRecord>();
-    public DbSet<PaymentFeeConfig> PaymentFeeConfigs => Set<PaymentFeeConfig>();
+    public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
 
     // ── Model Configuration ──────────────────────────────────────────────────
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -64,6 +64,9 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 idProperty.SetIdentityIncrement(1);
             }
         }
+
+        // Seed default model data directly into EF migrations
+        modelBuilder.SeedDefaultData();
     }
 
     // ── Auto-Audit on SaveChanges ────────────────────────────────────────────

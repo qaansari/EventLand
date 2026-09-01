@@ -1,21 +1,31 @@
 namespace EventLand.Application.Services;
 
+using EventLand.Application.Common;
 using EventLand.Application.Common.Interfaces;
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using EventLand.Domain.Entities;
 using EventLand.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 public class BookingService : IBookingService
 {
     private readonly IApplicationDbContext _context;
     private readonly ICacheService _cacheService;
+    private readonly INotificationService _notificationService;
+    private readonly ILogger<BookingService> _logger;
 
-    public BookingService(IApplicationDbContext context, ICacheService cacheService)
+    public BookingService(
+        IApplicationDbContext context, 
+        ICacheService cacheService,
+        INotificationService notificationService,
+        ILogger<BookingService> logger)
     {
         _context = context;
         _cacheService = cacheService;
+        _notificationService = notificationService;
+        _logger = logger;
     }
 
     public async Task<BookingDto> CreateBookingAsync(CreateBookingDto dto, int? userId = null, string? userEmail = null)
@@ -44,8 +54,7 @@ public class BookingService : IBookingService
             throw new InvalidOperationException($"You may book at most {tier.MaxPerOrder} ticket(s) per order for '{tier.Name}'.");
 
         // ── Pricing ──────────────────────────────────────────────────────────
-        // Seated events price per seat (seat override → zone price → tier price);
-        // general-admission events price by tier.
+        // Seated events price per seat; general-admission events price by tier.
         decimal unitPrice;
         decimal totalAmount;
         List<Seat> seats = new();
@@ -74,17 +83,23 @@ public class BookingService : IBookingService
         }
 
         Enum.TryParse<PaymentMethod>(dto.PaymentMethod, true, out var paymentMethod);
+        if (paymentMethod == PaymentMethod.None)
+        {
+            paymentMethod = PaymentMethod.BankTransfer;
+        }
 
         // Authenticated identity is authoritative over any client-supplied email.
         var effectiveEmail = string.IsNullOrWhiteSpace(userEmail) ? dto.CustomerEmail : userEmail;
 
         // Collision-safe booking reference: CSPRNG + uniqueness check before insert.
-        // The unique index on BookingRef remains the final backstop against the race window.
         string bookingRef;
         do
         {
             bookingRef = $"EVL-{System.Security.Cryptography.RandomNumberGenerator.GetInt32(100000, 1000000)}";
         } while (await _context.Bookings.AnyAsync(b => b.BookingRef == bookingRef));
+
+        // Exactly 30-minute reservation hold window for bank transfer
+        var holdExpiresAt = DateTimeOffset.UtcNow.AddMinutes(30);
 
         var booking = new Booking
         {
@@ -92,22 +107,18 @@ public class BookingService : IBookingService
             TicketTierId = dto.TicketTierId,
             UserId = userId,
             BookingRef = bookingRef,
-            CustomerName = dto.CustomerName,
-            CustomerEmail = effectiveEmail,
-            CustomerPhone = dto.CustomerPhone,
+            CustomerName = dto.CustomerName.Trim(),
+            CustomerEmail = effectiveEmail.Trim(),
+            CustomerPhone = dto.CustomerPhone.Trim(),
             Quantity = effectiveQuantity,
             UnitPrice = unitPrice,
             TotalAmount = totalAmount,
-            // Pending until payment is confirmed via the PayPro invoice/IPN flow.
             Status = BookingStatus.Pending,
             PaymentStatus = PaymentStatus.Pending,
             PaymentMethod = paymentMethod,
-            // Give abandoned bookings a reclaim window even before an invoice is generated.
-            PaymentExpiresAt = DateTimeOffset.UtcNow.AddMinutes(60)
+            PaymentExpiresAt = holdExpiresAt
         };
 
-        // Built once, outside the retryable delegate: re-adding the same entity
-        // references on a transient-failure retry is a no-op, so no duplicate rows.
         var bookingSeats = seatIds
             .Select(seatId => new BookingSeat
             {
@@ -118,9 +129,6 @@ public class BookingService : IBookingService
             .ToList();
 
         // ── Atomic reservation ───────────────────────────────────────────────
-        // EnableRetryOnFailure requires explicit transactions to run inside an
-        // execution strategy. All availability guards run as conditional UPDATEs
-        // so the database is the single source of truth against oversell / double-book.
         var strategy = _context.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
         {
@@ -156,8 +164,136 @@ public class BookingService : IBookingService
 
         await _cacheService.ClearEventCacheAsync(dto.EventId);
 
+        _logger.LogInformation("Created Booking {BookingRef} for {CustomerEmail}. 30-min hold expires at {HoldExpiresAt:O}",
+            booking.BookingRef, booking.CustomerEmail, holdExpiresAt);
+
         return await GetBookingByIdAsync(booking.Id)
             ?? throw new InvalidOperationException("Failed to load created booking.");
+    }
+
+    public async Task<BookingDto> SubmitPaymentProofAsync(int id, SubmitBankPaymentProofDto dto)
+    {
+        var booking = await _context.Bookings
+            .Include(b => b.Event)
+            .Include(b => b.TicketTier)
+            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+            .FirstOrDefaultAsync(b => b.Id == id && !b.IsDeleted);
+
+        if (booking is null)
+            throw new KeyNotFoundException($"Booking with ID '{id}' not found.");
+
+        if (booking.PaymentExpiresAt.HasValue && booking.PaymentExpiresAt.Value <= DateTimeOffset.UtcNow && booking.PaymentStatus == PaymentStatus.Pending)
+        {
+            throw new InvalidOperationException("The 30-minute payment hold window for this booking has expired. Please place a new booking.");
+        }
+
+        booking.BankTransactionRef = dto.BankTransactionRef?.Trim();
+        booking.PaymentProofUrl = dto.PaymentProofUrl?.Trim();
+        booking.PaymentStatus = PaymentStatus.PendingVerification;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Customer submitted Bank Transfer Proof for Booking {BookingRef} (Ref: {BankTxRef})", 
+            booking.BookingRef, booking.BankTransactionRef);
+
+        return MapToDto(booking);
+    }
+
+    public async Task<BookingDto> ConfirmBankPaymentAsync(int id, ConfirmBankPaymentDto dto, int? adminId = null, string? adminEmail = null)
+    {
+        var booking = await _context.Bookings
+            .Include(b => b.Event)
+            .Include(b => b.TicketTier)
+            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+            .FirstOrDefaultAsync(b => b.Id == id && !b.IsDeleted);
+
+        if (booking is null)
+            throw new KeyNotFoundException($"Booking with ID '{id}' not found.");
+
+        if (booking.PaymentStatus == PaymentStatus.Paid)
+            return MapToDto(booking);
+
+        var now = DateTimeOffset.UtcNow;
+        booking.PaymentStatus = PaymentStatus.Paid;
+        booking.Status = BookingStatus.Confirmed;
+        booking.PaidAt = now;
+        booking.VerifiedByAdminId = adminId;
+        booking.VerifiedByAdminEmail = adminEmail ?? "admin@eventland.pk";
+        booking.VerifiedAt = now;
+
+        // Permanently book reserved seats
+        foreach (var bs in booking.BookingSeats)
+        {
+            if (bs.Seat != null)
+            {
+                bs.Seat.Status = SeatStatus.Booked;
+            }
+        }
+
+        var seatIds = booking.BookingSeats.Select(bs => bs.SeatId).ToList();
+        if (seatIds.Any())
+        {
+            await _cacheService.ReleaseSeatsAsync(booking.EventId, seatIds, null);
+        }
+
+        await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync(booking.EventId);
+
+        var resultDto = MapToDto(booking);
+
+        // Dispatch E-Ticket pass via Email
+        _ = _notificationService.SendTicketConfirmationEmailAsync(resultDto);
+
+        _logger.LogInformation("Admin {AdminEmail} verified & confirmed Bank Transfer for Booking {BookingRef}. E-Ticket generated!",
+            adminEmail, booking.BookingRef);
+
+        return resultDto;
+    }
+
+    public async Task<BookingDto> RejectBankPaymentAsync(int id, RejectBankPaymentDto dto, int? adminId = null, string? adminEmail = null)
+    {
+        var booking = await _context.Bookings
+            .Include(b => b.Event)
+            .Include(b => b.TicketTier)
+            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+            .FirstOrDefaultAsync(b => b.Id == id && !b.IsDeleted);
+
+        if (booking is null)
+            throw new KeyNotFoundException($"Booking with ID '{id}' not found.");
+
+        booking.PaymentStatus = PaymentStatus.Failed;
+        booking.Status = BookingStatus.Cancelled;
+        booking.RefundReason = dto.Reason ?? "Payment transfer could not be verified by Admin.";
+        booking.VerifiedByAdminId = adminId;
+        booking.VerifiedByAdminEmail = adminEmail ?? "admin@eventland.pk";
+        booking.VerifiedAt = DateTimeOffset.UtcNow;
+
+        if (booking.TicketTier != null)
+        {
+            booking.TicketTier.SoldCount = Math.Max(0, booking.TicketTier.SoldCount - booking.Quantity);
+        }
+
+        foreach (var bs in booking.BookingSeats)
+        {
+            if (bs.Seat != null)
+            {
+                bs.Seat.Status = SeatStatus.Available;
+            }
+        }
+
+        var seatIds = booking.BookingSeats.Select(bs => bs.SeatId).ToList();
+        if (seatIds.Any())
+        {
+            await _cacheService.ReleaseSeatsAsync(booking.EventId, seatIds, null);
+        }
+
+        await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync(booking.EventId);
+
+        _logger.LogInformation("Admin {AdminEmail} rejected Bank Transfer for Booking {BookingRef}. Seats unlocked.",
+            adminEmail, booking.BookingRef);
+
+        return MapToDto(booking);
     }
 
     public async Task<BookingDto?> GetBookingByIdAsync(int id)
@@ -198,7 +334,7 @@ public class BookingService : IBookingService
             .Include(x => x.Event)
             .Include(x => x.TicketTier)
             .Include(x => x.BookingSeats).ThenInclude(bs => bs.Seat)
-            .Where(b => b.CustomerEmail == email && !b.IsDeleted);
+            .Where(b => b.CustomerEmail.ToLower() == email.ToLower() && !b.IsDeleted);
 
         var totalCount = await query.CountAsync();
 
@@ -226,23 +362,26 @@ public class BookingService : IBookingService
             b.Quantity,
             b.UnitPrice,
             b.TotalAmount,
-            b.GatewayFee,
-            b.GrossAmount > 0 ? b.GrossAmount : b.TotalAmount,
             b.Status.ToString(),
             b.PaymentStatus.ToString(),
             b.PaymentMethod.ToString(),
             b.PaidAt,
             b.CreatedAt,
-            b.BookingSeats.Select(bs => new BookingSeatDto(
-                bs.Seat.Id,
-                bs.Seat.Label,
-                bs.Seat.Row,
-                bs.Seat.Col,
-                bs.Seat.Price
-            )).ToList(),
-            b.PayFastTransactionId,
-            b.PayFastUrl,
-            b.PaymentExpiresAt
+            b.BookingSeats
+                .Where(bs => bs.Seat != null)
+                .Select(bs => new BookingSeatDto(
+                    bs.Seat!.Id,
+                    bs.Seat.Label,
+                    bs.Seat.Row,
+                    bs.Seat.Col,
+                    bs.Seat.Price
+                )).ToList(),
+            b.BankTransactionRef,
+            b.PaymentProofUrl,
+            b.VerifiedAt,
+            b.PaymentExpiresAt,
+            FileUrlHelper.FormatEventBannerUrl(b.Event?.Banner),
+            b.Event?.Venue?.Name ?? b.Event?.Address
         );
     }
 }

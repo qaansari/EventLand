@@ -111,9 +111,29 @@ public static class FileUrlHelper
     }
 
     /// <summary>
+    /// Formats a bank account QR code image URL for API responses.
+    /// </summary>
+    public static string FormatBankAccountQrCodeUrl(string? qrUrl)
+    {
+        if (string.IsNullOrWhiteSpace(qrUrl)) return string.Empty;
+
+        var trimmed = qrUrl.Trim();
+
+        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("/"))
+        {
+            return trimmed;
+        }
+
+        return $"/assets/images/qr_codes/{trimmed}";
+    }
+
+    /// <summary>
     /// Generates structured image filename following strict naming convention:
     /// Organizers: org_[name]_[fullId].[ext] (e.g. org_eventland_42.png)
     /// Users:      usr_[name]_[fullId].[ext] (e.g. usr_qamaransari_7.png)
+    /// QR Codes:   qr_[name]_[fullId].[ext] (e.g. qr_meezanbank_1.png)
     /// Events:     ev_[name]_[fullId].[ext] (e.g. ev_suffinight_123.jpg)
     /// The full entity id is embedded (not modulo) so filenames never collide across ids.
     /// </summary>
@@ -126,6 +146,8 @@ public static class FileUrlHelper
         {
             "organizer" or "organizers" => "org",
             "user" or "users" => "usr",
+            "artist" or "artists" => "art",
+            "qrcode" or "qr_code" or "qr_codes" or "bank" or "bankaccount" or "bankaccounts" => "qr",
             _ => "ev"
         };
 
@@ -141,6 +163,8 @@ public static class FileUrlHelper
             {
                 "org" => "organizer",
                 "usr" => "user",
+                "art" => "artist",
+                "qr" => "bankqr",
                 _ => "event"
             };
         }

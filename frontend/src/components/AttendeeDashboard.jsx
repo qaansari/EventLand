@@ -182,7 +182,7 @@ export default function AttendeeDashboard({
       </div>
 
       {/* Main Tabs Navigation */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem', marginBottom: '1.75rem', flexWrap: 'wrap' }}>
+      <div className="attendee-tabs" style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.75rem', marginBottom: '1.75rem', flexWrap: 'wrap' }}>
         <button
           onClick={() => setActiveTab('passes')}
           className={`btn ${activeTab === 'passes' ? 'btn-primary' : 'btn-secondary'}`}
@@ -289,19 +289,30 @@ export default function AttendeeDashboard({
               {filteredTickets.map((t) => (
                 <div
                   key={t.ticketId}
-                  className="glass-card"
+                  className="attendee-ticket-card"
                   style={{
-                    padding: '1.5rem',
                     display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
+                    backgroundColor: '#0a101d',
+                    borderRadius: '16px',
                     border: '1px solid rgba(13, 148, 136, 0.25)',
-                    position: 'relative',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    position: 'relative'
                   }}
                 >
-                  {/* Top Header */}
-                  <div>
+                  {/* Card Left / Image Banner */}
+                  <div className="attendee-ticket-card-image" style={{
+                    width: '160px',
+                    minWidth: '160px',
+                    backgroundColor: '#1e293b',
+                    backgroundImage: `url(${t.eventBanner || '/assets/images/events/default_event.jpg'})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    borderRight: '1px dashed rgba(255,255,255,0.1)'
+                  }}>
+                  </div>
+
+                  {/* Card Right / Content */}
+                  <div className="attendee-ticket-card-body" style={{ padding: '1.5rem', flex: 1, display: 'flex', flexDirection: 'column' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                       <span className="badge badge-live" style={{ fontSize: '0.7rem' }}>
                         OFFICIAL E-TICKET
@@ -348,35 +359,75 @@ export default function AttendeeDashboard({
                     </div>
 
                     {/* Specs Grid */}
-                    <div style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '0.75rem', borderRadius: '10px', fontSize: '0.82rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1' }}>
-                        <span>Pass Holder:</span>
-                        <strong style={{ color: '#fff' }}>{t.attendeeName}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1' }}>
-                        <span>Seats / Tiers:</span>
-                        <strong style={{ color: '#2dd4bf' }}>
-                          {(t.seats || []).map((s) => s.label || (typeof s.id === 'string' ? s.id.split('-').pop() : s.id)).join(', ') || 'General Admission'}
-                        </strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1' }}>
-                        <span>Amount Paid:</span>
-                        <strong style={{ color: '#34d399' }}>PKR {(t.totalPaid || 0).toLocaleString()}</strong>
-                      </div>
-                    </div>
-                  </div>
+                    {(() => {
+                      const statusStr = (t?.paymentStatus || t?.status || '').toString().toLowerCase();
+                      const isVerified = statusStr === 'verified' || statusStr === 'confirmed' || statusStr === 'paid';
+                      const seatCount = t?.seatCount || (t?.seats || []).length || t?.quantity || 1;
+                      const categoryName = t?.ticketTierName || t?.tierName || t?.category || t?.ticketTier || 'Standard Pass';
 
-                  {/* Actions Grid */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <button
-                      onClick={() => onViewTicket(t)}
-                      className="btn btn-primary"
-                      style={{ width: '100%', fontSize: '0.88rem', padding: '0.6rem' }}
-                    >
-                      <Ticket size={16} /> View E-Ticket Pass & QR
-                    </button>
+                      return (
+                        <>
+                          <div style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '0.75rem', borderRadius: '10px', fontSize: '0.82rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1' }}>
+                              <span>Pass Holder:</span>
+                              <strong style={{ color: '#fff' }}>{t.attendeeName}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1' }}>
+                              <span>Ticket Tier:</span>
+                              <strong style={{ color: '#38bdf8' }}>{categoryName}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1' }}>
+                              <span>Total Seats:</span>
+                              <strong style={{ color: '#38bdf8' }}>{seatCount} {seatCount === 1 ? 'Seat' : 'Seats'}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1' }}>
+                              <span>Reserved Seats:</span>
+                              <strong style={{ color: '#2dd4bf' }}>
+                                {(t.seats || []).map((s) => s.label || (typeof s.id === 'string' ? s.id.split('-').pop() : s.id)).join(', ') || 'General Admission'}
+                              </strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1' }}>
+                              <span>Total Amount:</span>
+                              <strong style={{ color: '#34d399' }}>PKR {(t.totalPaid || 0).toLocaleString()}</strong>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1' }}>
+                              <span>Payment Status:</span>
+                              <strong style={{ color: isVerified ? '#2dd4bf' : '#fbbf24' }}>
+                                {isVerified ? '✔ Verified & Active' : '⏳ Pending Admin Verification'}
+                              </strong>
+                            </div>
+                          </div>
 
-                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          {/* Actions Grid */}
+                          <div className="attendee-ticket-card-actions" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                            {isVerified ? (
+                              <button
+                                onClick={() => onViewTicket({ ...t, seatCount })}
+                                className="btn btn-primary"
+                                style={{ width: '100%', fontSize: '0.88rem', padding: '0.6rem' }}
+                              >
+                                <Ticket size={16} /> View E-Ticket Pass & QR
+                              </button>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                <div style={{ padding: '0.5rem 0.75rem', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', color: '#fbbf24', fontSize: '0.78rem', fontWeight: 700, textAlign: 'center' }}>
+                                  ⏳ Bank payment under verification by Admin
+                                </div>
+                                <button
+                                  disabled
+                                  className="btn btn-secondary"
+                                  style={{ width: '100%', fontSize: '0.82rem', padding: '0.6rem', opacity: 0.6, cursor: 'not-allowed' }}
+                                >
+                                  🔒 E-Ticket Locked (Awaiting Verification)
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()}
+
+                    <div style={{ display: 'flex', gap: '0.4rem', marginTop: '1rem' }}>
                       <button
                         onClick={() => exportTicketPdf(t)}
                         className="btn btn-secondary"
@@ -436,7 +487,7 @@ export default function AttendeeDashboard({
             </p>
           </div>
 
-          <form onSubmit={handleSearchClick} style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
+          <form onSubmit={handleSearchClick} className="attendee-lookup-form" style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
             <input
               type="text"
               required
@@ -461,7 +512,7 @@ export default function AttendeeDashboard({
 
           <div style={{ backgroundColor: 'rgba(13, 148, 136, 0.08)', border: '1px solid rgba(13, 148, 136, 0.2)', padding: '1rem', borderRadius: '12px', fontSize: '0.82rem', color: '#cbd5e1' }}>
             <div style={{ fontWeight: 800, color: '#2dd4bf', marginBottom: '0.3rem' }}>💡 Quick Tip:</div>
-            Bookings purchased via JazzCash, EasyPaisa, or PayFast credit card are linked directly to your customer email. Recovered passes will automatically save to your active E-Ticket wallet.
+            Bookings verified via Online Direct Bank Transfer are linked directly to your customer email. Recovered passes will automatically save to your active E-Ticket wallet.
           </div>
         </div>
       )}
@@ -511,7 +562,7 @@ export default function AttendeeDashboard({
           </p>
 
           <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="attendee-profile-form" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', color: '#cbd5e1', fontWeight: 700, marginBottom: '0.35rem' }}>Full Legal Name *</label>
                 <input
@@ -534,7 +585,7 @@ export default function AttendeeDashboard({
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="attendee-profile-form" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', color: '#cbd5e1', fontWeight: 700, marginBottom: '0.35rem' }}>Mobile Phone # *</label>
                 <input

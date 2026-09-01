@@ -76,6 +76,67 @@ public class BookingsController : ControllerBase
         return Ok(bookings);
     }
 
+    /// <summary>Submit bank transfer transaction reference and proof for a booking.</summary>
+    [HttpPost("{id:int}/submit-proof")]
+    [Authorize]
+    public async Task<ActionResult<BookingDto>> SubmitPaymentProof(int id, [FromBody] SubmitBankPaymentProofDto dto)
+    {
+        var existing = await _bookingService.GetBookingByIdAsync(id);
+        if (existing is null)
+            return NotFound(new { message = $"Booking '{id}' not found." });
+
+        if (!CanAccess(existing.CustomerEmail))
+            return Forbid();
+
+        try
+        {
+            var updated = await _bookingService.SubmitPaymentProofAsync(id, dto);
+            return Ok(updated);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>Admin verifies bank payment and issues official E-Ticket pass.</summary>
+    [HttpPost("{id:int}/confirm-bank-payment")]
+    [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+    public async Task<ActionResult<BookingDto>> ConfirmBankPayment(int id, [FromBody] ConfirmBankPaymentDto dto)
+    {
+        var adminId = GetAuthenticatedUserId();
+        var adminEmail = GetAuthenticatedEmail();
+
+        try
+        {
+            var updated = await _bookingService.ConfirmBankPaymentAsync(id, dto, adminId, adminEmail);
+            return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>Admin rejects bank payment and releases held seats.</summary>
+    [HttpPost("{id:int}/reject-bank-payment")]
+    [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+    public async Task<ActionResult<BookingDto>> RejectBankPayment(int id, [FromBody] RejectBankPaymentDto dto)
+    {
+        var adminId = GetAuthenticatedUserId();
+        var adminEmail = GetAuthenticatedEmail();
+
+        try
+        {
+            var updated = await _bookingService.RejectBankPaymentAsync(id, dto, adminId, adminEmail);
+            return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
     private string? GetAuthenticatedEmail() =>
         User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue("email");

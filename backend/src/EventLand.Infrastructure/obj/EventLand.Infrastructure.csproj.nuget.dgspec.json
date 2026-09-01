@@ -1,23 +1,23 @@
 {
   "format": 1,
   "restore": {
-    "E:\\EventLand\\backend\\src\\EventLand.Infrastructure\\EventLand.Infrastructure.csproj": {}
+    "D:\\EventLand\\backend\\src\\EventLand.Infrastructure\\EventLand.Infrastructure.csproj": {}
   },
   "projects": {
-    "E:\\EventLand\\backend\\src\\EventLand.Application\\EventLand.Application.csproj": {
+    "D:\\EventLand\\backend\\src\\EventLand.Application\\EventLand.Application.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "E:\\EventLand\\backend\\src\\EventLand.Application\\EventLand.Application.csproj",
+        "projectUniqueName": "D:\\EventLand\\backend\\src\\EventLand.Application\\EventLand.Application.csproj",
         "projectName": "EventLand.Application",
-        "projectPath": "E:\\EventLand\\backend\\src\\EventLand.Application\\EventLand.Application.csproj",
-        "packagesPath": "C:\\Users\\EVENT-LAND\\.nuget\\packages\\",
-        "outputPath": "E:\\EventLand\\backend\\src\\EventLand.Application\\obj\\",
+        "projectPath": "D:\\EventLand\\backend\\src\\EventLand.Application\\EventLand.Application.csproj",
+        "packagesPath": "C:\\Users\\Qamar\\.nuget\\packages\\",
+        "outputPath": "D:\\EventLand\\backend\\src\\EventLand.Application\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\EVENT-LAND\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\Qamar\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -34,8 +34,8 @@
             "framework": "net10.0",
             "targetAlias": "net10.0",
             "projectReferences": {
-              "E:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj": {
-                "projectPath": "E:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj"
+              "D:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj": {
+                "projectPath": "D:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj"
               }
             }
           }
@@ -50,7 +50,7 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.300"
+        "SdkAnalysisLevel": "10.0.400"
       },
       "frameworks": {
         "net10.0": {
@@ -82,7 +82,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",
@@ -360,20 +360,20 @@
         }
       }
     },
-    "E:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj": {
+    "D:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "E:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj",
+        "projectUniqueName": "D:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj",
         "projectName": "EventLand.Domain",
-        "projectPath": "E:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj",
-        "packagesPath": "C:\\Users\\EVENT-LAND\\.nuget\\packages\\",
-        "outputPath": "E:\\EventLand\\backend\\src\\EventLand.Domain\\obj\\",
+        "projectPath": "D:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj",
+        "packagesPath": "C:\\Users\\Qamar\\.nuget\\packages\\",
+        "outputPath": "D:\\EventLand\\backend\\src\\EventLand.Domain\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\EVENT-LAND\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\Qamar\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -402,7 +402,7 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.300"
+        "SdkAnalysisLevel": "10.0.400"
       },
       "frameworks": {
         "net10.0": {
@@ -424,7 +424,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",
@@ -702,20 +702,20 @@
         }
       }
     },
-    "E:\\EventLand\\backend\\src\\EventLand.Infrastructure\\EventLand.Infrastructure.csproj": {
+    "D:\\EventLand\\backend\\src\\EventLand.Infrastructure\\EventLand.Infrastructure.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "E:\\EventLand\\backend\\src\\EventLand.Infrastructure\\EventLand.Infrastructure.csproj",
+        "projectUniqueName": "D:\\EventLand\\backend\\src\\EventLand.Infrastructure\\EventLand.Infrastructure.csproj",
         "projectName": "EventLand.Infrastructure",
-        "projectPath": "E:\\EventLand\\backend\\src\\EventLand.Infrastructure\\EventLand.Infrastructure.csproj",
-        "packagesPath": "C:\\Users\\EVENT-LAND\\.nuget\\packages\\",
-        "outputPath": "E:\\EventLand\\backend\\src\\EventLand.Infrastructure\\obj\\",
+        "projectPath": "D:\\EventLand\\backend\\src\\EventLand.Infrastructure\\EventLand.Infrastructure.csproj",
+        "packagesPath": "C:\\Users\\Qamar\\.nuget\\packages\\",
+        "outputPath": "D:\\EventLand\\backend\\src\\EventLand.Infrastructure\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\EVENT-LAND\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\Qamar\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -732,11 +732,11 @@
             "framework": "net10.0",
             "targetAlias": "net10.0",
             "projectReferences": {
-              "E:\\EventLand\\backend\\src\\EventLand.Application\\EventLand.Application.csproj": {
-                "projectPath": "E:\\EventLand\\backend\\src\\EventLand.Application\\EventLand.Application.csproj"
+              "D:\\EventLand\\backend\\src\\EventLand.Application\\EventLand.Application.csproj": {
+                "projectPath": "D:\\EventLand\\backend\\src\\EventLand.Application\\EventLand.Application.csproj"
               },
-              "E:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj": {
-                "projectPath": "E:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj"
+              "D:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj": {
+                "projectPath": "D:\\EventLand\\backend\\src\\EventLand.Domain\\EventLand.Domain.csproj"
               }
             }
           }
@@ -751,7 +751,7 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.300"
+        "SdkAnalysisLevel": "10.0.400"
       },
       "frameworks": {
         "net10.0": {
@@ -799,7 +799,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",

@@ -1,8 +1,22 @@
 import React, { useMemo } from 'react';
-import { SlidersHorizontal, Tag as TagIcon } from 'lucide-react';
+import { SlidersHorizontal, Tag as TagIcon, Music, Mic, Theater, Sparkles, Trophy, Users, Film, Compass, Calendar } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
 const CITIES = ['All Cities', 'Karachi', 'Lahore', 'Islamabad'];
+
+// Helper to get matching category icon for quick visual discovery
+function getCategoryIcon(name) {
+  const n = String(name || '').toLowerCase();
+  if (n.includes('music') || n.includes('concert') || n.includes('qawwali') || n.includes('band')) return <Music size={14} />;
+  if (n.includes('comedy') || n.includes('standup') || n.includes('open mic')) return <Mic size={14} />;
+  if (n.includes('theatre') || n.includes('drama') || n.includes('play')) return <Theater size={14} />;
+  if (n.includes('fest') || n.includes('party') || n.includes('night')) return <Sparkles size={14} />;
+  if (n.includes('sport') || n.includes('cricket') || n.includes('match')) return <Trophy size={14} />;
+  if (n.includes('family') || n.includes('kids') || n.includes('expo')) return <Users size={14} />;
+  if (n.includes('film') || n.includes('movie') || n.includes('cinema')) return <Film size={14} />;
+  if (n === 'all') return <Compass size={14} />;
+  return <TagIcon size={14} />;
+}
 
 export default function EventFilterBar({
   tags = [],
@@ -50,18 +64,20 @@ export default function EventFilterBar({
 
   return (
     <div style={{
-      marginBottom: '2rem',
+      marginBottom: '2.25rem',
       display: 'flex',
       flexDirection: 'column',
       gap: '1rem'
     }}>
-      {/* Dynamic Tag Pills Row */}
-      <div style={{
+      {/* Dynamic Tag Pills Row with Smooth Scroll */}
+      <div className="filter-tags-row hide-scrollbar" style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '0.6rem',
+        gap: '0.65rem',
         overflowX: 'auto',
-        paddingBottom: '0.5rem'
+        paddingBottom: '0.6rem',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none'
       }}>
         {allTags.map((tagName) => {
           const isActive = selectedTag === tagName;
@@ -73,10 +89,10 @@ export default function EventFilterBar({
                 fontFamily: 'var(--font-display)',
                 background: isActive 
                   ? 'linear-gradient(135deg, #0d9488 0%, #059669 100%)' 
-                  : 'rgba(255, 255, 255, 0.05)',
+                  : 'rgba(255, 255, 255, 0.06)',
                 color: isActive ? '#ffffff' : '#cbd5e1',
-                border: isActive ? '1px solid rgba(45, 212, 191, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
-                padding: '0.55rem 1.3rem',
+                border: isActive ? '1px solid rgba(45, 212, 191, 0.6)' : '1px solid rgba(255, 255, 255, 0.12)',
+                padding: '0.55rem 1.25rem',
                 borderRadius: '9999px',
                 fontWeight: isActive ? 700 : 500,
                 fontSize: '0.88rem',
@@ -84,58 +100,92 @@ export default function EventFilterBar({
                 whiteSpace: 'nowrap',
                 cursor: 'pointer',
                 transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                boxShadow: isActive ? '0 4px 18px rgba(13, 148, 136, 0.45)' : 'none',
+                boxShadow: isActive ? '0 4px 18px rgba(13, 148, 136, 0.5)' : 'none',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.4rem'
+                gap: '0.45rem',
+                transform: isActive ? 'scale(1.02)' : 'scale(1)'
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+                  e.currentTarget.style.borderColor = 'rgba(45, 212, 191, 0.4)';
+                  e.currentTarget.style.color = '#ffffff';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.06)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                  e.currentTarget.style.color = '#cbd5e1';
+                }
               }}
             >
-              {tagName !== 'All' && <TagIcon size={13} opacity={0.7} />}
-              {tagName === 'All' ? 'All Events' : tagName}
+              {getCategoryIcon(tagName)}
+              <span>{tagName === 'All' ? 'All Events' : tagName}</span>
             </button>
           );
         })}
       </div>
 
       {/* City & Sorting Strip */}
-      <div style={{
+      <div className="filter-strip" style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: '1rem',
-        backgroundColor: 'rgba(13, 30, 43, 0.6)',
-        padding: '0.85rem 1.25rem',
+        backgroundColor: 'rgba(13, 30, 43, 0.65)',
+        backdropFilter: 'blur(16px)',
+        padding: '0.85rem 1.35rem',
         borderRadius: '16px',
-        border: '1px solid rgba(13, 148, 136, 0.2)'
+        border: '1px solid rgba(13, 148, 136, 0.25)',
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>Filter by City:</span>
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-            {cityList.map((city) => (
-              <button
-                key={city}
-                onClick={() => onSelectCity(city)}
-                style={{
-                  backgroundColor: selectedCity === city ? 'rgba(13, 148, 136, 0.25)' : 'transparent',
-                  color: selectedCity === city ? '#2dd4bf' : '#94a3b8',
-                  border: selectedCity === city ? '1px solid rgba(13, 148, 136, 0.5)' : '1px solid transparent',
-                  padding: '0.3rem 0.75rem',
-                  borderRadius: '8px',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                {city}
-              </button>
-            ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>Quick City:</span>
+          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+            {cityList.map((city) => {
+              const isSelected = selectedCity === city;
+              return (
+                <button
+                  key={city}
+                  onClick={() => onSelectCity(city)}
+                  style={{
+                    backgroundColor: isSelected ? 'rgba(13, 148, 136, 0.25)' : 'rgba(255, 255, 255, 0.04)',
+                    color: isSelected ? '#2dd4bf' : '#94a3b8',
+                    border: isSelected ? '1px solid rgba(45, 212, 191, 0.55)' : '1px solid rgba(255, 255, 255, 0.08)',
+                    padding: '0.35rem 0.85rem',
+                    borderRadius: '8px',
+                    fontSize: '0.82rem',
+                    fontWeight: isSelected ? 700 : 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    boxShadow: isSelected ? '0 0 12px rgba(13, 148, 136, 0.3)' : 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.09)';
+                      e.currentTarget.style.color = '#fff';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
+                      e.currentTarget.style.color = '#94a3b8';
+                    }
+                  }}
+                >
+                  {city}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div className="filter-sort-group" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
           <SlidersHorizontal size={16} color="#94a3b8" />
-          <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>Sort by:</span>
+          <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>Sort:</span>
           <SearchableSelect
             value={sortBy}
             onChange={(e) => onSortChange(e.target.value)}

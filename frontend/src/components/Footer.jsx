@@ -102,11 +102,12 @@ export default function Footer({ onSelectCity }) {
 
   return (
     <footer style={{
-      backgroundColor: '#050912',
-      borderTop: '1px solid rgba(13, 148, 136, 0.15)',
-      marginTop: '4rem',
-      paddingTop: '3.5rem',
-      paddingBottom: '2rem',
+      backgroundColor: '#040812',
+      borderTop: '1px solid rgba(13, 148, 136, 0.3)',
+      boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(45, 212, 191, 0.15)',
+      marginTop: '4.5rem',
+      paddingTop: '4rem',
+      paddingBottom: '2.5rem',
       color: '#94a3b8'
     }}>
       <div className="container">
@@ -164,7 +165,7 @@ export default function Footer({ onSelectCity }) {
         </div>
 
         {/* Footer Grid Loaded From Database */}
-        <div style={{
+        <div className="footer-grid" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
           gap: '2.5rem',
@@ -179,8 +180,8 @@ export default function Footer({ onSelectCity }) {
                 alt="EventLand Icon"
                 style={{ height: '38px', width: 'auto' }}
               />
-              <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#fff' }}>
-                EVENT <span style={{ color: '#10b981' }}>LAND</span>
+              <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#fff', textTransform: 'capitalize' }}>
+                Event <span style={{ color: '#10b981' }}>Land</span>
               </span>
             </div>
             <p style={{ fontSize: '0.85rem', lineHeight: 1.5, marginBottom: '1rem' }}>
@@ -224,7 +225,7 @@ export default function Footer({ onSelectCity }) {
           </div>
 
           {/* Newsletter */}
-          <div>
+          <div className="footer-newsletter">
             <h4 style={{ color: '#fff', fontWeight: 700, marginBottom: '1rem', fontSize: '0.95rem' }}>Stay Updated</h4>
             <p style={{ fontSize: '0.82rem', marginBottom: '1rem' }}>
               Subscribe to receive instant alerts on upcoming concerts and early bird ticket drops.
@@ -259,7 +260,7 @@ export default function Footer({ onSelectCity }) {
         </div>
 
         {/* Bottom Copyright */}
-        <div style={{
+        <div className="footer-bottom" style={{
           paddingTop: '1.5rem',
           display: 'flex',
           justifyContent: 'space-between',

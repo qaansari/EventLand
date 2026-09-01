@@ -79,6 +79,11 @@ public sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.HasIndex(b => new { b.EventId, b.Status })
                .HasDatabaseName("IX_Bookings_EventId_Status");
 
-        builder.HasQueryFilter(b => !b.IsDeleted);
+        // Composite index for PendingBookingExpiryService — queried every 60 seconds
+        builder.HasIndex(b => new { b.PaymentStatus, b.PaymentExpiresAt })
+               .HasDatabaseName("IX_Bookings_PaymentStatus_PaymentExpiresAt");
+
+        // Note: Global soft-delete query filter (!IsDeleted) is applied in OnModelCreating.
+        // Do NOT add a duplicate HasQueryFilter here — EF Core only supports one per entity.
     }
 }

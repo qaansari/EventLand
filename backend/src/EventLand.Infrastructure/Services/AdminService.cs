@@ -1408,16 +1408,15 @@ public class AdminService : IAdminService
         b.Quantity,
         b.UnitPrice,
         b.TotalAmount,
-        b.GatewayFee,
-        b.GrossAmount > 0 ? b.GrossAmount : b.TotalAmount,
         b.Status.ToString(),
         b.PaymentStatus.ToString(),
         b.PaymentMethod.ToString(),
         b.PaidAt,
         b.CreatedAt,
         b.BookingSeats != null ? b.BookingSeats.Select(bs => new BookingSeatDto(bs.Seat.Id, bs.Seat.Label, bs.Seat.Row, bs.Seat.Col, bs.Seat.Price)).ToList() : new List<BookingSeatDto>(),
-        b.PayFastTransactionId,
-        b.PayFastUrl,
+        b.BankTransactionRef,
+        b.PaymentProofUrl,
+        b.VerifiedAt,
         b.PaymentExpiresAt
     );
 

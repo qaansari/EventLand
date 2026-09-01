@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { X, Ticket, Calendar, Layers, ZoomIn, ZoomOut, RotateCcw, Maximize2, ShieldAlert, Download } from 'lucide-react';
-import { seatHoldApi, eventsApi, auditoriumLayoutsApi, BACKEND_URL } from '../services/api';
+import { seatHoldApi, eventsApi, auditoriumLayoutsApi, bankAccountsApi, BACKEND_URL } from '../services/api';
 import { parseAuditoriumLayout } from '../data/auditoriumLayouts';
 import { exportAuditoriumChartPdf } from '../utils/pdfChartExporter';
 
@@ -20,6 +20,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
   const isPreviewMode = isPreview || !onProceedToCheckout || String(initialEvent?.id || '').startsWith('preview-');
   const [eventData, setEventData] = useState(initialEvent);
   const [dbAuditoriums, setDbAuditoriums] = useState([]);
+  const [activeBank, setActiveBank] = useState(null);
 
   // Refresh full event details if seatingZones were not preloaded
   useEffect(() => {
@@ -37,6 +38,10 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
   useEffect(() => {
     auditoriumLayoutsApi.getAll()
       .then(list => setDbAuditoriums(list || []))
+      .catch(() => {});
+
+    bankAccountsApi.getActive()
+      .then(bank => { if (bank) setActiveBank(bank); })
       .catch(() => {});
   }, []);
 
@@ -181,6 +186,11 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
   };
 
   const handleSeatClick = async (seatId, label, seatInfo) => {
+    if (activeBank?.isUnderMaintenance && activeBank?.maintenanceNotice) {
+      alert(`⚠️ Bank Maintenance Alert:\n\n${activeBank.maintenanceNotice}\n\nSeat selection is temporarily paused. Please try again after the maintenance window.`);
+      return;
+    }
+
     const seatPrice = seatInfo?.price ?? activeShowPrice ?? currentZone.price ?? 2500;
     const tierId = seatInfo?.tierId ?? null;
     const tierName = seatInfo?.tierName ?? null;
@@ -559,7 +569,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
               <Download size={15} /> Download Chart (PDF)
             </button>
 
-            <div style={{ display: 'flex', alignItems: 'center', background: 'rgba(30, 41, 59, 0.8)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '0.15rem' }}>
+            <div className="seat-picker-zoom-controls" style={{ display: 'flex', alignItems: 'center', background: 'rgba(30, 41, 59, 0.8)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '0.15rem' }}>
               <button
                 type="button"
                 onClick={() => setZoomScale(prev => Math.max(0.6, prev - 0.1))}
@@ -609,9 +619,38 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
           </div>
         </div>
 
+        {/* Bank Channel Maintenance Notice Banner */}
+        {activeBank?.isUnderMaintenance && activeBank?.maintenanceNotice && (
+          <div style={{
+            margin: '0.75rem 1.5rem 0.25rem 1.5rem',
+            padding: '0.85rem 1.25rem',
+            backgroundColor: 'rgba(239, 68, 68, 0.12)',
+            border: '1px solid rgba(239, 68, 68, 0.35)',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            color: '#fca5a5',
+            flexShrink: 0
+          }}>
+            <ShieldAlert size={24} color="#ef4444" style={{ flexShrink: 0 }} />
+            <div style={{ fontSize: '0.82rem', lineHeight: '1.4' }}>
+              <strong style={{ color: '#fff', display: 'block', fontSize: '0.88rem', marginBottom: '0.15rem' }}>
+                ⚠️ Scheduled Bank Channel Maintenance (Seat Booking Paused)
+              </strong>
+              {activeBank.maintenanceNotice}
+              {(activeBank.maintenanceStartUtc || activeBank.maintenanceEndUtc) && (
+                <div style={{ fontSize: '0.72rem', color: '#cbd5e1', marginTop: '0.25rem' }}>
+                  Maintenance Window: {activeBank.maintenanceStartUtc ? new Date(activeBank.maintenanceStartUtc).toLocaleString() : 'Now'} → {activeBank.maintenanceEndUtc ? new Date(activeBank.maintenanceEndUtc).toLocaleString() : 'Ongoing'}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Shows Selection Strip (Only in Buyer Mode) */}
         {!isPreviewMode && showsList.length > 1 && (
-          <div style={{
+          <div className="seat-picker-show-tabs" style={{
             padding: '0.6rem 1.5rem',
             background: 'rgba(30, 41, 59, 0.5)',
             borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
@@ -652,7 +691,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
         )}
 
         {/* Interactive Seating Area (Expansive Canvas) */}
-        <div style={{ 
+        <div className="seat-picker-container" style={{ 
           flex: 1, 
           padding: '2rem 1.5rem', 
           textAlign: 'center', 
@@ -745,7 +784,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
             </div>
 
             {/* Seat Legend */}
-            <div style={{
+            <div className="seat-picker-legend" style={{
               display: 'flex',
               justifyContent: 'center',
               flexWrap: 'wrap',
@@ -801,7 +840,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div className="seat-picker-actions" style={{ display: 'flex', gap: '0.75rem' }}>
               {selectedSeats.length > 0 && (
                 <button
                   type="button"
@@ -869,12 +908,12 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
               </div>
 
               <button
-                disabled={selectedSeats.length === 0}
+                disabled={selectedSeats.length === 0 || activeBank?.isUnderMaintenance}
                 onClick={() => onProceedToCheckout && onProceedToCheckout(selectedSeats, selectedShowId)}
                 style={{
                   padding: '0.75rem 1.6rem',
                   borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #0d9488, #0f766e)',
+                  background: activeBank?.isUnderMaintenance ? '#475569' : 'linear-gradient(135deg, #0d9488, #0f766e)',
                   border: 'none',
                   color: '#fff',
                   fontWeight: 700,
@@ -882,11 +921,15 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.5rem',
-                  opacity: selectedSeats.length === 0 ? 0.5 : 1,
-                  cursor: selectedSeats.length === 0 ? 'not-allowed' : 'pointer'
+                  opacity: (selectedSeats.length === 0 || activeBank?.isUnderMaintenance) ? 0.5 : 1,
+                  cursor: (selectedSeats.length === 0 || activeBank?.isUnderMaintenance) ? 'not-allowed' : 'pointer'
                 }}
               >
-                <Ticket size={18} /> Confirm & Pay
+                {activeBank?.isUnderMaintenance ? (
+                  <>⚠️ Booking Paused (Bank Maintenance)</>
+                ) : (
+                  <><Ticket size={18} /> Confirm & Pay</>
+                )}
               </button>
             </div>
           </div>

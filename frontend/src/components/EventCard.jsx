@@ -9,7 +9,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
 
   return (
     <div
-      className="glass-card"
+      className="glass-card event-card"
       onClick={() => onSelect(event)}
       style={{
         maxWidth: '1200px',
@@ -35,7 +35,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
       }}
     >
       {/* Event Banner Container (Left / Top) */}
-      <div style={{ position: 'relative', flex: '1 1 480px', minHeight: '260px', overflow: 'hidden' }}>
+      <div className="event-card-image" style={{ position: 'relative', flex: '1 1 480px', minHeight: '260px', overflow: 'hidden' }}>
         <img
           src={getEventImageUrl(event.banner)}
           alt={event.title}
@@ -110,7 +110,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
       </div>
 
       {/* Content Body (Right / Bottom) */}
-      <div style={{ padding: '1.75rem', flex: '1 1 450px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+      <div className="event-card-body" style={{ padding: '1.75rem', flex: '1 1 450px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#94a3b8', fontSize: '0.86rem', marginBottom: '0.5rem', fontWeight: 500 }}>
             <MapPin size={15} color="#0d9488" />
@@ -169,7 +169,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
         </div>
 
         {/* Bottom Pricing & View Details Action */}
-        <div style={{ paddingTop: '1rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="event-card-footer" style={{ paddingTop: '1rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <span style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Starting From</span>
             <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: '#2dd4bf' }}>

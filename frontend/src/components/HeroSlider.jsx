@@ -39,20 +39,34 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
 
   return (
     <div 
+      className="hero-slider"
       style={{ position: 'relative', width: '100%', marginBottom: '2.5rem' }}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      <div style={{
+      <div className="hero-slide" style={{
         position: 'relative',
         minHeight: '360px',
         maxHeight: '480px',
         borderRadius: '24px',
         overflow: 'hidden',
-        boxShadow: '0 25px 50px -15px rgba(0, 0, 0, 0.85), 0 0 30px rgba(13, 148, 136, 0.25)',
+        boxShadow: '0 25px 50px -15px rgba(0, 0, 0, 0.85), 0 0 35px rgba(13, 148, 136, 0.3)',
         border: '1px solid rgba(13, 148, 136, 0.35)',
         backgroundColor: '#060a14'
       }}>
+        {/* Ambient Radial Glow Orb */}
+        <div style={{
+          position: 'absolute',
+          top: '-20%',
+          right: '-10%',
+          width: '350px',
+          height: '350px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(13, 148, 136, 0.28) 0%, transparent 70%)',
+          filter: 'blur(45px)',
+          pointerEvents: 'none',
+          zIndex: 2
+        }} />
         {/* Animated Ken Burns Background Image */}
         <img
           key={`bg-${currentIndex}`}
@@ -172,6 +186,7 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
         {featuredEvents.length > 1 && (
           <>
             <button
+              className="hero-arrow"
               onClick={handlePrev}
               title="Previous Slide"
               style={{
@@ -208,6 +223,7 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
             </button>
 
             <button
+              className="hero-arrow"
               onClick={handleNext}
               title="Next Slide"
               style={{
@@ -244,7 +260,7 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
             </button>
 
             {/* Bottom Glass Navigation Indicator Bar */}
-            <div style={{
+            <div className="hero-indicators" style={{
               position: 'absolute',
               bottom: '1rem',
               right: '1.25rem',

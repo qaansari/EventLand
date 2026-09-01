@@ -101,7 +101,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
     <div className="modal-overlay">
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '780px' }}>
         {/* Banner Header */}
-        <div style={{ position: 'relative', height: '280px', overflow: 'hidden' }}>
+        <div className="detail-modal-banner" style={{ position: 'relative', height: '280px', overflow: 'hidden' }}>
           <img
             src={getEventImageUrl(event.banner)}
             alt={event.title}
@@ -342,7 +342,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                 <label style={{ fontSize: '0.825rem', fontWeight: 600, color: '#94a3b8', display: 'block', marginBottom: '0.6rem' }}>
                   Select Show Timing / Slot:
                 </label>
-                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <div className="detail-show-selector" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
                   {effectiveShows.map((show) => {
                     const isSelected = (selectedShowId === show.id || (!selectedShowId && show.id === effectiveShows[0]?.id));
                     return (
@@ -381,7 +381,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
 
             {/* Option 1: Categorized Ticket Tiers */}
             {event.ticketingType === 'categorized' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="detail-modal-tiers" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {displayTiers.map((tier) => {
                   const qty = selectedTiers[tier.id] || 0;
                   return (
@@ -454,7 +454,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                 })}
 
                 {/* Bottom Total & Book Button for Categorized */}
-                <div style={{
+                <div className="detail-actions-row" style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
@@ -495,7 +495,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                   </span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <div className="detail-modal-info-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
                   {(event.seatingZones && event.seatingZones.length > 0 ? event.seatingZones : [{ zone: event.venue || 'Auditorium Main Hall', price: activeShow?.startingPrice || event.startingPrice || 2500 }]).map((zone, zIdx) => (
                     <div key={zone.zone || zIdx} style={{ backgroundColor: '#10192d', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
                       <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', display: 'block' }}>{zone.zone}</span>
@@ -504,7 +504,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                   ))}
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <div className="detail-actions-row" style={{ display: 'flex', gap: '0.75rem' }}>
                   <button
                     onClick={() => setShowLayoutPreview(true)}
                     style={{ flex: 1, padding: '0.85rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '10px', color: '#2dd4bf', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}

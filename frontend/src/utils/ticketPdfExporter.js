@@ -20,21 +20,27 @@ export async function exportTicketPdf(ticketData = {}) {
     attendeeEmail = 'ali@example.com',
     phone = '0300 1234567',
     seats = [],
-    paymentMethod = 'PAYFAST PAKISTAN',
+    paymentMethod = 'DIRECT BANK TRANSFER',
     paymentStatus = 'Paid',
     totalPaid = 1500,
     bookingTime = ''
   } = ticketData;
 
   const qrDataUrl = await generateTicketQrDataUrl({ ticketId, eventTitle, attendeeName });
-  const seatsText = seats.map(s => s.label || (typeof s.id === 'string' ? s.id.split('-').pop() : s.id)).join(', ') || 'General Admission Pass';
+  const seatCount = ticketData.seatCount || seats.length || ticketData.quantity || 1;
+  const categoryName = ticketData.ticketTierName || ticketData.tierName || ticketData.category || ticketData.ticketTier || 'Standard Pass';
+  const rawSeatsText = seats.map(s => s.label || (typeof s.id === 'string' ? s.id.split('-').pop() : s.id)).join(', ') || 'General Admission Pass';
+  const seatsText = `${rawSeatsText} (${seatCount} ${seatCount === 1 ? 'Seat' : 'Seats'})`;
   const showDateStr = date || 'Saturday, 10th January 2027';
   const showTimeStr = time || '08:00 PM PKT';
   const fullShowDateTime = showDateTime || (date && time ? `${date} at ${time}` : `${showDateStr} at ${showTimeStr}`);
   const bookingDateStr = bookingTime || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   // Default fallback banner if none supplied
-  const bannerImgUrl = banner || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&h=450&fit=crop';
+  const rawBanner = banner || ticketData.eventBanner || ticketData.bannerUrl || '';
+  const bannerImgUrl = rawBanner
+    ? (rawBanner.startsWith('/') ? `${window.location.origin}${rawBanner}` : rawBanner)
+    : 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&h=450&fit=crop';
 
   const printDocumentHtml = `
 <!DOCTYPE html>
@@ -283,7 +289,9 @@ export async function exportTicketPdf(ticketData = {}) {
           <div class="brand-tagline">Official Digital Event E-Ticket Pass</div>
         </div>
       </div>
-      <div class="pass-status-pill" style="background-color: #0d9488;">OFFICIAL PASS • CONFIRMED</div>
+      <div class="pass-status-pill" style="background-color: #0d9488;">
+        TIER: ${categoryName.toUpperCase()} • CONFIRMED PASS
+      </div>
     </div>
 
     <!-- Show Banner Image Section -->
@@ -316,16 +324,20 @@ export async function exportTicketPdf(ticketData = {}) {
           <span class="spec-val">${attendeeName}</span>
         </div>
         <div class="spec-card">
-          <span class="spec-label">📅 SHOW DATE & TIME</span>
-          <span class="spec-val" style="color: #059669;">${fullShowDateTime}</span>
+          <span class="spec-label">🎫 TICKET TIER / CATEGORY</span>
+          <span class="spec-val" style="color: #0284c7;">${categoryName}</span>
         </div>
         <div class="spec-card">
           <span class="spec-label">VENUE LOCATION</span>
           <span class="spec-val">📍 ${venue}</span>
         </div>
         <div class="spec-card">
-          <span class="spec-label">RESERVED SEATS / TIERS</span>
-          <span class="spec-val" style="color: #059669;">${seatsText}</span>
+          <span class="spec-label">🎟️ NUMBER OF SEATS</span>
+          <span class="spec-val" style="color: #059669;">${seatCount} ${seatCount === 1 ? 'Seat' : 'Seats'}</span>
+        </div>
+        <div class="spec-card" style="grid-column: span 2;">
+          <span class="spec-label">RESERVED SEATS & TIER SPECIFICATIONS</span>
+          <span class="spec-val" style="color: #059669;">Tier: ${categoryName} ${rawSeatsText ? `• Seats: ${rawSeatsText}` : ''} (${seatCount} ${seatCount === 1 ? 'Seat' : 'Seats'})</span>
         </div>
         <div class="spec-card">
           <span class="spec-label">TOTAL PAID (PKR)</span>
