@@ -154,9 +154,9 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
               <MapPin size={12} style={{ display: 'inline', marginRight: '3px' }} /> {event.city}
             </span>
             <span style={{
-              backgroundColor: 'rgba(59, 130, 246, 0.2)',
-              color: '#60a5fa',
-              border: '1px solid rgba(59, 130, 246, 0.4)',
+              backgroundColor: 'rgba(13, 148, 136, 0.2)',
+              color: '#2dd4bf',
+              border: '1px solid rgba(13, 148, 136, 0.4)',
               borderRadius: '8px',
               padding: '0.25rem 0.65rem',
               fontSize: '0.75rem',
@@ -180,7 +180,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
           {/* Date, Time & Location Bar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap', color: '#cbd5e1', fontSize: '0.92rem', marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#f8fafc', fontWeight: 600 }}>
-              <Calendar size={18} color="#3b82f6" />
+              <Calendar size={18} color="#0d9488" />
               <span>{formatEventDateRange(event.startDateUtc || event.startDate || event.date, event.endDateUtc || event.endDate)}</span>
             </div>
 
@@ -188,20 +188,20 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.35rem',
-              backgroundColor: 'rgba(59, 130, 246, 0.15)',
-              color: '#93c5fd',
+              backgroundColor: 'rgba(13, 148, 136, 0.15)',
+              color: '#99f6e4',
               padding: '0.25rem 0.65rem',
               borderRadius: '6px',
               fontSize: '0.825rem',
               fontWeight: 600,
-              border: '1px solid rgba(59, 130, 246, 0.3)'
+              border: '1px solid rgba(13, 148, 136, 0.3)'
             }}>
-              <Clock size={14} color="#60a5fa" />
+              <Clock size={14} color="#2dd4bf" />
               <span>{formatEventStartTime(event.startDateUtc || event.startDate, event.time)}</span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#94a3b8' }}>
-              <MapPin size={18} color="#3b82f6" />
+              <MapPin size={18} color="#0d9488" />
               <span>{event.city ? `${event.city} • ${event.venue}` : event.venue}</span>
             </div>
           </div>
@@ -229,13 +229,13 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
           {effectiveShows && effectiveShows.length > 0 && (
             <div style={{
               backgroundColor: 'rgba(30, 41, 59, 0.8)',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
+              border: '1px solid rgba(13, 148, 136, 0.3)',
               padding: '0.85rem 1.1rem',
               borderRadius: '12px',
               marginBottom: '1.5rem'
             }}>
-              <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#60a5fa', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Clock size={15} color="#60a5fa" /> Available Event Shows ({effectiveShows.length} Slot{effectiveShows.length > 1 ? 's' : ''} - PKT):
+              <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#2dd4bf', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Clock size={15} color="#2dd4bf" /> Available Event Shows ({effectiveShows.length} Slot{effectiveShows.length > 1 ? 's' : ''} - PKT):
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {effectiveShows.map(s => (
@@ -251,7 +251,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                     alignItems: 'center',
                     gap: '0.35rem'
                   }}>
-                    <strong style={{ color: '#38bdf8' }}>{s.showTitle}</strong>
+                    <strong style={{ color: '#2dd4bf' }}>{s.showTitle}</strong>
                     {s.startTimeUtc && (
                       <span style={{ color: '#94a3b8' }}>
                         ({new Date(s.startTimeUtc).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' })} PKT)
@@ -276,7 +276,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                 marginTop: '1rem',
                 padding: '0.85rem 1.1rem',
                 background: 'rgba(30, 41, 59, 0.7)',
-                border: '1px solid rgba(59, 130, 246, 0.25)',
+                border: '1px solid rgba(13, 148, 136, 0.25)',
                 borderRadius: '12px',
                 display: 'flex',
                 alignItems: 'center',
@@ -307,14 +307,14 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '0.4rem',
-                      color: '#60a5fa',
+                      color: '#2dd4bf',
                       fontSize: '0.82rem',
                       fontWeight: 600,
                       textDecoration: 'none',
                       padding: '0.4rem 0.85rem',
-                      background: 'rgba(59, 130, 246, 0.15)',
+                      background: 'rgba(13, 148, 136, 0.15)',
                       borderRadius: '8px',
-                      border: '1px solid rgba(59, 130, 246, 0.35)',
+                      border: '1px solid rgba(13, 148, 136, 0.35)',
                       transition: 'all 0.2s ease'
                     }}
                   >
@@ -328,17 +328,17 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
           {/* Ticketing Options Section */}
           <div style={{
             backgroundColor: '#070c18',
-            border: '1px solid rgba(59, 130, 246, 0.2)',
+            border: '1px solid rgba(13, 148, 136, 0.2)',
             borderRadius: '16px',
             padding: '1.5rem'
           }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Ticket size={18} color="#3b82f6" /> Select Ticket Options ({event.ticketingType === 'mapped' ? 'Mapped Seating' : 'Categorized Tiers'})
+              <Ticket size={18} color="#0d9488" /> Select Ticket Options ({event.ticketingType === 'mapped' ? 'Mapped Seating' : 'Categorized Tiers'})
             </h3>
 
             {/* Show Slot Selector */}
             {effectiveShows && effectiveShows.length > 0 && (
-              <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'rgba(16, 25, 45, 0.8)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '12px' }}>
+              <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'rgba(16, 25, 45, 0.8)', border: '1px solid rgba(13, 148, 136, 0.25)', borderRadius: '12px' }}>
                 <label style={{ fontSize: '0.825rem', fontWeight: 600, color: '#94a3b8', display: 'block', marginBottom: '0.6rem' }}>
                   Select Show Timing / Slot:
                 </label>
@@ -352,8 +352,8 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                         style={{
                           padding: '0.55rem 0.95rem',
                           borderRadius: '10px',
-                          border: isSelected ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.1)',
-                          background: isSelected ? 'rgba(59, 130, 246, 0.25)' : 'rgba(15, 23, 42, 0.6)',
+                          border: isSelected ? '1px solid #0d9488' : '1px solid rgba(255, 255, 255, 0.1)',
+                          background: isSelected ? 'rgba(13, 148, 136, 0.25)' : 'rgba(15, 23, 42, 0.6)',
                           color: isSelected ? '#fff' : '#cbd5e1',
                           fontSize: '0.85rem',
                           fontWeight: 600,
@@ -361,14 +361,14 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                           display: 'flex',
                           alignItems: 'center',
                           gap: '0.4rem',
-                          boxShadow: isSelected ? '0 0 12px rgba(59, 130, 246, 0.3)' : 'none',
+                          boxShadow: isSelected ? '0 0 12px rgba(13, 148, 136, 0.3)' : 'none',
                           transition: 'all 0.2s ease'
                         }}
                       >
-                        <Clock size={14} color={isSelected ? '#60a5fa' : '#94a3b8'} />
+                        <Clock size={14} color={isSelected ? '#2dd4bf' : '#94a3b8'} />
                         <span>{show.showTitle || `Show #${show.id}`}</span>
                         {show.startTimeUtc && (
-                          <span style={{ fontSize: '0.75rem', color: isSelected ? '#38bdf8' : '#94a3b8', marginLeft: '0.25rem' }}>
+                          <span style={{ fontSize: '0.75rem', color: isSelected ? '#2dd4bf' : '#94a3b8', marginLeft: '0.25rem' }}>
                             ({new Date(show.startTimeUtc).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' })} PKT)
                           </span>
                         )}
@@ -389,7 +389,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                       key={tier.id}
                       style={{
                         backgroundColor: '#10192d',
-                        border: qty > 0 ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.1)',
+                        border: qty > 0 ? '1px solid #0d9488' : '1px solid rgba(255, 255, 255, 0.1)',
                         borderRadius: '12px',
                         padding: '1rem',
                         display: 'flex',
@@ -406,7 +406,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                         <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
                           {tier.description}
                         </span>
-                        <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#3b82f6', display: 'block', marginTop: '0.35rem' }}>
+                        <span style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0d9488', display: 'block', marginTop: '0.35rem' }}>
                           PKR {tier.price.toLocaleString()}
                         </span>
                       </div>
@@ -439,7 +439,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                             width: '32px',
                             height: '32px',
                             borderRadius: '8px',
-                            backgroundColor: '#3b82f6',
+                            backgroundColor: '#0d9488',
                             border: 'none',
                             color: '#fff',
                             fontWeight: 700,
@@ -464,7 +464,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                 }}>
                   <div>
                     <span style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block' }}>Total ({selectedCategorizedCount} Tickets)</span>
-                    <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#3b82f6' }}>
+                    <span style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0d9488' }}>
                       PKR {categorizedTotal.toLocaleString()}
                     </span>
                   </div>
@@ -488,9 +488,9 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <p style={{ fontSize: '0.88rem', color: '#cbd5e1', margin: 0 }}>
-                    Selected Show Slot: <strong style={{ color: '#38bdf8' }}>{activeShow?.showTitle || 'Standard Performance'}</strong>
+                    Selected Show Slot: <strong style={{ color: '#2dd4bf' }}>{activeShow?.showTitle || 'Standard Performance'}</strong>
                   </p>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#60a5fa', background: 'rgba(59, 130, 246, 0.15)', padding: '0.25rem 0.65rem', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#2dd4bf', background: 'rgba(13, 148, 136, 0.15)', padding: '0.25rem 0.65rem', borderRadius: '6px', border: '1px solid rgba(13, 148, 136, 0.3)' }}>
                     Starting from PKR {(activeShow?.startingPrice || activeShow?.ticketTiers?.[0]?.price || event.startingPrice || 2500).toLocaleString()}
                   </span>
                 </div>
@@ -499,7 +499,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                   {(event.seatingZones && event.seatingZones.length > 0 ? event.seatingZones : [{ zone: event.venue || 'Auditorium Main Hall', price: activeShow?.startingPrice || event.startingPrice || 2500 }]).map((zone, zIdx) => (
                     <div key={zone.zone || zIdx} style={{ backgroundColor: '#10192d', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
                       <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#fff', display: 'block' }}>{zone.zone}</span>
-                      <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#3b82f6' }}>PKR {(activeShow?.startingPrice || zone.price || event.startingPrice || 2500).toLocaleString()}</span>
+                      <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0d9488' }}>PKR {(activeShow?.startingPrice || zone.price || event.startingPrice || 2500).toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
@@ -507,7 +507,7 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                   <button
                     onClick={() => setShowLayoutPreview(true)}
-                    style={{ flex: 1, padding: '0.85rem', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '10px', color: '#60a5fa', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                    style={{ flex: 1, padding: '0.85rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '10px', color: '#2dd4bf', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                   >
                     <Eye size={18} /> View Auditorium Layout Blueprint
                   </button>

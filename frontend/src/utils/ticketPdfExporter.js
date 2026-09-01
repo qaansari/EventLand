@@ -1,30 +1,36 @@
+import { generateTicketQrDataUrl } from './qrGenerator';
+
 /**
  * Premium Utility to generate and download official EventLand PDF E-Tickets.
  * Formatted with EventLand logo, Event Banner image, Show Date & Time, Booking Date & Time,
  * Pass Holder details, Seat numbers, and HD Security QR Code.
  */
-export function exportTicketPdf({
-  ticketId = 'EVL-100001',
-  eventTitle = 'Garbar Family (Urdu Comedy Family Theatre Play)',
-  banner = '',
-  venue = 'Arts Council of Pakistan, Karachi',
-  cityName = 'Karachi',
-  date = 'Saturday, 10th January 2027',
-  time = '08:00 PM PKT',
-  showTitle = '',
-  showDateTime = '',
-  attendeeName = 'Muhammad Ali',
-  attendeeEmail = 'ali@example.com',
-  phone = '0300 1234567',
-  seats = [],
-  paymentMethod = 'PAYFAST PAKISTAN',
-  paymentStatus = 'Paid',
-  totalPaid = 1500,
-  bookingTime = ''
-}) {
+export async function exportTicketPdf(ticketData = {}) {
+  const {
+    ticketId = 'EVL-100001',
+    eventTitle = 'Garbar Family (Urdu Comedy Family Theatre Play)',
+    banner = '',
+    venue = 'Arts Council of Pakistan, Karachi',
+    cityName = 'Karachi',
+    date = 'Saturday, 10th January 2027',
+    time = '08:00 PM PKT',
+    showTitle = '',
+    showDateTime = '',
+    attendeeName = 'Muhammad Ali',
+    attendeeEmail = 'ali@example.com',
+    phone = '0300 1234567',
+    seats = [],
+    paymentMethod = 'PAYFAST PAKISTAN',
+    paymentStatus = 'Paid',
+    totalPaid = 1500,
+    bookingTime = ''
+  } = ticketData;
+
+  const qrDataUrl = await generateTicketQrDataUrl({ ticketId, eventTitle, attendeeName });
   const seatsText = seats.map(s => s.label || (typeof s.id === 'string' ? s.id.split('-').pop() : s.id)).join(', ') || 'General Admission Pass';
   const showDateStr = date || 'Saturday, 10th January 2027';
   const showTimeStr = time || '08:00 PM PKT';
+  const fullShowDateTime = showDateTime || (date && time ? `${date} at ${time}` : `${showDateStr} at ${showTimeStr}`);
   const bookingDateStr = bookingTime || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   // Default fallback banner if none supplied
@@ -50,7 +56,7 @@ export function exportTicketPdf({
       width: 100%;
       background-color: #ffffff !important;
       color: #0f172a !important;
-      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -85,7 +91,7 @@ export function exportTicketPdf({
     .brand-logo-icon {
       width: 32px;
       height: 32px;
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      background: linear-gradient(135deg, #059669, #0f766e);
       border-radius: 8px;
       display: flex;
       align-items: center;
@@ -106,7 +112,7 @@ export function exportTicketPdf({
       font-weight: 600;
     }
     .pass-status-pill {
-      background-color: #2563eb;
+      background-color: #059669;
       color: #ffffff;
       padding: 4px 12px;
       border-radius: 999px;
@@ -172,7 +178,7 @@ export function exportTicketPdf({
     .schedule-label {
       font-size: 10px;
       font-weight: 800;
-      color: #2563eb;
+      color: #059669;
       text-transform: uppercase;
       margin-bottom: 2px;
       letter-spacing: 0.5px;
@@ -269,15 +275,15 @@ export function exportTicketPdf({
     <!-- Brand Header -->
     <div class="brand-header">
       <div class="brand-title-wrap">
-        <img src="${window.location.origin}/logo-icon.png" alt="EventLand Icon" style="height: 38px; width: auto; object-fit: contain; filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));" />
+        <img src="${window.location.origin}/logo-icon.png" alt="EventLand Icon" style="height: 38px; width: auto; object-fit: contain; filter: drop-shadow(0 0 8px rgba(13, 148, 136, 0.5));" />
         <div>
           <div class="brand-name" style="font-size: 20px; font-weight: 900; letter-spacing: -0.5px; color: #ffffff; display: flex; alignItems: center; gap: 4px;">
-            EVENT<span style="color: #60a5fa;">LAND</span> <span style="font-size: 11px; color: #94a3b8; font-weight: 800; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">PAKISTAN</span>
+            EVENT<span style="color: #10b981;">LAND</span> <span style="font-size: 11px; color: #99f6e4; font-weight: 800; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">PAKISTAN</span>
           </div>
           <div class="brand-tagline">Official Digital Event E-Ticket Pass</div>
         </div>
       </div>
-      <div class="pass-status-pill">OFFICIAL PASS • CONFIRMED</div>
+      <div class="pass-status-pill" style="background-color: #0d9488;">OFFICIAL PASS • CONFIRMED</div>
     </div>
 
     <!-- Show Banner Image Section -->
@@ -294,12 +300,12 @@ export function exportTicketPdf({
       <!-- Prominent Show Date & Time Schedule Box -->
       <div class="schedule-highlight-box">
         <div class="schedule-item">
-          <span class="schedule-label">📅 SHOW DATE</span>
-          <span class="schedule-value">${showDateStr}</span>
+          <span class="schedule-label">📅 SHOW DATE & TIME</span>
+          <span class="schedule-value">${fullShowDateTime}</span>
         </div>
         <div class="schedule-item" style="text-align: right;">
-          <span class="schedule-label">⏰ SHOW START TIME</span>
-          <span class="schedule-value">${showTimeStr}</span>
+          <span class="schedule-label">⏰ SHOW TIME / SLOT</span>
+          <span class="schedule-value">${showTitle || showTimeStr}</span>
         </div>
       </div>
 
@@ -310,12 +316,16 @@ export function exportTicketPdf({
           <span class="spec-val">${attendeeName}</span>
         </div>
         <div class="spec-card">
+          <span class="spec-label">📅 SHOW DATE & TIME</span>
+          <span class="spec-val" style="color: #059669;">${fullShowDateTime}</span>
+        </div>
+        <div class="spec-card">
           <span class="spec-label">VENUE LOCATION</span>
           <span class="spec-val">📍 ${venue}</span>
         </div>
         <div class="spec-card">
           <span class="spec-label">RESERVED SEATS / TIERS</span>
-          <span class="spec-val" style="color: #2563eb;">${seatsText}</span>
+          <span class="spec-val" style="color: #059669;">${seatsText}</span>
         </div>
         <div class="spec-card">
           <span class="spec-label">TOTAL PAID (PKR)</span>
@@ -325,7 +335,7 @@ export function exportTicketPdf({
           <span class="spec-label">PAYMENT METHOD</span>
           <span class="spec-val">${paymentMethod}</span>
         </div>
-        <div class="spec-card">
+        <div class="spec-card" style="grid-column: span 2;">
           <span class="spec-label">🕒 BOOKING DATE & TIME</span>
           <span class="spec-val">${bookingDateStr}</span>
         </div>
@@ -335,25 +345,7 @@ export function exportTicketPdf({
       <div class="qr-entry-box">
         <div class="qr-graphic-wrap">
           <div class="qr-border">
-            <svg width="100" height="100" viewBox="0 0 100 100" fill="#000">
-              <rect width="100" height="100" fill="#fff"/>
-              <rect x="8" y="8" width="28" height="28" fill="#000"/>
-              <rect x="12" y="12" width="20" height="20" fill="#fff"/>
-              <rect x="16" y="16" width="12" height="12" fill="#000"/>
-              
-              <rect x="64" y="8" width="28" height="28" fill="#000"/>
-              <rect x="68" y="12" width="20" height="20" fill="#fff"/>
-              <rect x="72" y="16" width="12" height="12" fill="#000"/>
-
-              <rect x="8" y="64" width="28" height="28" fill="#000"/>
-              <rect x="12" y="68" width="20" height="20" fill="#fff"/>
-              <rect x="16" y="72" width="12" height="12" fill="#000"/>
-
-              <rect x="44" y="44" width="12" height="12" fill="#000"/>
-              <rect x="64" y="56" width="16" height="16" fill="#000"/>
-              <rect x="56" y="76" width="12" height="12" fill="#000"/>
-              <rect x="76" y="76" width="12" height="12" fill="#000"/>
-            </svg>
+            <img src="${qrDataUrl}" alt="Real QR Code Pass" style="width: 100px; height: 100px; display: block; object-fit: contain; border-radius: 4px;" />
           </div>
           <div>
             <div style="font-size: 11px; font-weight: 800; color: #64748b; text-transform: uppercase;">SCAN FOR ENTRY</div>

@@ -21,13 +21,13 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
         cursor: 'pointer',
         overflow: 'hidden',
         borderRadius: '16px',
-        border: '1px solid rgba(59, 130, 246, 0.2)',
+        border: '1px solid rgba(13, 148, 136, 0.2)',
         boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4)',
         transition: 'transform 0.3s ease, box-shadow 0.3s ease'
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-3px)';
-        e.currentTarget.style.boxShadow = '0 15px 35px rgba(59, 130, 246, 0.2)';
+        e.currentTarget.style.boxShadow = '0 15px 35px rgba(13, 148, 136, 0.2)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)';
@@ -96,12 +96,12 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
           left: '14px',
           backgroundColor: 'rgba(7, 12, 24, 0.88)',
           backdropFilter: 'blur(8px)',
-          color: '#60a5fa',
+          color: '#2dd4bf',
           padding: '0.28rem 0.8rem',
           borderRadius: '8px',
           fontSize: '0.78rem',
           fontWeight: 700,
-          border: '1px solid rgba(59, 130, 246, 0.4)'
+          border: '1px solid rgba(13, 148, 136, 0.4)'
         }}>
           {event.tags && event.tags.length > 0
             ? event.tags.map(t => typeof t === 'string' ? t : t.name).join(' • ')
@@ -113,7 +113,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
       <div style={{ padding: '1.75rem', flex: '1 1 450px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#94a3b8', fontSize: '0.86rem', marginBottom: '0.5rem', fontWeight: 500 }}>
-            <MapPin size={15} color="#3b82f6" />
+            <MapPin size={15} color="#0d9488" />
             <span>{(event?.cityName || event?.city || 'Karachi')} • {(event?.venueName || event?.venue) ? String(event.venueName || event.venue).split(',')[0] : 'Arts Council of Pakistan'}</span>
           </div>
 
@@ -132,7 +132,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
           {/* Date & Dedicated Start Time Badge Row */}
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#cbd5e1', fontSize: '0.88rem', fontWeight: 500 }}>
-              <Calendar size={16} color="#3b82f6" />
+              <Calendar size={16} color="#0d9488" />
               <span>{formattedDate}</span>
             </div>
 
@@ -140,15 +140,15 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.35rem',
-              backgroundColor: 'rgba(59, 130, 246, 0.12)',
-              color: '#93c5fd',
+              backgroundColor: 'rgba(13, 148, 136, 0.15)',
+              color: '#2dd4bf',
               padding: '0.25rem 0.65rem',
               borderRadius: '6px',
               fontSize: '0.8rem',
               fontWeight: 600,
-              border: '1px solid rgba(59, 130, 246, 0.25)'
+              border: '1px solid rgba(13, 148, 136, 0.3)'
             }}>
-              <Clock size={13} color="#60a5fa" />
+              <Clock size={13} color="#2dd4bf" />
               <span>{formattedTime}</span>
             </div>
           </div>
@@ -163,7 +163,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
             gap: '0.45rem',
             fontWeight: 500
           }}>
-            {event.ticketingType === 'mapped' ? <Grid size={14} color="#60a5fa" /> : <Layers size={14} color="#60a5fa" />}
+            {event.ticketingType === 'mapped' ? <Grid size={14} color="#2dd4bf" /> : <Layers size={14} color="#2dd4bf" />}
             <span>{event.ticketingType === 'mapped' ? 'Mapped Seat Selection' : 'Tiered Ticket Passes'}</span>
           </div>
         </div>
@@ -172,7 +172,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
         <div style={{ paddingTop: '1rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <span style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Starting From</span>
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: '#60a5fa' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: '#2dd4bf' }}>
               PKR {(event.startingPrice || 0).toLocaleString()}
             </span>
           </div>

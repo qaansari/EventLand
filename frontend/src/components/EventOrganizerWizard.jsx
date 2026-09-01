@@ -179,7 +179,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
                   style={{
                     width: '100%',
                     backgroundColor: '#1e293b',
-                    border: '1px solid rgba(59, 130, 246, 0.25)',
+                    border: '1px solid rgba(13, 148, 136, 0.25)',
                     borderRadius: '10px',
                     padding: '0.75rem 1rem',
                     color: '#fff',
@@ -190,7 +190,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
 
               {/* Ticketing Type Selection */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', color: '#60a5fa', fontWeight: 700, marginBottom: '0.5rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: '#2dd4bf', fontWeight: 700, marginBottom: '0.5rem' }}>
                   2. Select Ticketing Type *
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
@@ -199,15 +199,15 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
                     style={{
                       padding: '1rem',
                       borderRadius: '12px',
-                      backgroundColor: eventForm.ticketingType === 'categorized' ? 'rgba(59, 130, 246, 0.2)' : '#1e293b',
-                      border: eventForm.ticketingType === 'categorized' ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.1)',
+                      backgroundColor: eventForm.ticketingType === 'categorized' ? 'rgba(13, 148, 136, 0.2)' : '#1e293b',
+                      border: eventForm.ticketingType === 'categorized' ? '2px solid #0d9488' : '1px solid rgba(255,255,255,0.1)',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.75rem'
                     }}
                   >
-                    <Layers color="#3b82f6" size={22} />
+                    <Layers color="#0d9488" size={22} />
                     <div>
                       <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem', display: 'block' }}>1) Categorized</span>
                       <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Tiered Passes (VIP, Standard)</span>
@@ -219,15 +219,15 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
                     style={{
                       padding: '1rem',
                       borderRadius: '12px',
-                      backgroundColor: eventForm.ticketingType === 'mapped' ? 'rgba(59, 130, 246, 0.2)' : '#1e293b',
-                      border: eventForm.ticketingType === 'mapped' ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.1)',
+                      backgroundColor: eventForm.ticketingType === 'mapped' ? 'rgba(13, 148, 136, 0.2)' : '#1e293b',
+                      border: eventForm.ticketingType === 'mapped' ? '2px solid #0d9488' : '1px solid rgba(255,255,255,0.1)',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.75rem'
                     }}
                   >
-                    <Grid color="#3b82f6" size={22} />
+                    <Grid color="#0d9488" size={22} />
                     <div>
                       <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem', display: 'block' }}>2) Mapped</span>
                       <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Interactive Auditorium Seat Chart</span>
@@ -238,8 +238,8 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
 
               {/* Auditorium Layout Picker (when Mapped Ticketing) */}
               {eventForm.ticketingType === 'mapped' && (
-                <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '12px', padding: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#60a5fa', fontWeight: 700, marginBottom: '0.35rem' }}>
+                <div style={{ background: 'rgba(13, 148, 136, 0.08)', border: '1px solid rgba(13, 148, 136, 0.25)', borderRadius: '12px', padding: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#2dd4bf', fontWeight: 700, marginBottom: '0.35rem' }}>
                     Select Auditorium / Hall Blueprint *
                   </label>
                   <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '0.75rem' }}>
@@ -271,9 +271,9 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
                       />
 
                       {selectedAuditorium && (
-                        <div style={{ marginTop: '0.75rem', padding: '0.65rem 0.85rem', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ marginTop: '0.75rem', padding: '0.65rem 0.85rem', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '8px', border: '1px solid rgba(13, 148, 136, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <CheckCircle size={15} color="#60a5fa" />
+                            <CheckCircle size={15} color="#2dd4bf" />
                             <span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>
                               Selected: <strong style={{ color: '#fff' }}>{selectedAuditorium.name}</strong> ({selectedAuditorium.totalCapacity} seats layout)
                             </span>
@@ -301,8 +301,8 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
                               gap: '0.35rem',
                               padding: '0.35rem 0.75rem',
                               borderRadius: '6px',
-                              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                              border: '1px solid rgba(96, 165, 250, 0.4)',
+                              background: 'linear-gradient(135deg, #059669, #0f766e)',
+                              border: '1px solid rgba(45, 212, 191, 0.4)',
                               color: '#fff',
                               fontSize: '0.75rem',
                               fontWeight: 700,
@@ -361,7 +361,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
                   style={{
                     width: '100%',
                     backgroundColor: '#1e293b',
-                    border: '1px solid rgba(59, 130, 246, 0.25)',
+                    border: '1px solid rgba(13, 148, 136, 0.25)',
                     borderRadius: '10px',
                     padding: '0.75rem 1rem',
                     color: '#fff',
@@ -384,7 +384,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
                     style={{
                       width: '100%',
                       backgroundColor: '#1e293b',
-                      border: '1px solid rgba(59, 130, 246, 0.25)',
+                      border: '1px solid rgba(13, 148, 136, 0.25)',
                       borderRadius: '10px',
                       padding: '0.75rem 1rem',
                       color: '#fff',
@@ -405,7 +405,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
                     style={{
                       width: '100%',
                       backgroundColor: '#1e293b',
-                      border: '1px solid rgba(59, 130, 246, 0.25)',
+                      border: '1px solid rgba(13, 148, 136, 0.25)',
                       borderRadius: '10px',
                       padding: '0.75rem 1rem',
                       color: '#fff',
@@ -417,7 +417,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                  Event Banner Image <span style={{ color: '#38bdf8', fontWeight: 600 }}>(Recommended: 1200x500px)</span> *
+                  Event Banner Image <span style={{ color: '#2dd4bf', fontWeight: 600 }}>(Recommended: 1200x500px)</span> *
                 </label>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <input
@@ -428,7 +428,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
                     style={{
                       flex: 1,
                       backgroundColor: '#1e293b',
-                      border: '1px solid rgba(59, 130, 246, 0.25)',
+                      border: '1px solid rgba(13, 148, 136, 0.25)',
                       borderRadius: '10px',
                       padding: '0.75rem 1rem',
                       color: '#fff',
@@ -437,7 +437,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
                   />
                   <label style={{
                     padding: '0.75rem 1rem',
-                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    background: 'linear-gradient(135deg, #0d9488, #0f766e)',
                     borderRadius: '10px',
                     color: '#fff',
                     fontWeight: 600,
@@ -478,7 +478,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
                   style={{
                     width: '100%',
                     backgroundColor: '#1e293b',
-                    border: '1px solid rgba(59, 130, 246, 0.25)',
+                    border: '1px solid rgba(13, 148, 136, 0.25)',
                     borderRadius: '10px',
                     padding: '0.75rem 1rem',
                     color: '#fff',
@@ -517,7 +517,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
             alignItems: 'center',
             gap: '0.5rem',
             marginBottom: '1rem',
-            color: '#3b82f6',
+            color: '#0d9488',
             fontWeight: 700,
             fontSize: '0.9rem'
           }}>

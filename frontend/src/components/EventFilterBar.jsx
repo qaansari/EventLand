@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { SlidersHorizontal, Tag as TagIcon } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
@@ -6,6 +6,7 @@ const CITIES = ['All Cities', 'Karachi', 'Lahore', 'Islamabad'];
 
 export default function EventFilterBar({
   tags = [],
+  events = [],
   cities = [],
   selectedTag = 'All',
   onSelectTag,
@@ -14,7 +15,35 @@ export default function EventFilterBar({
   sortBy = 'featured',
   onSortChange
 }) {
-  const allTags = ['All', ...(tags || []).map(t => typeof t === 'string' ? t : t.name)];
+  const allTags = useMemo(() => {
+    const set = new Set();
+
+    // 1. Tags passed from API
+    (tags || []).forEach(t => {
+      const name = typeof t === 'string' ? t : (t?.name || t?.tagName);
+      if (name) set.add(name);
+    });
+
+    // 2. Extract tags from events
+    (events || []).forEach(ev => {
+      if (ev.tag) set.add(typeof ev.tag === 'string' ? ev.tag : ev.tag.name);
+      if (ev.category) set.add(typeof ev.category === 'string' ? ev.category : ev.category.name);
+      if (Array.isArray(ev.tags)) {
+        ev.tags.forEach(t => set.add(typeof t === 'string' ? t : (t?.name || t?.tag?.name)));
+      }
+      if (Array.isArray(ev.eventTags)) {
+        ev.eventTags.forEach(t => set.add(typeof t === 'string' ? t : (t?.name || t?.tagName || t?.tag?.name)));
+      }
+    });
+
+    // 3. Popular defaults if set is small
+    if (set.size === 0) {
+      ['Concert', 'Music', 'Comedy', 'Theatre', 'Festival', 'Workshop', 'Family'].forEach(t => set.add(t));
+    }
+
+    return ['All', ...Array.from(set).filter(Boolean)];
+  }, [tags, events]);
+
   const cityList = cities && cities.length > 0
     ? ['All Cities', ...cities.map(c => typeof c === 'string' ? c : c.name)]
     : CITIES;
@@ -43,10 +72,10 @@ export default function EventFilterBar({
               style={{
                 fontFamily: 'var(--font-display)',
                 background: isActive 
-                  ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%)' 
+                  ? 'linear-gradient(135deg, #0d9488 0%, #059669 100%)' 
                   : 'rgba(255, 255, 255, 0.05)',
                 color: isActive ? '#ffffff' : '#cbd5e1',
-                border: isActive ? '1px solid rgba(147, 197, 253, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
+                border: isActive ? '1px solid rgba(45, 212, 191, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
                 padding: '0.55rem 1.3rem',
                 borderRadius: '9999px',
                 fontWeight: isActive ? 700 : 500,
@@ -55,7 +84,7 @@ export default function EventFilterBar({
                 whiteSpace: 'nowrap',
                 cursor: 'pointer',
                 transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                boxShadow: isActive ? '0 4px 18px rgba(59, 130, 246, 0.45)' : 'none',
+                boxShadow: isActive ? '0 4px 18px rgba(13, 148, 136, 0.45)' : 'none',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.4rem'
@@ -75,10 +104,10 @@ export default function EventFilterBar({
         justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: '1rem',
-        backgroundColor: 'rgba(16, 25, 45, 0.6)',
+        backgroundColor: 'rgba(13, 30, 43, 0.6)',
         padding: '0.85rem 1.25rem',
         borderRadius: '16px',
-        border: '1px solid rgba(59, 130, 246, 0.15)'
+        border: '1px solid rgba(13, 148, 136, 0.2)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>Filter by City:</span>
@@ -88,9 +117,9 @@ export default function EventFilterBar({
                 key={city}
                 onClick={() => onSelectCity(city)}
                 style={{
-                  backgroundColor: selectedCity === city ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-                  color: selectedCity === city ? '#60a5fa' : '#94a3b8',
-                  border: selectedCity === city ? '1px solid rgba(59, 130, 246, 0.45)' : '1px solid transparent',
+                  backgroundColor: selectedCity === city ? 'rgba(13, 148, 136, 0.25)' : 'transparent',
+                  color: selectedCity === city ? '#2dd4bf' : '#94a3b8',
+                  border: selectedCity === city ? '1px solid rgba(13, 148, 136, 0.5)' : '1px solid transparent',
                   padding: '0.3rem 0.75rem',
                   borderRadius: '8px',
                   fontSize: '0.8rem',

@@ -108,14 +108,14 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
               width: '52px',
               height: '52px',
               borderRadius: '16px',
-              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(37, 99, 235, 0.25))',
-              border: '1px solid rgba(59, 130, 246, 0.4)',
+              background: 'linear-gradient(135deg, rgba(13, 148, 136, 0.2), rgba(13, 148, 136, 0.25))',
+              border: '1px solid rgba(13, 148, 136, 0.4)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 1rem',
-              color: '#3b82f6',
-              boxShadow: '0 0 20px rgba(59, 130, 246, 0.25)'
+              color: '#0d9488',
+              boxShadow: '0 0 20px rgba(13, 148, 136, 0.25)'
             }}
           >
             {isSignUp ? <UserPlus size={24} /> : <LogIn size={24} />}
@@ -163,7 +163,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
                     width: '100%',
                     padding: '0.75rem 1rem 0.75rem 2.75rem',
                     background: 'rgba(12, 23, 54, 0.6)',
-                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                    border: '1px solid rgba(13, 148, 136, 0.2)',
                     borderRadius: '10px',
                     color: '#f8fafc',
                     fontSize: '0.875rem',
@@ -190,7 +190,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
                   width: '100%',
                   padding: '0.75rem 1rem 0.75rem 2.75rem',
                   background: 'rgba(12, 23, 54, 0.6)',
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  border: '1px solid rgba(13, 148, 136, 0.2)',
                   borderRadius: '10px',
                   color: '#f8fafc',
                   fontSize: '0.875rem',
@@ -216,7 +216,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
                   width: '100%',
                   padding: '0.75rem 2.75rem 0.75rem 2.75rem',
                   background: 'rgba(12, 23, 54, 0.6)',
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  border: '1px solid rgba(13, 148, 136, 0.2)',
                   borderRadius: '10px',
                   color: '#f8fafc',
                   fontSize: '0.875rem',
@@ -257,7 +257,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
             style={{
               marginTop: '0.5rem',
               padding: '0.875rem',
-              background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+              background: 'linear-gradient(135deg, #0d9488, #0f766e)',
               border: 'none',
               borderRadius: '10px',
               color: '#ffffff',
@@ -265,7 +265,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
               fontSize: '0.9375rem',
               cursor: loading ? 'wait' : 'pointer',
               opacity: loading ? 0.7 : 1,
-              boxShadow: '0 4px 16px rgba(59, 130, 246, 0.4)'
+              boxShadow: '0 4px 16px rgba(13, 148, 136, 0.4)'
             }}
           >
             {loading ? 'Authenticating...' : (isSignUp ? 'Create Account' : 'Sign In')}
@@ -278,7 +278,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
               Already have an account?{' '}
               <button 
                 onClick={() => { setIsSignUp(false); setErrorMsg(''); }}
-                style={{ background: 'none', border: 'none', color: '#60a5fa', fontWeight: 600, cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', color: '#2dd4bf', fontWeight: 600, cursor: 'pointer' }}
               >
                 Sign In
               </button>
@@ -288,7 +288,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
               Don't have an account?{' '}
               <button 
                 onClick={() => { setIsSignUp(true); setErrorMsg(''); }}
-                style={{ background: 'none', border: 'none', color: '#60a5fa', fontWeight: 600, cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', color: '#2dd4bf', fontWeight: 600, cursor: 'pointer' }}
               >
                 Sign Up
               </button>

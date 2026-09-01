@@ -103,7 +103,7 @@ export default function Footer({ onSelectCity }) {
   return (
     <footer style={{
       backgroundColor: '#050912',
-      borderTop: '1px solid rgba(59, 130, 246, 0.15)',
+      borderTop: '1px solid rgba(13, 148, 136, 0.15)',
       marginTop: '4rem',
       paddingTop: '3.5rem',
       paddingBottom: '2rem',
@@ -121,7 +121,7 @@ export default function Footer({ onSelectCity }) {
                 key={faq.id || idx}
                 style={{
                   backgroundColor: '#10192d',
-                  border: '1px solid rgba(59, 130, 246, 0.15)',
+                  border: '1px solid rgba(13, 148, 136, 0.15)',
                   borderRadius: '12px',
                   overflow: 'hidden'
                 }}
@@ -149,7 +149,7 @@ export default function Footer({ onSelectCity }) {
                     style={{
                       transform: openFaq === idx ? 'rotate(180deg)' : 'rotate(0deg)',
                       transition: 'transform 0.2s ease',
-                      color: '#3b82f6'
+                      color: '#0d9488'
                     }}
                   />
                 </button>
@@ -179,8 +179,8 @@ export default function Footer({ onSelectCity }) {
                 alt="EventLand Icon"
                 style={{ height: '38px', width: 'auto' }}
               />
-              <span style={{ fontSize: '1.35rem', fontWeight: 800, color: '#fff' }}>
-                EVENT <span style={{ color: '#3b82f6' }}>LAND</span>
+              <span style={{ fontSize: '1.35rem', fontWeight: 900, color: '#fff' }}>
+                EVENT <span style={{ color: '#10b981' }}>LAND</span>
               </span>
             </div>
             <p style={{ fontSize: '0.85rem', lineHeight: 1.5, marginBottom: '1rem' }}>
@@ -189,12 +189,12 @@ export default function Footer({ onSelectCity }) {
             <div style={{ fontSize: '0.8rem', color: '#cbd5e1', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               {footerData.phone && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Phone size={14} color="#3b82f6" /> {footerData.phone}
+                  <Phone size={14} color="#0d9488" /> {footerData.phone}
                 </div>
               )}
               {footerData.email && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Mail size={14} color="#3b82f6" /> {footerData.email}
+                  <Mail size={14} color="#0d9488" /> {footerData.email}
                 </div>
               )}
             </div>
@@ -213,7 +213,7 @@ export default function Footer({ onSelectCity }) {
                       onSelectCity(city);
                     }}
                     style={{ color: '#94a3b8', textDecoration: 'none', transition: 'color 0.2s' }}
-                    onMouseEnter={(e) => (e.target.style.color = '#3b82f6')}
+                    onMouseEnter={(e) => (e.target.style.color = '#0d9488')}
                     onMouseLeave={(e) => (e.target.style.color = '#94a3b8')}
                   >
                     Events in {city}
@@ -237,7 +237,7 @@ export default function Footer({ onSelectCity }) {
                 onChange={(e) => setNewsletterEmail(e.target.value)}
                 style={{
                   backgroundColor: '#10192d',
-                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  border: '1px solid rgba(13, 148, 136, 0.25)',
                   borderRadius: '8px',
                   padding: '0.5rem 0.75rem',
                   color: '#fff',
@@ -251,7 +251,7 @@ export default function Footer({ onSelectCity }) {
               </button>
             </form>
             {subscribedToast && (
-              <span style={{ display: 'block', color: '#60a5fa', fontSize: '0.75rem', marginTop: '0.5rem' }}>
+              <span style={{ display: 'block', color: '#2dd4bf', fontSize: '0.75rem', marginTop: '0.5rem' }}>
                 ✓ Subscribed! You will receive upcoming event drops.
               </span>
             )}

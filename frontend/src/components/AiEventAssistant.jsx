@@ -132,7 +132,7 @@ export default function AiEventAssistant({ events = [], onSelectEvent }) {
 
               <div style={{ maxWidth: '78%' }}>
                 <div style={{
-                  backgroundColor: m.sender === 'user' ? '#3b82f6' : '#1f2937',
+                  backgroundColor: m.sender === 'user' ? '#0d9488' : '#1f2937',
                   color: m.sender === 'user' ? '#ffffff' : '#f3f4f6',
                   fontWeight: m.sender === 'user' ? 600 : 400,
                   padding: '0.85rem 1.15rem',
@@ -152,7 +152,7 @@ export default function AiEventAssistant({ events = [], onSelectEvent }) {
                         onClick={() => onSelectEvent(ev)}
                         style={{
                           backgroundColor: '#090d16',
-                          border: '1px solid rgba(59, 130, 246, 0.3)',
+                          border: '1px solid rgba(13, 148, 136, 0.3)',
                           borderRadius: '12px',
                           padding: '0.75rem 1rem',
                           display: 'flex',
@@ -183,7 +183,7 @@ export default function AiEventAssistant({ events = [], onSelectEvent }) {
                   width: '36px',
                   height: '36px',
                   borderRadius: '50%',
-                  backgroundColor: '#3b82f6',
+                  backgroundColor: '#0d9488',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

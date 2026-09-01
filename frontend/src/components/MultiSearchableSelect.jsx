@@ -85,15 +85,15 @@ export default function MultiSearchableSelect({
           width: '100%',
           minHeight: '44px',
           padding: '0.45rem 0.75rem',
-          backgroundColor: 'rgba(15, 23, 42, 0.75)',
-          border: isOpen ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.12)',
+          backgroundColor: 'rgba(13, 30, 43, 0.75)',
+          border: isOpen ? '1px solid #0d9488' : '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '10px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '0.5rem',
           cursor: disabled ? 'not-allowed' : 'pointer',
-          boxShadow: isOpen ? '0 0 12px rgba(59, 130, 246, 0.25)' : 'none',
+          boxShadow: isOpen ? '0 0 12px rgba(13, 148, 136, 0.3)' : 'none',
           backdropFilter: 'blur(8px)',
           transition: 'all 0.2s ease',
           flexWrap: 'wrap'
@@ -108,9 +108,9 @@ export default function MultiSearchableSelect({
                 <span
                   key={String(val)}
                   style={{
-                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                    border: '1px solid rgba(59, 130, 246, 0.45)',
-                    color: '#60a5fa',
+                    backgroundColor: 'rgba(13, 148, 136, 0.22)',
+                    border: '1px solid rgba(13, 148, 136, 0.5)',
+                    color: '#2dd4bf',
                     fontSize: '0.78rem',
                     fontWeight: 600,
                     padding: '0.2rem 0.55rem',
@@ -120,11 +120,11 @@ export default function MultiSearchableSelect({
                     gap: '0.35rem'
                   }}
                 >
-                  <Tag size={12} color="#60a5fa" />
+                  <Tag size={12} color="#2dd4bf" />
                   {label}
                   <X
                     size={13}
-                    color="#60a5fa"
+                    color="#2dd4bf"
                     style={{ cursor: 'pointer', borderRadius: '50%' }}
                     onClick={(e) => handleRemoveChip(e, val)}
                   />
@@ -188,10 +188,10 @@ export default function MultiSearchableSelect({
             right: 0,
             zIndex: 9999,
             backgroundColor: 'rgba(10, 16, 31, 0.95)',
-            border: '1px solid rgba(59, 130, 246, 0.3)',
+            border: '1px solid rgba(13, 148, 136, 0.3)',
             borderRadius: '12px',
             backdropFilter: 'blur(16px)',
-            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.6), 0 0 15px rgba(59, 130, 246, 0.15)',
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.6), 0 0 15px rgba(13, 148, 136, 0.15)',
             overflow: 'hidden',
             animation: 'fadeIn 0.15s ease'
           }}
@@ -204,10 +204,10 @@ export default function MultiSearchableSelect({
               display: 'flex',
               alignItems: 'center',
               gap: '0.4rem',
-              backgroundColor: 'rgba(15, 23, 42, 0.6)'
+              backgroundColor: 'rgba(13, 30, 43, 0.6)'
             }}
           >
-            <Search size={14} color="#3b82f6" />
+            <Search size={14} color="#0d9488" />
             <input
               type="text"
               autoFocus
@@ -254,8 +254,8 @@ export default function MultiSearchableSelect({
                       borderRadius: '8px',
                       fontSize: '0.85rem',
                       fontWeight: isSelected ? 600 : 400,
-                      color: isSelected ? '#60a5fa' : '#e2e8f0',
-                      backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                      color: isSelected ? '#2dd4bf' : '#e2e8f0',
+                      backgroundColor: isSelected ? 'rgba(13, 148, 136, 0.2)' : 'transparent',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.6rem',
@@ -274,8 +274,8 @@ export default function MultiSearchableSelect({
                         width: '18px',
                         height: '18px',
                         borderRadius: '4px',
-                        border: isSelected ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.25)',
-                        backgroundColor: isSelected ? '#3b82f6' : 'transparent',
+                        border: isSelected ? '1px solid #0d9488' : '1px solid rgba(255, 255, 255, 0.25)',
+                        backgroundColor: isSelected ? '#0d9488' : 'transparent',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',

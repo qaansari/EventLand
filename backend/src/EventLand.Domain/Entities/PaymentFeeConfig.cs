@@ -32,9 +32,4 @@ public class PaymentFeeConfig : BaseEntity
     /// Whether this payment method category is currently enabled.
     /// </summary>
     public bool IsActive { get; set; } = true;
-
-    /// <summary>
-    /// Timestamp when this configuration was last modified.
-    /// </summary>
-    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

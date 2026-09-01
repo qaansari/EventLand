@@ -8,6 +8,7 @@ import InteractiveSeatPicker from './components/InteractiveSeatPicker';
 import CheckoutModal from './components/CheckoutModal';
 import DigitalTicketModal from './components/DigitalTicketModal';
 import UnpaidInvoicesModal from './components/UnpaidInvoicesModal';
+import AttendeeDashboard from './components/AttendeeDashboard';
 import AuthModal from './components/AuthModal';
 import Footer from './components/Footer';
 import { Ticket, MapPin, Trash2, Search, RefreshCw } from 'lucide-react';
@@ -191,6 +192,10 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const savedEvents = useMemo(() => {
+    return events.filter((e) => savedEventIds.includes(e.id));
+  }, [events, savedEventIds]);
+
   // User Purchased Tickets
   const [purchasedTickets, setPurchasedTickets] = useState(() => {
     const tickets = localStorage.getItem('eventland_purchased_tickets');
@@ -230,7 +235,11 @@ export default function App() {
           const tObj = {
             ticketId: booking.bookingRef,
             eventTitle: booking.eventTitle,
-            venue: 'Confirmed Venue',
+            venue: booking.venueName || 'Arts Council of Pakistan, Karachi',
+            date: booking.showDate || booking.eventDate || 'Saturday, 10th January 2027',
+            time: booking.showTime || booking.showTitle || '08:00 PM PKT',
+            showTitle: booking.showTitle || 'Main Show Slot',
+            showDateTime: (booking.showDate && booking.showTime) ? `${booking.showDate} at ${booking.showTime}` : (booking.showDate || booking.showTime || 'Saturday, 10th January 2027 at 08:00 PM PKT'),
             attendeeName: booking.customerName,
             attendeeEmail: booking.customerEmail,
             phone: booking.customerPhone,
@@ -258,7 +267,11 @@ export default function App() {
           const newTickets = list.map(b => ({
             ticketId: b.bookingRef,
             eventTitle: b.eventTitle,
-            venue: 'Confirmed Venue',
+            venue: b.venueName || 'Arts Council of Pakistan, Karachi',
+            date: b.showDate || b.eventDate || 'Saturday, 10th January 2027',
+            time: b.showTime || b.showTitle || '08:00 PM PKT',
+            showTitle: b.showTitle || 'Main Show Slot',
+            showDateTime: (b.showDate && b.showTime) ? `${b.showDate} at ${b.showTime}` : (b.showDate || b.showTime || 'Saturday, 10th January 2027 at 08:00 PM PKT'),
             attendeeName: b.customerName,
             attendeeEmail: b.customerEmail,
             phone: b.customerPhone,
@@ -455,18 +468,49 @@ export default function App() {
   const sortedEvents = useMemo(() => {
     const needle = debouncedSearch.trim().toLowerCase();
     const citySel = selectedCity.toLowerCase();
-    const tagSel = selectedTag.toLowerCase();
+    const tagSel = selectedTag.toLowerCase().trim();
 
     const filtered = events.filter((ev) => {
       const matchCity = selectedCity === 'All Cities' || (ev.city && ev.city.toLowerCase() === citySel);
 
       let matchTag = true;
       if (selectedTag !== 'All') {
+        const evTagNames = [];
+        
+        if (ev.tag) {
+          if (typeof ev.tag === 'string') evTagNames.push(ev.tag);
+          else if (typeof ev.tag === 'object' && ev.tag.name) evTagNames.push(ev.tag.name);
+        }
+        
+        if (ev.category) {
+          if (typeof ev.category === 'string') evTagNames.push(ev.category);
+          else if (typeof ev.category === 'object' && ev.category.name) evTagNames.push(ev.category.name);
+        }
+
+        if (ev.categoryName) {
+          evTagNames.push(String(ev.categoryName));
+        }
+
         const rawTags = ev.tags || ev.eventTags || [];
-        matchTag = rawTags.some(t => {
-          const tObj = (typeof t === 'object' && t.tag) ? t.tag : t;
-          const tName = (typeof tObj === 'string' ? tObj : (tObj.name || tObj.slug || '')).toLowerCase();
-          return tName === tagSel;
+        if (Array.isArray(rawTags)) {
+          rawTags.forEach(t => {
+            if (typeof t === 'string') evTagNames.push(t);
+            else if (typeof t === 'object' && t !== null) {
+              if (t.name) evTagNames.push(t.name);
+              if (t.tagName) evTagNames.push(t.tagName);
+              if (t.tag && typeof t.tag === 'string') evTagNames.push(t.tag);
+              if (t.tag && typeof t.tag === 'object' && t.tag.name) evTagNames.push(t.tag.name);
+            }
+          });
+        }
+
+        if (Array.isArray(ev.tagNames)) {
+          ev.tagNames.forEach(t => typeof t === 'string' && evTagNames.push(t));
+        }
+
+        matchTag = evTagNames.some(name => {
+          const n = String(name).toLowerCase().trim();
+          return n === tagSel || n.includes(tagSel) || tagSel.includes(n);
         });
       }
 
@@ -520,6 +564,7 @@ export default function App() {
             {/* Filter Bar */}
             <EventFilterBar
               tags={tags}
+              events={events}
               cities={cities}
               selectedTag={selectedTag}
               onSelectTag={setSelectedTag}
@@ -628,142 +673,18 @@ export default function App() {
           </Suspense>
         )}
 
-        {/* View: My Tickets Dashboard */}
+        {/* View: Attendee Dashboard & E-Tickets */}
         {activeView === 'my-tickets' && (
-          <div className="container" style={{ padding: '2rem 1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
-              <div>
-                <span className="badge badge-live" style={{ marginBottom: '0.5rem' }}>MY PURCHASES & SAVED PASSES</span>
-                <h1 style={{ fontSize: '2.2rem', fontWeight: 800, color: '#fff' }}>My Digital Tickets</h1>
-                <p style={{ color: '#94a3b8' }}>
-                  Access all your purchased E-Tickets, QR pass codes, and gatekeeper verification receipts.
-                </p>
-              </div>
-
-              {purchasedTickets.length > 0 && (
-                <button
-                  onClick={handleClearAllTickets}
-                  className="btn"
-                  style={{
-                    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                    color: '#f87171',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    padding: '0.6rem 1.2rem',
-                    fontSize: '0.88rem'
-                  }}
-                >
-                  <Trash2 size={16} /> Remove All Tickets ({purchasedTickets.length})
-                </button>
-              )}
-            </div>
-
-            {/* Ticket Lookup Bar */}
-            <form onSubmit={handleLookupTickets} style={{ marginBottom: '2rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: '280px', position: 'relative' }}>
-                <Search size={18} color="#94a3b8" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} />
-                <input
-                  type="text"
-                  placeholder="Look up passes by Email Address or Booking Reference (e.g. EVL-123456)..."
-                  value={ticketLookupQuery}
-                  onChange={(e) => setTicketLookupQuery(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.85rem 1rem 0.85rem 2.8rem',
-                    background: 'rgba(15, 23, 42, 0.7)',
-                    border: '1px solid rgba(59, 130, 246, 0.3)',
-                    borderRadius: '12px',
-                    color: '#fff',
-                    outline: 'none',
-                    fontSize: '0.9rem'
-                  }}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={isLookingUpTicket}
-                className="btn btn-primary"
-                style={{ padding: '0.85rem 1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
-              >
-                <RefreshCw size={16} className={isLookingUpTicket ? 'animate-spin' : ''} />
-                {isLookingUpTicket ? 'Searching...' : 'Find Passes'}
-              </button>
-            </form>
-
-            {purchasedTickets.length === 0 ? (
-              <div className="glass-card" style={{ padding: '4rem 2rem', textAlign: 'center' }}>
-                <Ticket size={48} color="#3b82f6" style={{ margin: '0 auto 1rem' }} />
-                <h3 style={{ fontSize: '1.3rem', color: '#fff', marginBottom: '0.5rem' }}>No active tickets purchased yet</h3>
-                <p style={{ color: '#94a3b8', marginBottom: '1.5rem' }}>
-                  Explore Pakistan's top concerts, comedy nights, and festivals to get your passes!
-                </p>
-                <button onClick={() => setActiveView('explore')} className="btn btn-primary">
-                  Browse Upcoming Events
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-                {purchasedTickets.map((t) => (
-                  <div key={t.ticketId} className="glass-card" style={{ padding: '1.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
-                      <span className="badge badge-live">CONFIRMED PASS</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{t.ticketId}</span>
-                        <button
-                          onClick={() => handleRemoveTicket(t.ticketId)}
-                          title="Delete ticket pass"
-                          style={{
-                            background: 'rgba(239, 68, 68, 0.15)',
-                            border: 'none',
-                            color: '#f87171',
-                            borderRadius: '6px',
-                            padding: '4px 8px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '0.75rem'
-                          }}
-                        >
-                          <Trash2 size={13} /> Delete
-                        </button>
-                      </div>
-                    </div>
-
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', marginBottom: '0.35rem' }}>
-                      {t.eventTitle}
-                    </h3>
-                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1rem' }}>
-                      <MapPin size={14} color="#3b82f6" style={{ display: 'inline', marginRight: '4px' }} />
-                      {t.venue}
-                    </div>
-
-                    <div style={{ backgroundColor: 'rgba(0,0,0,0.3)', padding: '0.75rem', borderRadius: '10px', fontSize: '0.82rem', marginBottom: '1.25rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1', marginBottom: '0.25rem' }}>
-                        <span>Pass Holder:</span>
-                        <strong style={{ color: '#fff' }}>{t.attendeeName}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1', marginBottom: '0.25rem' }}>
-                        <span>Seats/Tiers:</span>
-                        <strong style={{ color: '#60a5fa' }}>{t.seats.map((s) => s.label || (typeof s.id === 'string' ? s.id.split('-').pop() : s.id)).join(', ')}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1' }}>
-                        <span>Amount Paid:</span>
-                        <strong style={{ color: '#fff' }}>PKR {t.totalPaid.toLocaleString()}</strong>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => setActiveTicketView(t)}
-                      className="btn btn-primary"
-                      style={{ width: '100%', fontSize: '0.88rem' }}
-                    >
-                      <Ticket size={16} /> View E-Ticket & QR Pass
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <AttendeeDashboard
+            currentUser={currentUser}
+            purchasedTickets={purchasedTickets}
+            savedEvents={savedEvents}
+            onViewTicket={(ticket) => setActiveTicketView(ticket)}
+            onRemoveTicket={handleRemoveTicket}
+            onLookupTickets={handleLookupTickets}
+            onBrowseEvents={() => setActiveView('explore')}
+            onSelectEvent={handleSelectEventForDetail}
+          />
         )}
         {/* View: Admin Console Dashboard */}
         {activeView === 'admin' && (

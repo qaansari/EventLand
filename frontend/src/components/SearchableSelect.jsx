@@ -67,8 +67,8 @@ export default function SearchableSelect({
         style={{
           width: '100%',
           padding: '0.7rem 0.9rem',
-          backgroundColor: 'rgba(15, 23, 42, 0.75)',
-          border: isOpen ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.12)',
+          backgroundColor: 'rgba(13, 30, 43, 0.75)',
+          border: isOpen ? '1px solid #0d9488' : '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '10px',
           color: selectedOption ? '#f8fafc' : '#94a3b8',
           fontSize: '0.875rem',
@@ -78,13 +78,13 @@ export default function SearchableSelect({
           justifyContent: 'space-between',
           gap: '0.5rem',
           cursor: disabled ? 'not-allowed' : 'pointer',
-          boxShadow: isOpen ? '0 0 12px rgba(59, 130, 246, 0.25)' : 'none',
+          boxShadow: isOpen ? '0 0 12px rgba(13, 148, 136, 0.3)' : 'none',
           backdropFilter: 'blur(8px)',
           transition: 'all 0.2s ease'
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-          {LeadingIcon && <LeadingIcon size={16} color="#60a5fa" />}
+          {LeadingIcon && <LeadingIcon size={16} color="#2dd4bf" />}
           <span>{selectedOption ? selectedOption.label : placeholder}</span>
         </div>
         <ChevronDown
@@ -118,11 +118,11 @@ export default function SearchableSelect({
             left: 0,
             right: 0,
             zIndex: 9999,
-            backgroundColor: 'rgba(10, 16, 31, 0.95)',
-            border: '1px solid rgba(59, 130, 246, 0.3)',
+            backgroundColor: 'rgba(9, 23, 33, 0.95)',
+            border: '1px solid rgba(13, 148, 136, 0.35)',
             borderRadius: '12px',
             backdropFilter: 'blur(16px)',
-            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.6), 0 0 15px rgba(59, 130, 246, 0.15)',
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.7), 0 0 15px rgba(13, 148, 136, 0.2)',
             overflow: 'hidden',
             animation: 'fadeIn 0.15s ease'
           }}
@@ -135,10 +135,10 @@ export default function SearchableSelect({
               display: 'flex',
               alignItems: 'center',
               gap: '0.4rem',
-              backgroundColor: 'rgba(15, 23, 42, 0.6)'
+              backgroundColor: 'rgba(13, 30, 43, 0.6)'
             }}
           >
-            <Search size={14} color="#3b82f6" />
+            <Search size={14} color="#0d9488" />
             <input
               type="text"
               autoFocus
@@ -185,8 +185,8 @@ export default function SearchableSelect({
                       borderRadius: '8px',
                       fontSize: '0.85rem',
                       fontWeight: isSelected ? 600 : 400,
-                      color: isSelected ? '#60a5fa' : '#e2e8f0',
-                      backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
+                      color: isSelected ? '#2dd4bf' : '#e2e8f0',
+                      backgroundColor: isSelected ? 'rgba(13, 148, 136, 0.2)' : 'transparent',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
@@ -201,7 +201,7 @@ export default function SearchableSelect({
                     }}
                   >
                     <span>{opt.label}</span>
-                    {isSelected && <Check size={14} color="#60a5fa" />}
+                    {isSelected && <Check size={14} color="#2dd4bf" />}
                   </div>
                 );
               })

@@ -34,11 +34,11 @@ export default function Navbar({
       position: 'sticky',
       top: 0,
       zIndex: 50,
-      backgroundColor: 'rgba(7, 12, 24, 0.94)',
+      backgroundColor: 'rgba(6, 16, 23, 0.94)',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
-      borderBottom: '1px solid rgba(59, 130, 246, 0.18)',
-      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)'
+      borderBottom: '1px solid rgba(13, 148, 136, 0.25)',
+      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)'
     }}>
       <div className="container" style={{
         display: 'flex',
@@ -68,10 +68,10 @@ export default function Navbar({
             src="/logo-icon.png"
             alt="EventLand Logo"
             style={{
-              height: '42px',
+              height: '44px',
               width: 'auto',
               objectFit: 'contain',
-              filter: 'drop-shadow(0 0 10px rgba(59, 130, 246, 0.4))',
+              filter: 'drop-shadow(0 0 12px rgba(13, 148, 136, 0.5))',
               flexShrink: 0
             }}
           />
@@ -79,19 +79,19 @@ export default function Navbar({
             <div style={{
               fontFamily: 'var(--font-display)',
               fontSize: '1.4rem',
-              fontWeight: 800,
+              fontWeight: 900,
               letterSpacing: '-0.02em',
               color: '#fff',
               lineHeight: 1.1,
               whiteSpace: 'nowrap'
             }}>
-              EVENT <span style={{ color: '#3b82f6' }}>LAND</span>
+              EVENT <span style={{ color: '#10b981' }}>LAND</span>
             </div>
             <div style={{
               fontFamily: 'var(--font-body)',
               fontSize: '0.58rem',
-              color: '#94a3b8',
-              fontWeight: 700,
+              color: '#d9a05b',
+              fontWeight: 800,
               letterSpacing: '0.12em',
               textTransform: 'uppercase',
               whiteSpace: 'nowrap',
@@ -131,7 +131,7 @@ export default function Navbar({
                 width: '100%',
                 backgroundColor: 'rgba(255, 255, 255, 0.06)',
                 color: '#f8fafc',
-                border: '1px solid rgba(59, 130, 246, 0.25)',
+                border: '1px solid rgba(13, 148, 136, 0.25)',
                 borderRadius: '9999px',
                 padding: '0.5rem 1rem 0.5rem 2.2rem',
                 fontSize: '0.85rem',
@@ -154,8 +154,8 @@ export default function Navbar({
             onClick={() => handleNavClick('explore')}
             className={`btn ${activeView === 'explore' ? 'btn-secondary' : ''}`}
             style={{
-              background: activeView === 'explore' ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
-              color: activeView === 'explore' ? '#60a5fa' : '#cbd5e1',
+              background: activeView === 'explore' ? 'rgba(13, 148, 136, 0.18)' : 'transparent',
+              color: activeView === 'explore' ? '#2dd4bf' : '#cbd5e1',
               fontSize: '0.88rem',
               padding: '0.55rem 0.9rem'
             }}
@@ -167,8 +167,8 @@ export default function Navbar({
             onClick={() => handleNavClick('artists')}
             className="btn"
             style={{
-              background: activeView === 'artists' ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
-              color: activeView === 'artists' ? '#60a5fa' : '#cbd5e1',
+              background: activeView === 'artists' ? 'rgba(13, 148, 136, 0.18)' : 'transparent',
+              color: activeView === 'artists' ? '#2dd4bf' : '#cbd5e1',
               fontSize: '0.88rem',
               padding: '0.55rem 0.9rem'
             }}
@@ -195,8 +195,8 @@ export default function Navbar({
             className="btn"
             style={{
               position: 'relative',
-              background: activeView === 'my-tickets' ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
-              color: activeView === 'my-tickets' ? '#60a5fa' : '#cbd5e1',
+              background: activeView === 'my-tickets' ? 'rgba(13, 148, 136, 0.18)' : 'transparent',
+              color: activeView === 'my-tickets' ? '#2dd4bf' : '#cbd5e1',
               fontSize: '0.88rem',
               padding: '0.55rem 0.9rem'
             }}
@@ -207,7 +207,7 @@ export default function Navbar({
                 position: 'absolute',
                 top: '2px',
                 right: '2px',
-                backgroundColor: '#2563eb',
+                backgroundColor: '#059669',
                 color: '#ffffff',
                 borderRadius: '50%',
                 width: '18px',
@@ -243,15 +243,15 @@ export default function Navbar({
               onClick={() => handleNavClick('organizer')}
               className="btn"
               style={{
-                background: activeView === 'organizer' ? 'rgba(59, 130, 246, 0.25)' : 'rgba(59, 130, 246, 0.15)',
-                color: '#60a5fa',
-                border: '1px solid rgba(59, 130, 246, 0.4)',
+                background: activeView === 'organizer' ? 'rgba(13, 148, 136, 0.25)' : 'rgba(13, 148, 136, 0.15)',
+                color: '#2dd4bf',
+                border: '1px solid rgba(13, 148, 136, 0.4)',
                 fontSize: '0.85rem',
                 padding: '0.5rem 0.9rem',
                 fontWeight: 700
               }}
             >
-              <Building2 size={15} color="#60a5fa" /> Organizer Portal
+              <Building2 size={15} color="#2dd4bf" /> Organizer Portal
             </button>
           )}
 
@@ -288,13 +288,13 @@ export default function Navbar({
                 backgroundColor: currentUser.role === 'admin' 
                   ? 'rgba(139, 92, 246, 0.15)' 
                   : currentUser.role === 'organizer' 
-                  ? 'rgba(59, 130, 246, 0.15)' 
-                  : 'rgba(59, 130, 246, 0.15)',
+                  ? 'rgba(13, 148, 136, 0.15)' 
+                  : 'rgba(13, 148, 136, 0.15)',
                 border: currentUser.role === 'admin' 
                   ? '1px solid rgba(139, 92, 246, 0.35)' 
                   : currentUser.role === 'organizer' 
-                  ? '1px solid rgba(59, 130, 246, 0.35)' 
-                  : '1px solid rgba(59, 130, 246, 0.35)',
+                  ? '1px solid rgba(13, 148, 136, 0.35)' 
+                  : '1px solid rgba(13, 148, 136, 0.35)',
                 color: '#fff',
                 borderRadius: '9999px',
                 padding: '0.45rem 0.85rem',
@@ -307,9 +307,9 @@ export default function Navbar({
                 {currentUser.role === 'admin' ? (
                   <ShieldCheck size={13} color="#c084fc" />
                 ) : currentUser.role === 'organizer' ? (
-                  <Building2 size={13} color="#60a5fa" />
+                  <Building2 size={13} color="#2dd4bf" />
                 ) : (
-                  <User size={13} color="#60a5fa" />
+                  <User size={13} color="#2dd4bf" />
                 )}
                 {(currentUser?.name || currentUser?.fullName || 'User').split(' ')[0]}
               </span>
@@ -349,7 +349,7 @@ export default function Navbar({
           className="mobile-only"
           style={{
             background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(59, 130, 246, 0.3)',
+            border: '1px solid rgba(13, 148, 136, 0.3)',
             color: '#fff',
             borderRadius: '10px',
             padding: '0.5rem',
@@ -358,7 +358,7 @@ export default function Navbar({
             justifyContent: 'center'
           }}
         >
-          {isMobileMenuOpen ? <X size={24} color="#3b82f6" /> : <Menu size={24} color="#ffffff" />}
+          {isMobileMenuOpen ? <X size={24} color="#0d9488" /> : <Menu size={24} color="#ffffff" />}
         </button>
       </div>
 
@@ -367,7 +367,7 @@ export default function Navbar({
         <div className="mobile-only animate-slide-down" style={{
           flexDirection: 'column',
           backgroundColor: '#0b1328',
-          borderBottom: '1px solid rgba(59, 130, 246, 0.3)',
+          borderBottom: '1px solid rgba(13, 148, 136, 0.3)',
           padding: '1.25rem 1rem',
           gap: '1rem'
         }}>
@@ -384,7 +384,7 @@ export default function Navbar({
                   width: '100%',
                   backgroundColor: '#16233f',
                   color: '#fff',
-                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  border: '1px solid rgba(13, 148, 136, 0.25)',
                   borderRadius: '10px',
                   padding: '0.65rem 1rem 0.65rem 2.3rem',
                   fontSize: '0.9rem',
@@ -411,7 +411,7 @@ export default function Navbar({
               className="btn btn-secondary"
               style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
             >
-              <Calendar size={18} color="#3b82f6" /> Explore Events
+              <Calendar size={18} color="#0d9488" /> Explore Events
             </button>
 
             <button
@@ -419,7 +419,7 @@ export default function Navbar({
               className="btn btn-secondary"
               style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
             >
-              <Music size={18} color="#3b82f6" /> Artists Bookings
+              <Music size={18} color="#0d9488" /> Artists Bookings
             </button>
 
             <button
@@ -435,7 +435,7 @@ export default function Navbar({
               className="btn btn-secondary"
               style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
             >
-              <User size={18} color="#3b82f6" /> My Digital Tickets ({savedTicketsCount})
+              <User size={18} color="#0d9488" /> My Digital Tickets ({savedTicketsCount})
             </button>
 
             {currentUser && (currentUser.role === 'organizer' || currentUser.role === 'admin') && (
@@ -444,7 +444,7 @@ export default function Navbar({
                 className="btn btn-secondary"
                 style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
               >
-                <Building2 size={18} color="#3b82f6" /> Organizer Portal
+                <Building2 size={18} color="#0d9488" /> Organizer Portal
               </button>
             )}
 
@@ -454,7 +454,7 @@ export default function Navbar({
                 className="btn btn-secondary"
                 style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
               >
-                <ShieldCheck size={18} color="#3b82f6" /> Admin Console
+                <ShieldCheck size={18} color="#0d9488" /> Admin Console
               </button>
             )}
 

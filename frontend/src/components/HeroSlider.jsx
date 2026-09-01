@@ -49,8 +49,8 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
         maxHeight: '480px',
         borderRadius: '24px',
         overflow: 'hidden',
-        boxShadow: '0 25px 50px -15px rgba(0, 0, 0, 0.85), 0 0 30px rgba(59, 130, 246, 0.25)',
-        border: '1px solid rgba(59, 130, 246, 0.35)',
+        boxShadow: '0 25px 50px -15px rgba(0, 0, 0, 0.85), 0 0 30px rgba(13, 148, 136, 0.25)',
+        border: '1px solid rgba(13, 148, 136, 0.35)',
         backgroundColor: '#060a14'
       }}>
         {/* Animated Ken Burns Background Image */}
@@ -138,11 +138,11 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
               fontWeight: 500
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                <Calendar size={16} color="#60a5fa" />
+                <Calendar size={16} color="#2dd4bf" />
                 <span>{dateLabel}{timeLabel ? ` (${timeLabel})` : ''}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                <MapPin size={16} color="#60a5fa" />
+                <MapPin size={16} color="#2dd4bf" />
                 <span>{current?.venue ? String(current.venue).split(',')[0] : (current?.cityName || current?.city || 'Arts Council of Pakistan')}</span>
               </div>
             </div>
@@ -180,7 +180,7 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
                 top: '50%',
                 transform: 'translateY(-50%)',
                 background: 'rgba(11, 19, 40, 0.75)',
-                border: '1px solid rgba(59, 130, 246, 0.35)',
+                border: '1px solid rgba(13, 148, 136, 0.35)',
                 color: '#ffffff',
                 borderRadius: '50%',
                 width: '44px',
@@ -194,12 +194,12 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
                 boxShadow: '0 8px 20px rgba(0,0,0,0.5)'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.8)';
+                e.currentTarget.style.borderColor = 'rgba(13, 148, 136, 0.8)';
                 e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
-                e.currentTarget.style.boxShadow = '0 0 15px rgba(59, 130, 246, 0.5)';
+                e.currentTarget.style.boxShadow = '0 0 15px rgba(13, 148, 136, 0.5)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.35)';
+                e.currentTarget.style.borderColor = 'rgba(13, 148, 136, 0.35)';
                 e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
                 e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.5)';
               }}
@@ -216,7 +216,7 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
                 top: '50%',
                 transform: 'translateY(-50%)',
                 background: 'rgba(11, 19, 40, 0.75)',
-                border: '1px solid rgba(59, 130, 246, 0.35)',
+                border: '1px solid rgba(13, 148, 136, 0.35)',
                 color: '#ffffff',
                 borderRadius: '50%',
                 width: '44px',
@@ -230,12 +230,12 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
                 boxShadow: '0 8px 20px rgba(0,0,0,0.5)'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.8)';
+                e.currentTarget.style.borderColor = 'rgba(13, 148, 136, 0.8)';
                 e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
-                e.currentTarget.style.boxShadow = '0 0 15px rgba(59, 130, 246, 0.5)';
+                e.currentTarget.style.boxShadow = '0 0 15px rgba(13, 148, 136, 0.5)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.35)';
+                e.currentTarget.style.borderColor = 'rgba(13, 148, 136, 0.35)';
                 e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
                 e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.5)';
               }}
@@ -264,11 +264,11 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
                       height: '8px',
                       width: isActive ? '36px' : '10px',
                       borderRadius: '9999px',
-                      backgroundColor: isActive ? '#3b82f6' : 'rgba(255, 255, 255, 0.25)',
+                      backgroundColor: isActive ? '#0d9488' : 'rgba(255, 255, 255, 0.25)',
                       border: 'none',
                       cursor: 'pointer',
                       transition: 'all 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-                      boxShadow: isActive ? '0 0 12px rgba(59, 130, 246, 0.7)' : 'none',
+                      boxShadow: isActive ? '0 0 12px rgba(13, 148, 136, 0.7)' : 'none',
                       position: 'relative',
                       overflow: 'hidden'
                     }}
@@ -279,7 +279,7 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
                         style={{
                           position: 'absolute',
                           inset: 0,
-                          backgroundColor: '#60a5fa',
+                          backgroundColor: '#2dd4bf',
                           animation: 'heroProgressBar 6s linear infinite'
                         }}
                       />

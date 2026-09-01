@@ -87,7 +87,7 @@ function FileUploadField({ label, value, onChange, placeholder = "Image URL or u
         />
         <label style={{
           padding: '0.75rem 1rem',
-          background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+          background: 'linear-gradient(135deg, #0d9488, #0f766e)',
           borderRadius: '8px',
           color: '#fff',
           fontWeight: 600,
@@ -106,7 +106,7 @@ function FileUploadField({ label, value, onChange, placeholder = "Image URL or u
       {value && (
         <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <img src={value} alt="Preview" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.2)' }} onError={(e) => e.target.style.display = 'none'} />
-          <span style={{ fontSize: '0.75rem', color: '#60a5fa' }}>✓ Image ready</span>
+          <span style={{ fontSize: '0.75rem', color: '#2dd4bf' }}>✓ Image ready</span>
         </div>
       )}
     </div>
@@ -1606,7 +1606,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <ShieldCheck size={32} color="#3b82f6" /> Super Admin Control Hub
+            <ShieldCheck size={32} color="#0d9488" /> Super Admin Control Hub
           </h1>
           <p style={{ color: '#94a3b8', marginTop: '0.25rem' }}>
             Full CRUD Management for Events, Organizers, Artists, Bookings, Ticket Tiers, Users, Roles & Tags with Integrated Image Upload
@@ -1643,7 +1643,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'events' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'events' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1661,7 +1661,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'organizers' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'organizers' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1679,7 +1679,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'artists' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'artists' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1697,7 +1697,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'bookings' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'bookings' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1715,7 +1715,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'users' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'users' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1733,7 +1733,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'roles' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'roles' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1751,7 +1751,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'auditoriums' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'auditoriums' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1769,7 +1769,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'venues' ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'venues' ? 'linear-gradient(135deg, #0d9488, #059669)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1787,7 +1787,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'cities' ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'cities' ? 'linear-gradient(135deg, #0d9488, #059669)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1805,7 +1805,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'countries' ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'countries' ? 'linear-gradient(135deg, #0d9488, #059669)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1823,7 +1823,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'tags' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'tags' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1841,7 +1841,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'faqs' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'faqs' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1862,7 +1862,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'footer-info' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'footer-info' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1880,7 +1880,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'payment-fees' ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'payment-fees' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -1901,13 +1901,13 @@ export default function AdminDashboard({ onSelectEvent }) {
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button
                 onClick={() => { setTierForm(defaultTierForm); setShowTierModal(true); }}
-                style={{ padding: '0.6rem 1rem', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', color: '#60a5fa', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                style={{ padding: '0.6rem 1rem', borderRadius: '8px', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', color: '#2dd4bf', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
               >
                 <Plus size={16} /> Add Ticket Tier
               </button>
               <button
                 onClick={() => { setEventForm(defaultEventForm); setShowEventModal(true); }}
-                style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
               >
                 <Plus size={16} /> Create Event
               </button>
@@ -1934,7 +1934,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                         <div>
                           <div style={{ color: '#f8fafc', fontWeight: 600 }}>{ev.title}</div>
                           {ev.shows && ev.shows.length > 0 && (
-                            <span style={{ fontSize: '0.7rem', color: '#60a5fa', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '0.1rem 0.4rem', borderRadius: '4px', marginTop: '0.2rem', display: 'inline-block', fontWeight: 600 }}>
+                            <span style={{ fontSize: '0.7rem', color: '#2dd4bf', background: 'rgba(13, 148, 136, 0.15)', border: '1px solid rgba(13, 148, 136, 0.3)', padding: '0.1rem 0.4rem', borderRadius: '4px', marginTop: '0.2rem', display: 'inline-block', fontWeight: 600 }}>
                               {ev.shows.length} Show{ev.shows.length > 1 ? 's' : ''}
                             </span>
                           )}
@@ -1948,7 +1948,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button
                           onClick={() => handleEditEvent(ev)}
-                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '6px', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                         >
                           <Edit3 size={14} /> Edit
                         </button>
@@ -1975,7 +1975,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>Organizers Directory</h3>
             <button
               onClick={() => { setOrgForm(defaultOrgForm); setShowOrgModal(true); }}
-              style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <Plus size={16} /> Add Organizer
             </button>
@@ -2009,13 +2009,13 @@ export default function AdminDashboard({ onSelectEvent }) {
                     </td>
                     <td style={{ padding: '1rem', color: '#94a3b8' }}>{org.email}</td>
                     <td style={{ padding: '1rem', color: '#94a3b8' }}>{org.phone}</td>
-                    <td style={{ padding: '1rem', color: '#60a5fa' }}>
+                    <td style={{ padding: '1rem', color: '#2dd4bf' }}>
                       {(org.websiteUrl || org.WebsiteUrl) ? (
                         <a 
                           href={(org.websiteUrl || org.WebsiteUrl).startsWith('http') ? (org.websiteUrl || org.WebsiteUrl) : `https://${org.websiteUrl || org.WebsiteUrl}`} 
                           target="_blank" 
                           rel="noreferrer" 
-                          style={{ color: '#60a5fa', textDecoration: 'underline', fontWeight: 500 }}
+                          style={{ color: '#2dd4bf', textDecoration: 'underline', fontWeight: 500 }}
                         >
                           {(org.websiteUrl || org.WebsiteUrl).replace(/^https?:\/\//, '')} ↗
                         </a>
@@ -2027,7 +2027,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button
                           onClick={() => handleEditOrganizer(org)}
-                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '6px', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                         >
                           <Edit3 size={14} /> Edit
                         </button>
@@ -2113,7 +2113,7 @@ export default function AdminDashboard({ onSelectEvent }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Ticket size={22} color="#3b82f6" /> Issued Bookings & E-Tickets Log
+                <Ticket size={22} color="#0d9488" /> Issued Bookings & E-Tickets Log
               </h3>
               <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.2rem' }}>
                 Filter customer bookings by Event and Show Slot, preview QR passes, and export official PDF E-Tickets.
@@ -2131,7 +2131,7 @@ export default function AdminDashboard({ onSelectEvent }) {
           </div>
 
           {/* Filtering Bar */}
-          <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '14px', padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'center' }}>
+          <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(13, 148, 136, 0.2)', borderRadius: '14px', padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'center' }}>
             {/* Search Input */}
             <div style={{ position: 'relative' }}>
               <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
@@ -2288,6 +2288,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                       date: dateStr || 'Saturday, 10th January 2027',
                       time: timeStr || '08:00 PM PKT',
                       showTitle: matchedShow?.showTitle || b.showTitle || 'Main Show Slot',
+                      showDateTime: (dateStr && timeStr) ? `${dateStr} at ${timeStr}` : (dateStr || timeStr || 'Saturday, 10th January 2027 at 08:00 PM PKT'),
                       attendeeName: b.customerName || 'Customer',
                       attendeeEmail: b.customerEmail || '',
                       phone: b.customerPhone || '',
@@ -2303,7 +2304,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                     return (
                       <tr key={b.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
                         <td style={{ padding: '1rem', color: '#f8fafc', fontWeight: 600 }}>
-                          <span style={{ color: '#38bdf8' }}>#{ticketObj.ticketId}</span>
+                          <span style={{ color: '#2dd4bf' }}>#{ticketObj.ticketId}</span>
                           <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{ticketObj.bookingTime || 'Direct Booking'}</div>
                         </td>
 
@@ -2315,18 +2316,18 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                         <td style={{ padding: '1rem', color: '#94a3b8' }}>
                           <div style={{ fontWeight: 600, color: '#fff' }}>{ticketObj.eventTitle}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#38bdf8' }}>
+                          <div style={{ fontSize: '0.75rem', color: '#2dd4bf' }}>
                             {ticketObj.showTitle ? `Slot: ${ticketObj.showTitle}` : ticketObj.date}
                           </div>
                         </td>
 
-                        <td style={{ padding: '1rem', color: '#60a5fa', fontWeight: 700 }}>
+                        <td style={{ padding: '1rem', color: '#2dd4bf', fontWeight: 700 }}>
                           PKR {ticketObj.totalPaid.toLocaleString()}
                         </td>
 
                         <td style={{ padding: '1rem' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                            <span className="badge" style={{ backgroundColor: isPaid ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)', color: isPaid ? '#60a5fa' : '#fbbf24', fontWeight: 800, width: 'fit-content' }}>
+                            <span className="badge" style={{ backgroundColor: isPaid ? 'rgba(13, 148, 136, 0.2)' : 'rgba(245, 158, 11, 0.2)', color: isPaid ? '#2dd4bf' : '#fbbf24', fontWeight: 800, width: 'fit-content' }}>
                               {isPaid ? 'Paid & Confirmed' : 'Pending / Unpaid'}
                             </span>
                             <SearchableSelect
@@ -2347,7 +2348,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                                 exportTicketPdf(ticketObj);
                                 showSuccess('PDF Ticket Exported', `E-Ticket #${ticketObj.ticketId} downloaded successfully!`);
                               }}
-                              style={{ padding: '0.4rem 0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                              style={{ padding: '0.4rem 0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
                               title="Export Official PDF E-Ticket"
                             >
                               <Download size={13} /> PDF
@@ -2357,7 +2358,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                             <button
                               type="button"
                               onClick={() => setAdminPreviewTicket(ticketObj)}
-                              style={{ padding: '0.4rem 0.75rem', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '6px', color: '#60a5fa', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                              style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.15)', border: '1px solid rgba(13, 148, 136, 0.3)', borderRadius: '6px', color: '#2dd4bf', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
                               title="View Digital QR Pass Preview"
                             >
                               <Eye size={13} /> View Pass
@@ -2461,7 +2462,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>Database System Roles</h3>
             <button
               onClick={() => { setRoleForm(defaultRoleForm); setShowRoleModal(true); }}
-              style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <Plus size={16} /> Create Role
             </button>
@@ -2485,7 +2486,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button
                           onClick={() => handleEditRole(r)}
-                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '6px', color: '#60a5fa', cursor: 'pointer' }}
+                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer' }}
                         >
                           <Edit3 size={14} /> Edit
                         </button>
@@ -2512,7 +2513,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>Event Categories & Tags</h3>
             <button
               onClick={() => { setTagForm(defaultTagForm); setShowTagModal(true); }}
-              style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <Plus size={16} /> Create Tag
             </button>
@@ -2530,13 +2531,13 @@ export default function AdminDashboard({ onSelectEvent }) {
               <tbody>
                 {tagsList.map(t => (
                   <tr key={t.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                    <td style={{ padding: '1rem', fontWeight: 700, color: '#60a5fa' }}>{t.name}</td>
+                    <td style={{ padding: '1rem', fontWeight: 700, color: '#2dd4bf' }}>{t.name}</td>
                     <td style={{ padding: '1rem', color: '#94a3b8' }}>{t.slug}</td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button
                           onClick={() => handleEditTag(t)}
-                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '6px', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                         >
                           <Edit3 size={14} /> Edit
                         </button>
@@ -2566,7 +2567,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             </div>
             <button
               onClick={handleOpenNewAuditorium}
-              style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <Plus size={16} /> Add Auditorium Layout
             </button>
@@ -2574,14 +2575,14 @@ export default function AdminDashboard({ onSelectEvent }) {
 
           {auditoriumsList.length === 0 ? (
             <div className="glass-card" style={{ padding: '3rem 2rem', textAlign: 'center', borderRadius: '16px' }}>
-              <Grid size={48} color="#3b82f6" style={{ margin: '0 auto 1rem', opacity: 0.8 }} />
+              <Grid size={48} color="#0d9488" style={{ margin: '0 auto 1rem', opacity: 0.8 }} />
               <h4 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fff', marginBottom: '0.5rem' }}>No Auditorium Layouts In Database</h4>
               <p style={{ color: '#94a3b8', fontSize: '0.9rem', maxWidth: '480px', margin: '0 auto 1.5rem' }}>
                 You have not added any auditorium layouts yet. Click below to create your custom auditorium blueprint.
               </p>
               <button
                 onClick={handleOpenNewAuditorium}
-                style={{ padding: '0.65rem 1.5rem', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+                style={{ padding: '0.65rem 1.5rem', borderRadius: '8px', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
               >
                 + Create Your First Auditorium
               </button>
@@ -2592,7 +2593,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                 <div key={aud.id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <span className="badge" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', marginBottom: '0.35rem' }}>
+                      <span className="badge" style={{ backgroundColor: 'rgba(13, 148, 136, 0.15)', color: '#2dd4bf', border: '1px solid rgba(13, 148, 136, 0.3)', marginBottom: '0.35rem' }}>
                         {aud.city} • {aud.totalCapacity} Seats
                       </span>
                       <h4 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', marginTop: '0.2rem' }}>
@@ -2611,13 +2612,13 @@ export default function AdminDashboard({ onSelectEvent }) {
                   <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
                     <button
                       onClick={() => setPreviewAuditorium(aud)}
-                      style={{ padding: '0.5rem 0.85rem', background: 'rgba(59, 130, 246, 0.18)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '6px', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600 }}
+                      style={{ padding: '0.5rem 0.85rem', background: 'rgba(13, 148, 136, 0.18)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600 }}
                     >
                       <Eye size={14} /> Preview Chart
                     </button>
                     <button
                       onClick={() => handleEditAuditorium(aud)}
-                      style={{ flex: 1, padding: '0.5rem', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '6px', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600 }}
+                      style={{ flex: 1, padding: '0.5rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600 }}
                     >
                       <Edit3 size={14} /> Edit
                     </button>
@@ -2659,7 +2660,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                 });
                 setShowVenueModal(true);
               }}
-              style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <Plus size={18} /> Add New Venue
             </button>
@@ -2688,17 +2689,17 @@ export default function AdminDashboard({ onSelectEvent }) {
                       <tr key={v.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
                         <td style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>#{v.id}</td>
                         <td style={{ padding: '1rem', color: '#f8fafc', fontWeight: 600 }}>🏛️ {v.name}</td>
-                        <td style={{ padding: '1rem', color: '#38bdf8' }}>🏙️ {v.cityName || matchedCity?.name || 'Karachi'}</td>
+                        <td style={{ padding: '1rem', color: '#2dd4bf' }}>🏙️ {v.cityName || matchedCity?.name || 'Karachi'}</td>
                         <td style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.address || '—'}</td>
                         <td style={{ padding: '1rem', color: '#94a3b8' }}>{audCount} auditoriums</td>
                         <td style={{ padding: '1rem' }}>
-                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: v.isActive !== false ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: v.isActive !== false ? '#60a5fa' : '#f87171' }}>
+                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: v.isActive !== false ? 'rgba(13, 148, 136, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: v.isActive !== false ? '#2dd4bf' : '#f87171' }}>
                             {v.isActive !== false ? 'Active' : 'Inactive'}
                           </span>
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                            <button onClick={() => handleEditVenue(v)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(59, 130, 246, 0.2)', border: 'none', borderRadius: '6px', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Edit3 size={14} /> Edit</button>
+                            <button onClick={() => handleEditVenue(v)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(13, 148, 136, 0.2)', border: 'none', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Edit3 size={14} /> Edit</button>
                             <button onClick={() => handleDeleteVenue(v.id)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(239, 68, 68, 0.2)', border: 'none', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Trash2 size={14} /> Delete</button>
                           </div>
                         </td>
@@ -2727,7 +2728,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             </div>
             <button
               onClick={() => { setCityForm({ ...defaultCityForm, countryId: countriesList[0]?.id || 1000 }); setShowCityModal(true); }}
-              style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <Plus size={18} /> Add New City
             </button>
@@ -2758,13 +2759,13 @@ export default function AdminDashboard({ onSelectEvent }) {
                         <td style={{ padding: '1rem', color: '#94a3b8' }}>🌍 {c.countryName || matchedCountry?.name || 'Pakistan'}</td>
                         <td style={{ padding: '1rem', color: '#94a3b8' }}>{venueCount} venues</td>
                         <td style={{ padding: '1rem' }}>
-                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: c.isActive !== false ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: c.isActive !== false ? '#60a5fa' : '#f87171' }}>
+                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: c.isActive !== false ? 'rgba(13, 148, 136, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: c.isActive !== false ? '#2dd4bf' : '#f87171' }}>
                             {c.isActive !== false ? 'Active' : 'Inactive'}
                           </span>
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                            <button onClick={() => handleEditCity(c)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(59, 130, 246, 0.2)', border: 'none', borderRadius: '6px', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Edit3 size={14} /> Edit</button>
+                            <button onClick={() => handleEditCity(c)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(13, 148, 136, 0.2)', border: 'none', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Edit3 size={14} /> Edit</button>
                             <button onClick={() => handleDeleteCity(c.id)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(239, 68, 68, 0.2)', border: 'none', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Trash2 size={14} /> Delete</button>
                           </div>
                         </td>
@@ -2793,7 +2794,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             </div>
             <button
               onClick={() => { setCountryForm(defaultCountryForm); setShowCountryModal(true); }}
-              style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              style={{ padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '10px', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <Plus size={18} /> Add New Country
             </button>
@@ -2820,16 +2821,16 @@ export default function AdminDashboard({ onSelectEvent }) {
                       <tr key={c.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
                         <td style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>#{c.id}</td>
                         <td style={{ padding: '1rem', color: '#f8fafc', fontWeight: 600 }}>🌍 {c.name}</td>
-                        <td style={{ padding: '1rem', color: '#38bdf8', fontFamily: 'monospace', fontWeight: 700 }}>{c.code}</td>
+                        <td style={{ padding: '1rem', color: '#2dd4bf', fontFamily: 'monospace', fontWeight: 700 }}>{c.code}</td>
                         <td style={{ padding: '1rem', color: '#94a3b8' }}>{cityCount} cities</td>
                         <td style={{ padding: '1rem' }}>
-                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: c.isActive !== false ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: c.isActive !== false ? '#60a5fa' : '#f87171' }}>
+                          <span style={{ padding: '0.25rem 0.6rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600, background: c.isActive !== false ? 'rgba(13, 148, 136, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: c.isActive !== false ? '#2dd4bf' : '#f87171' }}>
                             {c.isActive !== false ? 'Active' : 'Inactive'}
                           </span>
                         </td>
                         <td style={{ padding: '1rem', textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                            <button onClick={() => handleEditCountry(c)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(59, 130, 246, 0.2)', border: 'none', borderRadius: '6px', color: '#60a5fa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Edit3 size={14} /> Edit</button>
+                            <button onClick={() => handleEditCountry(c)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(13, 148, 136, 0.2)', border: 'none', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Edit3 size={14} /> Edit</button>
                             <button onClick={() => handleDeleteCountry(c.id)} style={{ padding: '0.4rem 0.8rem', background: 'rgba(239, 68, 68, 0.2)', border: 'none', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Trash2 size={14} /> Delete</button>
                           </div>
                         </td>
@@ -2862,7 +2863,7 @@ export default function AdminDashboard({ onSelectEvent }) {
               style={{
                 padding: '0.65rem 1.25rem',
                 borderRadius: '8px',
-                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                background: 'linear-gradient(135deg, #0d9488, #0f766e)',
                 border: 'none',
                 color: '#fff',
                 fontWeight: 600,
@@ -2897,11 +2898,11 @@ export default function AdminDashboard({ onSelectEvent }) {
                     onDragEnd={handleFaqDragEnd}
                     style={{
                       background: isDragging 
-                        ? 'rgba(59, 130, 246, 0.15)' 
+                        ? 'rgba(13, 148, 136, 0.15)' 
                         : 'rgba(15, 23, 42, 0.6)',
                       border: isDragOver 
-                        ? '2px dashed #60a5fa' 
-                        : '1px solid rgba(59, 130, 246, 0.2)',
+                        ? '2px dashed #2dd4bf' 
+                        : '1px solid rgba(13, 148, 136, 0.2)',
                       borderRadius: '12px',
                       padding: '1.25rem',
                       display: 'flex',
@@ -2910,7 +2911,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                       opacity: isDragging ? 0.4 : 1,
                       cursor: 'grab',
                       transition: 'all 0.2s ease',
-                      boxShadow: isDragOver ? '0 0 15px rgba(59, 130, 246, 0.4)' : 'none'
+                      boxShadow: isDragOver ? '0 0 15px rgba(13, 148, 136, 0.4)' : 'none'
                     }}
                   >
                     {/* Drag Handle */}
@@ -2932,18 +2933,18 @@ export default function AdminDashboard({ onSelectEvent }) {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
                         <span style={{
                           background: '#1e293b',
-                          color: '#60a5fa',
+                          color: '#2dd4bf',
                           fontSize: '0.75rem',
                           fontWeight: 700,
                           padding: '0.25rem 0.6rem',
                           borderRadius: '6px',
-                          border: '1px solid rgba(59, 130, 246, 0.3)'
+                          border: '1px solid rgba(13, 148, 136, 0.3)'
                         }}>
                           Order #{faq.displayOrder ?? idx + 1}
                         </span>
                         <span style={{
-                          backgroundColor: faq.isActive !== false ? 'rgba(59, 130, 246, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                          color: faq.isActive !== false ? '#60a5fa' : '#f87171',
+                          backgroundColor: faq.isActive !== false ? 'rgba(13, 148, 136, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                          color: faq.isActive !== false ? '#2dd4bf' : '#f87171',
                           padding: '0.2rem 0.6rem',
                           borderRadius: '6px',
                           fontSize: '0.75rem',
@@ -2965,10 +2966,10 @@ export default function AdminDashboard({ onSelectEvent }) {
                         onClick={() => handleEditFaq(faq)}
                         style={{
                           padding: '0.4rem 0.8rem',
-                          background: 'rgba(59, 130, 246, 0.2)',
+                          background: 'rgba(13, 148, 136, 0.2)',
                           border: 'none',
                           borderRadius: '6px',
-                          color: '#60a5fa',
+                          color: '#2dd4bf',
                           cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
@@ -3006,11 +3007,11 @@ export default function AdminDashboard({ onSelectEvent }) {
 
       {/* --- TAB: PAYFAST GATEWAY FEES MANAGEMENT --- */}
       {activeAdminTab === 'payment-fees' && (
-        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '16px', padding: '2rem' }}>
+        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(13, 148, 136, 0.2)', borderRadius: '16px', padding: '2rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <CreditCard size={22} color="#3b82f6" /> PayFast Gateway Commission Fee Settings
+                <CreditCard size={22} color="#0d9488" /> PayFast Gateway Commission Fee Settings
               </h3>
               <p style={{ fontSize: '0.875rem', color: '#94a3b8', marginTop: '0.25rem' }}>
                 Dynamic commission percentages stored in database table <code>PaymentFeeConfigs</code>. Values are automatically reflected during customer checkout.
@@ -3020,13 +3021,13 @@ export default function AdminDashboard({ onSelectEvent }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
             {feeConfigsList.map(fee => (
-              <div key={fee.id} style={{ backgroundColor: '#0f172a', border: '1px solid rgba(59, 130, 246, 0.25)', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div key={fee.id} style={{ backgroundColor: '#0f172a', border: '1px solid rgba(13, 148, 136, 0.25)', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#38bdf8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#2dd4bf', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                       {fee.paymentMethodCode}
                     </span>
-                    <span className="badge" style={{ backgroundColor: fee.isActive ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: fee.isActive ? '#60a5fa' : '#f87171', fontWeight: 800 }}>
+                    <span className="badge" style={{ backgroundColor: fee.isActive ? 'rgba(13, 148, 136, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: fee.isActive ? '#2dd4bf' : '#f87171', fontWeight: 800 }}>
                       {fee.isActive ? 'Active' : 'Disabled'}
                     </span>
                   </div>
@@ -3038,7 +3039,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                   </p>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', backgroundColor: 'rgba(255,255,255,0.04)', padding: '0.75rem', borderRadius: '10px', marginBottom: '1rem' }}>
                     <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Commission Rate:</span>
-                    <strong style={{ fontSize: '1.4rem', color: '#60a5fa' }}>{fee.commissionPercentage}%</strong>
+                    <strong style={{ fontSize: '1.4rem', color: '#2dd4bf' }}>{fee.commissionPercentage}%</strong>
                   </div>
                 </div>
                 <button
@@ -3049,7 +3050,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                   }}
                   style={{
                     padding: '0.65rem',
-                    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                    background: 'linear-gradient(135deg, #0d9488, #059669)',
                     border: 'none',
                     borderRadius: '8px',
                     color: '#fff',
@@ -3075,7 +3076,7 @@ export default function AdminDashboard({ onSelectEvent }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <FileText size={22} color="#3b82f6" /> Footer Info Settings
+                <FileText size={22} color="#0d9488" /> Footer Info Settings
               </h3>
               <p style={{ fontSize: '0.875rem', color: '#94a3b8', marginTop: '0.25rem' }}>
                 Single-row site configuration stored in database table <code>FooterInfo</code>
@@ -3085,7 +3086,7 @@ export default function AdminDashboard({ onSelectEvent }) {
               onClick={() => setShowFooterModal(true)}
               style={{
                 padding: '0.75rem 1.5rem',
-                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                background: 'linear-gradient(135deg, #0d9488, #0f766e)',
                 border: 'none',
                 borderRadius: '10px',
                 color: '#fff',
@@ -3108,12 +3109,12 @@ export default function AdminDashboard({ onSelectEvent }) {
 
             <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
               <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>Phone</span>
-              <div style={{ fontSize: '1.1rem', color: '#3b82f6', fontWeight: 600, marginTop: '0.25rem' }}>{footerForm.phone || 'N/A'}</div>
+              <div style={{ fontSize: '1.1rem', color: '#0d9488', fontWeight: 600, marginTop: '0.25rem' }}>{footerForm.phone || 'N/A'}</div>
             </div>
 
             <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
               <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>Email</span>
-              <div style={{ fontSize: '1.1rem', color: '#3b82f6', fontWeight: 600, marginTop: '0.25rem' }}>{footerForm.email || 'N/A'}</div>
+              <div style={{ fontSize: '1.1rem', color: '#0d9488', fontWeight: 600, marginTop: '0.25rem' }}>{footerForm.email || 'N/A'}</div>
             </div>
 
             <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -3152,7 +3153,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
         return (
           <div className="modal-overlay" style={{ background: 'rgba(7, 11, 20, 0.82)', backdropFilter: 'blur(10px)', zIndex: 1000 }}>
-            <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '1100px', width: '95%', padding: '2.25rem', position: 'relative', maxHeight: '90vh', overflowY: 'auto', borderRadius: '20px', border: '1px solid rgba(59, 130, 246, 0.25)', boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(59, 130, 246, 0.15)', background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(7, 11, 20, 0.98))' }}>
+            <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '1100px', width: '95%', padding: '2.25rem', position: 'relative', maxHeight: '90vh', overflowY: 'auto', borderRadius: '20px', border: '1px solid rgba(13, 148, 136, 0.25)', boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(13, 148, 136, 0.15)', background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(7, 11, 20, 0.98))' }}>
               
               {/* Close Button */}
               <button
@@ -3165,7 +3166,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
               {/* Modal Header */}
               <div style={{ marginBottom: '1.75rem', paddingBottom: '1.25rem', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, rgba(59,130,246,0.25), rgba(37,99,235,0.45))', border: '1px solid rgba(59,130,246,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#60a5fa', boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, rgba(59,130,246,0.25), rgba(37,99,235,0.45))', border: '1px solid rgba(59,130,246,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2dd4bf', boxShadow: '0 4px 12px rgba(37,99,235,0.3)' }}>
                   <Calendar size={22} />
                 </div>
                 <div>
@@ -3185,7 +3186,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                     
                     {/* SECTION 1: Basic Event Information */}
                     <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2dd4bf', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <Tag size={15} /> 1. Basic Event Details
                       </div>
 
@@ -3228,7 +3229,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                     {/* SECTION 2: Location & Cascading Venue Details */}
                     <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2dd4bf', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <MapPin size={15} /> 2. Location & Venue Selection (Cascading Hierarchy)
                       </div>
 
@@ -3325,7 +3326,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                           <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Start Date & Time (PKT)</label>
                           <input type="datetime-local" value={eventForm.startDateUtc} onChange={e => setEventForm({ ...eventForm, startDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }} />
                           {eventForm.startDateUtc && !isNaN(new Date(eventForm.startDateUtc).getTime()) && (
-                            <span style={{ fontSize: '0.75rem', color: '#38bdf8', marginTop: '0.25rem', display: 'block' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#2dd4bf', marginTop: '0.25rem', display: 'block' }}>
                               📅 {new Date(eventForm.startDateUtc).toLocaleString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })} PKT
                             </span>
                           )}
@@ -3334,7 +3335,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                           <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>End Date & Time (PKT)</label>
                           <input type="datetime-local" value={eventForm.endDateUtc} onChange={e => setEventForm({ ...eventForm, endDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }} />
                           {eventForm.endDateUtc && !isNaN(new Date(eventForm.endDateUtc).getTime()) && (
-                            <span style={{ fontSize: '0.75rem', color: '#38bdf8', marginTop: '0.25rem', display: 'block' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#2dd4bf', marginTop: '0.25rem', display: 'block' }}>
                               📅 {new Date(eventForm.endDateUtc).toLocaleString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })} PKT
                             </span>
                           )}
@@ -3344,7 +3345,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div>
                           <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Starting Price (PKR)</label>
-                          <input type="number" value={eventForm.startingPrice} onChange={e => setEventForm({ ...eventForm, startingPrice: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#38bdf8', fontWeight: 700, fontSize: '0.9rem' }} />
+                          <input type="number" value={eventForm.startingPrice} onChange={e => setEventForm({ ...eventForm, startingPrice: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#2dd4bf', fontWeight: 700, fontSize: '0.9rem' }} />
                         </div>
                         <div>
                           <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Price Range Summary</label>
@@ -3372,15 +3373,15 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                       {/* Auditorium Seating Chart Selector (if Mapped Ticketing) */}
                       {eventForm.ticketingType === 'mapped' && (
-                        <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '12px', padding: '1rem', marginTop: '0.25rem' }}>
+                        <div style={{ background: 'rgba(13, 148, 136, 0.1)', border: '1px solid rgba(13, 148, 136, 0.3)', borderRadius: '12px', padding: '1rem', marginTop: '0.25rem' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                            <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <label style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2dd4bf', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                               <Grid size={16} /> Select Auditorium Seating Layout *
                             </label>
                             <button
                               type="button"
                               onClick={() => { setShowEventModal(false); setActiveAdminTab('auditoriums'); }}
-                              style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
+                              style={{ background: 'none', border: 'none', color: '#2dd4bf', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline' }}
                             >
                               Manage Auditoriums ↗
                             </button>
@@ -3423,11 +3424,11 @@ export default function AdminDashboard({ onSelectEvent }) {
                     </div>
 
                     {/* SECTION 5: Show Slots & Ticket Pricing */}
-                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
+                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '1.25rem', borderRadius: '14px', border: '1px solid rgba(13, 148, 136, 0.25)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                         <div>
                           <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <Ticket size={16} color="#60a5fa" /> Event Shows & Ticket Tier Pricing
+                            <Ticket size={16} color="#2dd4bf" /> Event Shows & Ticket Tier Pricing
                           </span>
                           <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
                             {eventForm.ticketingType === 'mapped' ? 'Set row-wise ticket prices (e.g. Row A, Rows B-E)' : 'Set category pass prices and stock limits'}
@@ -3452,7 +3453,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                             }];
                             setEventForm({ ...eventForm, shows: newShows });
                           }}
-                          style={{ padding: '0.45rem 0.85rem', borderRadius: '6px', background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', color: '#60a5fa', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                          style={{ padding: '0.45rem 0.85rem', borderRadius: '6px', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', color: '#2dd4bf', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
                         >
                           <Plus size={14} /> Add Show Slot
                         </button>
@@ -3492,7 +3493,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                                       updated[sIdx].startingPrice = parseFloat(e.target.value) || 0;
                                       setEventForm({ ...eventForm, shows: updated });
                                     }}
-                                    style={{ width: '100%', padding: '0.5rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', color: '#38bdf8', fontWeight: 700, fontSize: '0.8125rem' }}
+                                    style={{ width: '100%', padding: '0.5rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '6px', color: '#2dd4bf', fontWeight: 700, fontSize: '0.8125rem' }}
                                   />
                                 </div>
                                 <button
@@ -3589,7 +3590,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                                               updated[sIdx].ticketTiers[tIdx].rowRange = e.target.value;
                                               setEventForm({ ...eventForm, shows: updated });
                                             }}
-                                            style={{ flex: 1.2, padding: '0.35rem 0.5rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '4px', color: '#60a5fa', fontWeight: 700, fontSize: '0.75rem' }}
+                                            style={{ flex: 1.2, padding: '0.35rem 0.5rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '4px', color: '#2dd4bf', fontWeight: 700, fontSize: '0.75rem' }}
                                             title="Row Range for mapped seating pricing (e.g. A, B-E, F-O)"
                                           />
                                         )}
@@ -3602,7 +3603,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                                             updated[sIdx].ticketTiers[tIdx].price = parseFloat(e.target.value) || 0;
                                             setEventForm({ ...eventForm, shows: updated });
                                           }}
-                                          style={{ flex: 1.2, padding: '0.35rem 0.5rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', color: '#38bdf8', fontWeight: 700, fontSize: '0.75rem' }}
+                                          style={{ flex: 1.2, padding: '0.35rem 0.5rem', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '4px', color: '#2dd4bf', fontWeight: 700, fontSize: '0.75rem' }}
                                         />
                                         <input
                                           type="number"
@@ -3639,17 +3640,17 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                     {/* SECTION 6: Description & Visibility */}
                     <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2dd4bf', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <FileText size={15} /> 6. Description & Visibility Settings
                       </div>
 
                       <div style={{ display: 'flex', gap: '2rem', margin: '0.25rem 0' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f8fafc', fontSize: '0.875rem', cursor: 'pointer', fontWeight: 600 }}>
-                          <input type="checkbox" checked={eventForm.isFeatured} onChange={e => setEventForm({ ...eventForm, isFeatured: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: '#3b82f6' }} />
+                          <input type="checkbox" checked={eventForm.isFeatured} onChange={e => setEventForm({ ...eventForm, isFeatured: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: '#0d9488' }} />
                           Featured Event
                         </label>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f8fafc', fontSize: '0.875rem', cursor: 'pointer', fontWeight: 600 }}>
-                          <input type="checkbox" checked={eventForm.isPublished} onChange={e => setEventForm({ ...eventForm, isPublished: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: '#3b82f6' }} />
+                          <input type="checkbox" checked={eventForm.isPublished} onChange={e => setEventForm({ ...eventForm, isPublished: e.target.checked })} style={{ width: '16px', height: '16px', accentColor: '#0d9488' }} />
                           Published / Active
                         </label>
                       </div>
@@ -3672,7 +3673,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                       <button
                         type="submit"
                         disabled={isSaving}
-                        style={{ flex: 2, padding: '0.85rem 1.5rem', background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', border: '1px solid rgba(59, 130, 246, 0.5)', borderRadius: '10px', color: '#fff', fontWeight: 700, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1, boxShadow: '0 4px 15px rgba(37, 99, 235, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.95rem' }}
+                        style={{ flex: 2, padding: '0.85rem 1.5rem', background: 'linear-gradient(135deg, #059669 0%, #0f766e 100%)', border: '1px solid rgba(13, 148, 136, 0.5)', borderRadius: '10px', color: '#fff', fontWeight: 700, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1, boxShadow: '0 4px 15px rgba(13, 148, 136, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.95rem' }}
                       >
                         <Save size={18} /> {isSaving ? 'Saving Event...' : (eventForm.id ? 'Update & Save Event' : 'Create & Publish Event')}
                       </button>
@@ -3683,7 +3684,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                 {/* Right Column: Live Event Card Preview */}
                 <div style={{ minWidth: '300px', alignSelf: 'flex-start', position: 'sticky', top: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#60a5fa', fontWeight: 700, fontSize: '0.875rem', letterSpacing: '0.05em' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#2dd4bf', fontWeight: 700, fontSize: '0.875rem', letterSpacing: '0.05em' }}>
                     <Sparkles size={16} /> LIVE CARD PREVIEW
                   </div>
                   <EventCard event={previewEvent} onSelect={() => {}} isSaved={false} onToggleSave={() => {}} />
@@ -3738,7 +3739,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowOrgModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Organizer...' : 'Save Organizer'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Organizer...' : 'Save Organizer'}</button>
               </div>
             </form>
           </div>
@@ -3847,8 +3848,8 @@ export default function AdminDashboard({ onSelectEvent }) {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#60a5fa', fontWeight: 700, marginBottom: '0.25rem' }}>Row Range (for Interactive Mapped Seating)</label>
-                  <input type="text" placeholder="e.g. G, A-F, H-K, or A, B, C" value={tierForm.rowRange || ''} onChange={e => setTierForm({ ...tierForm, rowRange: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(59, 130, 246, 0.4)', borderRadius: '8px', color: '#60a5fa', fontWeight: 700 }} />
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#2dd4bf', fontWeight: 700, marginBottom: '0.25rem' }}>Row Range (for Interactive Mapped Seating)</label>
+                  <input type="text" placeholder="e.g. G, A-F, H-K, or A, B, C" value={tierForm.rowRange || ''} onChange={e => setTierForm({ ...tierForm, rowRange: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '8px', color: '#2dd4bf', fontWeight: 700 }} />
                 </div>
 
                 <div>
@@ -3859,7 +3860,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Price per Ticket (PKR) *</label>
-                    <input type="number" required value={tierForm.price} onChange={e => setTierForm({ ...tierForm, price: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#38bdf8', fontWeight: 700 }} />
+                    <input type="number" required value={tierForm.price} onChange={e => setTierForm({ ...tierForm, price: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#2dd4bf', fontWeight: 700 }} />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Available Capacity</label>
@@ -3869,7 +3870,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                   <button type="button" onClick={() => setShowTierModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                  <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Tier...' : 'Save Tier & Price'}</button>
+                  <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Tier...' : 'Save Tier & Price'}</button>
                 </div>
               </form>
             </div>
@@ -3964,7 +3965,7 @@ export default function AdminDashboard({ onSelectEvent }) {
               </div>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowRoleModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Role...' : 'Save Role'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Role...' : 'Save Role'}</button>
               </div>
             </form>
           </div>
@@ -4014,7 +4015,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                   value={tagForm.slug} 
                   onChange={e => setTagForm({ ...tagForm, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })} 
                   placeholder="e.g. qawwali-concerts"
-                  style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#60a5fa', fontFamily: 'monospace' }} 
+                  style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#2dd4bf', fontFamily: 'monospace' }} 
                 />
                 <span style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem', display: 'block' }}>
                   URL-friendly slug (e.g. concerts, sufi-rock, tech-workshops)
@@ -4022,7 +4023,7 @@ export default function AdminDashboard({ onSelectEvent }) {
               </div>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowTagModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Tag...' : 'Save Tag'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Tag...' : 'Save Tag'}</button>
               </div>
             </form>
           </div>
@@ -4035,7 +4036,7 @@ export default function AdminDashboard({ onSelectEvent }) {
           <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '780px', width: '95vw', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
-                <span style={{ fontSize: '0.75rem', color: '#60a5fa', fontWeight: 700, textTransform: 'uppercase' }}>VENUE BLUEPRINT DESIGNER</span>
+                <span style={{ fontSize: '0.75rem', color: '#2dd4bf', fontWeight: 700, textTransform: 'uppercase' }}>VENUE BLUEPRINT DESIGNER</span>
                 <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f8fafc' }}>
                   {auditoriumForm.id ? 'Edit Auditorium Layout' : 'Create New Auditorium Layout'}
                 </h3>
@@ -4069,9 +4070,9 @@ export default function AdminDashboard({ onSelectEvent }) {
                   style={{
                     padding: '0.35rem 0.75rem',
                     borderRadius: '8px',
-                    background: 'rgba(59, 130, 246, 0.18)',
-                    border: '1px solid rgba(59, 130, 246, 0.4)',
-                    color: '#60a5fa',
+                    background: 'rgba(13, 148, 136, 0.18)',
+                    border: '1px solid rgba(13, 148, 136, 0.4)',
+                    color: '#2dd4bf',
                     fontSize: '0.75rem',
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -4088,9 +4089,9 @@ export default function AdminDashboard({ onSelectEvent }) {
                   style={{
                     padding: '0.35rem 0.75rem',
                     borderRadius: '8px',
-                    background: 'rgba(59, 130, 246, 0.15)',
-                    border: '1px solid rgba(59, 130, 246, 0.35)',
-                    color: '#93c5fd',
+                    background: 'rgba(13, 148, 136, 0.15)',
+                    border: '1px solid rgba(13, 148, 136, 0.35)',
+                    color: '#99f6e4',
                     fontSize: '0.75rem',
                     fontWeight: 600,
                     cursor: 'pointer'
@@ -4103,8 +4104,8 @@ export default function AdminDashboard({ onSelectEvent }) {
 
             <form onSubmit={handleSaveAuditorium} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {/* 3-Tier Cascading Location Selection: Country -> City -> Venue */}
-              <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '12px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(13, 148, 136, 0.2)', borderRadius: '12px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2dd4bf', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <MapPin size={15} /> Venue & Location Selection (Cascading Hierarchy)
                 </div>
 
@@ -4214,7 +4215,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                     placeholder="e.g. ACP_AC_II"
                     value={auditoriumForm.layoutCode}
                     onChange={e => setAuditoriumForm({ ...auditoriumForm, layoutCode: e.target.value.toUpperCase().replace(/\s+/g, '_') })}
-                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#38bdf8', fontFamily: 'monospace' }}
+                    style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#2dd4bf', fontFamily: 'monospace' }}
                   />
                 </div>
               </div>
@@ -4236,7 +4237,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                   <label style={{ fontSize: '0.8125rem', color: '#94a3b8', fontWeight: 600 }}>
                     Layout JSON Configuration (Rows, Sections & Aisles)
                   </label>
-                  <span style={{ fontSize: '0.75rem', color: '#60a5fa' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#2dd4bf' }}>
                     ✓ JSON Schema Valid
                   </span>
                 </div>
@@ -4248,9 +4249,9 @@ export default function AdminDashboard({ onSelectEvent }) {
                     width: '100%',
                     padding: '0.75rem',
                     background: 'rgba(2, 6, 23, 0.85)',
-                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    border: '1px solid rgba(13, 148, 136, 0.3)',
                     borderRadius: '8px',
-                    color: '#60a5fa',
+                    color: '#2dd4bf',
                     fontFamily: 'monospace',
                     fontSize: '0.8rem',
                     lineHeight: 1.4
@@ -4260,7 +4261,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowAuditoriumModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Layout...' : 'Save Auditorium Layout'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Layout...' : 'Save Auditorium Layout'}</button>
               </div>
             </form>
           </div>
@@ -4286,12 +4287,12 @@ export default function AdminDashboard({ onSelectEvent }) {
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>ISO Country Code *</label>
-                <input type="text" required placeholder="e.g. PK" value={countryForm.code} onChange={e => setCountryForm({ ...countryForm, code: e.target.value.toUpperCase() })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#38bdf8', fontFamily: 'monospace', fontWeight: 700 }} />
+                <input type="text" required placeholder="e.g. PK" value={countryForm.code} onChange={e => setCountryForm({ ...countryForm, code: e.target.value.toUpperCase() })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#2dd4bf', fontFamily: 'monospace', fontWeight: 700 }} />
               </div>
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowCountryModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Country...' : 'Save Country'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Country...' : 'Save Country'}</button>
               </div>
             </form>
           </div>
@@ -4330,7 +4331,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowCityModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving City...' : 'Save City'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving City...' : 'Save City'}</button>
               </div>
             </form>
           </div>
@@ -4403,7 +4404,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                   <button type="button" onClick={() => setShowVenueModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                  <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Venue...' : 'Save Venue'}</button>
+                  <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Venue...' : 'Save Venue'}</button>
                 </div>
               </form>
             </div>
@@ -4473,7 +4474,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                       type="checkbox"
                       checked={faqForm.isActive}
                       onChange={e => setFaqForm({ ...faqForm, isActive: e.target.checked })}
-                      style={{ width: '16px', height: '16px', accentColor: '#3b82f6' }}
+                      style={{ width: '16px', height: '16px', accentColor: '#0d9488' }}
                     />
                     Active on Website
                   </label>
@@ -4484,7 +4485,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                 <button type="button" onClick={() => setShowFaqModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>
                   Cancel
                 </button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>
                   {isSaving ? 'Saving FAQ...' : (faqForm.id ? 'Update FAQ' : 'Save FAQ')}
                 </button>
               </div>
@@ -4504,7 +4505,7 @@ export default function AdminDashboard({ onSelectEvent }) {
               <X size={18} />
             </button>
             <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <FileText color="#3b82f6" size={24} /> Edit Footer Info
+              <FileText color="#0d9488" size={24} /> Edit Footer Info
             </h3>
             <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1.5rem' }}>
               Update site branding, tagline, contact information, and policy URLs stored in table <code>FooterInfo</code>.
@@ -4630,7 +4631,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                 <button type="button" onClick={() => setShowFooterModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>
                   Cancel
                 </button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>
                   {isSaving ? 'Updating...' : 'Save Footer Info'}
                 </button>
               </div>
@@ -4642,10 +4643,10 @@ export default function AdminDashboard({ onSelectEvent }) {
       {/* --- EDIT PAYFAST FEE CONFIG MODAL --- */}
       {showFeeConfigModal && editingFeeConfig && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(3, 7, 18, 0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }}>
-          <div style={{ background: '#0f172a', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '20px', width: '100%', maxWidth: '480px', padding: '1.75rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)' }}>
+          <div style={{ background: '#0f172a', border: '1px solid rgba(13, 148, 136, 0.3)', borderRadius: '20px', width: '100%', maxWidth: '480px', padding: '1.75rem', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <CreditCard size={20} color="#3b82f6" /> Edit PayFast Commission Fee
+                <CreditCard size={20} color="#0d9488" /> Edit PayFast Commission Fee
               </h3>
               <button onClick={() => setShowFeeConfigModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}><X size={20} /></button>
             </div>
@@ -4681,7 +4682,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
               <div style={{ marginBottom: '1rem' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.35rem' }}>Commission Fee Percentage (%) *</label>
-                <input type="number" step="0.001" min="0" max="100" required value={editingFeeConfig.commissionPercentage} onChange={e => setEditingFeeConfig({ ...editingFeeConfig, commissionPercentage: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: '#1e293b', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '8px', color: '#60a5fa', fontWeight: 800, fontSize: '1.1rem' }} />
+                <input type="number" step="0.001" min="0" max="100" required value={editingFeeConfig.commissionPercentage} onChange={e => setEditingFeeConfig({ ...editingFeeConfig, commissionPercentage: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: '#1e293b', border: '1px solid rgba(59,130,246,0.3)', borderRadius: '8px', color: '#2dd4bf', fontWeight: 800, fontSize: '1.1rem' }} />
               </div>
 
               <div style={{ marginBottom: '1.25rem' }}>

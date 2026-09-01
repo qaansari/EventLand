@@ -312,7 +312,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
             : occupied 
               ? '#334155' 
               : isSelected 
-                ? '#3b82f6' 
+                ? '#0d9488' 
                 : 'rgba(255, 255, 255, 0.1)',
           color: isDisabled 
             ? '#fca5a5' 
@@ -321,7 +321,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
               : isSelected 
                 ? '#ffffff' 
                 : '#e2e8f0',
-          boxShadow: isSelected ? '0 0 8px #3b82f6' : isDisabled ? '0 0 4px rgba(239, 68, 68, 0.4)' : 'none',
+          boxShadow: isSelected ? '0 0 8px #0d9488' : isDisabled ? '0 0 4px rgba(239, 68, 68, 0.4)' : 'none',
           transition: 'all 0.12s ease',
           textDecoration: isDisabled ? 'line-through' : 'none',
           display: 'inline-flex',
@@ -498,8 +498,8 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 40px rgba(59, 130, 246, 0.15)',
-          border: '1px solid rgba(59, 130, 246, 0.3)'
+          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 40px rgba(13, 148, 136, 0.15)',
+          border: '1px solid rgba(13, 148, 136, 0.3)'
         }}
       >
         {/* Modal Header */}
@@ -517,11 +517,11 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               {isPreviewMode ? (
-                <span className="badge" style={{ backgroundColor: 'rgba(59, 130, 246, 0.18)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.4)', padding: '0.2rem 0.6rem', fontSize: '0.72rem', fontWeight: 800 }}>
+                <span className="badge" style={{ backgroundColor: 'rgba(13, 148, 136, 0.18)', color: '#2dd4bf', border: '1px solid rgba(13, 148, 136, 0.4)', padding: '0.2rem 0.6rem', fontSize: '0.72rem', fontWeight: 800 }}>
                   BLUEPRINT PREVIEW MODE
                 </span>
               ) : (
-                <span style={{ fontSize: '0.75rem', color: '#60a5fa', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={{ fontSize: '0.75rem', color: '#2dd4bf', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {auditoriumName}
                 </span>
               )}
@@ -545,13 +545,13 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
                 gap: '0.4rem',
                 padding: '0.45rem 0.95rem',
                 borderRadius: '8px',
-                background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-                border: '1px solid rgba(96, 165, 250, 0.4)',
+                background: 'linear-gradient(135deg, #059669, #0f766e)',
+                border: '1px solid rgba(45, 212, 191, 0.4)',
                 color: '#ffffff',
                 fontSize: '0.8rem',
                 fontWeight: 700,
                 cursor: 'pointer',
-                boxShadow: '0 2px 10px rgba(37, 99, 235, 0.35)',
+                boxShadow: '0 2px 10px rgba(13, 148, 136, 0.35)',
                 whiteSpace: 'nowrap'
               }}
               title="Download Seating Chart in PDF format with White Background"
@@ -568,7 +568,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
               >
                 <ZoomOut size={15} />
               </button>
-              <span style={{ fontSize: '0.75rem', color: '#93c5fd', fontWeight: 700, padding: '0 0.4rem', minWidth: '42px', textAlign: 'center' }}>
+              <span style={{ fontSize: '0.75rem', color: '#99f6e4', fontWeight: 700, padding: '0 0.4rem', minWidth: '42px', textAlign: 'center' }}>
                 {Math.round(zoomScale * 100)}%
               </span>
               <button
@@ -621,7 +621,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
             overflowX: 'auto',
             flexShrink: 0
           }}>
-            <Calendar size={16} color="#60a5fa" />
+            <Calendar size={16} color="#2dd4bf" />
             <span style={{ fontSize: '0.82rem', color: '#94a3b8', fontWeight: 600 }}>Select Show Time:</span>
             {showsList.map((show) => {
               const active = show.id === selectedShowId;
@@ -637,9 +637,9 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
                     borderRadius: '9999px',
                     fontSize: '0.8rem',
                     fontWeight: active ? 700 : 500,
-                    backgroundColor: active ? '#2563eb' : 'rgba(255, 255, 255, 0.08)',
+                    backgroundColor: active ? '#059669' : 'rgba(255, 255, 255, 0.08)',
                     color: '#fff',
-                    border: active ? '1px solid #60a5fa' : '1px solid transparent',
+                    border: active ? '1px solid #2dd4bf' : '1px solid transparent',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap'
                   }}
@@ -673,9 +673,9 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
               <div style={{ display: 'inline-flex', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '1.25rem', padding: '0.5rem 1rem', background: 'rgba(30, 41, 59, 0.7)', borderRadius: '9999px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
                 {effectiveTiers.filter(t => t.rowRange).map((t, idx) => (
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem' }}>
-                    <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: idx === 0 ? '#f59e0b' : idx === 1 ? '#a855f7' : '#3b82f6' }} />
+                    <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: idx === 0 ? '#f59e0b' : idx === 1 ? '#a855f7' : '#0d9488' }} />
                     <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{t.name} (Row {t.rowRange}):</span>
-                    <span style={{ color: '#38bdf8', fontWeight: 700 }}>PKR {Number(t.price).toLocaleString()}</span>
+                    <span style={{ color: '#2dd4bf', fontWeight: 700 }}>PKR {Number(t.price).toLocaleString()}</span>
                   </div>
                 ))}
               </div>
@@ -693,7 +693,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
               fontWeight: 900,
               letterSpacing: '0.35em',
               fontSize: '1.1rem',
-              boxShadow: '0 4px 25px rgba(0, 0, 0, 0.6), 0 0 20px rgba(59, 130, 246, 0.15)'
+              boxShadow: '0 4px 25px rgba(0, 0, 0, 0.6), 0 0 20px rgba(13, 148, 136, 0.15)'
             }}>
               STAGE / SCREEN
             </div>
@@ -707,9 +707,9 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
                     <div key={sIdx} style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', alignItems: 'center' }}>
                       <div style={{
                         padding: '0.3rem 1.2rem',
-                        background: 'rgba(59, 130, 246, 0.15)',
-                        border: '1px solid rgba(59, 130, 246, 0.3)',
-                        color: '#93c5fd',
+                        background: 'rgba(13, 148, 136, 0.15)',
+                        border: '1px solid rgba(13, 148, 136, 0.3)',
+                        color: '#99f6e4',
                         borderRadius: '9999px',
                         fontSize: '0.75rem',
                         fontWeight: 700,
@@ -760,7 +760,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
                 <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255, 255, 255, 0.2)' }} /> Available
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#3b82f6', boxShadow: '0 0 8px #3b82f6' }} /> Selected
+                <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#0d9488', boxShadow: '0 0 8px #0d9488' }} /> Selected
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#334155' }} /> Booked / Locked
@@ -789,13 +789,13 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
             <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
               <div>
                 <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block' }}>Total Venue Blueprint Capacity</span>
-                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#38bdf8' }}>
+                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#2dd4bf' }}>
                   {currentZone.totalCapacity || event.totalCapacity || '1,085'} Seats
                 </span>
               </div>
               <div>
                 <span style={{ fontSize: '0.72rem', color: '#94a3b8', display: 'block' }}>Selected Seat Test</span>
-                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: selectedSeats.length > 0 ? '#60a5fa' : '#64748b' }}>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: selectedSeats.length > 0 ? '#2dd4bf' : '#64748b' }}>
                   {selectedSeats.length > 0 ? selectedSeats.map(s => s.label).join(', ') : 'Click any seat above to test selection'}
                 </span>
               </div>
@@ -826,7 +826,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
                 style={{
                   padding: '0.6rem 1.5rem',
                   borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  background: 'linear-gradient(135deg, #0d9488, #0f766e)',
                   border: 'none',
                   color: '#fff',
                   fontSize: '0.85rem',
@@ -855,7 +855,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
               <span style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block' }}>
                 Selected Seats ({selectedSeats.length}):
               </span>
-              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#38bdf8' }}>
+              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: '#2dd4bf' }}>
                 {selectedSeats.length > 0 ? selectedSeats.map((s) => s.label || s.id).join(', ') : 'None'}
               </span>
             </div>
@@ -863,7 +863,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
             <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
               <div>
                 <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block' }}>Total Amount</span>
-                <span style={{ fontSize: '1.35rem', fontWeight: 800, color: '#60a5fa' }}>
+                <span style={{ fontSize: '1.35rem', fontWeight: 800, color: '#2dd4bf' }}>
                   PKR {totalPrice.toLocaleString()}
                 </span>
               </div>
@@ -874,7 +874,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
                 style={{
                   padding: '0.75rem 1.6rem',
                   borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  background: 'linear-gradient(135deg, #0d9488, #0f766e)',
                   border: 'none',
                   color: '#fff',
                   fontWeight: 700,

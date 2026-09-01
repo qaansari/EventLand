@@ -253,6 +253,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         cityName: event.cityName || event.city || 'Karachi',
         date: dbShowDate || 'Saturday, 10th January 2027',
         time: dbShowTime || '08:00 PM PKT',
+        showDateTime: (dbShowDate && dbShowTime) ? `${dbShowDate} at ${dbShowTime}` : (dbShowDate || dbShowTime || 'Saturday, 10th January 2027 at 08:00 PM PKT'),
         showTitle: event.selectedShow?.showTitle || 'Main Show Slot',
         attendeeName: formData.name,
         attendeeEmail: formData.email,
@@ -291,7 +292,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
     }}>
       <div style={{
         backgroundColor: '#0f172a',
-        border: '1px solid rgba(59, 130, 246, 0.25)',
+        border: '1px solid rgba(13, 148, 136, 0.25)',
         borderRadius: '20px',
         width: '100%',
         maxWidth: '540px',
@@ -309,7 +310,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
           alignItems: 'center'
         }}>
           <div>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#3b82f6', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0d9488', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
               PAYFAST PAKISTAN 🇵🇰
             </span>
             <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', margin: 0 }}>
@@ -338,22 +339,22 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         {/* 60-Minute Countdown Banner */}
         {step >= 2 && (
           <div style={{
-            backgroundColor: timerSeconds < 300 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.12)',
-            borderBottom: timerSeconds < 300 ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(59, 130, 246, 0.25)',
+            backgroundColor: timerSeconds < 300 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(13, 148, 136, 0.12)',
+            borderBottom: timerSeconds < 300 ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(13, 148, 136, 0.25)',
             padding: '0.65rem 1.5rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             fontSize: '0.82rem'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: timerSeconds < 300 ? '#fca5a5' : '#93c5fd' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: timerSeconds < 300 ? '#fca5a5' : '#99f6e4' }}>
               <Clock size={16} />
               <span>Seat Reservation Hold Timer</span>
             </div>
             <strong style={{
               fontSize: '1rem',
               fontFamily: 'monospace',
-              color: timerSeconds < 300 ? '#ef4444' : '#60a5fa'
+              color: timerSeconds < 300 ? '#ef4444' : '#2dd4bf'
             }}>
               {formatTimer(timerSeconds)}
             </strong>
@@ -470,7 +471,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               {feeConfigs.map(fee => {
                 const isSelected = paymentMethodCode === fee.paymentMethodCode;
                 const IconComponent = fee.paymentMethodCode === 'card_international' ? Globe : (fee.paymentMethodCode === 'card_domestic' ? CreditCard : Smartphone);
-                const iconColor = fee.paymentMethodCode === 'card_international' ? '#a855f7' : (fee.paymentMethodCode === 'card_domestic' ? '#3b82f6' : '#38bdf8');
+                const iconColor = fee.paymentMethodCode === 'card_international' ? '#a855f7' : (fee.paymentMethodCode === 'card_domestic' ? '#0d9488' : '#2dd4bf');
                 
                 return (
                   <div
@@ -479,8 +480,8 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                     style={{
                       padding: '1rem',
                       borderRadius: '12px',
-                      backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.15)' : '#1e293b',
-                      border: isSelected ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.1)',
+                      backgroundColor: isSelected ? 'rgba(13, 148, 136, 0.15)' : '#1e293b',
+                      border: isSelected ? '2px solid #0d9488' : '1px solid rgba(255,255,255,0.1)',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -494,7 +495,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                         <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{fee.description || 'PayFast Gateway'}</span>
                       </div>
                     </div>
-                    <span className="badge" style={{ backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255,255,255,0.06)', color: isSelected ? '#60a5fa' : '#94a3b8', fontWeight: 800 }}>
+                    <span className="badge" style={{ backgroundColor: isSelected ? 'rgba(13, 148, 136, 0.25)' : 'rgba(255,255,255,0.06)', color: isSelected ? '#2dd4bf' : '#94a3b8', fontWeight: 800 }}>
                       +{fee.commissionPercentage}% fee
                     </span>
                   </div>
@@ -512,7 +513,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                 style={{
                   flexGrow: 1,
                   backgroundColor: '#1e293b',
-                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  border: '1px solid rgba(13, 148, 136, 0.25)',
                   borderRadius: '8px',
                   padding: '0.6rem 0.85rem',
                   color: '#fff',
@@ -537,13 +538,13 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                 <span>PKR {subtotal.toLocaleString()}</span>
               </div>
               {groupDiscount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#60a5fa', marginBottom: '0.35rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2dd4bf', marginBottom: '0.35rem' }}>
                   <span>Group Savings (10% Off 3+ Seats)</span>
                   <span>- PKR {groupDiscount.toLocaleString()}</span>
                 </div>
               )}
               {discount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#60a5fa', marginBottom: '0.35rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#2dd4bf', marginBottom: '0.35rem' }}>
                   <span>Promo Code Discount</span>
                   <span>- PKR {discount.toLocaleString()}</span>
                 </div>
@@ -558,7 +559,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#fff', fontWeight: 800, fontSize: '1.05rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                 <span>Grand Total Payable</span>
-                <span style={{ color: '#3b82f6' }}>PKR {grossPayableAmount.toLocaleString()}</span>
+                <span style={{ color: '#0d9488' }}>PKR {grossPayableAmount.toLocaleString()}</span>
               </div>
             </div>
 
@@ -587,7 +588,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         {step === 3 && checkoutData && (
           <div style={{ padding: '1.5rem' }}>
             <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
-              <span style={{ display: 'inline-block', width: '54px', height: '54px', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.18)', color: '#60a5fa', lineHeight: '54px', fontSize: '1.6rem', marginBottom: '0.5rem' }}>
+              <span style={{ display: 'inline-block', width: '54px', height: '54px', borderRadius: '50%', background: 'rgba(13, 148, 136, 0.18)', color: '#2dd4bf', lineHeight: '54px', fontSize: '1.6rem', marginBottom: '0.5rem' }}>
                 💳
               </span>
               <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff' }}>PayFast Checkout Generated</h3>
@@ -597,10 +598,10 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
             </div>
 
             {/* PayFast Checkout Details Box */}
-            <div style={{ background: '#0f172a', border: '1px dashed rgba(59, 130, 246, 0.4)', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.5rem' }}>
+            <div style={{ background: '#0f172a', border: '1px dashed rgba(13, 148, 136, 0.4)', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.6rem', marginBottom: '0.6rem', fontSize: '0.85rem' }}>
                 <span style={{ color: '#94a3b8' }}>PayFast Transaction Ref</span>
-                <strong style={{ color: '#60a5fa' }}>{checkoutData.transactionId}</strong>
+                <strong style={{ color: '#2dd4bf' }}>{checkoutData.transactionId}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '0.6rem', marginBottom: '0.6rem', fontSize: '0.85rem' }}>
                 <span style={{ color: '#94a3b8' }}>Ticket Subtotal</span>
@@ -645,7 +646,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                 onClick={handleSimulatePayFastPaymentSuccess}
                 disabled={isProcessing}
                 className="btn btn-secondary"
-                style={{ width: '100%', padding: '0.85rem', background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', border: 'none', color: '#fff', fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                style={{ width: '100%', padding: '0.85rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', color: '#fff', fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
               >
                 <CheckCircle size={18} /> {isProcessing ? 'Verifying PayFast Payment...' : 'Simulate PayFast Instant IPN Payment Success'}
               </button>

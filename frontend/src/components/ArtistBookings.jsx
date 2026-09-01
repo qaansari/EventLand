@@ -140,7 +140,7 @@ export default function ArtistBookings({ cities: citiesProp = [] }) {
                 }}>
                   {artist.name}
                 </h3>
-                <span style={{ fontSize: '0.82rem', color: '#60a5fa', fontWeight: 600, marginBottom: '0.75rem' }}>
+                <span style={{ fontSize: '0.82rem', color: '#2dd4bf', fontWeight: 600, marginBottom: '0.75rem' }}>
                   {artist.genre || artist.role}
                 </span>
                 <p style={{ fontSize: '0.86rem', color: '#94a3b8', marginBottom: '1.1rem', lineHeight: 1.5 }}>
@@ -149,14 +149,14 @@ export default function ArtistBookings({ cities: citiesProp = [] }) {
 
                 {artist.availability && (
                   <div style={{ backgroundColor: 'rgba(0,0,0,0.35)', padding: '0.6rem 0.8rem', borderRadius: '8px', marginBottom: '1.25rem', border: '1px solid rgba(255, 255, 255, 0.05)', fontSize: '0.8rem', color: '#cbd5e1' }}>
-                    <span style={{ color: '#60a5fa', fontWeight: 600 }}>✓ </span> {artist.availability}
+                    <span style={{ color: '#2dd4bf', fontWeight: 600 }}>✓ </span> {artist.availability}
                   </div>
                 )}
 
                 <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
                   <div>
                     <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Starting Rate</span>
-                    <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 800, color: '#60a5fa' }}>
+                    <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', fontWeight: 800, color: '#2dd4bf' }}>
                       PKR {typeof artist.startingRate === 'number' ? artist.startingRate.toLocaleString() : (artist.startingRate || 'Custom')}
                     </span>
                   </div>
@@ -187,7 +187,7 @@ export default function ArtistBookings({ cities: citiesProp = [] }) {
               alignItems: 'center'
             }}>
               <div>
-                <span style={{ fontSize: '0.75rem', color: '#60a5fa', fontWeight: 700 }}>OFFICIAL ARTIST BOOKING</span>
+                <span style={{ fontSize: '0.75rem', color: '#2dd4bf', fontWeight: 700 }}>OFFICIAL ARTIST BOOKING</span>
                 <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff' }}>
                   Request Booking for {selectedArtist.name}
                 </h2>

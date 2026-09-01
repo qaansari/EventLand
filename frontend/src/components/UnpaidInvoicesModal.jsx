@@ -220,7 +220,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
     }}>
       <div style={{
         backgroundColor: '#0f172a',
-        border: '1px solid rgba(59, 130, 246, 0.3)',
+        border: '1px solid rgba(13, 148, 136, 0.3)',
         borderRadius: '20px',
         width: '100%',
         maxWidth: '840px',
@@ -250,7 +250,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
               </span>
             </div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', margin: '0.2rem 0 0 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <FileText size={22} color="#3b82f6" /> Unpaid Payment Invoices ({invoices.length})
+              <FileText size={22} color="#0d9488" /> Unpaid Payment Invoices ({invoices.length})
             </h2>
           </div>
           <button
@@ -285,7 +285,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
                 width: '100%',
                 padding: '0.6rem 1rem 0.6rem 2.5rem',
                 backgroundColor: '#1e293b',
-                border: '1px solid rgba(59, 130, 246, 0.25)',
+                border: '1px solid rgba(13, 148, 136, 0.25)',
                 borderRadius: '10px',
                 color: '#fff',
                 fontSize: '0.85rem',
@@ -296,7 +296,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
-              Total Outstanding: <strong style={{ color: '#60a5fa', fontSize: '0.95rem' }}>PKR {totalOutstanding.toLocaleString()}</strong>
+              Total Outstanding: <strong style={{ color: '#2dd4bf', fontSize: '0.95rem' }}>PKR {totalOutstanding.toLocaleString()}</strong>
             </div>
             <button
               onClick={loadUnpaidInvoices}
@@ -313,12 +313,12 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
         <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
           {loading ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
-              <RefreshCw size={32} className="animate-spin" style={{ margin: '0 auto 1rem auto', color: '#3b82f6' }} />
+              <RefreshCw size={32} className="animate-spin" style={{ margin: '0 auto 1rem auto', color: '#0d9488' }} />
               <p>Loading unpaid invoices...</p>
             </div>
           ) : filteredInvoices.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem', background: '#0b1329', border: '1px dashed rgba(59, 130, 246, 0.2)', borderRadius: '16px' }}>
-              <CheckCircle size={48} color="#3b82f6" style={{ margin: '0 auto 1rem auto', opacity: 0.8 }} />
+            <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem', background: '#0b1329', border: '1px dashed rgba(13, 148, 136, 0.2)', borderRadius: '16px' }}>
+              <CheckCircle size={48} color="#0d9488" style={{ margin: '0 auto 1rem auto', opacity: 0.8 }} />
               <h3 style={{ fontSize: '1.15rem', color: '#fff', fontWeight: 700 }}>No Unpaid Invoices Found</h3>
               <p style={{ fontSize: '0.85rem', color: '#94a3b8', maxWidth: '420px', margin: '0.5rem auto 0 auto' }}>
                 All your ticket bookings are fully paid and confirmed! You can view your active passes in <strong>My Tickets</strong>.
@@ -337,7 +337,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
                     key={refKey}
                     style={{
                       backgroundColor: '#0b1329',
-                      border: isExpired ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(59, 130, 246, 0.25)',
+                      border: isExpired ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(13, 148, 136, 0.25)',
                       borderRadius: '16px',
                       padding: '1.25rem',
                       display: 'flex',
@@ -349,7 +349,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
                     {/* Header Row */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '0.75rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                        <span style={{ fontWeight: 800, color: '#38bdf8', fontSize: '0.9rem' }}>
+                        <span style={{ fontWeight: 800, color: '#2dd4bf', fontSize: '0.9rem' }}>
                           Ref #{inv.bookingRef}
                         </span>
                         <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
@@ -362,12 +362,12 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.4rem',
-                        backgroundColor: isExpired ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                        border: isExpired ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
+                        backgroundColor: isExpired ? 'rgba(239, 68, 68, 0.15)' : 'rgba(13, 148, 136, 0.15)',
+                        border: isExpired ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(13, 148, 136, 0.3)',
                         borderRadius: '20px',
                         padding: '0.25rem 0.75rem',
                         fontSize: '0.8rem',
-                        color: isExpired ? '#fca5a5' : '#60a5fa',
+                        color: isExpired ? '#fca5a5' : '#2dd4bf',
                         fontWeight: 700
                       }}>
                         <Clock size={14} />
@@ -401,7 +401,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: '#fff', fontWeight: 800, fontSize: '0.95rem', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                           <span>Grand Total Payable</span>
-                          <span style={{ color: '#60a5fa' }}>PKR {(inv.grossAmount || inv.baseAmount || 0).toLocaleString()}</span>
+                          <span style={{ color: '#2dd4bf' }}>PKR {(inv.grossAmount || inv.baseAmount || 0).toLocaleString()}</span>
                         </div>
                       </div>
                     </div>
@@ -449,7 +449,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
                           style={{
                             padding: '0.55rem 1.1rem',
                             fontSize: '0.82rem',
-                            background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                            background: 'linear-gradient(135deg, #0d9488, #0f766e)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '0.4rem',
