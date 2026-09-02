@@ -184,7 +184,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
             className="btn btn-primary"
             style={{ padding: '0.65rem 1.4rem', fontSize: '0.9rem' }}
           >
-            <Info size={16} /> View Pass
+            <Info size={16} /> View Details
           </button>
         </div>
       </div>

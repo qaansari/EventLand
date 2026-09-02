@@ -3,7 +3,7 @@ import Navbar from './components/Navbar';
 import HeroSlider from './components/HeroSlider';
 import EventCard from './components/EventCard';
 import EventFilterBar from './components/EventFilterBar';
-import EventDetailModal from './components/EventDetailModal';
+import EventDetailPage from './components/EventDetailPage';
 import InteractiveSeatPicker from './components/InteractiveSeatPicker';
 import CheckoutModal from './components/CheckoutModal';
 import DigitalTicketModal from './components/DigitalTicketModal';
@@ -30,6 +30,20 @@ const LazyFallback = (
 );
 
 const PAGE_SIZE = 12;
+
+const getEventIdFromUrl = () => {
+  if (typeof window === 'undefined') return null;
+  const path = window.location.pathname;
+  if (path.startsWith('/event/')) {
+    const parts = path.split('/event/');
+    if (parts[1]) return decodeURIComponent(parts[1].split('/')[0]);
+  }
+  const searchParams = new URLSearchParams(window.location.search);
+  if (searchParams.has('event')) {
+    return searchParams.get('event');
+  }
+  return null;
+};
 
 export default function App() {
   const { showSuccess, showInfo, showError, showWarning } = useToast();
@@ -110,7 +124,8 @@ export default function App() {
     }
   };
 
-  const [activeView, setActiveView] = useState('explore'); // explore, artists, organizer-wizard, my-tickets, organizer, admin
+  const [urlEventId, setUrlEventId] = useState(getEventIdFromUrl);
+  const [activeView, setActiveView] = useState(() => getEventIdFromUrl() ? 'event-detail' : 'explore'); // explore, event-detail, artists, organizer-wizard, my-tickets, organizer, admin
   const [userRole, setUserRole] = useState('customer'); // customer, organizer, admin
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('featured');
@@ -308,11 +323,41 @@ export default function App() {
     }
   };
 
-  // Active Modals
+  // Active Modals & Dedicated Detail View
   const [activeDetailEvent, setActiveDetailEvent] = useState(null);
   const [activeSeatPickerEvent, setActiveSeatPickerEvent] = useState(null);
   const [checkoutData, setCheckoutData] = useState(null); // { event, seats }
   const [activeTicketView, setActiveTicketView] = useState(null);
+
+  // Handle URL deep-linking and browser Back/Forward (popstate)
+  useEffect(() => {
+    const initialId = getEventIdFromUrl();
+    if (initialId) {
+      setUrlEventId(initialId);
+      setActiveView('event-detail');
+      eventsApi.getEventById(initialId)
+        .then(ev => { if (ev) setActiveDetailEvent(ev); })
+        .catch(err => console.error('Failed to load initial event from URL:', err));
+    }
+
+    const handlePopState = () => {
+      const eid = getEventIdFromUrl();
+      if (eid) {
+        setUrlEventId(eid);
+        setActiveView('event-detail');
+        eventsApi.getEventById(eid)
+          .then(ev => { if (ev) setActiveDetailEvent(ev); })
+          .catch(err => console.error(err));
+      } else {
+        setUrlEventId(null);
+        setActiveDetailEvent(null);
+        setActiveView('explore');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('eventland_saved_events', JSON.stringify(savedEventIds));
@@ -377,15 +422,41 @@ export default function App() {
     }
   };
 
-  // Open Detail Modal when event card is clicked
-  const handleSelectEventForDetail = (event) => {
-    setActiveDetailEvent(event);
+  const handleNavigateView = (view) => {
+    if (window.location.pathname.startsWith('/event/') || window.location.search.includes('event=')) {
+      window.history.pushState({}, '', '/');
+    }
+    setActiveDetailEvent(null);
+    setUrlEventId(null);
+    setActiveView(view);
   };
 
-  // Handle Action from EventDetailModal
-  const handleProceedFromDetail = (event, targetFlow, seats) => {
-    setActiveDetailEvent(null);
+  // Open Detail Page when event card is clicked & update URL path to /event/:id
+  const handleSelectEventForDetail = (event) => {
+    const id = event?.id || (typeof event === 'string' || typeof event === 'number' ? event : null);
+    if (typeof event === 'object' && event !== null) {
+      setActiveDetailEvent(event);
+    }
+    if (id) {
+      setUrlEventId(id);
+      window.history.pushState({ eventId: id }, '', `/event/${id}`);
+    }
+    setActiveView('event-detail');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
+  const handleBackFromEventDetail = () => {
+    setActiveDetailEvent(null);
+    setUrlEventId(null);
+    setActiveView('explore');
+    if (window.location.pathname.startsWith('/event/') || window.location.search.includes('event=')) {
+      window.history.pushState({}, '', '/');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Handle Action from EventDetailPage
+  const handleProceedFromDetail = (event, targetFlow, seats) => {
     if (targetFlow === 'seat-picker') {
       setActiveSeatPickerEvent(event);
       return;
@@ -557,7 +628,7 @@ export default function App() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         activeView={activeView}
-        onNavigate={setActiveView}
+        onNavigate={handleNavigateView}
         savedTicketsCount={purchasedTickets.length}
         currentRole={userRole}
         onSelectRole={handleRoleChange}
@@ -718,16 +789,19 @@ export default function App() {
             />
           </Suspense>
         )}
+
+        {/* View: Dedicated Event Details Page */}
+        {activeView === 'event-detail' && (
+          <EventDetailPage
+            event={activeDetailEvent}
+            eventId={urlEventId}
+            onBack={handleBackFromEventDetail}
+            onProceedToBooking={handleProceedFromDetail}
+          />
+        )}
       </main>
 
       {/* Active Modals */}
-      {activeDetailEvent && (
-        <EventDetailModal
-          event={activeDetailEvent}
-          onClose={() => setActiveDetailEvent(null)}
-          onProceedToBooking={handleProceedFromDetail}
-        />
-      )}
 
       {activeSeatPickerEvent && (
         <InteractiveSeatPicker
