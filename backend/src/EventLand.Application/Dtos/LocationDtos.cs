@@ -5,7 +5,8 @@ public record CountryDto(
     string Name,
     string Code,
     bool IsActive,
-    List<CityDto>? Cities = null
+    List<CityDto>? Cities = null,
+    string? DialingCode = null
 );
 
 public record CityDto(
@@ -39,12 +40,12 @@ public record AuditoriumDto(
     bool IsActive
 );
 
-public record CreateCountryDto(string Name, string Code);
+public record CreateCountryDto(string Name, string Code, string? DialingCode = null);
 public record CreateCityDto(int CountryId, string Name);
 public record CreateVenueDto(int CityId, string Name, string Address, string? Description);
 public record CreateAuditoriumDto(int VenueId, string Name, string LayoutCode, int TotalCapacity, string? Description, string? LayoutJson);
 
-public record UpdateCountryDto(string Name, string Code, bool IsActive);
+public record UpdateCountryDto(string Name, string Code, bool IsActive, string? DialingCode = null);
 public record UpdateCityDto(string Name, bool IsActive);
 public record UpdateVenueDto(int CityId, string Name, string Address, string? Description, bool IsActive);
 public record UpdateAuditoriumDto(int VenueId, string Name, string LayoutCode, int TotalCapacity, string? Description, string? LayoutJson, bool IsActive);

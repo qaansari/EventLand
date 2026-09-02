@@ -6,7 +6,8 @@ public record RegisterRequestDto(
     string FullName,
     string Email,
     string Password,
-    string? PhoneNumber = null
+    string? PhoneNumber = null,
+    int? CountryId = null
 );
 
 public record LoginResponseDto(
@@ -21,7 +22,11 @@ public record UserDto(
     string FullName,
     string Role,
     DateTimeOffset? LastLoginAt,
-    string? ImageUrl = null
+    string? ImageUrl = null,
+    string? PhoneNumber = null,
+    int? CountryId = null,
+    string? CountryName = null,
+    string? DialingCode = null
 );
 
 public record ChangePasswordDto(

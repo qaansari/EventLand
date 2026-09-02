@@ -454,14 +454,14 @@ public class AdminService : IAdminService
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var query = _context.Users.AsNoTracking().Include(u => u.Role).Where(u => !u.IsDeleted);
+        var query = _context.Users.AsNoTracking().Include(u => u.Role).Include(u => u.Country).Where(u => !u.IsDeleted);
         var totalCount = await query.CountAsync();
 
         var items = await query
             .OrderByDescending(u => u.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(u => new UserDto(u.Id, u.Email, u.FullName, u.Role.Name, u.LastLoginAt, FileUrlHelper.FormatUserImageUrl(u.ImageUrl)))
+            .Select(u => new UserDto(u.Id, u.Email, u.FullName, u.Role.Name, u.LastLoginAt, FileUrlHelper.FormatUserImageUrl(u.ImageUrl), u.PhoneNumber, u.CountryId, u.Country != null ? u.Country.Name : null, u.Country != null ? u.Country.DialingCode : null))
             .ToListAsync();
 
         return new PagedResult<UserDto>(items, totalCount, pageNumber, pageSize);
@@ -469,8 +469,8 @@ public class AdminService : IAdminService
 
     public async Task<UserDto?> GetUserByIdAsync(int id)
     {
-        var u = await _context.Users.AsNoTracking().Include(x => x.Role).FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
-        return u is null ? null : new UserDto(u.Id, u.Email, u.FullName, u.Role.Name, u.LastLoginAt, FileUrlHelper.FormatUserImageUrl(u.ImageUrl));
+        var u = await _context.Users.AsNoTracking().Include(x => x.Role).Include(x => x.Country).FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        return u is null ? null : new UserDto(u.Id, u.Email, u.FullName, u.Role.Name, u.LastLoginAt, FileUrlHelper.FormatUserImageUrl(u.ImageUrl), u.PhoneNumber, u.CountryId, u.Country?.Name, u.Country?.DialingCode);
     }
 
     public async Task<UserDto> CreateUserAsync(CreateUserDto dto)
@@ -489,6 +489,7 @@ public class AdminService : IAdminService
             FullName = dto.FullName.Trim(),
             RoleId = dto.RoleId,
             PhoneNumber = dto.PhoneNumber,
+            CountryId = dto.CountryId,
             ImageUrl = FileUrlHelper.ExtractFileName(dto.ImageUrl) ?? dto.ImageUrl,
             IsActive = true
         };
@@ -498,7 +499,9 @@ public class AdminService : IAdminService
 
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
-        return new UserDto(user.Id, user.Email, user.FullName, role.Name, null, FileUrlHelper.FormatUserImageUrl(user.ImageUrl));
+
+        var country = dto.CountryId.HasValue ? await _context.Countries.FirstOrDefaultAsync(c => c.Id == dto.CountryId.Value) : null;
+        return new UserDto(user.Id, user.Email, user.FullName, role.Name, null, FileUrlHelper.FormatUserImageUrl(user.ImageUrl), user.PhoneNumber, user.CountryId, country?.Name, country?.DialingCode);
     }
 
     public async Task<UserDto> UpdateUserAsync(int id, UpdateUserDto dto)
@@ -514,6 +517,7 @@ public class AdminService : IAdminService
         user.FullName = dto.FullName.Trim();
         user.RoleId = dto.RoleId;
         user.PhoneNumber = dto.PhoneNumber;
+        user.CountryId = dto.CountryId;
         user.IsActive = dto.IsActive;
 
         if (dto.ImageUrl != null)
@@ -529,7 +533,8 @@ public class AdminService : IAdminService
         }
 
         await _context.SaveChangesAsync();
-        return new UserDto(user.Id, user.Email, user.FullName, role.Name, user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl));
+        var country = dto.CountryId.HasValue ? await _context.Countries.FirstOrDefaultAsync(c => c.Id == dto.CountryId.Value) : null;
+        return new UserDto(user.Id, user.Email, user.FullName, role.Name, user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl), user.PhoneNumber, user.CountryId, country?.Name, country?.DialingCode);
     }
 
     public async Task<bool> DeleteUserAsync(int id)
@@ -1415,7 +1420,7 @@ public class AdminService : IAdminService
         b.CreatedAt,
         b.BookingSeats != null ? b.BookingSeats.Select(bs => new BookingSeatDto(bs.Seat.Id, bs.Seat.Label, bs.Seat.Row, bs.Seat.Col, bs.Seat.Price)).ToList() : new List<BookingSeatDto>(),
         b.BankTransactionRef,
-        b.PaymentProofUrl,
+        FileUrlHelper.FormatPaymentSlipUrl(b.PaymentProofUrl),
         b.VerifiedAt,
         b.PaymentExpiresAt
     );

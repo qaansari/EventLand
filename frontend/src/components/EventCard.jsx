@@ -22,16 +22,15 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
         overflow: 'hidden',
         borderRadius: '16px',
         border: '1px solid rgba(13, 148, 136, 0.2)',
-        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4)',
-        transition: 'transform 0.3s ease, box-shadow 0.3s ease'
+        transition: 'transform 0.25s ease, border-color 0.25s ease'
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-3px)';
-        e.currentTarget.style.boxShadow = '0 15px 35px rgba(13, 148, 136, 0.2)';
+        e.currentTarget.style.borderColor = 'rgba(20, 184, 166, 0.6)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.4)';
+        e.currentTarget.style.borderColor = 'rgba(13, 148, 136, 0.2)';
       }}
     >
       {/* Event Banner Container (Left / Top) */}

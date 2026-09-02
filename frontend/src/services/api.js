@@ -23,6 +23,13 @@ export function getUserImageUrl(imageUrl) {
   return `${SERVER_BASE}/assets/images/users/${fileName}`;
 }
 
+export function getPaymentSlipUrl(slipUrl) {
+  if (!slipUrl) return '';
+  if (slipUrl.startsWith('http://') || slipUrl.startsWith('https://')) return slipUrl;
+  const fileName = slipUrl.split('/').pop().split('\\').pop();
+  return `${SERVER_BASE}/assets/images/slips/${fileName}`;
+}
+
 async function request(endpoint, options = {}) {
   const token = localStorage.getItem('eventland_jwt_token');
 
@@ -81,10 +88,10 @@ export const authApi = {
     }
     return data;
   },
-  register: async (fullName, email, password, phoneNumber = null) => {
+  register: async (fullName, email, password, phoneNumber = null, countryId = null) => {
     const data = await request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ fullName, email, password, phoneNumber })
+      body: JSON.stringify({ fullName, email, password, phoneNumber, countryId })
     });
     if (data.token) {
       localStorage.setItem('eventland_jwt_token', data.token);
@@ -347,6 +354,46 @@ export const bankAccountsApi = {
   adminUpdate: async (id, dto) => request(`/admin/bank-accounts/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   adminDelete: async (id) => request(`/admin/bank-accounts/${id}`, { method: 'DELETE' }),
   adminToggleActive: async (id) => request(`/admin/bank-accounts/${id}/toggle-active`, { method: 'PUT' })
+};
+
+// --- Phone Number Dialing Code Helpers ---
+export const formatPhoneNumberOnSubmit = (rawPhone, dialingCode) => {
+  if (!rawPhone || !rawPhone.trim()) return null;
+  let clean = rawPhone.trim();
+  // Trim leading zero if present
+  if (clean.startsWith('0')) {
+    clean = clean.substring(1).trim();
+  }
+  const prefix = dialingCode ? dialingCode.trim() : '+92';
+  if (clean.startsWith(prefix)) {
+    return clean;
+  }
+  return `${prefix} ${clean}`;
+};
+
+export const splitPhoneNumberForEdit = (fullPhone, countryList = [], countryId = null) => {
+  if (!fullPhone) return { dialingCode: '+92', nationalNumber: '', countryId: countryId || 1 };
+  
+  let clean = fullPhone.trim();
+  let foundCountry = countryList.find(c => c.id === countryId);
+  let dialingCode = foundCountry?.dialingCode || '+92';
+
+  if (!foundCountry) {
+    foundCountry = countryList.find(c => c.dialingCode && clean.startsWith(c.dialingCode));
+    if (foundCountry) {
+      dialingCode = foundCountry.dialingCode;
+    }
+  }
+
+  if (dialingCode && clean.startsWith(dialingCode)) {
+    clean = clean.slice(dialingCode.length).trim();
+  }
+
+  return {
+    dialingCode,
+    nationalNumber: clean,
+    countryId: foundCountry?.id || countryId || 1
+  };
 };
 
 

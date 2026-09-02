@@ -19,7 +19,6 @@ import './App.css';
 // Code-split heavy / role-gated views into separate chunks
 const ArtistBookings = lazy(() => import('./components/ArtistBookings'));
 const EventOrganizerWizard = lazy(() => import('./components/EventOrganizerWizard'));
-const AiEventAssistant = lazy(() => import('./components/AiEventAssistant'));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
 const OrganizerDashboard = lazy(() => import('./components/OrganizerDashboard'));
 
@@ -111,7 +110,7 @@ export default function App() {
     }
   };
 
-  const [activeView, setActiveView] = useState('explore'); // explore, artists, ai-assistant, organizer-wizard, my-tickets, organizer, admin
+  const [activeView, setActiveView] = useState('explore'); // explore, artists, organizer-wizard, my-tickets, organizer, admin
   const [userRole, setUserRole] = useState('customer'); // customer, organizer, admin
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('featured');
@@ -335,8 +334,6 @@ export default function App() {
       document.title = `${activeDetailEvent.title} (${activeDetailEvent.city}) | Event Land`;
     } else if (activeView === 'artists') {
       document.title = `Artist Bookings & Live Talent | Event Land`;
-    } else if (activeView === 'ai-assistant') {
-      document.title = `EventVibe AI Matchmaker & Concierge | Event Land`;
     } else if (activeView === 'organizer-wizard') {
       document.title = `List & Host Your Event | Event Land`;
     } else if (activeView === 'my-tickets') {
@@ -671,13 +668,6 @@ export default function App() {
         {activeView === 'artists' && (
           <Suspense fallback={LazyFallback}>
             <ArtistBookings cities={cities} />
-          </Suspense>
-        )}
-
-        {/* View: AI Event Matchmaker Assistant */}
-        {activeView === 'ai-assistant' && (
-          <Suspense fallback={LazyFallback}>
-            <AiEventAssistant events={events} onSelectEvent={handleSelectEventForDetail} />
           </Suspense>
         )}
 

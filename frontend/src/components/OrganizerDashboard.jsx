@@ -418,32 +418,32 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
           </div>
 
           {/* Roster Table */}
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
+          <div className="mature-table-wrapper">
+            <table className="mature-data-table">
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8' }}>
-                  <th style={{ padding: '0.75rem' }}>TICKET ID</th>
-                  <th style={{ padding: '0.75rem' }}>ATTENDEE NAME</th>
-                  <th style={{ padding: '0.75rem' }}>GOVT CNIC #</th>
-                  <th style={{ padding: '0.75rem' }}>PASS TIER / SEAT</th>
-                  <th style={{ padding: '0.75rem' }}>CHECK-IN STATUS</th>
-                  <th style={{ padding: '0.75rem' }}>TIME</th>
+                <tr>
+                  <th>TICKET ID</th>
+                  <th>ATTENDEE NAME</th>
+                  <th>GOVT CNIC #</th>
+                  <th>PASS TIER / SEAT</th>
+                  <th>CHECK-IN STATUS</th>
+                  <th>TIME</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRoster.map((row) => (
-                  <tr key={row.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#cbd5e1' }}>
-                    <td style={{ padding: '0.85rem', fontWeight: 800, color: '#2dd4bf' }}>{row.id}</td>
-                    <td style={{ padding: '0.85rem' }}>
+                  <tr key={row.id}>
+                    <td style={{ fontWeight: 800, color: '#2dd4bf' }}>{row.id}</td>
+                    <td>
                       <div style={{ fontWeight: 700, color: '#fff' }}>{row.name}</div>
                       <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{row.email} • {row.phone}</div>
                     </td>
-                    <td style={{ padding: '0.85rem', fontFamily: 'monospace' }}>{row.cnic}</td>
-                    <td style={{ padding: '0.85rem' }}>
+                    <td style={{ fontFamily: 'monospace' }}>{row.cnic}</td>
+                    <td>
                       <div style={{ color: '#fbbf24', fontWeight: 700 }}>{row.tier}</div>
                       <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{row.seat}</div>
                     </td>
-                    <td style={{ padding: '0.85rem' }}>
+                    <td>
                       <span style={{
                         padding: '0.25rem 0.6rem',
                         borderRadius: '9999px',
@@ -455,7 +455,7 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
                         {row.status}
                       </span>
                     </td>
-                    <td style={{ padding: '0.85rem', color: '#94a3b8' }}>{row.checkedInAt}</td>
+                    <td style={{ color: '#94a3b8' }}>{row.checkedInAt}</td>
                   </tr>
                 ))}
               </tbody>
@@ -482,34 +482,34 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
             </button>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem', textAlign: 'left' }}>
+          <div className="mature-table-wrapper">
+            <table className="mature-data-table">
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8' }}>
-                  <th style={{ padding: '0.75rem' }}>PROMO CODE</th>
-                  <th style={{ padding: '0.75rem' }}>DISCOUNT</th>
-                  <th style={{ padding: '0.75rem' }}>USAGE STATS</th>
-                  <th style={{ padding: '0.75rem' }}>EXPIRY DATE</th>
-                  <th style={{ padding: '0.75rem' }}>STATUS</th>
-                  <th style={{ padding: '0.75rem' }}>ACTION</th>
+                <tr>
+                  <th>PROMO CODE</th>
+                  <th>DISCOUNT</th>
+                  <th>USAGE STATS</th>
+                  <th>EXPIRY DATE</th>
+                  <th>STATUS</th>
+                  <th>ACTION</th>
                 </tr>
               </thead>
               <tbody>
                 {promoCodes.map((p) => (
-                  <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#cbd5e1' }}>
-                    <td style={{ padding: '0.85rem', fontWeight: 900, color: '#fff', letterSpacing: '0.5px' }}>
+                  <tr key={p.id}>
+                    <td style={{ fontWeight: 900, color: '#fff', letterSpacing: '0.5px' }}>
                       <span style={{ backgroundColor: 'rgba(13, 148, 136, 0.15)', border: '1px border-dashed #0d9488', color: '#2dd4bf', padding: '0.3rem 0.6rem', borderRadius: '6px' }}>
                         {p.code}
                       </span>
                     </td>
-                    <td style={{ padding: '0.85rem', fontWeight: 800, color: '#34d399' }}>
+                    <td style={{ fontWeight: 800, color: '#34d399' }}>
                       {p.type === 'percentage' ? `${p.value}% OFF` : `PKR ${p.value} OFF`}
                     </td>
-                    <td style={{ padding: '0.85rem' }}>
+                    <td>
                       <strong>{p.currentUses}</strong> / {p.maxUses} used
                     </td>
-                    <td style={{ padding: '0.85rem', color: '#94a3b8' }}>{p.expiry}</td>
-                    <td style={{ padding: '0.85rem' }}>
+                    <td style={{ color: '#94a3b8' }}>{p.expiry}</td>
+                    <td>
                       <span style={{
                         padding: '0.2rem 0.6rem',
                         borderRadius: '9999px',
@@ -521,7 +521,7 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
                         {p.active ? 'ACTIVE' : 'DISABLED'}
                       </span>
                     </td>
-                    <td style={{ padding: '0.85rem' }}>
+                    <td>
                       <button
                         onClick={() => handleTogglePromoStatus(p.id)}
                         className="btn btn-secondary"

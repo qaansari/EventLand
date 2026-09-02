@@ -42,12 +42,14 @@ public static class DataSeeder
         var superAdminRole = await context.Roles.FirstAsync(r => r.Name == "SuperAdmin");
 
         // 2. Default SuperAdmin User Seeding
-        if (!await context.Users.AnyAsync(u => u.Email == "admin@eventland.pk" && !u.IsDeleted))
+        var existingSuperAdmin = await context.Users.FirstOrDefaultAsync(u => u.Email == "admin@eventland.pk" && !u.IsDeleted);
+        if (existingSuperAdmin == null)
         {
             var superAdmin = new User
             {
                 Email = "admin@eventland.pk",
                 FullName = "Super Admin",
+                PhoneNumber = "+92 331 2541767",
                 RoleId = superAdminRole.Id,
                 IsActive = true
             };
@@ -55,20 +57,37 @@ public static class DataSeeder
             context.Users.Add(superAdmin);
             await context.SaveChangesAsync();
         }
-
-        // 3. Default Country & Major Cities Seeding (Pakistan -> Karachi, Lahore, Islamabad)
-        var pakistan = await context.Countries.FirstOrDefaultAsync(c => c.Code == "PK" || c.Name == "Pakistan");
-        if (pakistan == null)
+        else if (existingSuperAdmin.PhoneNumber != "+92 331 2541767")
         {
-            pakistan = new Country
-            {
-                Name = "Pakistan",
-                Code = "PK",
-                IsActive = true
-            };
-            context.Countries.Add(pakistan);
+            existingSuperAdmin.PhoneNumber = "+92 331 2541767";
             await context.SaveChangesAsync();
         }
+
+        // 3. Default Countries Seeding
+        var countriesToSeed = new[]
+        {
+            new { Name = "Pakistan", Code = "PK", DialingCode = "+92" },
+            new { Name = "United Arab Emirates", Code = "AE", DialingCode = "+971" },
+            new { Name = "Saudi Arabia", Code = "SA", DialingCode = "+966" },
+            new { Name = "United Kingdom", Code = "GB", DialingCode = "+44" },
+            new { Name = "United States", Code = "US", DialingCode = "+1" }
+        };
+
+        foreach (var item in countriesToSeed)
+        {
+            var existingCountry = await context.Countries.FirstOrDefaultAsync(c => c.Code == item.Code);
+            if (existingCountry == null)
+            {
+                context.Countries.Add(new Country { Name = item.Name, Code = item.Code, DialingCode = item.DialingCode, IsActive = true });
+            }
+            else if (existingCountry.DialingCode != item.DialingCode)
+            {
+                existingCountry.DialingCode = item.DialingCode;
+            }
+        }
+        await context.SaveChangesAsync();
+
+        var pakistan = await context.Countries.FirstOrDefaultAsync(c => c.Code == "PK" || c.Name == "Pakistan");
 
         var defaultCities = new[] { "Karachi", "Lahore", "Islamabad" };
         foreach (var cityName in defaultCities)

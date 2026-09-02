@@ -130,10 +130,30 @@ public static class FileUrlHelper
     }
 
     /// <summary>
+    /// Formats a transaction payment slip image URL for API responses.
+    /// </summary>
+    public static string FormatPaymentSlipUrl(string? slipUrl)
+    {
+        if (string.IsNullOrWhiteSpace(slipUrl)) return string.Empty;
+
+        var trimmed = slipUrl.Trim();
+
+        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("/"))
+        {
+            return trimmed;
+        }
+
+        return $"/assets/images/slips/{trimmed}";
+    }
+
+    /// <summary>
     /// Generates structured image filename following strict naming convention:
     /// Organizers: org_[name]_[fullId].[ext] (e.g. org_eventland_42.png)
     /// Users:      usr_[name]_[fullId].[ext] (e.g. usr_qamaransari_7.png)
     /// QR Codes:   qr_[name]_[fullId].[ext] (e.g. qr_meezanbank_1.png)
+    /// Slips:      slip_[name]_[fullId].[ext] (e.g. slip_payment_105.jpg)
     /// Events:     ev_[name]_[fullId].[ext] (e.g. ev_suffinight_123.jpg)
     /// The full entity id is embedded (not modulo) so filenames never collide across ids.
     /// </summary>
@@ -148,6 +168,7 @@ public static class FileUrlHelper
             "user" or "users" => "usr",
             "artist" or "artists" => "art",
             "qrcode" or "qr_code" or "qr_codes" or "bank" or "bankaccount" or "bankaccounts" => "qr",
+            "slip" or "slips" or "proof" or "proofs" or "transaction" or "transactions" or "paymentproof" or "paymentproofs" or "receipt" or "receipts" => "slip",
             _ => "ev"
         };
 
@@ -165,6 +186,7 @@ public static class FileUrlHelper
                 "usr" => "user",
                 "art" => "artist",
                 "qr" => "bankqr",
+                "slip" => "receipt",
                 _ => "event"
             };
         }

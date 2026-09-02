@@ -4,6 +4,7 @@ using EventLand.Api.Middleware;
 using EventLand.Application.Interfaces;
 using EventLand.Infrastructure;
 using EventLand.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.OpenApi;
@@ -155,6 +156,7 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await dbContext.Database.MigrateAsync();
         await DataSeeder.SeedAsync(dbContext);
 
         var authService = scope.ServiceProvider.GetRequiredService<IAuthService>();

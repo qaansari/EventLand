@@ -39,6 +39,11 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
                .HasForeignKey(u => u.RoleId)
                .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(u => u.Country)
+               .WithMany()
+               .HasForeignKey(u => u.CountryId)
+               .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasQueryFilter(u => !u.IsDeleted);
     }
 }

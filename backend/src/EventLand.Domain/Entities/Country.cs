@@ -9,6 +9,7 @@ public class Country : BaseEntity
 {
     public string Name { get; set; } = string.Empty; // e.g. "Pakistan"
     public string Code { get; set; } = string.Empty; // e.g. "PK"
+    public string? DialingCode { get; set; } // e.g. "+92"
     public bool IsActive { get; set; } = true;
 
     public ICollection<City> Cities { get; set; } = new List<City>();

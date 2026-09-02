@@ -190,7 +190,8 @@ public record CreateUserDto(
     string FullName,
     int RoleId,
     string? PhoneNumber,
-    string? ImageUrl = null
+    string? ImageUrl = null,
+    int? CountryId = null
 );
 
 public record UpdateUserDto(
@@ -199,5 +200,6 @@ public record UpdateUserDto(
     string? PhoneNumber,
     bool IsActive,
     string? ImageUrl = null,
-    string? Password = null
+    string? Password = null,
+    int? CountryId = null
 );

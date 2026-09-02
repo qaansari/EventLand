@@ -13,9 +13,10 @@ import {
   Copy, 
   Check, 
   MessageSquare,
-  Send
+  Send,
+  UploadCloud
 } from 'lucide-react';
-import { bookingsApi, bankAccountsApi, getEventImageUrl } from '../services/api';
+import { bookingsApi, bankAccountsApi, uploadApi, getEventImageUrl, getPaymentSlipUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 
 export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuccess, onInvoicePaid }) {
@@ -27,24 +28,24 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
   const [timers, setTimers] = useState({});
 
   // Active Bank Account from DB
-  const [bankAccount, setBankAccount] = useState({
-    bankName: 'Meezan Bank Limited',
-    accountTitle: 'EventLand Official Pvt Ltd',
-    accountNumber: '0102030405060701',
-    iban: 'PK64MEZN0001020304050607',
-    branchCode: '0102',
-    branchName: 'Clifton Branch, Karachi'
-  });
+  const [bankAccount, setBankAccount] = useState(null);
   const [copiedField, setCopiedField] = useState(null);
   const [tidInputs, setTidInputs] = useState({});
+  const [proofUrls, setProofUrls] = useState({});
+  const [uploadingSlipKey, setUploadingSlipKey] = useState(null);
 
   useEffect(() => {
     async function loadBank() {
       try {
         const active = await bankAccountsApi.getActive();
-        if (active) setBankAccount(active);
+        if (active && (active.accountNumber || active.iban || active.bankName)) {
+          setBankAccount(active);
+        } else {
+          setBankAccount(null);
+        }
       } catch (err) {
         console.warn('Bank fetch error:', err);
+        setBankAccount(null);
       }
     }
     loadBank();
@@ -156,11 +157,41 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
+  const handleSlipFileUpload = async (refKey, file) => {
+    if (!file) return;
+
+    // Strict image format extension check: webp, jpg, jpeg, png ONLY
+    const allowedExtensions = ['.webp', '.jpg', '.jpeg', '.png'];
+    const ext = file.name.slice(((file.name.lastIndexOf(".") - 1) >>> 0) + 2).toLowerCase();
+    if (!allowedExtensions.includes('.' + ext)) {
+      showError('Invalid File Format', 'Only webp, jpg, jpeg, and png payment slips are supported.');
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      showError('File Too Large', 'Transaction slip image size must be under 25 MB.');
+      return;
+    }
+
+    setUploadingSlipKey(refKey);
+    try {
+      const res = await uploadApi.uploadFile(file, 'slips');
+      setProofUrls(prev => ({ ...prev, [refKey]: res.url }));
+      showSuccess('Receipt Uploaded 📎', 'Transaction slip image compressed & saved in organized slips directory.');
+    } catch (err) {
+      showError('Upload Failed', err.message || 'Could not upload payment slip.');
+    } finally {
+      setUploadingSlipKey(null);
+    }
+  };
+
   const handleSubmitProofForInvoice = async (invoice) => {
     const refKey = invoice.bookingRef || invoice.id;
     const enteredTid = tidInputs[refKey] || invoice.bankTransactionRef;
-    if (!enteredTid?.trim()) {
-      showError('Transaction TID Required', 'Please enter your bank transfer transaction ID or reference number.');
+    const slipUrlToSubmit = proofUrls[refKey] || invoice.paymentProofUrl || null;
+
+    if (!enteredTid?.trim() && !slipUrlToSubmit) {
+      showError('Proof Required', 'Please enter your Bank Transaction ID or upload your transaction slip image.');
       return;
     }
 
@@ -168,11 +199,12 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
     try {
       if (invoice.bookingId) {
         await bookingsApi.submitPaymentProof(invoice.bookingId, {
-          bankTransactionRef: enteredTid.trim()
+          bankTransactionRef: (enteredTid || '').trim(),
+          paymentProofUrl: slipUrlToSubmit
         });
       }
 
-      showSuccess('Proof Submitted! 🏦', 'Bank transfer TID saved. Super Admin will verify and confirm your booking.');
+      showSuccess('Proof Submitted! 🏦', 'Payment details saved. Super Admin will verify and issue your official E-Ticket.');
       loadUnpaidInvoices();
     } catch (err) {
       showError('Submission Failed', err.message || 'Could not submit payment proof.');
@@ -230,7 +262,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
         maxHeight: '90vh',
         borderRadius: '24px',
         border: '1px solid rgba(13, 148, 136, 0.35)',
-        boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.95), 0 0 35px rgba(13, 148, 136, 0.25)',
+        boxShadow: '0 12px 36px rgba(0, 0, 0, 0.5)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden'
@@ -278,18 +310,20 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
         </div>
 
         {/* Bank Receiving Info Strip with 1-Click Copy */}
-        <div style={{ padding: '0.85rem 1.5rem', background: 'rgba(13, 148, 136, 0.1)', borderBottom: '1px solid rgba(13, 148, 136, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.8rem' }}>
-          <div>
-            <strong style={{ color: '#fff' }}>{bankAccount.bankName}</strong>: Acc# <span style={{ color: '#2dd4bf', fontWeight: 700 }}>{bankAccount.accountNumber}</span> | Title: <strong>{bankAccount.accountTitle}</strong>
+        {bankAccount && (bankAccount.accountNumber || bankAccount.iban || bankAccount.bankName) && (
+          <div style={{ padding: '0.85rem 1.5rem', background: 'rgba(13, 148, 136, 0.1)', borderBottom: '1px solid rgba(13, 148, 136, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.8rem' }}>
+            <div>
+              <strong style={{ color: '#fff' }}>{bankAccount.bankName}</strong>: Acc# <span style={{ color: '#2dd4bf', fontWeight: 700 }}>{bankAccount.accountNumber}</span> | Title: <strong>{bankAccount.accountTitle}</strong>
+            </div>
+            <button
+              type="button"
+              onClick={() => copyToClipboard(bankAccount.accountNumber, 'Account Number')}
+              style={{ background: copiedField === 'Account Number' ? '#059669' : 'rgba(13, 148, 136, 0.25)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', padding: '0.25rem 0.6rem', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}
+            >
+              {copiedField === 'Account Number' ? <><Check size={12} color="#fff" /> Copied!</> : <><Copy size={12} /> Copy Acc#</>}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => copyToClipboard(bankAccount.accountNumber, 'Account Number')}
-            style={{ background: copiedField === 'Account Number' ? '#059669' : 'rgba(13, 148, 136, 0.25)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', padding: '0.25rem 0.6rem', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}
-          >
-            {copiedField === 'Account Number' ? <><Check size={12} color="#fff" /> Copied!</> : <><Copy size={12} /> Copy Acc#</>}
-          </button>
-        </div>
+        )}
 
         {/* Search & Refresh Bar */}
         <div style={{ padding: '0.85rem 1.5rem', backgroundColor: '#070c18', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
@@ -419,29 +453,74 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
                       </div>
                     </div>
 
-                    {/* Transaction Reference Input & Submit */}
-                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <div style={{ flex: 1, minWidth: '200px' }}>
-                        <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.2rem', fontWeight: 600 }}>
-                          Bank Transaction Reference # / Raast TID
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. TXN-982314 or Raast TID"
-                          value={currentTid}
-                          onChange={e => setTidInputs({ ...tidInputs, [refKey]: e.target.value })}
-                          style={{ width: '100%', padding: '0.5rem 0.75rem', background: 'rgba(0, 0, 0, 0.4)', border: '1px solid rgba(13, 148, 136, 0.3)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
-                        />
+                    {/* Transaction Reference & Slip Upload */}
+                    <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                          <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.2rem', fontWeight: 600 }}>
+                            Bank Transaction Reference # / Raast TID
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. TXN-982314 or Raast TID"
+                            value={currentTid}
+                            onChange={e => setTidInputs({ ...tidInputs, [refKey]: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem 0.75rem', background: 'rgba(0, 0, 0, 0.4)', border: '1px solid rgba(13, 148, 136, 0.3)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
+                          />
+                        </div>
+
+                        <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <input
+                            type="file"
+                            accept=".webp,.jpg,.jpeg,.png"
+                            id={`slip-upload-${refKey}`}
+                            style={{ display: 'none' }}
+                            onChange={e => handleSlipFileUpload(refKey, e.target.files?.[0])}
+                          />
+                          <label
+                            htmlFor={`slip-upload-${refKey}`}
+                            style={{
+                              padding: '0.5rem 0.85rem',
+                              background: 'rgba(255, 255, 255, 0.08)',
+                              border: '1px solid rgba(13, 148, 136, 0.35)',
+                              borderRadius: '8px',
+                              color: '#fff',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.35rem'
+                            }}
+                          >
+                            <UploadCloud size={14} color="#0d9488" /> {uploadingSlipKey === refKey ? 'Compressing...' : ((proofUrls[refKey] || inv.paymentProofUrl) ? 'Change Slip' : 'Upload Slip')}
+                          </label>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSubmitProofForInvoice(inv)}
+                            disabled={isProcessing || isExpired}
+                            className="btn btn-primary"
+                            style={{ padding: '0.5rem 1rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                          >
+                            <Send size={13} /> {inv.bankTransactionRef ? 'Update Proof' : 'Submit Proof'}
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleSubmitProofForInvoice(inv)}
-                        disabled={isProcessing || isExpired}
-                        className="btn btn-primary"
-                        style={{ padding: '0.55rem 1rem', fontSize: '0.82rem', marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                      >
-                        <Send size={13} /> {inv.bankTransactionRef ? 'Update TID' : 'Submit TID Proof'}
-                      </button>
+
+                      {/* Attached Payment Slip Preview */}
+                      {(proofUrls[refKey] || inv.paymentProofUrl) && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', background: 'rgba(0, 0, 0, 0.3)', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid rgba(45, 212, 191, 0.25)', width: 'fit-content' }}>
+                          <img
+                            src={getPaymentSlipUrl(proofUrls[refKey] || inv.paymentProofUrl)}
+                            alt="Payment Slip"
+                            style={{ width: '48px', height: '36px', objectFit: 'cover', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.15)' }}
+                          />
+                          <div style={{ fontSize: '0.75rem', color: '#2dd4bf', fontWeight: 600 }}>
+                            Receipt Slip Attached ✓
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Footer / Cancel */}

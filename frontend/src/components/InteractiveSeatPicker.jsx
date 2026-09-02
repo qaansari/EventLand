@@ -508,7 +508,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 40px rgba(13, 148, 136, 0.15)',
+          boxShadow: '0 12px 36px rgba(0, 0, 0, 0.5)',
           border: '1px solid rgba(13, 148, 136, 0.3)'
         }}
       >
@@ -731,8 +731,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
               color: '#f8fafc',
               fontWeight: 900,
               letterSpacing: '0.35em',
-              fontSize: '1.1rem',
-              boxShadow: '0 4px 25px rgba(0, 0, 0, 0.6), 0 0 20px rgba(13, 148, 136, 0.15)'
+              fontSize: '1.1rem'
             }}>
               STAGE / SCREEN
             </div>

@@ -377,7 +377,7 @@ public class BookingService : IBookingService
                     bs.Seat.Price
                 )).ToList(),
             b.BankTransactionRef,
-            b.PaymentProofUrl,
+            FileUrlHelper.FormatPaymentSlipUrl(b.PaymentProofUrl),
             b.VerifiedAt,
             b.PaymentExpiresAt,
             FileUrlHelper.FormatEventBannerUrl(b.Event?.Banner),

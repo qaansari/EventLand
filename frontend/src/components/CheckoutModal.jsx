@@ -149,11 +149,25 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
   const handleProofFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Strict image format extension check: webp, jpg, jpeg, png ONLY
+    const allowedExtensions = ['.webp', '.jpg', '.jpeg', '.png'];
+    const ext = file.name.slice(((file.name.lastIndexOf(".") - 1) >>> 0) + 2).toLowerCase();
+    if (!allowedExtensions.includes('.' + ext)) {
+      showError('Invalid File Format', 'Only webp, jpg, jpeg, and png payment slips are supported.');
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      showError('File Too Large', 'Transaction slip image size must be under 25 MB.');
+      return;
+    }
+
     setIsUploadingProof(true);
     try {
-      const res = await uploadApi.uploadFile(file, 'proofs');
+      const res = await uploadApi.uploadFile(file, 'slips');
       setProofUrl(res.url);
-      showSuccess('Receipt Uploaded 📎', 'Payment receipt image attached.');
+      showSuccess('Receipt Uploaded 📎', 'Transaction slip image compressed & saved in organized slips directory.');
     } catch (err) {
       showError('Upload Failed', err.message || 'Could not upload payment slip.');
     } finally {
@@ -292,7 +306,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         overflowY: 'auto',
         borderRadius: '24px',
         border: '1px solid rgba(13, 148, 136, 0.35)',
-        boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.95), 0 0 35px rgba(13, 148, 136, 0.25)',
+        boxShadow: '0 12px 36px rgba(0, 0, 0, 0.5)',
         padding: '2rem'
       }}>
         {/* Header */}
@@ -676,41 +690,62 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                 </span>
               </div>
 
-              {/* Optional Payment Screenshot Slip Upload */}
+              {/* Payment Screenshot Slip Upload */}
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{ display: 'block', fontSize: '0.8125rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '0.35rem' }}>
-                  Upload Payment Screenshot / Transfer Slip (Optional)
+                  Upload Payment Screenshot / Transfer Slip (WEBP, JPG, PNG)
                 </label>
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    id="proof-upload"
-                    style={{ display: 'none' }}
-                    onChange={handleProofFileUpload}
-                  />
-                  <label
-                    htmlFor="proof-upload"
-                    style={{
-                      padding: '0.7rem 1.25rem',
-                      background: 'rgba(255, 255, 255, 0.08)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      borderRadius: '8px',
-                      color: '#fff',
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.4rem'
-                    }}
-                  >
-                    <UploadCloud size={16} /> {isUploadingProof ? 'Uploading...' : 'Choose Receipt Image'}
-                  </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                    <input
+                      type="file"
+                      accept=".webp,.jpg,.jpeg,.png"
+                      id="proof-upload"
+                      style={{ display: 'none' }}
+                      onChange={handleProofFileUpload}
+                    />
+                    <label
+                      htmlFor="proof-upload"
+                      style={{
+                        padding: '0.65rem 1.1rem',
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(13, 148, 136, 0.35)',
+                        borderRadius: '10px',
+                        color: '#fff',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
+                      }}
+                    >
+                      <UploadCloud size={16} color="#0d9488" /> {isUploadingProof ? 'Compressing & Uploading...' : (proofUrl ? 'Change Receipt Slip' : 'Choose Receipt Image')}
+                    </label>
+                    {proofUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setProofUrl('')}
+                        style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', padding: '0.45rem 0.75rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                      >
+                        Remove Slip
+                      </button>
+                    )}
+                  </div>
                   {proofUrl && (
-                    <span style={{ fontSize: '0.8rem', color: '#2dd4bf', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <CheckCircle size={14} /> Receipt attached!
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(15, 23, 42, 0.7)', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1px solid rgba(45, 212, 191, 0.35)', width: 'fit-content' }}>
+                      <img
+                        src={getPaymentSlipUrl(proofUrl)}
+                        alt="Attached Slip Preview"
+                        style={{ width: '56px', height: '42px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.2)' }}
+                      />
+                      <div>
+                        <div style={{ fontSize: '0.78rem', color: '#2dd4bf', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <CheckCircle size={13} /> Transaction Slip Attached & Compressed!
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Saved in /assets/images/slips/</div>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

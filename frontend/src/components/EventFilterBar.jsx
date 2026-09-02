@@ -100,7 +100,7 @@ export default function EventFilterBar({
                 whiteSpace: 'nowrap',
                 cursor: 'pointer',
                 transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                boxShadow: isActive ? '0 4px 18px rgba(13, 148, 136, 0.5)' : 'none',
+                boxShadow: 'none',
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.45rem',
@@ -139,8 +139,7 @@ export default function EventFilterBar({
         backdropFilter: 'blur(16px)',
         padding: '0.85rem 1.35rem',
         borderRadius: '16px',
-        border: '1px solid rgba(13, 148, 136, 0.25)',
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)'
+        border: '1px solid rgba(13, 148, 136, 0.25)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>Quick City:</span>
@@ -161,7 +160,7 @@ export default function EventFilterBar({
                     fontWeight: isSelected ? 700 : 500,
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
-                    boxShadow: isSelected ? '0 0 12px rgba(13, 148, 136, 0.3)' : 'none'
+                    boxShadow: 'none'
                   }}
                   onMouseEnter={(e) => {
                     if (!isSelected) {

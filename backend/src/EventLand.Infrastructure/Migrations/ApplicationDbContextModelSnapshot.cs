@@ -483,6 +483,9 @@ namespace EventLand.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("DialingCode")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -509,9 +512,54 @@ namespace EventLand.Infrastructure.Migrations
                             Id = 1,
                             Code = "PK",
                             CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DialingCode = "+92",
                             IsActive = true,
                             IsDeleted = false,
                             Name = "Pakistan",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Code = "AE",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DialingCode = "+971",
+                            IsActive = true,
+                            IsDeleted = false,
+                            Name = "United Arab Emirates",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Code = "SA",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DialingCode = "+966",
+                            IsActive = true,
+                            IsDeleted = false,
+                            Name = "Saudi Arabia",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Code = "GB",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DialingCode = "+44",
+                            IsActive = true,
+                            IsDeleted = false,
+                            Name = "United Kingdom",
+                            UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Code = "US",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            DialingCode = "+1",
+                            IsActive = true,
+                            IsDeleted = false,
+                            Name = "United States",
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
                         });
                 });
@@ -1366,6 +1414,9 @@ namespace EventLand.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
 
+                    b.Property<int?>("CountryId")
+                        .HasColumnType("int");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -1418,6 +1469,8 @@ namespace EventLand.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CountryId");
+
                     b.HasIndex("Email")
                         .IsUnique()
                         .HasDatabaseName("IX_Users_Email")
@@ -1436,7 +1489,8 @@ namespace EventLand.Infrastructure.Migrations
                             FullName = "Super Admin",
                             IsActive = true,
                             IsDeleted = false,
-                            PasswordHash = "AQAAAAIAAYagAAAAENtEHgk5Bb4ECS6lht+1+8+Q9Ng8JsfDfEKF67zmh4AWY2ufSE/oEFAaqto+hdeSsQ==",
+                            PasswordHash = "AQAAAAIAAYagAAAAENG4wsxNaY8HzMLppm+krVBdOe6xCL6XSwBqivW71fBgOJdat/lKZZFdsdv7u1pZXg==",
+                            PhoneNumber = "+92 331 2541767",
                             RoleId = 1,
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
                         });
@@ -1692,11 +1746,18 @@ namespace EventLand.Infrastructure.Migrations
 
             modelBuilder.Entity("EventLand.Domain.Entities.User", b =>
                 {
+                    b.HasOne("EventLand.Domain.Entities.Country", "Country")
+                        .WithMany()
+                        .HasForeignKey("CountryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("EventLand.Domain.Entities.Role", "Role")
                         .WithMany("Users")
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Country");
 
                     b.Navigation("Role");
                 });

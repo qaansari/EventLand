@@ -31,6 +31,7 @@ public class AuthService : IAuthService
         var normalizedEmail = (dto.Email ?? string.Empty).Trim().ToLower();
         var user = await _context.Users
             .Include(u => u.Role)
+            .Include(u => u.Country)
             .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail && !u.IsDeleted);
 
         if (user is null || !user.IsActive)
@@ -45,7 +46,7 @@ public class AuthService : IAuthService
         await _context.SaveChangesAsync();
 
         var (token, expiresAt) = _tokenGenerator.GenerateToken(user);
-        var userDto = new UserDto(user.Id, user.Email, user.FullName, user.Role?.Name ?? "Customer", user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl));
+        var userDto = new UserDto(user.Id, user.Email, user.FullName, user.Role?.Name ?? "Customer", user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl), user.PhoneNumber, user.CountryId, user.Country?.Name, user.Country?.DialingCode);
 
         return new LoginResponseDto(token, userDto, expiresAt);
     }
@@ -75,6 +76,7 @@ public class AuthService : IAuthService
             Email = email,
             FullName = fullName,
             PhoneNumber = string.IsNullOrWhiteSpace(dto.PhoneNumber) ? null : dto.PhoneNumber.Trim(),
+            CountryId = dto.CountryId ?? 1,
             RoleId = customerRole.Id,
             Role = customerRole,
             IsActive = true,
@@ -85,8 +87,10 @@ public class AuthService : IAuthService
         _context.Users.Add(user);
         await _context.SaveChangesAsync();
 
+        var country = await _context.Countries.FirstOrDefaultAsync(c => c.Id == user.CountryId);
+
         var (token, expiresAt) = _tokenGenerator.GenerateToken(user);
-        var userDto = new UserDto(user.Id, user.Email, user.FullName, customerRole.Name, user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl));
+        var userDto = new UserDto(user.Id, user.Email, user.FullName, customerRole.Name, user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl), user.PhoneNumber, user.CountryId, country?.Name, country?.DialingCode);
 
         return new LoginResponseDto(token, userDto, expiresAt);
     }
@@ -109,9 +113,10 @@ public class AuthService : IAuthService
         var user = await _context.Users
             .AsNoTracking()
             .Include(u => u.Role)
+            .Include(u => u.Country)
             .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive && !u.IsDeleted);
 
-        return user == null ? null : new UserDto(user.Id, user.Email, user.FullName, user.Role?.Name ?? "Customer", user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl));
+        return user == null ? null : new UserDto(user.Id, user.Email, user.FullName, user.Role?.Name ?? "Customer", user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl), user.PhoneNumber, user.CountryId, user.Country?.Name, user.Country?.DialingCode);
     }
 
     public async Task ChangePasswordAsync(int userId, ChangePasswordDto dto)
@@ -150,21 +155,28 @@ public class AuthService : IAuthService
 
         var superAdminRole = await _context.Roles.FirstAsync(r => r.Name == "SuperAdmin");
 
-        // 2. Seed Super Admin user if not exists
-        var hasSuperAdmin = await _context.Users.AnyAsync(u => u.RoleId == superAdminRole.Id && !u.IsDeleted);
-        if (hasSuperAdmin) return;
-
-        var superAdmin = new User
+        // 2. Seed Super Admin user if not exists or update phone number / countryId
+        var superAdmin = await _context.Users.FirstOrDefaultAsync(u => u.RoleId == superAdminRole.Id && !u.IsDeleted);
+        if (superAdmin == null)
         {
-            Email = "admin@eventland.pk",
-            FullName = "Super Admin",
-            RoleId = superAdminRole.Id,
-            IsActive = true
-        };
-
-        superAdmin.PasswordHash = _passwordHasher.HashPassword(superAdmin, "SuperAdmin123!");
-
-        _context.Users.Add(superAdmin);
-        await _context.SaveChangesAsync();
+            superAdmin = new User
+            {
+                Email = "admin@eventland.pk",
+                FullName = "Super Admin",
+                PhoneNumber = "+92 331 2541767",
+                CountryId = 1,
+                RoleId = superAdminRole.Id,
+                IsActive = true
+            };
+            superAdmin.PasswordHash = _passwordHasher.HashPassword(superAdmin, "SuperAdmin123!");
+            _context.Users.Add(superAdmin);
+            await _context.SaveChangesAsync();
+        }
+        else if (superAdmin.PhoneNumber != "+92 331 2541767" || superAdmin.CountryId != 1)
+        {
+            superAdmin.PhoneNumber = "+92 331 2541767";
+            superAdmin.CountryId = 1;
+            await _context.SaveChangesAsync();
+        }
     }
 }

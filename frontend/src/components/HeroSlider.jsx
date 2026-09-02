@@ -50,23 +50,10 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
         maxHeight: '480px',
         borderRadius: '24px',
         overflow: 'hidden',
-        boxShadow: '0 25px 50px -15px rgba(0, 0, 0, 0.85), 0 0 35px rgba(13, 148, 136, 0.3)',
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
         border: '1px solid rgba(13, 148, 136, 0.35)',
         backgroundColor: '#060a14'
       }}>
-        {/* Ambient Radial Glow Orb */}
-        <div style={{
-          position: 'absolute',
-          top: '-20%',
-          right: '-10%',
-          width: '350px',
-          height: '350px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(13, 148, 136, 0.28) 0%, transparent 70%)',
-          filter: 'blur(45px)',
-          pointerEvents: 'none',
-          zIndex: 2
-        }} />
         {/* Animated Ken Burns Background Image */}
         <img
           key={`bg-${currentIndex}`}
@@ -118,8 +105,7 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
                 fontWeight: 700,
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.3rem',
-                boxShadow: '0 0 12px rgba(139, 92, 246, 0.3)'
+                gap: '0.3rem'
               }}>
                 <Sparkles size={13} color="#c084fc" /> FEATURED PASS
               </span>
@@ -134,8 +120,7 @@ export default function HeroSlider({ featuredEvents = [], onSelectEvent }) {
               lineHeight: 1.18,
               marginBottom: '0.75rem',
               color: '#ffffff',
-              maxWidth: '850px',
-              textShadow: '0 4px 30px rgba(0,0,0,0.9)'
+              maxWidth: '850px'
             }}>
               {current.title}
             </h1>

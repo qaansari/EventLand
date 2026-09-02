@@ -29,6 +29,7 @@ public static class ModelBuilderExtensions
                 Id = 1,
                 Email = "admin@eventland.pk",
                 FullName = "Super Admin",
+                PhoneNumber = "+92 331 2541767",
                 PasswordHash = adminPasswordHash,
                 RoleId = 1,
                 IsActive = true,
@@ -39,7 +40,11 @@ public static class ModelBuilderExtensions
 
         // 3. Country & Cities
         modelBuilder.Entity<Country>().HasData(
-            new Country { Id = 1, Name = "Pakistan", Code = "PK", IsActive = true, CreatedAt = fixedDateOffset, UpdatedAt = fixedDateOffset }
+            new Country { Id = 1, Name = "Pakistan", Code = "PK", DialingCode = "+92", IsActive = true, CreatedAt = fixedDateOffset, UpdatedAt = fixedDateOffset },
+            new Country { Id = 2, Name = "United Arab Emirates", Code = "AE", DialingCode = "+971", IsActive = true, CreatedAt = fixedDateOffset, UpdatedAt = fixedDateOffset },
+            new Country { Id = 3, Name = "Saudi Arabia", Code = "SA", DialingCode = "+966", IsActive = true, CreatedAt = fixedDateOffset, UpdatedAt = fixedDateOffset },
+            new Country { Id = 4, Name = "United Kingdom", Code = "GB", DialingCode = "+44", IsActive = true, CreatedAt = fixedDateOffset, UpdatedAt = fixedDateOffset },
+            new Country { Id = 5, Name = "United States", Code = "US", DialingCode = "+1", IsActive = true, CreatedAt = fixedDateOffset, UpdatedAt = fixedDateOffset }
         );
 
         modelBuilder.Entity<City>().HasData(

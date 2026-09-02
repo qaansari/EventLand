@@ -39,7 +39,7 @@ import {
   MessageSquare,
   Lock
 } from 'lucide-react';
-import { adminApi, locationsApi, uploadApi, faqsApi, footerApi, paymentsApi, bankAccountsApi, bookingsApi, getEventImageUrl, getOrganizerImageUrl, getUserImageUrl } from '../services/api';
+import { adminApi, locationsApi, uploadApi, faqsApi, footerApi, paymentsApi, bankAccountsApi, bookingsApi, getEventImageUrl, getOrganizerImageUrl, getUserImageUrl, getPaymentSlipUrl, formatPhoneNumberOnSubmit, splitPhoneNumberForEdit } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
@@ -271,7 +271,8 @@ export default function AdminDashboard({ onSelectEvent }) {
     email: '',
     password: '',
     roleId: 2,
-    phoneNumber: '+92 300 0000000',
+    countryId: 1,
+    phoneNumber: '',
     imageUrl: ''
   };
 
@@ -872,11 +873,16 @@ export default function AdminDashboard({ onSelectEvent }) {
     }
 
     try {
+      const activeCountry = countriesList.find(c => c.id === parseInt(userForm.countryId, 10)) || countriesList[0];
+      const dialingCode = activeCountry?.dialingCode || '+92';
+      const formattedPhone = formatPhoneNumberOnSubmit(userForm.phoneNumber, dialingCode);
+
       if (userForm.id) {
         const payload = {
           fullName: userForm.fullName,
           roleId: parseInt(userForm.roleId, 10),
-          phoneNumber: userForm.phoneNumber,
+          phoneNumber: formattedPhone,
+          countryId: parseInt(userForm.countryId, 10),
           imageUrl: userForm.imageUrl || null,
           password: userForm.password || null,
           isActive: true
@@ -891,7 +897,8 @@ export default function AdminDashboard({ onSelectEvent }) {
           password: userForm.password,
           fullName: userForm.fullName,
           roleId: parseInt(userForm.roleId, 10),
-          phoneNumber: userForm.phoneNumber,
+          phoneNumber: formattedPhone,
+          countryId: parseInt(userForm.countryId, 10),
           imageUrl: userForm.imageUrl || null
         };
         await adminApi.users.create(payload);
@@ -911,13 +918,16 @@ export default function AdminDashboard({ onSelectEvent }) {
 
   const handleEditUser = (u) => {
     const matchedRole = rolesList.find(r => (r.name || '').toLowerCase() === (u.role || '').toLowerCase());
+    const splitPhone = splitPhoneNumberForEdit(u.phoneNumber, countriesList, u.countryId);
+
     setUserForm({
       id: u.id,
       email: u.email || '',
       password: '',
       fullName: u.fullName || '',
       roleId: matchedRole ? matchedRole.id : (u.roleId || rolesList[0]?.id || 2),
-      phoneNumber: u.phoneNumber || '',
+      countryId: splitPhone.countryId || u.countryId || 1,
+      phoneNumber: splitPhone.nationalNumber || '',
       imageUrl: u.imageUrl || ''
     });
     setShowUserModal(true);
@@ -2058,8 +2068,8 @@ export default function AdminDashboard({ onSelectEvent }) {
             </div>
           </div>
 
-          <div className="glass-card" style={{ overflowX: 'auto', borderRadius: '16px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="mature-table-wrapper">
+            <table className="mature-data-table">
               <thead>
                 <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                   <th style={{ padding: '1rem' }}>Title</th>
@@ -2125,8 +2135,8 @@ export default function AdminDashboard({ onSelectEvent }) {
             </button>
           </div>
 
-          <div className="glass-card" style={{ overflowX: 'auto', borderRadius: '16px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="mature-table-wrapper">
+            <table className="mature-data-table">
               <thead>
                 <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                   <th style={{ padding: '1rem' }}>Name</th>
@@ -2204,8 +2214,8 @@ export default function AdminDashboard({ onSelectEvent }) {
             </button>
           </div>
 
-          <div className="glass-card" style={{ overflowX: 'auto', borderRadius: '16px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="mature-table-wrapper">
+            <table className="mature-data-table">
               <thead>
                 <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                   <th style={{ padding: '1rem' }}>Artist Name</th>
@@ -2345,8 +2355,8 @@ export default function AdminDashboard({ onSelectEvent }) {
           </div>
 
           {/* Bookings Table */}
-          <div className="glass-card" style={{ overflowX: 'auto', borderRadius: '16px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+          <div className="mature-table-wrapper">
+            <table className="mature-data-table">
               <thead>
                 <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                   <th style={{ padding: '1rem', color: '#94a3b8' }}>Booking Ref</th>
@@ -2508,7 +2518,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                                   title="Click to view full receipt screenshot"
                                 >
                                   <img
-                                    src={b.paymentProofUrl}
+                                    src={getPaymentSlipUrl(b.paymentProofUrl)}
                                     alt="Receipt Slip"
                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                   />
@@ -2671,12 +2681,13 @@ export default function AdminDashboard({ onSelectEvent }) {
             </button>
           </div>
 
-          <div className="glass-card" style={{ overflowX: 'auto', borderRadius: '16px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="mature-table-wrapper">
+            <table className="mature-data-table">
               <thead>
                 <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                   <th style={{ padding: '1rem' }}>Full Name</th>
                   <th style={{ padding: '1rem' }}>Email</th>
+                  <th style={{ padding: '1rem' }}>Mobile Number</th>
                   <th style={{ padding: '1rem' }}>Role</th>
                   <th style={{ padding: '1rem' }}>Actions</th>
                 </tr>
@@ -2695,11 +2706,13 @@ export default function AdminDashboard({ onSelectEvent }) {
                         )}
                         <div>
                           <div>{u.fullName}</div>
-                          {u.phoneNumber && <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{u.phoneNumber}</div>}
                         </div>
                       </div>
                     </td>
                     <td style={{ padding: '1rem', color: '#94a3b8' }}>{u.email}</td>
+                    <td style={{ padding: '1rem', color: '#2dd4bf', fontWeight: 600, fontSize: '0.85rem' }}>
+                      {u.phoneNumber || u.phone || <span style={{ color: '#64748b', fontWeight: 400 }}>N/A</span>}
+                    </td>
                     <td style={{ padding: '1rem' }}>
                       <span style={{ padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', fontWeight: 600 }}>
                         {u.role}
@@ -2742,8 +2755,8 @@ export default function AdminDashboard({ onSelectEvent }) {
             </button>
           </div>
 
-          <div className="glass-card" style={{ overflowX: 'auto', borderRadius: '16px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="mature-table-wrapper">
+            <table className="mature-data-table">
               <thead>
                 <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                   <th style={{ padding: '1rem' }}>Role Name</th>
@@ -2793,8 +2806,8 @@ export default function AdminDashboard({ onSelectEvent }) {
             </button>
           </div>
 
-          <div className="glass-card" style={{ overflowX: 'auto', borderRadius: '16px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="mature-table-wrapper">
+            <table className="mature-data-table">
               <thead>
                 <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                   <th style={{ padding: '1rem' }}>Tag Name</th>
@@ -2940,8 +2953,8 @@ export default function AdminDashboard({ onSelectEvent }) {
             </button>
           </div>
 
-          <div className="glass-card" style={{ borderRadius: '16px', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="mature-table-wrapper">
+            <table className="mature-data-table">
               <thead>
                 <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                   <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>ID</th>
@@ -3008,8 +3021,8 @@ export default function AdminDashboard({ onSelectEvent }) {
             </button>
           </div>
 
-          <div className="glass-card" style={{ borderRadius: '16px', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="mature-table-wrapper">
+            <table className="mature-data-table">
               <thead>
                 <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                   <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>ID</th>
@@ -3074,8 +3087,8 @@ export default function AdminDashboard({ onSelectEvent }) {
             </button>
           </div>
 
-          <div className="glass-card" style={{ borderRadius: '16px', overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <div className="mature-table-wrapper">
+            <table className="mature-data-table">
               <thead>
                 <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                   <th style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>ID</th>
@@ -4108,6 +4121,42 @@ export default function AdminDashboard({ onSelectEvent }) {
               <div>
                 <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Email *</label>
                 <input type="email" required disabled={Boolean(userForm.id)} value={userForm.email} onChange={e => setUserForm({ ...userForm, email: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Country</label>
+                <SearchableSelect
+                  value={userForm.countryId}
+                  onChange={val => setUserForm({ ...userForm, countryId: parseInt(val, 10) })}
+                  options={countriesList.map(c => ({ id: c.id, label: `${c.name} (${c.dialingCode || c.code})` }))}
+                  placeholder="Select Country..."
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Mobile / Phone Number</label>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <div style={{
+                    padding: '0.75rem 0.85rem',
+                    background: 'rgba(13, 148, 136, 0.15)',
+                    border: '1px solid rgba(13, 148, 136, 0.35)',
+                    borderRadius: '8px',
+                    color: '#2dd4bf',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {(countriesList.find(c => c.id === parseInt(userForm.countryId, 10))?.dialingCode) || '+92'}
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder="331 2541767"
+                    value={userForm.phoneNumber || ''}
+                    onChange={e => setUserForm({ ...userForm, phoneNumber: e.target.value })}
+                    style={{ flex: 1, padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
+                  />
+                </div>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem', display: 'block' }}>
+                  If typed with leading '0', it will automatically be trimmed upon saving.
+                </span>
               </div>
               {!userForm.id ? (
                 <div>

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { User, Lock, Mail, X, LogIn, UserPlus, Eye, EyeOff } from 'lucide-react';
-import { authApi } from '../services/api';
+import React, { useState, useEffect } from 'react';
+import { User, Lock, Mail, X, LogIn, UserPlus, Eye, EyeOff, Phone, Globe } from 'lucide-react';
+import { authApi, locationsApi, formatPhoneNumberOnSubmit } from '../services/api';
 import { useToast } from '../context/ToastContext';
 
 export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'login' }) {
@@ -10,8 +10,34 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [countries, setCountries] = useState([
+    { id: 1, name: 'Pakistan', code: 'PK', dialingCode: '+92' },
+    { id: 2, name: 'United Arab Emirates', code: 'AE', dialingCode: '+971' },
+    { id: 3, name: 'Saudi Arabia', code: 'SA', dialingCode: '+966' },
+    { id: 4, name: 'United Kingdom', code: 'GB', dialingCode: '+44' },
+    { id: 5, name: 'United States', code: 'US', dialingCode: '+1' }
+  ]);
+  const [selectedCountryId, setSelectedCountryId] = useState(1);
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    async function fetchCountries() {
+      try {
+        const res = await locationsApi.getCountries();
+        if (Array.isArray(res) && res.length > 0) {
+          setCountries(res);
+        }
+      } catch (err) {
+        console.warn('Could not fetch countries:', err);
+      }
+    }
+    fetchCountries();
+  }, []);
+
+  const activeCountry = countries.find(c => c.id === Number(selectedCountryId)) || countries[0];
+  const activeDialingCode = activeCountry?.dialingCode || '+92';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,13 +61,19 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
           setLoading(false);
           return;
         }
+
+        // Clean leading zero & concatenate dialing code
+        const formattedPhone = formatPhoneNumberOnSubmit(phone, activeDialingCode);
+
         // Register with live .NET Backend API (auto-login: returns JWT)
-        const authData = await authApi.register(name.trim(), email.trim(), password);
+        const authData = await authApi.register(name.trim(), email.trim(), password, formattedPhone, Number(selectedCountryId));
         showSuccess('Account Created! 🎉', `Welcome to EventLand, ${name.trim()}!`);
         onLoginSuccess({
           id: authData.user?.id,
           name: authData.user?.fullName || name.trim(),
           email: authData.user?.email || email.trim(),
+          phone: authData.user?.phoneNumber || formattedPhone,
+          countryId: authData.user?.countryId || Number(selectedCountryId),
           role: 'customer',
           token: authData.token
         });
@@ -58,6 +90,8 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
           id: authData.user?.id,
           name: authData.user?.fullName || authData.user?.email,
           email: authData.user?.email,
+          phone: authData.user?.phoneNumber || '',
+          countryId: authData.user?.countryId || 1,
           role: userRole,
           token: authData.token
         });
@@ -148,30 +182,104 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
 
         <form onSubmit={handleSubmit} className="auth-form-group" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {isSignUp && (
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.375rem' }}>
-                Full Name
-              </label>
-              <div style={{ position: 'relative' }}>
-                <User size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                <input
-                  type="text"
-                  placeholder="Qamar Ansari"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem 1rem 0.75rem 2.75rem',
-                    background: 'rgba(12, 23, 54, 0.6)',
-                    border: '1px solid rgba(13, 148, 136, 0.2)',
-                    borderRadius: '10px',
-                    color: '#f8fafc',
-                    fontSize: '0.875rem',
-                    outline: 'none'
-                  }}
-                />
+            <>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.375rem' }}>
+                  Full Name
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <User size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                  <input
+                    type="text"
+                    placeholder="Qamar Ansari"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem 0.75rem 2.75rem',
+                      background: 'rgba(12, 23, 54, 0.6)',
+                      border: '1px solid rgba(13, 148, 136, 0.2)',
+                      borderRadius: '10px',
+                      color: '#f8fafc',
+                      fontSize: '0.875rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
               </div>
-            </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.375rem' }}>
+                  Country
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Globe size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b', zIndex: 1 }} />
+                  <select
+                    value={selectedCountryId}
+                    onChange={(e) => setSelectedCountryId(Number(e.target.value))}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 1rem 0.75rem 2.75rem',
+                      background: 'rgba(12, 23, 54, 0.6)',
+                      border: '1px solid rgba(13, 148, 136, 0.2)',
+                      borderRadius: '10px',
+                      color: '#f8fafc',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {countries.map(c => (
+                      <option key={c.id} value={c.id} style={{ background: '#0b1328', color: '#fff' }}>
+                        {c.name} ({c.dialingCode || c.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.375rem' }}>
+                  Mobile / WhatsApp Number
+                </label>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <div style={{
+                    padding: '0.75rem 0.85rem',
+                    background: 'rgba(13, 148, 136, 0.15)',
+                    border: '1px solid rgba(13, 148, 136, 0.35)',
+                    borderRadius: '10px',
+                    color: '#2dd4bf',
+                    fontWeight: 700,
+                    fontSize: '0.875rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    <Phone size={15} /> {activeDialingCode}
+                  </div>
+                  <input
+                    type="tel"
+                    placeholder="331 2541767"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    style={{
+                      flex: 1,
+                      padding: '0.75rem 1rem',
+                      background: 'rgba(12, 23, 54, 0.6)',
+                      border: '1px solid rgba(13, 148, 136, 0.2)',
+                      borderRadius: '10px',
+                      color: '#f8fafc',
+                      fontSize: '0.875rem',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem', display: 'block' }}>
+                  If typed with leading '0', it will automatically be trimmed upon saving.
+                </span>
+              </div>
+            </>
           )}
 
           <div>

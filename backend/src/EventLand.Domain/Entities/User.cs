@@ -16,6 +16,10 @@ public class User : BaseEntity
     public string?   PhoneNumber   { get; set; }
     public string?   ImageUrl      { get; set; }
 
+    // Country Foreign Key & Navigation
+    public int?      CountryId     { get; set; }
+    public Country?  Country       { get; set; }
+
     // Role Foreign Key & Navigation
     public int       RoleId        { get; set; }
     public Role      Role          { get; set; } = null!;

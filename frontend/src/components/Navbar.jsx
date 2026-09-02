@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { MapPin, Search, PlusCircle, User, Sparkles, Music, Calendar, Menu, X, ShieldCheck, Building2, LogIn, LogOut, FileText } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
+import { getUserImageUrl } from '../services/api';
 
 export default function Navbar({ 
   selectedCity, 
@@ -18,6 +19,16 @@ export default function Navbar({
   cities = []
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const getUserAvatarUrl = (user) => {
+    if (!user) return '';
+    if (user.imageUrl || user.avatar) {
+      return getUserImageUrl(user.imageUrl || user.avatar);
+    }
+    const name = user.fullName || user.name || (user.role === 'admin' ? 'Super Admin' : 'User');
+    const bgHex = user.role === 'admin' ? '8b5cf6' : user.role === 'organizer' ? '0d9488' : '059669';
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${bgHex}&color=ffffff&bold=true&rounded=true`;
+  };
 
   const cityOptions = useMemo(
     () => ['All Cities', ...(cities || []).map(c => typeof c === 'string' ? c : c.name).filter(Boolean)],
@@ -38,15 +49,17 @@ export default function Navbar({
       backdropFilter: 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
       borderBottom: '1px solid rgba(13, 148, 136, 0.35)',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6), 0 0 20px rgba(13, 148, 136, 0.15)'
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)'
     }}>
       <div className="container" style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        height: '78px',
-        gap: '1rem',
-        whiteSpace: 'nowrap'
+        height: '74px',
+        gap: '0.5rem',
+        maxWidth: '1440px',
+        margin: '0 auto',
+        padding: '0 1rem'
       }}>
         {/* Brand Logo & Tagline */}
         <div 
@@ -59,29 +72,26 @@ export default function Navbar({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.75rem',
+            gap: '0.6rem',
             cursor: 'pointer',
             flexShrink: 0,
-            whiteSpace: 'nowrap',
             transition: 'transform 0.25s ease'
           }}
         >
-
           <img
             src="/logo-icon.png"
             alt="EventLand Logo"
             style={{
-              height: '44px',
+              height: '38px',
               width: 'auto',
               objectFit: 'contain',
-              filter: 'drop-shadow(0 0 14px rgba(13, 148, 136, 0.6))',
               flexShrink: 0
             }}
           />
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <div style={{
               fontFamily: 'var(--font-display)',
-              fontSize: '1.4rem',
+              fontSize: '1.25rem',
               fontWeight: 900,
               letterSpacing: '-0.02em',
               color: '#fff',
@@ -93,13 +103,13 @@ export default function Navbar({
             </div>
             <div style={{
               fontFamily: 'var(--font-body)',
-              fontSize: '0.58rem',
+              fontSize: '0.52rem',
               color: '#d9a05b',
               fontWeight: 800,
-              letterSpacing: '0.12em',
+              letterSpacing: '0.1em',
               textTransform: 'uppercase',
               whiteSpace: 'nowrap',
-              marginTop: '2px'
+              marginTop: '1px'
             }}>
               DISCOVER | BOOK | EXPERIENCE
             </div>
@@ -110,11 +120,11 @@ export default function Navbar({
         <div className="navbar-search-bar desktop-only" style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.75rem',
+          gap: '0.45rem',
           flexShrink: 1,
-          whiteSpace: 'nowrap'
+          minWidth: 0
         }}>
-          <div style={{ width: '150px', flexShrink: 0 }}>
+          <div style={{ width: '130px', flexShrink: 0 }}>
             <SearchableSelect
               value={selectedCity}
               onChange={(e) => onSelectCity(e.target.value)}
@@ -124,11 +134,11 @@ export default function Navbar({
             />
           </div>
 
-          <div style={{ position: 'relative', width: '200px', flexShrink: 1 }}>
-            <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+          <div style={{ position: 'relative', width: '150px', flexShrink: 1 }}>
+            <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
-              placeholder="Search events..."
+              placeholder="Search..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               style={{
@@ -137,10 +147,9 @@ export default function Navbar({
                 color: '#f8fafc',
                 border: '1px solid rgba(13, 148, 136, 0.3)',
                 borderRadius: '9999px',
-                padding: '0.55rem 1rem 0.55rem 2.4rem',
-                fontSize: '0.85rem',
+                padding: '0.45rem 0.85rem 0.45rem 2.2rem',
+                fontSize: '0.82rem',
                 outline: 'none',
-                whiteSpace: 'nowrap',
                 transition: 'all 0.25s ease'
               }}
             />
@@ -151,9 +160,8 @@ export default function Navbar({
         <nav style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.45rem',
-          flexShrink: 0,
-          whiteSpace: 'nowrap'
+          gap: '0.3rem',
+          flexShrink: 0
         }} className="desktop-only">
           <button
             onClick={() => handleNavClick('explore')}
@@ -161,13 +169,12 @@ export default function Navbar({
             style={{
               background: activeView === 'explore' ? 'rgba(13, 148, 136, 0.22)' : 'transparent',
               color: activeView === 'explore' ? '#2dd4bf' : '#cbd5e1',
-              fontSize: '0.88rem',
-              padding: '0.55rem 0.95rem',
-              boxShadow: activeView === 'explore' ? '0 0 16px rgba(13, 148, 136, 0.3)' : 'none',
+              fontSize: '0.82rem',
+              padding: '0.45rem 0.75rem',
               border: activeView === 'explore' ? '1px solid rgba(45, 212, 191, 0.35)' : '1px solid transparent'
             }}
           >
-            <Calendar size={15} /> Explore
+            <Calendar size={14} /> Explore
           </button>
 
           <button
@@ -176,27 +183,12 @@ export default function Navbar({
             style={{
               background: activeView === 'artists' ? 'rgba(13, 148, 136, 0.22)' : 'transparent',
               color: activeView === 'artists' ? '#2dd4bf' : '#cbd5e1',
-              fontSize: '0.88rem',
-              padding: '0.55rem 0.95rem',
-              boxShadow: activeView === 'artists' ? '0 0 16px rgba(13, 148, 136, 0.3)' : 'none',
+              fontSize: '0.82rem',
+              padding: '0.45rem 0.75rem',
               border: activeView === 'artists' ? '1px solid rgba(45, 212, 191, 0.35)' : '1px solid transparent'
             }}
           >
-            <Music size={15} /> Artists
-          </button>
-
-          <button
-            onClick={() => handleNavClick('ai-assistant')}
-            className="btn"
-            style={{
-              background: activeView === 'ai-assistant' ? 'rgba(139, 92, 246, 0.2)' : 'transparent',
-              color: activeView === 'ai-assistant' ? '#c084fc' : '#cbd5e1',
-              fontSize: '0.88rem',
-              border: activeView === 'ai-assistant' ? '1px solid rgba(139, 92, 246, 0.4)' : 'none',
-              padding: '0.55rem 0.9rem'
-            }}
-          >
-            <Sparkles size={15} color="#c084fc" /> AI Match
+            <Music size={14} /> Artists
           </button>
 
           <button
@@ -206,22 +198,22 @@ export default function Navbar({
               position: 'relative',
               background: activeView === 'my-tickets' ? 'rgba(13, 148, 136, 0.18)' : 'transparent',
               color: activeView === 'my-tickets' ? '#2dd4bf' : '#cbd5e1',
-              fontSize: '0.88rem',
-              padding: '0.55rem 0.9rem'
+              fontSize: '0.82rem',
+              padding: '0.45rem 0.75rem'
             }}
           >
-            <User size={15} /> My Tickets
+            <User size={14} /> My Tickets
             {savedTicketsCount > 0 && (
               <span style={{
                 position: 'absolute',
-                top: '2px',
-                right: '2px',
+                top: '0px',
+                right: '0px',
                 backgroundColor: '#059669',
                 color: '#ffffff',
                 borderRadius: '50%',
-                width: '18px',
-                height: '18px',
-                fontSize: '0.7rem',
+                width: '16px',
+                height: '16px',
+                fontSize: '0.65rem',
                 fontWeight: 800,
                 display: 'flex',
                 alignItems: 'center',
@@ -239,11 +231,11 @@ export default function Navbar({
               position: 'relative',
               background: activeView === 'unpaid-invoices' ? 'rgba(245, 158, 11, 0.18)' : 'transparent',
               color: activeView === 'unpaid-invoices' ? '#fbbf24' : '#cbd5e1',
-              fontSize: '0.88rem',
-              padding: '0.55rem 0.9rem'
+              fontSize: '0.82rem',
+              padding: '0.45rem 0.75rem'
             }}
           >
-            <FileText size={15} color="#fbbf24" /> Unpaid Invoices
+            <FileText size={14} color="#fbbf24" /> Unpaid Invoices
           </button>
 
           {/* Special Console Button for Organizers */}
@@ -255,12 +247,12 @@ export default function Navbar({
                 background: activeView === 'organizer' ? 'rgba(13, 148, 136, 0.25)' : 'rgba(13, 148, 136, 0.15)',
                 color: '#2dd4bf',
                 border: '1px solid rgba(13, 148, 136, 0.4)',
-                fontSize: '0.85rem',
-                padding: '0.5rem 0.9rem',
+                fontSize: '0.82rem',
+                padding: '0.45rem 0.75rem',
                 fontWeight: 700
               }}
             >
-              <Building2 size={15} color="#2dd4bf" /> Organizer Portal
+              <Building2 size={14} color="#2dd4bf" /> Organizer Portal
             </button>
           )}
 
@@ -273,55 +265,60 @@ export default function Navbar({
                 background: activeView === 'admin' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(139, 92, 246, 0.15)',
                 color: '#c084fc',
                 border: '1px solid rgba(139, 92, 246, 0.4)',
-                fontSize: '0.85rem',
-                padding: '0.5rem 0.9rem',
+                fontSize: '0.82rem',
+                padding: '0.45rem 0.75rem',
                 fontWeight: 700
               }}
             >
-              <ShieldCheck size={15} color="#c084fc" /> Admin Console
+              <ShieldCheck size={14} color="#c084fc" /> Admin Console
             </button>
           )}
 
           <button
             onClick={() => handleNavClick('organizer-wizard')}
             className="btn btn-primary"
-            style={{ fontSize: '0.85rem', padding: '0.5rem 1.05rem' }}
+            style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
           >
-            <PlusCircle size={15} /> List Event
+            <PlusCircle size={14} /> List Event
           </button>
 
           {/* User Auth Profile Badge / Sign In Button */}
           {currentUser ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginLeft: '0.3rem' }}>
-              <span style={{
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginLeft: '0.2rem' }}>
+              <div style={{
                 backgroundColor: currentUser.role === 'admin' 
                   ? 'rgba(139, 92, 246, 0.15)' 
                   : currentUser.role === 'organizer' 
                   ? 'rgba(13, 148, 136, 0.15)' 
                   : 'rgba(13, 148, 136, 0.15)',
                 border: currentUser.role === 'admin' 
-                  ? '1px solid rgba(139, 92, 246, 0.35)' 
+                  ? '1px solid rgba(139, 92, 246, 0.4)' 
                   : currentUser.role === 'organizer' 
-                  ? '1px solid rgba(13, 148, 136, 0.35)' 
-                  : '1px solid rgba(13, 148, 136, 0.35)',
+                  ? '1px solid rgba(13, 148, 136, 0.4)' 
+                  : '1px solid rgba(13, 148, 136, 0.4)',
                 color: '#fff',
                 borderRadius: '9999px',
-                padding: '0.45rem 0.85rem',
-                fontSize: '0.8rem',
+                padding: '0.2rem 0.65rem 0.2rem 0.2rem',
+                fontSize: '0.78rem',
                 fontWeight: 700,
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.35rem'
+                gap: '0.4rem'
               }}>
-                {currentUser.role === 'admin' ? (
-                  <ShieldCheck size={13} color="#c084fc" />
-                ) : currentUser.role === 'organizer' ? (
-                  <Building2 size={13} color="#2dd4bf" />
-                ) : (
-                  <User size={13} color="#2dd4bf" />
-                )}
-                {(currentUser?.name || currentUser?.fullName || 'User').split(' ')[0]}
-              </span>
+                <img
+                  src={getUserAvatarUrl(currentUser)}
+                  alt={currentUser.fullName || currentUser.name || 'User Avatar'}
+                  style={{
+                    width: '26px',
+                    height: '26px',
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    border: currentUser.role === 'admin' ? '1.5px solid #c084fc' : '1.5px solid #2dd4bf',
+                    flexShrink: 0
+                  }}
+                />
+                <span>{(currentUser?.name || currentUser?.fullName || 'User').split(' ')[0]}</span>
+              </div>
               <button
                 onClick={onLogout}
                 title="Sign Out"
@@ -330,24 +327,24 @@ export default function Navbar({
                   color: '#f87171',
                   border: '1px solid rgba(239, 68, 68, 0.3)',
                   borderRadius: '50%',
-                  width: '32px',
-                  height: '32px',
+                  width: '30px',
+                  height: '30px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer'
                 }}
               >
-                <LogOut size={14} />
+                <LogOut size={13} />
               </button>
             </div>
           ) : (
             <button
               onClick={() => onOpenAuthModal && onOpenAuthModal()}
               className="btn btn-primary"
-              style={{ fontSize: '0.82rem', padding: '0.45rem 0.95rem', marginLeft: '0.3rem' }}
+              style={{ fontSize: '0.8rem', padding: '0.45rem 0.85rem', marginLeft: '0.2rem' }}
             >
-              <LogIn size={15} /> Sign In
+              <LogIn size={14} /> Sign In
             </button>
           )}
         </nav>
@@ -432,11 +429,11 @@ export default function Navbar({
             </button>
 
             <button
-              onClick={() => handleNavClick('ai-assistant')}
+              onClick={() => handleNavClick('my-tickets')}
               className="btn btn-secondary"
               style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
             >
-              <Sparkles size={18} color="#c084fc" /> EventVibe AI Matchmaker
+              <User size={18} color="#2dd4bf" /> My Saved Tickets ({savedTicketsCount})
             </button>
 
             <button
@@ -477,9 +474,25 @@ export default function Navbar({
 
             {currentUser ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '10px', marginTop: '0.5rem', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#fff', fontWeight: 600, fontSize: '0.88rem' }}>
-                  <User size={18} color="#2dd4bf" />
-                  <span>{(currentUser?.name || currentUser?.fullName || 'User').split(' ')[0]} ({currentUser?.role})</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: '#fff', fontWeight: 600, fontSize: '0.88rem' }}>
+                  <img
+                    src={getUserAvatarUrl(currentUser)}
+                    alt={currentUser.fullName || currentUser.name || 'User Avatar'}
+                    style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: currentUser.role === 'admin' ? '2px solid #c084fc' : '2px solid #2dd4bf',
+                      flexShrink: 0
+                    }}
+                  />
+                  <div>
+                    <div style={{ color: '#fff', fontWeight: 700 }}>{currentUser?.name || currentUser?.fullName || 'User'}</div>
+                    <div style={{ fontSize: '0.72rem', color: currentUser.role === 'admin' ? '#c084fc' : '#2dd4bf', textTransform: 'capitalize' }}>
+                      {currentUser?.role === 'admin' ? 'Super Admin' : currentUser?.role}
+                    </div>
+                  </div>
                 </div>
                 <button
                   onClick={() => { onLogout(); setIsMobileMenuOpen(false); }}

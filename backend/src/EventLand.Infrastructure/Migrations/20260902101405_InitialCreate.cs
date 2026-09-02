@@ -82,6 +82,7 @@ namespace EventLand.Infrastructure.Migrations
                         .Annotation("SqlServer:Identity", "1000, 1"),
                     Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Code = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    DialingCode = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
@@ -238,6 +239,7 @@ namespace EventLand.Infrastructure.Migrations
                     FullName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     PhoneNumber = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
                     ImageUrl = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    CountryId = table.Column<int>(type: "int", nullable: true),
                     RoleId = table.Column<int>(type: "int", nullable: false),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
                     LastLoginAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
@@ -251,6 +253,12 @@ namespace EventLand.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Users", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Users_Countries_CountryId",
+                        column: x => x.CountryId,
+                        principalTable: "Countries",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_Users_Roles_RoleId",
                         column: x => x.RoleId,
@@ -661,8 +669,15 @@ namespace EventLand.Infrastructure.Migrations
 
             migrationBuilder.InsertData(
                 table: "Countries",
-                columns: new[] { "Id", "Code", "CreatedAt", "CreatedBy", "DeletedAt", "IsActive", "IsDeleted", "Name", "UpdatedAt", "UpdatedBy" },
-                values: new object[] { 1, "PK", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, true, false, "Pakistan", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null });
+                columns: new[] { "Id", "Code", "CreatedAt", "CreatedBy", "DeletedAt", "DialingCode", "IsActive", "IsDeleted", "Name", "UpdatedAt", "UpdatedBy" },
+                values: new object[,]
+                {
+                    { 1, "PK", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "+92", true, false, "Pakistan", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null },
+                    { 2, "AE", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "+971", true, false, "United Arab Emirates", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null },
+                    { 3, "SA", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "+966", true, false, "Saudi Arabia", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null },
+                    { 4, "GB", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "+44", true, false, "United Kingdom", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null },
+                    { 5, "US", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "+1", true, false, "United States", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null }
+                });
 
             migrationBuilder.InsertData(
                 table: "Faqs",
@@ -720,8 +735,8 @@ namespace EventLand.Infrastructure.Migrations
 
             migrationBuilder.InsertData(
                 table: "Users",
-                columns: new[] { "Id", "CreatedAt", "CreatedBy", "DeletedAt", "Email", "FullName", "ImageUrl", "IsActive", "IsDeleted", "LastLoginAt", "PasswordHash", "PhoneNumber", "RoleId", "UpdatedAt", "UpdatedBy" },
-                values: new object[] { 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "admin@eventland.pk", "Super Admin", null, true, false, null, "AQAAAAIAAYagAAAAENtEHgk5Bb4ECS6lht+1+8+Q9Ng8JsfDfEKF67zmh4AWY2ufSE/oEFAaqto+hdeSsQ==", null, 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null });
+                columns: new[] { "Id", "CountryId", "CreatedAt", "CreatedBy", "DeletedAt", "Email", "FullName", "ImageUrl", "IsActive", "IsDeleted", "LastLoginAt", "PasswordHash", "PhoneNumber", "RoleId", "UpdatedAt", "UpdatedBy" },
+                values: new object[] { 1, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "admin@eventland.pk", "Super Admin", null, true, false, null, "AQAAAAIAAYagAAAAENG4wsxNaY8HzMLppm+krVBdOe6xCL6XSwBqivW71fBgOJdat/lKZZFdsdv7u1pZXg==", "+92 331 2541767", 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Artists_IsFeatured",
@@ -890,6 +905,11 @@ namespace EventLand.Infrastructure.Migrations
                 name: "IX_TicketTiers_EventShowId",
                 table: "TicketTiers",
                 column: "EventShowId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_CountryId",
+                table: "Users",
+                column: "CountryId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_Email",

@@ -13,7 +13,7 @@ using SkiaSharp;
 
 [ApiController]
 [Route("api/upload")]
-[Authorize(Roles = "SuperAdmin,Admin,Organizer")]
+[Authorize]
 [Produces("application/json")]
 public class UploadController : ControllerBase
 {
@@ -64,6 +64,7 @@ public class UploadController : ControllerBase
             "user" or "users" => Path.Combine("assets", "images", "users"),
             "artist" or "artists" => Path.Combine("assets", "images", "artists"),
             "qrcode" or "qr_code" or "qr_codes" or "bank" or "bankaccount" or "bankaccounts" => Path.Combine("assets", "images", "qr_codes"),
+            "slip" or "slips" or "proof" or "proofs" or "transaction" or "transactions" or "paymentproof" or "paymentproofs" or "receipt" or "receipts" => Path.Combine("assets", "images", "slips"),
             _ => Path.Combine("assets", "images", "events")
         };
 
