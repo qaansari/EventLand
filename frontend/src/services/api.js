@@ -1,5 +1,17 @@
-export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://celiac-briley-commandingly.ngrok-free.dev';
-export const BASE_URL = import.meta.env.VITE_API_URL || `${BACKEND_URL}/api`;
+const rawBackend = (import.meta.env.VITE_BACKEND_URL || '').trim();
+const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim();
+
+// Failsafe: If running on remote host (Vercel) but env var points to localhost, fallback to ngrok URL
+const isProductionDomain = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && window.location.hostname !== '127.0.0.1';
+
+export const BACKEND_URL = (isProductionDomain && (!rawBackend || rawBackend.includes('localhost')))
+  ? 'https://celiac-briley-commandingly.ngrok-free.dev'
+  : (rawBackend || 'https://celiac-briley-commandingly.ngrok-free.dev');
+
+export const BASE_URL = (isProductionDomain && (!rawApiUrl || rawApiUrl.includes('localhost')))
+  ? `${BACKEND_URL}/api`
+  : (rawApiUrl || `${BACKEND_URL}/api`);
+
 export const SERVER_BASE = BASE_URL.replace(/\/api\/?$/, '') || BACKEND_URL;
 
 export function getOrganizerImageUrl(logoUrl) {
@@ -43,7 +55,8 @@ async function request(endpoint, options = {}) {
 
   const headers = {
     'Content-Type': 'application/json',
-    'ngrok-skip-browser-warning': '69420',
+    'Accept': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
     ...(options.headers || {})
   };
 

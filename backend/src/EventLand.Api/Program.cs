@@ -118,6 +118,8 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+app.UseCors("AllowFrontend");
+
 // Global Exception Handler & Security Headers
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 app.UseMiddleware<SecurityHeadersMiddleware>();
@@ -134,7 +136,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseStaticFiles();
-app.UseCors("AllowFrontend");
 
 // Health endpoints — must be mapped before auth so probes work without credentials
 app.MapHealthChecks("/health");

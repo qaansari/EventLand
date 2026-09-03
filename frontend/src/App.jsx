@@ -86,11 +86,11 @@ export default function App() {
       pageSize: PAGE_SIZE
     })
       .then(resEvents => {
-        const items = resEvents.items || [];
+        const items = Array.isArray(resEvents) ? resEvents : (resEvents?.items || []);
         setEvents(items);
         setPageNumber(1);
         setLastPageCount(items.length);
-        setTotalEvents(typeof resEvents.totalCount === 'number' ? resEvents.totalCount : null);
+        setTotalEvents(typeof resEvents?.totalCount === 'number' ? resEvents.totalCount : items.length);
       })
       .catch(err => {
         console.error('Could not load events from API:', err);
