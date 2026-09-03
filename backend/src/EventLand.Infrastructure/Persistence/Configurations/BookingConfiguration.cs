@@ -40,6 +40,15 @@ public sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(b => b.TotalAmount)
                .HasPrecision(18, 2);
 
+        builder.Property(b => b.SenderAccountTitle)
+               .HasMaxLength(150);
+
+        builder.Property(b => b.SenderBankName)
+               .HasMaxLength(100);
+
+        builder.Property(b => b.SenderAccountLast4)
+               .HasMaxLength(10);
+
         builder.Property(b => b.Status)
                .HasConversion<int>();
 

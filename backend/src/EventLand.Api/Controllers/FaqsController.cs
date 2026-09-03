@@ -1,9 +1,11 @@
 namespace EventLand.Api.Controllers;
 
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using EventLand.Application.Common.Interfaces;
-using EventLand.Domain.Entities;
+using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,20 +14,26 @@ using Microsoft.EntityFrameworkCore;
 public class FaqsController : ControllerBase
 {
     private readonly IApplicationDbContext _context;
+    private readonly ICacheService _cacheService;
 
-    public FaqsController(IApplicationDbContext context)
+    public FaqsController(IApplicationDbContext context, ICacheService cacheService)
     {
         _context = context;
+        _cacheService = cacheService;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetFaqs()
     {
+        const string cacheKey = "public:faqs";
+        var cached = await _cacheService.GetAsync<List<object>>(cacheKey);
+        if (cached != null) return Ok(cached);
+
         var faqs = await _context.Faqs
             .AsNoTracking()
             .Where(f => f.IsActive && !f.IsDeleted)
             .OrderBy(f => f.DisplayOrder)
-            .Select(f => new
+            .Select(f => (object)new
             {
                 f.Id,
                 q = f.Question,
@@ -34,6 +42,7 @@ public class FaqsController : ControllerBase
             })
             .ToListAsync();
 
+        await _cacheService.SetAsync(cacheKey, faqs, TimeSpan.FromMinutes(15));
         return Ok(faqs);
     }
 }

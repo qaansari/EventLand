@@ -22,7 +22,7 @@ public class BankAccountsController : ControllerBase
     /// Sensitive admin-operational fields (maintenance internals) are stripped from the response.
     /// </summary>
     [HttpGet("active")]
-    [Authorize]
+    [AllowAnonymous]
     public async Task<ActionResult<BankAccountDto>> GetActiveBankAccount()
     {
         var account = await _bankAccountService.GetActiveBankAccountAsync();

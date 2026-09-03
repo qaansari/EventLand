@@ -42,6 +42,9 @@ public class Booking : BaseEntity
     // Direct Bank Transfer & Verification fields
     public string?        BankTransactionRef   { get; set; }
     public string?        PaymentProofUrl      { get; set; }
+    public string?        SenderAccountTitle   { get; set; }
+    public string?        SenderBankName       { get; set; }
+    public string?        SenderAccountLast4   { get; set; }
     public int?           VerifiedByAdminId    { get; set; }
     public string?        VerifiedByAdminEmail { get; set; }
     public DateTimeOffset? VerifiedAt          { get; set; }

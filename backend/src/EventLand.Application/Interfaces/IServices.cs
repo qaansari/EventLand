@@ -13,6 +13,7 @@ public interface IEventService
         int pageSize = 10);
 
     Task<EventDetailDto?> GetEventByIdAsync(int id);
+    Task<EventDetailDto?> GetEventByIdentifierAsync(string identifier);
 }
 
 public interface IArtistService

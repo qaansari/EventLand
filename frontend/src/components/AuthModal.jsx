@@ -43,8 +43,16 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
     e.preventDefault();
     setErrorMsg('');
 
-    if (!email.trim() || !password.trim()) {
-      const msg = 'Please enter a valid email and password.';
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailPattern.test(email.trim())) {
+      const msg = 'Please enter a valid email address (e.g. user@example.com).';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
+      return;
+    }
+
+    if (!password.trim() || password.length < 8) {
+      const msg = 'Password must be at least 8 characters long.';
       setErrorMsg(msg);
       showError('Validation Error', msg);
       return;
@@ -60,6 +68,17 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
           showError('Registration Error', msg);
           setLoading(false);
           return;
+        }
+
+        if (phone && phone.trim()) {
+          const digitsOnly = phone.replace(/\D/g, '');
+          if (digitsOnly.length < 7 || digitsOnly.length > 15) {
+            const msg = 'Please enter a valid phone number (7-15 digits).';
+            setErrorMsg(msg);
+            showError('Registration Error', msg);
+            setLoading(false);
+            return;
+          }
         }
 
         // Clean leading zero & concatenate dialing code

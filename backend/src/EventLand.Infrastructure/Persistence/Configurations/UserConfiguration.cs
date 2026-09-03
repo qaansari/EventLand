@@ -31,6 +31,11 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.PhoneNumber)
                .HasMaxLength(20);
 
+        builder.HasIndex(u => u.PhoneNumber)
+               .IsUnique()
+               .HasFilter("[IsDeleted] = 0 AND [PhoneNumber] IS NOT NULL")
+               .HasDatabaseName("IX_Users_PhoneNumber");
+
         builder.Property(u => u.ImageUrl)
                .HasMaxLength(500);
 

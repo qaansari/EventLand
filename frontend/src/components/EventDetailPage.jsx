@@ -42,6 +42,86 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
 
   const event = eventDetail || initialEvent;
 
+  // Dynamic SEO Meta Tags & Schema.org JSON-LD Script Injection
+  useEffect(() => {
+    if (!event) return;
+
+    const pageTitle = `${event.title} - ${event.cityName || event.city || 'Pakistan'} | EventLand`;
+    document.title = pageTitle;
+
+    // Helper to update meta tag content
+    const updateMetaTag = (propertyAttr, propertyVal, contentVal) => {
+      let tag = document.querySelector(`meta[${propertyAttr}="${propertyVal}"]`);
+      if (!tag) {
+        tag = document.createElement('meta');
+        tag.setAttribute(propertyAttr, propertyVal);
+        document.head.appendChild(tag);
+      }
+      tag.setAttribute('content', contentVal || '');
+    };
+
+    const eventBannerUrl = getEventImageUrl(event.banner);
+    const eventDescription = event.description ? event.description.slice(0, 160) : `Book tickets for ${event.title} on EventLand Pakistan.`;
+
+    updateMetaTag('name', 'description', eventDescription);
+    updateMetaTag('property', 'og:title', pageTitle);
+    updateMetaTag('property', 'og:description', eventDescription);
+    updateMetaTag('property', 'og:image', eventBannerUrl);
+    updateMetaTag('name', 'twitter:title', pageTitle);
+    updateMetaTag('name', 'twitter:description', eventDescription);
+    updateMetaTag('name', 'twitter:image', eventBannerUrl);
+
+    // Schema.org Event JSON-LD Structured Data
+    const scriptId = 'schema-event-jsonld';
+    let scriptTag = document.getElementById(scriptId);
+    if (!scriptTag) {
+      scriptTag = document.createElement('script');
+      scriptTag.id = scriptId;
+      scriptTag.type = 'application/ld+json';
+      document.head.appendChild(scriptTag);
+    }
+
+    const schemaData = {
+      "@context": "https://schema.org",
+      "@type": "Event",
+      "name": event.title,
+      "description": event.description || eventDescription,
+      "startDate": event.startDateUtc,
+      "endDate": event.endDateUtc,
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "location": {
+        "@type": "Place",
+        "name": event.venueName || event.address || "Event Venue",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": event.cityName || event.city || "Karachi",
+          "addressCountry": "PK"
+        }
+      },
+      "image": [eventBannerUrl],
+      "offers": {
+        "@type": "AggregateOffer",
+        "priceCurrency": "PKR",
+        "lowPrice": event.startingPrice || 0,
+        "offerCount": event.ticketTiers?.length || 1,
+        "availability": "https://schema.org/InStock"
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": event.organizerName || event.organizer?.name || "Event Organizer",
+        "url": "https://eventland.pk"
+      }
+    };
+
+    scriptTag.text = JSON.stringify(schemaData);
+
+    return () => {
+      const tag = document.getElementById(scriptId);
+      if (tag) tag.remove();
+    };
+  }, [event]);
+
   const handleCopyLink = () => {
     const shareableUrl = `${window.location.origin}/event/${event?.id || eventId}`;
     navigator.clipboard.writeText(shareableUrl)

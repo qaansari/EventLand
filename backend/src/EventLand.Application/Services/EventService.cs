@@ -39,13 +39,6 @@ public class EventService : IEventService
 
         var query = _context.Events
             .AsNoTracking()
-            .Include(e => e.Organizer)
-            .Include(e => e.Country)
-            .Include(e => e.City)
-            .Include(e => e.Venue)
-            .Include(e => e.Auditorium)
-            .Include(e => e.Shows.Where(s => !s.IsDeleted).OrderBy(s => s.StartTimeUtc))
-            .Include(e => e.EventTags).ThenInclude(et => et.Tag)
             .Where(e => !e.IsDeleted && e.IsPublished);
 
         if (!string.IsNullOrWhiteSpace(city))
@@ -145,6 +138,46 @@ public class EventService : IEventService
 
         await _cacheService.SetAsync(cacheKey, dto, TimeSpan.FromMinutes(10));
         return dto;
+    }
+
+    public async Task<EventDetailDto?> GetEventByIdentifierAsync(string identifier)
+    {
+        if (string.IsNullOrWhiteSpace(identifier)) return null;
+
+        var clean = identifier.Trim();
+
+        // 1. Direct numeric ID lookup
+        if (int.TryParse(clean, out int directId))
+        {
+            return await GetEventByIdAsync(directId);
+        }
+
+        // 2. Trailing ID extraction from slug (e.g. "atif-aslam-live-in-concert-12")
+        var lastDashIndex = clean.LastIndexOf('-');
+        if (lastDashIndex > 0 && lastDashIndex < clean.Length - 1)
+        {
+            var trailingIdPart = clean.Substring(lastDashIndex + 1);
+            if (int.TryParse(trailingIdPart, out int extractedId))
+            {
+                var evById = await GetEventByIdAsync(extractedId);
+                if (evById is not null) return evById;
+            }
+        }
+
+        // 3. Fallback matching by normalized Title (e.g. "Atif Aslam Live in Concert")
+        var normalizedSlug = clean.ToLower().Replace("-", " ");
+        var evByTitle = await _context.Events
+            .AsNoTracking()
+            .Where(e => !e.IsDeleted && e.IsPublished && e.Title.ToLower() == normalizedSlug)
+            .Select(e => e.Id)
+            .FirstOrDefaultAsync();
+
+        if (evByTitle > 0)
+        {
+            return await GetEventByIdAsync(evByTitle);
+        }
+
+        return null;
     }
 
     private static EventDetailDto MapToDetailDto(Event e) => new(

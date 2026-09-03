@@ -50,6 +50,12 @@
 - Queries `Bookings` where `PaymentStatus == Pending` and `PaymentExpiresAt <= UtcNow`.
 - Batches processing (200 records/tick) to prevent memory spikes.
 - Marks expired bookings as `Expired` / `Cancelled`, decrements `SoldCount`, and returns seats to `Available` status.
+- `BankAccountsController.GetActiveBankAccount` is annotated with `[AllowAnonymous]` so both guests and logged-in customers can fetch active bank details on checkout.
+- `DataSeeder.cs` seeds an initial active Bank Account record into the `BankAccounts` table if empty.
+- `CheckoutModal.jsx` imports `getQrCodeImageUrl` from `api.js` and fetches active bank details directly from `BankAccounts` DB table (`/api/bank-accounts/active`), displaying `qrCodeImageUrl` (e.g., United Bank Limited / active bank QR code) directly on the customer checkout page with fallbacks.
+- `CheckoutModal.jsx`, `Booking.cs`, `BookingService.cs`, and `AdminDashboard.jsx` support an alternative payment proof verification fallback (`SenderAccountTitle`, `SenderBankName`, `SenderAccountLast4`) for customers whose bank apps enforce screenshot blocks (e.g. Standard Chartered).
+- Event Detail pages use SEO URL Slugs (`/event/atif-aslam-live-in-concert-12`) via `toEventSlug` and `GetEventByIdentifierAsync`, completely hiding raw database numeric IDs from the frontend browser address bar.
+- Web app is 100% SEO-friendly with Canonical links, OpenGraph, Twitter Cards, dynamic Schema.org Event & Organization JSON-LD rich snippets (`EventDetailPage.jsx`), semantic `<article>` tags (`EventCard.jsx`), and backend dynamic `/sitemap.xml` & `/robots.txt` endpoints (`SeoController.cs`).
 
 ### 3. Bank Maintenance & Downtime Notice Guard
 - Super Admin can set maintenance details on the active bank account: `MaintenanceNotice`, `MaintenanceStartUtc`, `MaintenanceEndUtc`, or force `IsMaintenanceMode`.
@@ -78,17 +84,24 @@
 1. **Authentication & Role Authorization**:
    - Public bank endpoints return safe projections without admin internal operational metadata.
    - Bank details and payment status checks are guarded with `[Authorize]` and ownership verification.
-   - Admin endpoints use normalized role policies: `[Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]`.
-2. **XSS Protection**:
+   - Admin endpoints use normalized role policies: `[Authorize(Roles = "SuperAdmin,Admin")]`.
+2. **XSS & Image Upload Protection**:
    - Email notifications encode user-controlled text using `HttpUtility.HtmlEncode`.
    - Security headers middleware enforces `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection: 1; mode=block`, and strict CSP headers.
-3. **Database Indexing**:
+   - `UploadController` enforces image magic-byte header validation (JPEG, PNG, WebP), file size limits, and path traversal sanitization.
+   - User Registration (`AuthService`), Self-Registration Modal (`AuthModal.jsx`), and Admin User Management (`AdminService` & `AdminDashboard.jsx`) strictly enforce unique Email and unique Phone Number validations on both backend database (`IX_Users_Email`, `IX_Users_PhoneNumber`) and frontend UI forms.
+   - Bank Account QR code images are resolved via `getQrCodeImageUrl` and displayed in a scannable right-aligned side-by-side card preview box in the Super Admin Bank Accounts console and the customer Checkout Modal.
+3. **Database Indexing & Latency Optimizations**:
    - Composite index on `(PaymentStatus, PaymentExpiresAt)` optimizes the 60-second expiry background service worker.
    - Composite index on `(EventId, Status)` speeds up event seat map queries.
+   - Streamlined query projections in `EventService` by eliminating redundant `.Include()` chains prior to `.Select()`.
+   - Fixed missing `.ThenInclude(e => e.Venue)` in `BookingService` queries to ensure venue names populate accurately in booking DTOs.
+   - Batch-processed database operations in `AdminService` to eliminate N+1 `SaveChangesAsync()` calls inside loops.
+   - Applied Redis/Memory caching for high-traffic public lookup endpoints (`/api/faqs`, `/api/footer`).
    - Decimal precision explicitly set to `(18, 2)` across all monetary fields.
-4. **Environment Isolation**:
+4. **Environment Isolation & Rate Limiting**:
    - Swagger UI is strictly guarded behind `builder.Environment.IsDevelopment()`.
-   - Rate limiting policies (`login` window: 10 req/min, `general`: 100 req/min).
+   - Rate limiting policies (`login` window: 10 req/min, `general`: 100 req/min, global per-IP fallback).
 
 ---
 
@@ -116,4 +129,4 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
 ```
 
 ---
-*Last Updated: September 2026*
+*Last Updated: September 2026 (System-wide Optimization & Latency Hardening Completed)*

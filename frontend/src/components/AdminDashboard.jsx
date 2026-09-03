@@ -39,7 +39,7 @@ import {
   MessageSquare,
   Lock
 } from 'lucide-react';
-import { adminApi, locationsApi, uploadApi, faqsApi, footerApi, paymentsApi, bankAccountsApi, bookingsApi, getEventImageUrl, getOrganizerImageUrl, getUserImageUrl, getPaymentSlipUrl, formatPhoneNumberOnSubmit, splitPhoneNumberForEdit } from '../services/api';
+import { adminApi, locationsApi, uploadApi, faqsApi, footerApi, paymentsApi, bankAccountsApi, bookingsApi, getEventImageUrl, getOrganizerImageUrl, getUserImageUrl, getPaymentSlipUrl, getQrCodeImageUrl, formatPhoneNumberOnSubmit, splitPhoneNumberForEdit } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
@@ -861,13 +861,42 @@ export default function AdminDashboard({ onSelectEvent }) {
       return;
     }
 
-    // Duplicate check for User
-    if (!userForm.id) {
-      const isDupUser = usersList.some(u => u.email.trim().toLowerCase() === (userForm.email || '').trim().toLowerCase());
-      if (isDupUser) {
-        const msg = `A user with the email '${userForm.email}' already exists.`;
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const targetEmail = (userForm.email || '').trim().toLowerCase();
+    if (!targetEmail || !emailPattern.test(targetEmail)) {
+      const msg = 'Please enter a valid email address.';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
+      return;
+    }
+
+    if (!userForm.id && (!userForm.password || userForm.password.length < 8)) {
+      const msg = 'Password is required and must be at least 8 characters long.';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
+      return;
+    }
+
+    // Duplicate Email check (excluding current user when editing)
+    const isDupEmail = usersList.some(u => u.id !== userForm.id && (u.email || '').trim().toLowerCase() === targetEmail);
+    if (isDupEmail) {
+      const msg = `A user with the email '${userForm.email}' already exists.`;
+      setErrorMsg(msg);
+      showError('Duplicate Email', msg);
+      return;
+    }
+
+    const activeCountry = countriesList.find(c => c.id === parseInt(userForm.countryId, 10)) || countriesList[0];
+    const dialingCode = activeCountry?.dialingCode || '+92';
+    const formattedPhone = formatPhoneNumberOnSubmit(userForm.phoneNumber, dialingCode);
+
+    // Duplicate Phone Number check (excluding current user when editing)
+    if (formattedPhone) {
+      const isDupPhone = usersList.some(u => u.id !== userForm.id && u.phoneNumber?.trim() === formattedPhone.trim());
+      if (isDupPhone) {
+        const msg = `A user with the phone number '${formattedPhone}' already exists.`;
         setErrorMsg(msg);
-        showError('Duplicate User', msg);
+        showError('Duplicate Phone Number', msg);
         return;
       }
     }
@@ -4932,7 +4961,7 @@ export default function AdminDashboard({ onSelectEvent }) {
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem' }}>
             {bankAccountsList.map(acc => (
               <div key={acc.id} style={{
                 backgroundColor: '#0f172a',
@@ -4968,22 +4997,69 @@ export default function AdminDashboard({ onSelectEvent }) {
                     </button>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', background: 'rgba(255, 255, 255, 0.03)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.06)', marginBottom: '1rem' }}>
-                    <div>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Account Title</span>
-                      <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>{acc.accountTitle}</div>
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '1rem',
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    padding: '1rem',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    marginBottom: '1rem',
+                    flexWrap: 'wrap'
+                  }}>
+                    <div style={{ flex: 1, minWidth: '180px', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Account Title</span>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>{acc.accountTitle}</div>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Account Number</span>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, color: '#2dd4bf' }}>{acc.accountNumber}</div>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>IBAN</span>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1', wordBreak: 'break-all' }}>{acc.iban}</div>
+                      </div>
+                      {acc.branchName && (
+                        <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                          Branch: {acc.branchName} {acc.branchCode ? `(${acc.branchCode})` : ''}
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Account Number</span>
-                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#2dd4bf' }}>{acc.accountNumber}</div>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>IBAN</span>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1' }}>{acc.iban}</div>
-                    </div>
-                    {acc.branchName && (
-                      <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                        Branch: {acc.branchName} {acc.branchCode ? `(${acc.branchCode})` : ''}
+
+                    {acc.qrCodeImageUrl && (
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        background: 'rgba(13, 148, 136, 0.08)',
+                        padding: '0.75rem',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(45, 212, 191, 0.3)',
+                        flexShrink: 0
+                      }}>
+                        <img
+                          src={getQrCodeImageUrl(acc.qrCodeImageUrl)}
+                          alt="Bank QR Code"
+                          style={{
+                            width: '140px',
+                            height: '140px',
+                            objectFit: 'contain',
+                            background: '#ffffff',
+                            padding: '6px',
+                            borderRadius: '10px',
+                            border: '2px solid rgba(45, 212, 191, 0.5)',
+                            boxShadow: '0 4px 15px rgba(0, 0, 0, 0.4)'
+                          }}
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                        <span style={{ fontSize: '0.68rem', color: '#2dd4bf', fontWeight: 700, textTransform: 'uppercase' }}>
+                          Transfer QR
+                        </span>
                       </div>
                     )}
                   </div>
@@ -5293,6 +5369,16 @@ export default function AdminDashboard({ onSelectEvent }) {
                   <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700 }}>RESERVED SEATS</span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#cbd5e1' }}>{previewProofModal.seatsText}</span>
                 </div>
+                {(previewProofModal.senderAccountTitle || previewProofModal.senderBankName) && (
+                  <div style={{ gridColumn: 'span 2', background: 'rgba(13, 148, 136, 0.12)', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(45, 212, 191, 0.35)', marginTop: '0.25rem' }}>
+                    <span style={{ display: 'block', fontSize: '0.68rem', color: '#2dd4bf', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Alternative Sender Account Details
+                    </span>
+                    <div style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 700, marginTop: '0.15rem' }}>
+                      Title: {previewProofModal.senderAccountTitle || 'N/A'} • Bank: {previewProofModal.senderBankName || 'N/A'} {previewProofModal.senderAccountLast4 ? `(Last 4: ${previewProofModal.senderAccountLast4})` : ''}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

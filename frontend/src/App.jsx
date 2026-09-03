@@ -12,7 +12,7 @@ import AttendeeDashboard from './components/AttendeeDashboard';
 import AuthModal from './components/AuthModal';
 import Footer from './components/Footer';
 import { Ticket, MapPin, Trash2, Search, RefreshCw } from 'lucide-react';
-import { eventsApi, bookingsApi, tagsApi, locationsApi, adminApi } from './services/api';
+import { eventsApi, bookingsApi, tagsApi, locationsApi, adminApi, toEventSlug } from './services/api';
 import { useToast } from './context/ToastContext';
 import './App.css';
 
@@ -367,40 +367,56 @@ export default function App() {
     localStorage.setItem('eventland_purchased_tickets', JSON.stringify(purchasedTickets));
   }, [purchasedTickets]);
 
-  // Dynamic Document Title based on Active View, Search Filters, & Active Modals
+  // Dynamic Document Title & Meta Description based on Active View, Search Filters, & Active Modals
   useEffect(() => {
+    let title = 'EventLand - Discover | Book | Experience Live Events in Pakistan';
+    let description = 'Discover & book tickets for Pakistan\'s top concerts, comedy nights, festivals, and theatre shows across Karachi, Lahore, and Islamabad.';
+
     if (activeTicketView) {
-      document.title = `E-Ticket Pass (${activeTicketView.ticketId}) | Event Land`;
+      title = `E-Ticket Pass (${activeTicketView.ticketId}) | EventLand`;
+      description = `Digital ticket pass for ${activeTicketView.eventTitle} on EventLand Pakistan.`;
     } else if (checkoutData) {
-      document.title = `Checkout: ${checkoutData.event?.title || 'Tickets'} | Event Land`;
+      title = `Checkout: ${checkoutData.event?.title || 'Tickets'} | EventLand`;
+      description = `Complete your ticket booking for ${checkoutData.event?.title || 'live event'} on EventLand.`;
     } else if (activeSeatPickerEvent) {
-      document.title = `Select Seats: ${activeSeatPickerEvent.title} | Event Land`;
+      title = `Select Seats: ${activeSeatPickerEvent.title} | EventLand`;
+      description = `Choose your reserved seats for ${activeSeatPickerEvent.title} on EventLand.`;
     } else if (activeDetailEvent) {
-      document.title = `${activeDetailEvent.title} (${activeDetailEvent.city}) | Event Land`;
+      title = `${activeDetailEvent.title} (${activeDetailEvent.city || 'Pakistan'}) | EventLand`;
+      description = activeDetailEvent.description ? activeDetailEvent.description.slice(0, 160) : `Book tickets for ${activeDetailEvent.title} on EventLand.`;
     } else if (activeView === 'artists') {
-      document.title = `Artist Bookings & Live Talent | Event Land`;
+      title = `Artist Bookings & Live Talent | EventLand Pakistan`;
+      description = `Browse and book featured artists, musicians, and comedians across Pakistan on EventLand.`;
     } else if (activeView === 'organizer-wizard') {
-      document.title = `List & Host Your Event | Event Land`;
+      title = `List & Host Your Event | EventLand Pakistan`;
+      description = `Organizers can list events, configure ticket tiers, and sell tickets to audiences across Pakistan.`;
     } else if (activeView === 'my-tickets') {
-      document.title = `My Digital Tickets & Passes | Event Land`;
+      title = `My Digital Tickets & Passes | EventLand`;
+      description = `View and download your digital ticket passes and booking receipts on EventLand.`;
     } else if (activeView === 'admin') {
-      document.title = `Admin Console & Operations | Event Land`;
+      title = `Admin Console & Operations | EventLand`;
     } else if (activeView === 'organizer') {
-      document.title = `Organizer Command Center | Event Land`;
+      title = `Organizer Command Center | EventLand`;
     } else {
       // Explore View
       if (searchQuery.trim()) {
-        document.title = `Search: "${searchQuery}" | Event Land`;
+        title = `Search: "${searchQuery}" | EventLand Pakistan`;
       } else if (selectedTag !== 'All' && selectedCity !== 'All Cities') {
-        document.title = `${selectedTag} Events in ${selectedCity} | Event Land`;
+        title = `${selectedTag} Events in ${selectedCity} | EventLand Pakistan`;
+        description = `Find and book ${selectedTag} events in ${selectedCity}, Pakistan on EventLand.`;
       } else if (selectedTag !== 'All') {
-        document.title = `${selectedTag} Events | Event Land`;
+        title = `${selectedTag} Events | EventLand Pakistan`;
+        description = `Discover top ${selectedTag} events across Pakistan on EventLand.`;
       } else if (selectedCity !== 'All Cities') {
-        document.title = `Events in ${selectedCity} | Event Land`;
-      } else {
-        document.title = `Event Land - Discover | Book | Experience`;
+        title = `Events in ${selectedCity} | EventLand Pakistan`;
+        description = `Discover live concerts, comedy shows, and theatre in ${selectedCity}, Pakistan.`;
       }
     }
+
+    document.title = title;
+
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute('content', description);
   }, [
     activeView,
     selectedCity,
@@ -431,15 +447,15 @@ export default function App() {
     setActiveView(view);
   };
 
-  // Open Detail Page when event card is clicked & update URL path to /event/:id
+  // Open Detail Page when event card is clicked & update URL path to /event/:slug
   const handleSelectEventForDetail = (event) => {
-    const id = event?.id || (typeof event === 'string' || typeof event === 'number' ? event : null);
+    const slug = toEventSlug(event);
     if (typeof event === 'object' && event !== null) {
       setActiveDetailEvent(event);
     }
-    if (id) {
-      setUrlEventId(id);
-      window.history.pushState({ eventId: id }, '', `/event/${id}`);
+    if (slug) {
+      setUrlEventId(slug);
+      window.history.pushState({ eventSlug: slug, eventId: event?.id }, '', `/event/${slug}`);
     }
     setActiveView('event-detail');
     window.scrollTo({ top: 0, behavior: 'smooth' });

@@ -1,4 +1,4 @@
-export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://localhost:7257';
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || ' https://celiac-briley-commandingly.ngrok-free.dev';
 export const BASE_URL = import.meta.env.VITE_API_URL || `${BACKEND_URL}/api`;
 export const SERVER_BASE = BASE_URL.replace(/\/api\/?$/, '') || BACKEND_URL;
 
@@ -28,6 +28,14 @@ export function getPaymentSlipUrl(slipUrl) {
   if (slipUrl.startsWith('http://') || slipUrl.startsWith('https://')) return slipUrl;
   const fileName = slipUrl.split('/').pop().split('\\').pop();
   return `${SERVER_BASE}/assets/images/slips/${fileName}`;
+}
+
+export function getQrCodeImageUrl(qrUrl) {
+  if (!qrUrl) return '';
+  if (qrUrl.startsWith('http://') || qrUrl.startsWith('https://') || qrUrl.startsWith('data:image/') || qrUrl.startsWith('blob:')) return qrUrl;
+  if (qrUrl.startsWith('/assets/')) return `${SERVER_BASE}${qrUrl}`;
+  const fileName = qrUrl.split('/').pop().split('\\').pop();
+  return `${SERVER_BASE}/assets/images/qr_codes/${fileName}`;
 }
 
 async function request(endpoint, options = {}) {
@@ -119,8 +127,27 @@ export const eventsApi = {
     const queryString = query.toString();
     return request(`/events${queryString ? `?${queryString}` : ''}`);
   },
-  getEventById: async (id) => request(`/events/${id}`)
+  getEventById: async (identifier) => request(`/events/${encodeURIComponent(identifier)}`)
 };
+
+export function toEventSlug(event) {
+  if (!event) return '';
+  const rawTitle = typeof event === 'object' ? (event.title || event.name || '') : String(event);
+  const rawId = typeof event === 'object' ? event.id : event;
+
+  const cleanTitle = String(rawTitle)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+
+  if (!cleanTitle) {
+    return `event-${rawId}`;
+  }
+
+  return rawId ? `${cleanTitle}-${rawId}` : cleanTitle;
+}
 
 // --- Public Artists API ---
 export const artistsApi = {
@@ -373,7 +400,7 @@ export const formatPhoneNumberOnSubmit = (rawPhone, dialingCode) => {
 
 export const splitPhoneNumberForEdit = (fullPhone, countryList = [], countryId = null) => {
   if (!fullPhone) return { dialingCode: '+92', nationalNumber: '', countryId: countryId || 1 };
-  
+
   let clean = fullPhone.trim();
   let foundCountry = countryList.find(c => c.id === countryId);
   let dialingCode = foundCountry?.dialingCode || '+92';

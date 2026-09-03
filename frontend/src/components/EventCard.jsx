@@ -8,7 +8,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
   const formattedTime = formatEventStartTime(event.startDateUtc || event.startDate, event.time);
 
   return (
-    <div
+    <article
       className="glass-card event-card"
       onClick={() => onSelect(event)}
       style={{
@@ -37,7 +37,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
       <div className="event-card-image" style={{ position: 'relative', flex: '1 1 480px', minHeight: '260px', overflow: 'hidden' }}>
         <img
           src={getEventImageUrl(event.banner)}
-          alt={event.title}
+          alt={`${event.title} live event banner - ${event.cityName || event.city || 'Pakistan'}`}
           style={{
             width: '100%',
             height: '100%',
@@ -188,6 +188,6 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
           </button>
         </div>
       </div>
-    </div>
+    </article>
   );
 }

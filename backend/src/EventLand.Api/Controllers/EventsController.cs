@@ -30,13 +30,13 @@ public class EventsController : ControllerBase
         return Ok(events);
     }
 
-    /// <summary>Get full event details including ticket tiers and seating zones by 4-digit ID.</summary>
-    [HttpGet("{id:int}")]
-    public async Task<ActionResult<EventDetailDto>> GetEventById(int id)
+    /// <summary>Get full event details including ticket tiers and seating zones by slug identifier or numeric ID.</summary>
+    [HttpGet("{identifier}")]
+    public async Task<ActionResult<EventDetailDto>> GetEventByIdentifier(string identifier)
     {
-        var ev = await _eventService.GetEventByIdAsync(id);
+        var ev = await _eventService.GetEventByIdentifierAsync(identifier);
         if (ev is null)
-            return NotFound(new { message = $"Event '{id}' not found." });
+            return NotFound(new { message = $"Event '{identifier}' not found." });
 
         return Ok(ev);
     }

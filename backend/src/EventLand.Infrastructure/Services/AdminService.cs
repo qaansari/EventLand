@@ -479,6 +479,14 @@ public class AdminService : IAdminService
         if (exists)
             throw new InvalidOperationException($"A user with email '{dto.Email}' already exists.");
 
+        if (!string.IsNullOrWhiteSpace(dto.PhoneNumber))
+        {
+            var cleanPhone = dto.PhoneNumber.Trim();
+            var phoneExists = await _context.Users.AnyAsync(u => u.PhoneNumber == cleanPhone && !u.IsDeleted);
+            if (phoneExists)
+                throw new InvalidOperationException($"A user with phone number '{cleanPhone}' already exists.");
+        }
+
         var role = await _context.Roles.FirstOrDefaultAsync(r => r.Id == dto.RoleId && !r.IsDeleted);
         if (role is null)
             throw new KeyNotFoundException($"Role '{dto.RoleId}' not found.");
@@ -488,7 +496,7 @@ public class AdminService : IAdminService
             Email = dto.Email.Trim(),
             FullName = dto.FullName.Trim(),
             RoleId = dto.RoleId,
-            PhoneNumber = dto.PhoneNumber,
+            PhoneNumber = dto.PhoneNumber?.Trim(),
             CountryId = dto.CountryId,
             ImageUrl = FileUrlHelper.ExtractFileName(dto.ImageUrl) ?? dto.ImageUrl,
             IsActive = true
@@ -510,13 +518,21 @@ public class AdminService : IAdminService
         if (user is null)
             throw new KeyNotFoundException($"User '{id}' not found.");
 
+        if (!string.IsNullOrWhiteSpace(dto.PhoneNumber))
+        {
+            var cleanPhone = dto.PhoneNumber.Trim();
+            var phoneExists = await _context.Users.AnyAsync(u => u.Id != id && u.PhoneNumber == cleanPhone && !u.IsDeleted);
+            if (phoneExists)
+                throw new InvalidOperationException($"Another user with phone number '{cleanPhone}' already exists.");
+        }
+
         var role = await _context.Roles.FirstOrDefaultAsync(r => r.Id == dto.RoleId && !r.IsDeleted);
         if (role is null)
             throw new KeyNotFoundException($"Role '{dto.RoleId}' not found.");
 
         user.FullName = dto.FullName.Trim();
         user.RoleId = dto.RoleId;
-        user.PhoneNumber = dto.PhoneNumber;
+        user.PhoneNumber = dto.PhoneNumber?.Trim();
         user.CountryId = dto.CountryId;
         user.IsActive = dto.IsActive;
 
@@ -736,7 +752,6 @@ public class AdminService : IAdminService
                     EndTimeUtc = sInput.EndTimeUtc
                 };
                 _context.EventShows.Add(show);
-                await _context.SaveChangesAsync();
 
                 if (sInput.TicketTiers is not null && sInput.TicketTiers.Any())
                 {
@@ -746,7 +761,7 @@ public class AdminService : IAdminService
                         _context.TicketTiers.Add(new TicketTier
                         {
                             EventId = ev.Id,
-                            EventShowId = show.Id,
+                            EventShow = show,
                             Name = tInput.Name,
                             Description = tInput.Description ?? $"{tInput.Name} pass for {show.ShowTitle}",
                             Price = tInput.Price > 0 ? tInput.Price : (dto.StartingPrice > 0 ? dto.StartingPrice : 1500m),
@@ -762,7 +777,7 @@ public class AdminService : IAdminService
                     _context.TicketTiers.Add(new TicketTier
                     {
                         EventId = ev.Id,
-                        EventShowId = show.Id,
+                        EventShow = show,
                         Name = "Standard Pass",
                         Description = $"Standard admission pass for {show.ShowTitle}",
                         Price = basePrice,
@@ -772,7 +787,7 @@ public class AdminService : IAdminService
                     _context.TicketTiers.Add(new TicketTier
                     {
                         EventId = ev.Id,
-                        EventShowId = show.Id,
+                        EventShow = show,
                         Name = "VIP Pass",
                         Description = $"VIP fast-track pass for {show.ShowTitle}",
                         Price = basePrice * 2.25m,
@@ -792,7 +807,6 @@ public class AdminService : IAdminService
                 EndTimeUtc = dto.EndDateUtc
             };
             _context.EventShows.Add(defaultShow);
-            await _context.SaveChangesAsync();
 
             if (ticketingType == TicketingType.Categorized)
             {
@@ -800,7 +814,7 @@ public class AdminService : IAdminService
                 _context.TicketTiers.Add(new TicketTier
                 {
                     EventId = ev.Id,
-                    EventShowId = defaultShow.Id,
+                    EventShow = defaultShow,
                     Name = "Standard Pass",
                     Description = "Standard admission pass",
                     Price = basePrice,
@@ -810,7 +824,7 @@ public class AdminService : IAdminService
                 _context.TicketTiers.Add(new TicketTier
                 {
                     EventId = ev.Id,
-                    EventShowId = defaultShow.Id,
+                    EventShow = defaultShow,
                     Name = "VIP Pass",
                     Description = "VIP fast-track pass",
                     Price = basePrice * 2.25m,
@@ -1421,6 +1435,9 @@ public class AdminService : IAdminService
         b.BookingSeats != null ? b.BookingSeats.Select(bs => new BookingSeatDto(bs.Seat.Id, bs.Seat.Label, bs.Seat.Row, bs.Seat.Col, bs.Seat.Price)).ToList() : new List<BookingSeatDto>(),
         b.BankTransactionRef,
         FileUrlHelper.FormatPaymentSlipUrl(b.PaymentProofUrl),
+        b.SenderAccountTitle,
+        b.SenderBankName,
+        b.SenderAccountLast4,
         b.VerifiedAt,
         b.PaymentExpiresAt
     );

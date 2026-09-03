@@ -189,6 +189,9 @@ public class BookingService : IBookingService
 
         booking.BankTransactionRef = dto.BankTransactionRef?.Trim();
         booking.PaymentProofUrl = dto.PaymentProofUrl?.Trim();
+        booking.SenderAccountTitle = dto.SenderAccountTitle?.Trim();
+        booking.SenderBankName = dto.SenderBankName?.Trim();
+        booking.SenderAccountLast4 = dto.SenderAccountLast4?.Trim();
         booking.PaymentStatus = PaymentStatus.PendingVerification;
 
         await _context.SaveChangesAsync();
@@ -300,7 +303,7 @@ public class BookingService : IBookingService
     {
         var b = await _context.Bookings
             .AsNoTracking()
-            .Include(x => x.Event)
+            .Include(x => x.Event).ThenInclude(e => e!.Venue)
             .Include(x => x.TicketTier)
             .Include(x => x.BookingSeats).ThenInclude(bs => bs.Seat)
             .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
@@ -314,7 +317,7 @@ public class BookingService : IBookingService
     {
         var b = await _context.Bookings
             .AsNoTracking()
-            .Include(x => x.Event)
+            .Include(x => x.Event).ThenInclude(e => e!.Venue)
             .Include(x => x.TicketTier)
             .Include(x => x.BookingSeats).ThenInclude(bs => bs.Seat)
             .FirstOrDefaultAsync(x => x.BookingRef == bookingRef && !x.IsDeleted);
@@ -331,7 +334,7 @@ public class BookingService : IBookingService
 
         var query = _context.Bookings
             .AsNoTracking()
-            .Include(x => x.Event)
+            .Include(x => x.Event).ThenInclude(e => e!.Venue)
             .Include(x => x.TicketTier)
             .Include(x => x.BookingSeats).ThenInclude(bs => bs.Seat)
             .Where(b => b.CustomerEmail.ToLower() == email.ToLower() && !b.IsDeleted);
@@ -378,6 +381,9 @@ public class BookingService : IBookingService
                 )).ToList(),
             b.BankTransactionRef,
             FileUrlHelper.FormatPaymentSlipUrl(b.PaymentProofUrl),
+            b.SenderAccountTitle,
+            b.SenderBankName,
+            b.SenderAccountLast4,
             b.VerifiedAt,
             b.PaymentExpiresAt,
             FileUrlHelper.FormatEventBannerUrl(b.Event?.Banner),

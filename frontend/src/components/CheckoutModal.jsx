@@ -16,7 +16,7 @@ import {
   CreditCard
 } from 'lucide-react';
 import QRCode from 'qrcode';
-import { bookingsApi, bankAccountsApi, uploadApi, getEventImageUrl } from '../services/api';
+import { bookingsApi, bankAccountsApi, uploadApi, getEventImageUrl, getQrCodeImageUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 
 export default function CheckoutModal({ event, selectedSeats, onClose, onBookingSuccess, onInvoiceCreated }) {
@@ -53,6 +53,10 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
   // Bank Transfer Proof fields
   const [transactionRef, setTransactionRef] = useState('');
   const [proofUrl, setProofUrl] = useState('');
+  const [useAltVerification, setUseAltVerification] = useState(false);
+  const [senderAccountTitle, setSenderAccountTitle] = useState('');
+  const [senderBankName, setSenderBankName] = useState('');
+  const [senderAccountLast4, setSenderAccountLast4] = useState('');
   const [isUploadingProof, setIsUploadingProof] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -69,7 +73,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
     async function loadActiveBank() {
       try {
         const active = await bankAccountsApi.getActive();
-        if (active) {
+        if (active && active.bankName) {
           setBankAccount(active);
           generateBankQr(active);
         } else {
@@ -83,13 +87,16 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
     loadActiveBank();
   }, []);
 
-  const generateBankQr = async (bank) => {
-    if (bank.qrCodeImageUrl) {
-      setBankQrDataUrl(bank.qrCodeImageUrl);
-      return;
+  useEffect(() => {
+    if (bankAccount) {
+      generateBankQr(bankAccount);
     }
+  }, [bankAccount]);
+
+  const generateDynamicPayloadQr = async (bank) => {
     try {
-      const payload = `EVENTLAND BANK PAYMENT\nBank: ${bank.bankName}\nTitle: ${bank.accountTitle}\nAcc: ${bank.accountNumber}\nIBAN: ${bank.iban}`;
+      const b = bank || bankAccount;
+      const payload = `EVENTLAND BANK PAYMENT\nBank: ${b.bankName}\nTitle: ${b.accountTitle}\nAcc: ${b.accountNumber}\nIBAN: ${b.iban}`;
       const url = await QRCode.toDataURL(payload, {
         width: 360,
         margin: 1,
@@ -99,6 +106,15 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
     } catch (e) {
       console.warn('QR code generation error:', e);
     }
+  };
+
+  const generateBankQr = async (bank) => {
+    const targetBank = bank || bankAccount;
+    if (targetBank && targetBank.qrCodeImageUrl) {
+      setBankQrDataUrl(getQrCodeImageUrl(targetBank.qrCodeImageUrl));
+      return;
+    }
+    await generateDynamicPayloadQr(targetBank);
   };
 
   // 2. 30-Minute Countdown Timer for seat reservation hold
@@ -195,8 +211,12 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
 
   const handleSubmitBankTransfer = async (e) => {
     e.preventDefault();
-    if (!transactionRef.trim()) {
+    if (!useAltVerification && !transactionRef.trim()) {
       showError('Transaction Ref Required', 'Please enter your Bank Transaction ID, Raast Reference # or Transfer TID.');
+      return;
+    }
+    if (useAltVerification && (!senderAccountTitle.trim() || !senderBankName.trim())) {
+      showError('Sender Info Required', 'Please fill out your Sender Account Title and Sender Bank Name for manual verification.');
       return;
     }
     if (timerSeconds <= 0) {
@@ -241,11 +261,15 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         };
         backendBooking = await bookingsApi.createBooking(dto);
 
-        // Submit the Bank Transaction Reference & Receipt Proof
+        // Submit the Bank Transaction Reference / Alternative Verification & Receipt Proof
         if (backendBooking?.id) {
+          const defaultRef = transactionRef.trim() || `SENDER-${senderBankName.trim().toUpperCase().slice(0, 6)}`;
           backendBooking = await bookingsApi.submitPaymentProof(backendBooking.id, {
-            bankTransactionRef: transactionRef.trim(),
-            paymentProofUrl: proofUrl || null
+            bankTransactionRef: defaultRef,
+            paymentProofUrl: proofUrl || null,
+            senderAccountTitle: useAltVerification ? senderAccountTitle.trim() : null,
+            senderBankName: useAltVerification ? senderBankName.trim() : null,
+            senderAccountLast4: useAltVerification ? senderAccountLast4.trim() : null
           });
         }
       }
@@ -619,7 +643,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               </div>
 
               {/* Bank QR Code & Scan Option */}
-              {bankQrDataUrl && (
+              {(bankAccount.qrCodeImageUrl || bankQrDataUrl) && (
                 <div style={{
                   marginTop: '1.25rem',
                   padding: '1.25rem',
@@ -645,7 +669,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                     display: 'inline-block'
                   }}>
                     <img
-                      src={bankQrDataUrl}
+                      src={bankAccount.qrCodeImageUrl ? getQrCodeImageUrl(bankAccount.qrCodeImageUrl) : bankQrDataUrl}
                       alt="Bank QR Code"
                       style={{
                         width: '220px',
@@ -654,11 +678,17 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                         objectFit: 'contain',
                         borderRadius: '6px'
                       }}
+                      onError={(e) => {
+                        // Fall back to generated payload QR code if image is missing
+                        if (bankQrDataUrl && e.target.src !== bankQrDataUrl) {
+                          e.target.src = bankQrDataUrl;
+                        }
+                      }}
                     />
                   </div>
 
                   <p style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0, maxWidth: '440px', lineHeight: 1.45 }}>
-                    Scan directly using your mobile banking app (Meezan / HBL / Raast / EasyPaisa / JazzCash / Any 1Link App) for instant transfer.
+                    Scan directly using your mobile banking app (Meezan / HBL / UBL / Raast / EasyPaisa / JazzCash / Any 1Link App) for instant transfer.
                   </p>
                 </div>
               )}
@@ -748,6 +778,66 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Alternative Verification Option (e.g. Standard Chartered screenshot block) */}
+              <div style={{ marginBottom: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed rgba(255, 255, 255, 0.1)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem', color: '#2dd4bf', fontWeight: 600 }}>
+                  <input
+                    type="checkbox"
+                    checked={useAltVerification}
+                    onChange={e => setUseAltVerification(e.target.checked)}
+                    style={{ accentColor: '#0d9488', width: '17px', height: '17px', cursor: 'pointer' }}
+                  />
+                  No Screenshot or Transaction ID available? (e.g. Standard Chartered)
+                </label>
+
+                {useAltVerification && (
+                  <div style={{ marginTop: '0.85rem', padding: '1rem', background: 'rgba(13, 148, 136, 0.08)', borderRadius: '12px', border: '1px solid rgba(45, 212, 191, 0.25)', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    <span style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.4 }}>
+                      Provide your sender account information so our finance team can manually cross-reference and verify your transfer on our bank statement:
+                    </span>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600, marginBottom: '0.25rem' }}>
+                        Sender Account Title / Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Qamar Ansari"
+                        value={senderAccountTitle}
+                        onChange={e => setSenderAccountTitle(e.target.value)}
+                        style={{ width: '100%', padding: '0.65rem 0.85rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
+                      />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600, marginBottom: '0.25rem' }}>
+                          Sender Bank Name *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Standard Chartered Bank"
+                          value={senderBankName}
+                          onChange={e => setSenderBankName(e.target.value)}
+                          style={{ width: '100%', padding: '0.65rem 0.85rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600, marginBottom: '0.25rem' }}>
+                          Account Last 4 Digits (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          placeholder="e.g. 5432"
+                          value={senderAccountLast4}
+                          onChange={e => setSenderAccountLast4(e.target.value)}
+                          style={{ width: '100%', padding: '0.65rem 0.85rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '0.75rem' }}>

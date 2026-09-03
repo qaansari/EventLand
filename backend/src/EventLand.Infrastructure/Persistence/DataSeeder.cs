@@ -89,21 +89,24 @@ public static class DataSeeder
 
         var pakistan = await context.Countries.FirstOrDefaultAsync(c => c.Code == "PK" || c.Name == "Pakistan");
 
-        var defaultCities = new[] { "Karachi", "Lahore", "Islamabad" };
-        foreach (var cityName in defaultCities)
+        if (pakistan != null)
         {
-            var cityExists = await context.Cities.AnyAsync(c => c.CountryId == pakistan.Id && c.Name.ToLower() == cityName.ToLower() && !c.IsDeleted);
-            if (!cityExists)
+            var defaultCities = new[] { "Karachi", "Lahore", "Islamabad" };
+            foreach (var cityName in defaultCities)
             {
-                context.Cities.Add(new City
+                var cityExists = await context.Cities.AnyAsync(c => c.CountryId == pakistan.Id && c.Name.ToLower() == cityName.ToLower() && !c.IsDeleted);
+                if (!cityExists)
                 {
-                    CountryId = pakistan.Id,
-                    Name = cityName,
-                    IsActive = true
-                });
+                    context.Cities.Add(new City
+                    {
+                        CountryId = pakistan.Id,
+                        Name = cityName,
+                        IsActive = true
+                    });
+                }
             }
+            await context.SaveChangesAsync();
         }
-        await context.SaveChangesAsync();
 
         // 4. Default "Event Land" Organizer Seeding
         var defaultOrg = await context.Organizers.FirstOrDefaultAsync(o => o.Name == "Event Land" && !o.IsDeleted);
@@ -194,6 +197,25 @@ public static class DataSeeder
                 PrivacyPolicyUrl = "#",
                 TermsOfServiceUrl = "#",
                 OrganizerSupportUrl = "#"
+            });
+            await context.SaveChangesAsync();
+        }
+
+        // 8. Default Active Bank Account Seeding
+        if (!await context.BankAccounts.AnyAsync())
+        {
+            context.BankAccounts.Add(new BankAccount
+            {
+                BankName = "Meezan Bank Limited",
+                AccountTitle = "EventLand Official Pvt Ltd",
+                AccountNumber = "0102030405060701",
+                Iban = "PK64MEZN0001020304050607",
+                BranchCode = "0102",
+                BranchName = "Clifton Branch, Karachi",
+                QrCodeImageUrl = "qr_meezanbank_1000.png",
+                Instructions = "Please transfer the exact booking amount via Mobile Banking App, Raast ID, or ATM. Mention your Booking Ref in transfer remarks.",
+                IsActive = true,
+                DisplayOrder = 1
             });
             await context.SaveChangesAsync();
         }

@@ -1,8 +1,10 @@
 namespace EventLand.Api.Controllers;
 
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using EventLand.Application.Common.Interfaces;
+using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,15 +14,21 @@ using Microsoft.EntityFrameworkCore;
 public class FooterController : ControllerBase
 {
     private readonly IApplicationDbContext _context;
+    private readonly ICacheService _cacheService;
+    private const string FooterCacheKey = "public:footer_info";
 
-    public FooterController(IApplicationDbContext context)
+    public FooterController(IApplicationDbContext context, ICacheService cacheService)
     {
         _context = context;
+        _cacheService = cacheService;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetFooterInfo()
     {
+        var cached = await _cacheService.GetAsync<object>(FooterCacheKey);
+        if (cached != null) return Ok(cached);
+
         var footer = await _context.FooterInfo.AsNoTracking().FirstOrDefaultAsync();
         if (footer == null)
         {
@@ -41,7 +49,7 @@ public class FooterController : ControllerBase
             .Select(c => c.Name)
             .ToListAsync();
 
-        return Ok(new
+        var result = new
         {
             brandName = footer.BrandName,
             tagline = footer.Tagline,
@@ -54,7 +62,10 @@ public class FooterController : ControllerBase
             organizerSupportUrl = footer.OrganizerSupportUrl,
             faqs = faqs,
             majorCities = cities
-        });
+        };
+
+        await _cacheService.SetAsync(FooterCacheKey, result, TimeSpan.FromMinutes(15));
+        return Ok(result);
     }
 
     [HttpPut]
@@ -80,6 +91,8 @@ public class FooterController : ControllerBase
         footer.UpdatedAt = System.DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
+        await _cacheService.RemoveAsync(FooterCacheKey);
+
         return Ok(footer);
     }
 }

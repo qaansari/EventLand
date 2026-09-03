@@ -68,6 +68,14 @@ public class AuthService : IAuthService
         if (emailExists)
             throw new InvalidOperationException("An account with this email address already exists.");
 
+        var cleanPhone = string.IsNullOrWhiteSpace(dto.PhoneNumber) ? null : dto.PhoneNumber.Trim();
+        if (!string.IsNullOrWhiteSpace(cleanPhone))
+        {
+            var phoneExists = await _context.Users.AnyAsync(u => u.PhoneNumber == cleanPhone && !u.IsDeleted);
+            if (phoneExists)
+                throw new InvalidOperationException("An account with this phone number already exists.");
+        }
+
         var customerRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Customer")
             ?? throw new InvalidOperationException("The Customer role is not configured on the server.");
 

@@ -30,6 +30,9 @@ public record BookingDto(
     // Bank Transfer Details
     string? BankTransactionRef = null,
     string? PaymentProofUrl = null,
+    string? SenderAccountTitle = null,
+    string? SenderBankName = null,
+    string? SenderAccountLast4 = null,
     DateTimeOffset? VerifiedAt = null,
     DateTimeOffset? PaymentExpiresAt = null,
     string? EventBanner = null,
@@ -49,8 +52,11 @@ public record CreateBookingDto(
 );
 
 public record SubmitBankPaymentProofDto(
-    string BankTransactionRef,
-    string? PaymentProofUrl = null
+    string? BankTransactionRef = null,
+    string? PaymentProofUrl = null,
+    string? SenderAccountTitle = null,
+    string? SenderBankName = null,
+    string? SenderAccountLast4 = null
 );
 
 public record ConfirmBankPaymentDto(
