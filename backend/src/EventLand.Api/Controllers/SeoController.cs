@@ -84,7 +84,7 @@ public class SeoController : ControllerBase
                     .Replace(' ', '-');
 
                 var slug = string.IsNullOrWhiteSpace(cleanTitle) ? $"event-{ev.Id}" : $"{cleanTitle}-{ev.Id}";
-                var lastModDate = (ev.UpdatedAt ?? ev.CreatedAt).ToString("yyyy-MM-dd");
+                var lastModDate = ev.UpdatedAt.ToString("yyyy-MM-dd");
 
                 writer.WriteStartElement("url");
                 writer.WriteXmlElement("loc", $"{baseUrl}/event/{slug}");

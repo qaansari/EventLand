@@ -1,4 +1,4 @@
-export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || ' https://celiac-briley-commandingly.ngrok-free.dev';
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'https://celiac-briley-commandingly.ngrok-free.dev';
 export const BASE_URL = import.meta.env.VITE_API_URL || `${BACKEND_URL}/api`;
 export const SERVER_BASE = BASE_URL.replace(/\/api\/?$/, '') || BACKEND_URL;
 
@@ -43,6 +43,7 @@ async function request(endpoint, options = {}) {
 
   const headers = {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': '69420',
     ...(options.headers || {})
   };
 

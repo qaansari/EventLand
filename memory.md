@@ -56,6 +56,7 @@
 - `CheckoutModal.jsx`, `Booking.cs`, `BookingService.cs`, and `AdminDashboard.jsx` support an alternative payment proof verification fallback (`SenderAccountTitle`, `SenderBankName`, `SenderAccountLast4`) for customers whose bank apps enforce screenshot blocks (e.g. Standard Chartered).
 - Event Detail pages use SEO URL Slugs (`/event/atif-aslam-live-in-concert-12`) via `toEventSlug` and `GetEventByIdentifierAsync`, completely hiding raw database numeric IDs from the frontend browser address bar.
 - Web app is 100% SEO-friendly with Canonical links, OpenGraph, Twitter Cards, dynamic Schema.org Event & Organization JSON-LD rich snippets (`EventDetailPage.jsx`), semantic `<article>` tags (`EventCard.jsx`), and backend dynamic `/sitemap.xml` & `/robots.txt` endpoints (`SeoController.cs`).
+- Vercel frontend (`https://eventland-eblm0be23-qamar-ansari.vercel.app`) & Ngrok backend (`https://celiac-briley-commandingly.ngrok-free.dev`) connectivity configured with `ngrok-skip-browser-warning` header (`api.js`) and `SetIsOriginAllowed(_ => true)` CORS policy (`Program.cs`).
 
 ### 3. Bank Maintenance & Downtime Notice Guard
 - Super Admin can set maintenance details on the active bank account: `MaintenanceNotice`, `MaintenanceStartUtc`, `MaintenanceEndUtc`, or force `IsMaintenanceMode`.
