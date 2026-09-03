@@ -107,6 +107,13 @@ if (allowedOrigins is null || allowedOrigins.Length == 0)
 
 builder.Services.AddCors(options =>
 {
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.SetIsOriginAllowed(_ => true)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy.SetIsOriginAllowed(_ => true)
@@ -118,6 +125,8 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+app.UseRouting();
+app.UseCors();
 app.UseCors("AllowFrontend");
 
 // Global Exception Handler & Security Headers
