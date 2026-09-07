@@ -16,7 +16,7 @@ import {
   CreditCard
 } from 'lucide-react';
 import QRCode from 'qrcode';
-import { bookingsApi, bankAccountsApi, uploadApi, getEventImageUrl, getQrCodeImageUrl } from '../services/api';
+import { bookingsApi, bankAccountsApi, uploadApi, getEventImageUrl, getQrCodeImageUrl, getPaymentSlipUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 
 export default function CheckoutModal({ event, selectedSeats, onClose, onBookingSuccess, onInvoiceCreated }) {
@@ -59,14 +59,38 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
   const [senderAccountLast4, setSenderAccountLast4] = useState('');
   const [isUploadingProof, setIsUploadingProof] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [createdBooking, setCreatedBooking] = useState(null);
 
   // 30-Minute Seat Reservation Hold Timer (30 mins = 1800s)
   const [timerSeconds, setTimerSeconds] = useState(1800);
-  const [createdBooking, setCreatedBooking] = useState(null);
 
   // Promo Code
   const [promoCode, setPromoCode] = useState('');
   const [discount, setDiscount] = useState(0);
+
+  const generateDynamicPayloadQr = async (bank) => {
+    try {
+      const b = bank || bankAccount;
+      const payload = `EVENTLAND BANK PAYMENT\nBank: ${b.bankName}\nTitle: ${b.accountTitle}\nAcc: ${b.accountNumber}\nIBAN: ${b.iban}`;
+      const url = await QRCode.toDataURL(payload, {
+        width: 360,
+        margin: 1,
+        color: { dark: '#061017', light: '#ffffff' }
+      });
+      setBankQrDataUrl(url);
+    } catch (e) {
+      console.warn('QR code generation error:', e);
+    }
+  };
+
+  const generateBankQr = async (bank) => {
+    const targetBank = bank || bankAccount;
+    if (targetBank && targetBank.qrCodeImageUrl) {
+      setBankQrDataUrl(getQrCodeImageUrl(targetBank.qrCodeImageUrl));
+      return;
+    }
+    await generateDynamicPayloadQr(targetBank);
+  };
 
   // 1. Fetch Active Bank Account from Database & generate QR
   useEffect(() => {
@@ -92,30 +116,6 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
       generateBankQr(bankAccount);
     }
   }, [bankAccount]);
-
-  const generateDynamicPayloadQr = async (bank) => {
-    try {
-      const b = bank || bankAccount;
-      const payload = `EVENTLAND BANK PAYMENT\nBank: ${b.bankName}\nTitle: ${b.accountTitle}\nAcc: ${b.accountNumber}\nIBAN: ${b.iban}`;
-      const url = await QRCode.toDataURL(payload, {
-        width: 360,
-        margin: 1,
-        color: { dark: '#061017', light: '#ffffff' }
-      });
-      setBankQrDataUrl(url);
-    } catch (e) {
-      console.warn('QR code generation error:', e);
-    }
-  };
-
-  const generateBankQr = async (bank) => {
-    const targetBank = bank || bankAccount;
-    if (targetBank && targetBank.qrCodeImageUrl) {
-      setBankQrDataUrl(getQrCodeImageUrl(targetBank.qrCodeImageUrl));
-      return;
-    }
-    await generateDynamicPayloadQr(targetBank);
-  };
 
   // 2. 30-Minute Countdown Timer for seat reservation hold
   useEffect(() => {

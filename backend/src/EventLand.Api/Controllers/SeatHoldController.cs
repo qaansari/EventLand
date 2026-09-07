@@ -30,8 +30,12 @@ public class SeatHoldController : ControllerBase
         if (dto.SeatIds == null || !dto.SeatIds.Any())
             return BadRequest(new HoldSeatsResponseDto(false, "No seat IDs provided.", new List<int>(), null));
 
+        var authenticatedEmail = User.FindFirstValue(System.Security.Claims.ClaimTypes.Email) 
+            ?? User.FindFirstValue("email") 
+            ?? dto.CustomerEmail;
+
         var holdDuration = TimeSpan.FromMinutes(10);
-        var success = await _cacheService.HoldSeatsAsync(dto.EventId, dto.SeatIds, dto.CustomerEmail, holdDuration, dto.EventShowId);
+        var success = await _cacheService.HoldSeatsAsync(dto.EventId, dto.SeatIds, authenticatedEmail, holdDuration, dto.EventShowId);
 
         if (!success)
         {
@@ -45,7 +49,7 @@ public class SeatHoldController : ControllerBase
 
         // Broadcast live SignalR WebSocket notification to the hub group clients actually join.
         await _hubContext.Clients.Group(Hubs.SeatingHub.GetGroupName(dto.EventId))
-            .SeatsHeld(dto.EventId, dto.SeatIds, dto.CustomerEmail);
+            .SeatsHeld(dto.EventId, dto.SeatIds, authenticatedEmail);
 
         return Ok(new HoldSeatsResponseDto(
             true,

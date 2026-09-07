@@ -5,10 +5,6 @@ import EventCard from './components/EventCard';
 import EventFilterBar from './components/EventFilterBar';
 import EventDetailPage from './components/EventDetailPage';
 import InteractiveSeatPicker from './components/InteractiveSeatPicker';
-import CheckoutModal from './components/CheckoutModal';
-import DigitalTicketModal from './components/DigitalTicketModal';
-import UnpaidInvoicesModal from './components/UnpaidInvoicesModal';
-import AttendeeDashboard from './components/AttendeeDashboard';
 import AuthModal from './components/AuthModal';
 import Footer from './components/Footer';
 import { Ticket, MapPin, Trash2, Search, RefreshCw } from 'lucide-react';
@@ -16,11 +12,15 @@ import { eventsApi, bookingsApi, tagsApi, locationsApi, adminApi, toEventSlug } 
 import { useToast } from './context/ToastContext';
 import './App.css';
 
-// Code-split heavy / role-gated views into separate chunks
+// Code-split heavy / role-gated views and on-demand modals into separate chunks
 const ArtistBookings = lazy(() => import('./components/ArtistBookings'));
 const EventOrganizerWizard = lazy(() => import('./components/EventOrganizerWizard'));
 const AdminDashboard = lazy(() => import('./components/AdminDashboard'));
 const OrganizerDashboard = lazy(() => import('./components/OrganizerDashboard'));
+const CheckoutModal = lazy(() => import('./components/CheckoutModal'));
+const DigitalTicketModal = lazy(() => import('./components/DigitalTicketModal'));
+const UnpaidInvoicesModal = lazy(() => import('./components/UnpaidInvoicesModal'));
+const AttendeeDashboard = lazy(() => import('./components/AttendeeDashboard'));
 
 const LazyFallback = (
   <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#94a3b8' }}>
@@ -771,16 +771,18 @@ export default function App() {
 
         {/* View: Attendee Dashboard & E-Tickets */}
         {activeView === 'my-tickets' && (
-          <AttendeeDashboard
-            currentUser={currentUser}
-            purchasedTickets={purchasedTickets}
-            savedEvents={savedEvents}
-            onViewTicket={(ticket) => setActiveTicketView(ticket)}
-            onRemoveTicket={handleRemoveTicket}
-            onLookupTickets={handleLookupTickets}
-            onBrowseEvents={() => setActiveView('explore')}
-            onSelectEvent={handleSelectEventForDetail}
-          />
+          <Suspense fallback={LazyFallback}>
+            <AttendeeDashboard
+              currentUser={currentUser}
+              purchasedTickets={purchasedTickets}
+              savedEvents={savedEvents}
+              onViewTicket={(ticket) => setActiveTicketView(ticket)}
+              onRemoveTicket={handleRemoveTicket}
+              onLookupTickets={handleLookupTickets}
+              onBrowseEvents={() => setActiveView('explore')}
+              onSelectEvent={handleSelectEventForDetail}
+            />
+          </Suspense>
         )}
         {/* View: Admin Console Dashboard */}
         {activeView === 'admin' && (
@@ -828,30 +830,36 @@ export default function App() {
       )}
 
       {checkoutData && (
-        <CheckoutModal
-          event={checkoutData.event}
-          selectedSeats={checkoutData.seats}
-          onClose={() => setCheckoutData(null)}
-          onBookingSuccess={handleBookingSuccess}
-        />
+        <Suspense fallback={LazyFallback}>
+          <CheckoutModal
+            event={checkoutData.event}
+            selectedSeats={checkoutData.seats}
+            onClose={() => setCheckoutData(null)}
+            onBookingSuccess={handleBookingSuccess}
+          />
+        </Suspense>
       )}
 
       {activeTicketView && (
-        <DigitalTicketModal
-          ticket={activeTicketView}
-          onClose={() => setActiveTicketView(null)}
-        />
+        <Suspense fallback={LazyFallback}>
+          <DigitalTicketModal
+            ticket={activeTicketView}
+            onClose={() => setActiveTicketView(null)}
+          />
+        </Suspense>
       )}
 
       {activeView === 'unpaid-invoices' && (
-        <UnpaidInvoicesModal
-          currentUser={currentUser}
-          onClose={() => setActiveView('explore')}
-          onPaymentSuccess={(ticket) => {
-            setSavedTickets(prev => [ticket, ...prev]);
-            setActiveTicketView(ticket);
-          }}
-        />
+        <Suspense fallback={LazyFallback}>
+          <UnpaidInvoicesModal
+            currentUser={currentUser}
+            onClose={() => setActiveView('explore')}
+            onPaymentSuccess={(ticket) => {
+              setPurchasedTickets(prev => [ticket, ...prev]);
+              setActiveTicketView(ticket);
+            }}
+          />
+        </Suspense>
       )}
 
       {isAuthModalOpen && (

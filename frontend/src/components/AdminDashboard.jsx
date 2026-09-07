@@ -116,7 +116,7 @@ function FileUploadField({ label, value, onChange, placeholder = "Image URL or u
 }
 
 export default function AdminDashboard({ onSelectEvent }) {
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError, showWarning } = useToast();
   const [activeAdminTab, setActiveAdminTab] = useState('events'); // 'events', 'organizers', 'artists', 'bookings', 'users', 'roles', 'ticket-tiers', 'tags'
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);

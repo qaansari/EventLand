@@ -13,15 +13,18 @@ public class AuthService : IAuthService
     private readonly IApplicationDbContext _context;
     private readonly IPasswordHasher<User> _passwordHasher;
     private readonly IJwtTokenGenerator _tokenGenerator;
+    private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
 
     public AuthService(
         IApplicationDbContext context,
         IPasswordHasher<User> passwordHasher,
-        IJwtTokenGenerator tokenGenerator)
+        IJwtTokenGenerator tokenGenerator,
+        Microsoft.Extensions.Configuration.IConfiguration configuration)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _tokenGenerator = tokenGenerator;
+        _configuration = configuration;
     }
 
     public async Task<LoginResponseDto> LoginAsync(LoginRequestDto dto)
@@ -176,7 +179,10 @@ public class AuthService : IAuthService
                 RoleId = superAdminRole.Id,
                 IsActive = true
             };
-            superAdmin.PasswordHash = _passwordHasher.HashPassword(superAdmin, "SuperAdmin123!");
+            var initialPassword = _configuration["Admin:InitialPassword"]
+                ?? Environment.GetEnvironmentVariable("ADMIN_INITIAL_PASSWORD")
+                ?? "SuperAdmin123!";
+            superAdmin.PasswordHash = _passwordHasher.HashPassword(superAdmin, initialPassword);
             _context.Users.Add(superAdmin);
             await _context.SaveChangesAsync();
         }

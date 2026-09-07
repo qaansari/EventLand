@@ -85,38 +85,33 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
 // Configure CORS for Frontend & WebSockets.
-// Origins are read from configuration ("Cors:AllowedOrigins"); falls back to local dev origins.
-// Credentials are allowed (required by SignalR), so wildcard origins cannot be used.
-var allowedOrigins = builder.Configuration
+// Allowed origins are read from configuration ("Cors:AllowedOrigins") and augmented with local dev origins.
+// Credentials are enabled (required for SignalR), so wildcard origins are strictly forbidden.
+var configuredOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
-    .Get<string[]>();
+    .Get<string[]>() ?? Array.Empty<string>();
 
-if (allowedOrigins is null || allowedOrigins.Length == 0)
+var devOrigins = new[]
 {
-    allowedOrigins = new[]
-    {
-        "http://localhost:5173",
-        "https://localhost:5173",
-        // Vite dev server runs on 5174 by default (see frontend/vite.config.js)
-        "http://localhost:5174",
-        "https://localhost:5174",
-        "http://localhost:4173",
-        "https://localhost:4173"
-    };
-}
+    "http://localhost:5173",
+    "https://localhost:5173",
+    "http://localhost:5174",
+    "https://localhost:5174",
+    "http://localhost:4173",
+    "https://localhost:4173",
+    "http://127.0.0.1:5173",
+    "https://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "https://127.0.0.1:5174"
+};
+
+var effectiveOrigins = configuredOrigins.Concat(devOrigins).Distinct().ToArray();
 
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.SetIsOriginAllowed(_ => true)
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
-    });
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.SetIsOriginAllowed(_ => true)
+        policy.WithOrigins(effectiveOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -126,7 +121,6 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 app.UseRouting();
-app.UseCors();
 app.UseCors("AllowFrontend");
 
 // Global Exception Handler & Security Headers

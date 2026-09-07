@@ -88,7 +88,12 @@ public static class DependencyInjection
         })
         .AddJwtBearer(options =>
         {
-            options.RequireHttpsMetadata = false;
+            var isDevelopment = string.Equals(
+                configuration["ASPNETCORE_ENVIRONMENT"],
+                "Development",
+                StringComparison.OrdinalIgnoreCase);
+
+            options.RequireHttpsMetadata = !isDevelopment;
             options.SaveToken = true;
             options.TokenValidationParameters = new TokenValidationParameters
             {
@@ -99,6 +104,21 @@ public static class DependencyInjection
                 ValidateAudience = true,
                 ValidAudience = audience,
                 ClockSkew = TimeSpan.Zero
+            };
+
+            // Enable JWT token authentication over SignalR WebSockets (passed via ?access_token=)
+            options.Events = new JwtBearerEvents
+            {
+                OnMessageReceived = context =>
+                {
+                    var accessToken = context.Request.Query["access_token"];
+                    var path = context.HttpContext.Request.Path;
+                    if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                    {
+                        context.Token = accessToken;
+                    }
+                    return Task.CompletedTask;
+                }
             };
         });
 
