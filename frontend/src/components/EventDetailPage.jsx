@@ -38,7 +38,7 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
         })
         .finally(() => setLoading(false));
     }
-  }, [initialEvent?.id, eventId]);
+  }, [initialEvent?.id, eventId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const event = eventDetail || initialEvent;
 
