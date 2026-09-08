@@ -2,31 +2,15 @@
 # Dependencies
 node_modules/
 
-# Build artifacts
-dist/
-build/
-*.js.map
-*.css.map
-
 # Environment variables
 .env
 .env.local
 *.env.*
 
-# Editor/IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
-
-# Logs
-*.log
-
-# Coverage reports
-coverage/
-htmlcov/
-*.coverage
+# Build outputs
+dist/
+build/
+target/
 
 # Python cache
 __pycache__/
@@ -34,7 +18,37 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Compressed files
+# Logs
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# Package management
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Runtime data
+*.pid
+*.seed
+*.id
+*.core
+
+# Compression
 *.zip
 *.gz
 *.tar
@@ -53,4 +67,8 @@ __pycache__/
 *.Z
 *.lz
 *.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
 ```

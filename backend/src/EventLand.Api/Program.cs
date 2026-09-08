@@ -37,15 +37,30 @@ builder.Services.AddHealthChecks()
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, _) =>
+    {
+        context.HttpContext.Response.Headers.Append("X-RateLimit-Limit", "10");
+        context.HttpContext.Response.Headers.Append("X-RateLimit-Remaining", "0");
+        context.HttpContext.Response.Headers.Append("Retry-After", "60");
+        
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            statusCode = 429,
+            message = "Too many requests. Please try again later.",
+            retryAfter = 60
+        });
+    };
 
+    // Strict rate limiting for authentication endpoints
     options.AddFixedWindowLimiter("login", opt =>
     {
-        opt.PermitLimit = 10;
+        opt.PermitLimit = 5;  // Reduced from 10 to 5 for better brute-force protection
         opt.Window = TimeSpan.FromMinutes(1);
         opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
         opt.QueueLimit = 0;
     });
 
+    // General API rate limiting
     options.AddFixedWindowLimiter("general", opt =>
     {
         opt.PermitLimit = 100;
