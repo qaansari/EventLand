@@ -7,24 +7,37 @@ using EventLand.Application.Interfaces;
 using EventLand.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 public class AuthService : IAuthService
 {
     private readonly IApplicationDbContext _context;
     private readonly IPasswordHasher<User> _passwordHasher;
     private readonly IJwtTokenGenerator _tokenGenerator;
-    private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
+    private readonly IConfiguration _configuration;
+    private readonly int _passwordMinLength;
+    private readonly bool _passwordRequireNonAlphanumeric;
+    private readonly bool _passwordRequireDigit;
+    private readonly bool _passwordRequireUppercase;
+    private readonly bool _passwordRequireLowercase;
 
     public AuthService(
         IApplicationDbContext context,
         IPasswordHasher<User> passwordHasher,
         IJwtTokenGenerator tokenGenerator,
-        Microsoft.Extensions.Configuration.IConfiguration configuration)
+        IConfiguration configuration)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _tokenGenerator = tokenGenerator;
         _configuration = configuration;
+        
+        // Load security settings from configuration
+        _passwordMinLength = configuration.GetValue<int>("Security:PasswordMinLength", 10);
+        _passwordRequireNonAlphanumeric = configuration.GetValue<bool>("Security:PasswordRequireNonAlphanumeric", true);
+        _passwordRequireDigit = configuration.GetValue<bool>("Security:PasswordRequireDigit", true);
+        _passwordRequireUppercase = configuration.GetValue<bool>("Security:PasswordRequireUppercase", true);
+        _passwordRequireLowercase = configuration.GetValue<bool>("Security:PasswordRequireLowercase", true);
     }
 
     public async Task<LoginResponseDto> LoginAsync(LoginRequestDto dto)
@@ -83,8 +96,9 @@ public class AuthService : IAuthService
             throw new InvalidOperationException("Full name is required.");
         if (string.IsNullOrWhiteSpace(email) || !IsValidEmail(email))
             throw new InvalidOperationException("A valid email address is required.");
-        if (string.IsNullOrWhiteSpace(dto.Password) || dto.Password.Length < 8)
-            throw new InvalidOperationException("Password must be at least 8 characters long.");
+        
+        // Enhanced password validation
+        ValidatePassword(dto.Password);
 
         var normalizedEmail = email.ToLower();
         var emailExists = await _context.Users.AnyAsync(u => u.Email.ToLower() == normalizedEmail && !u.IsDeleted);
@@ -126,6 +140,27 @@ public class AuthService : IAuthService
         return new LoginResponseDto(token, userDto, expiresAt);
     }
 
+    private void ValidatePassword(string? password)
+    {
+        if (string.IsNullOrWhiteSpace(password))
+            throw new InvalidOperationException("Password is required.");
+        
+        if (password.Length < _passwordMinLength)
+            throw new InvalidOperationException($"Password must be at least {_passwordMinLength} characters long.");
+
+        if (_passwordRequireDigit && !password.Any(char.IsDigit))
+            throw new InvalidOperationException("Password must contain at least one digit.");
+
+        if (_passwordRequireUppercase && !password.Any(char.IsUpper))
+            throw new InvalidOperationException("Password must contain at least one uppercase letter.");
+
+        if (_passwordRequireLowercase && !password.Any(char.IsLower))
+            throw new InvalidOperationException("Password must contain at least one lowercase letter.");
+
+        if (_passwordRequireNonAlphanumeric && !password.Any(c => !char.IsLetterOrDigit(c)))
+            throw new InvalidOperationException("Password must contain at least one special character.");
+    }
+
     private static bool IsValidEmail(string email)
     {
         try
@@ -162,8 +197,8 @@ public class AuthService : IAuthService
 
     public async Task ChangePasswordAsync(int userId, ChangePasswordDto dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 8)
-            throw new InvalidOperationException("New password must be at least 8 characters long.");
+        // Enhanced password validation for new password
+        ValidatePassword(dto.NewPassword);
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted);
         if (user is null || !user.IsActive)
@@ -175,6 +210,10 @@ public class AuthService : IAuthService
         {
             throw new InvalidOperationException("The current password you provided is incorrect.");
         }
+
+        // Prevent reusing the same password
+        if (_passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.NewPassword) == PasswordVerificationResult.Success)
+            throw new InvalidOperationException("New password cannot be the same as your current password.");
 
         user.PasswordHash = _passwordHasher.HashPassword(user, dto.NewPassword);
         await _context.SaveChangesAsync();
