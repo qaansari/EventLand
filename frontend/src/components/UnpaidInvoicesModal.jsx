@@ -132,7 +132,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
 
   useEffect(() => {
     loadUnpaidInvoices();
-  }, [currentUser]);
+  }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Interval timer for 30-minute reservation countdowns
   useEffect(() => {

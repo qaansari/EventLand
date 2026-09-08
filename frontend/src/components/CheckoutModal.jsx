@@ -109,13 +109,13 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
       }
     }
     loadActiveBank();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (bankAccount) {
       generateBankQr(bankAccount);
     }
-  }, [bankAccount]);
+  }, [bankAccount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 2. 30-Minute Countdown Timer for seat reservation hold
   useEffect(() => {
