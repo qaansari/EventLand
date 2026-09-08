@@ -7,7 +7,7 @@ import EventDetailPage from './components/EventDetailPage';
 import InteractiveSeatPicker from './components/InteractiveSeatPicker';
 import AuthModal from './components/AuthModal';
 import Footer from './components/Footer';
-import { Ticket, MapPin, Trash2, Search, RefreshCw } from 'lucide-react';
+import { Ticket, MapPin, Trash2, Search, RefreshCw, ShieldCheck } from 'lucide-react';
 import { eventsApi, bookingsApi, tagsApi, locationsApi, adminApi, toEventSlug } from './services/api';
 import { useToast } from './context/ToastContext';
 import './App.css';
@@ -439,6 +439,18 @@ export default function App() {
   };
 
   const handleNavigateView = (view) => {
+    if (view === 'organizer-wizard') {
+      if (!currentUser) {
+        setAuthModalRole('organizer');
+        setIsAuthModalOpen(true);
+        showWarning('Organizer Login Required', 'Please sign in or register as an Organizer to list an event.');
+        return;
+      }
+      if (currentUser.role !== 'organizer' && currentUser.role !== 'admin') {
+        showWarning('Access Restricted', 'Attendees cannot list events. Only verified Organizers can publish events on EventLand.');
+        return;
+      }
+    }
     if (window.location.pathname.startsWith('/event/') || window.location.search.includes('event=')) {
       window.history.pushState({}, '', '/');
     }
@@ -760,13 +772,47 @@ export default function App() {
 
         {/* View: List Your Event Wizard */}
         {activeView === 'organizer-wizard' && (
-          <Suspense fallback={LazyFallback}>
-            <EventOrganizerWizard
-              onPublishEvent={handlePublishNewEvent}
-              onCancel={() => setActiveView('explore')}
-              cities={cities}
-            />
-          </Suspense>
+          currentUser && (currentUser.role === 'organizer' || currentUser.role === 'admin') ? (
+            <Suspense fallback={LazyFallback}>
+              <EventOrganizerWizard
+                currentUser={currentUser}
+                onPublishEvent={handlePublishNewEvent}
+                onCancel={() => setActiveView(currentUser?.role === 'organizer' ? 'organizer' : 'explore')}
+                cities={cities}
+              />
+            </Suspense>
+          ) : (
+            <div className="container" style={{ padding: '4rem 1.5rem', textAlign: 'center', maxWidth: '560px', margin: '0 auto' }}>
+              <div className="glass-card" style={{ padding: '3rem 2rem', borderRadius: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                <ShieldCheck size={48} color="#f59e0b" style={{ opacity: 0.9 }} />
+                <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#fff', margin: 0 }}>
+                  Organizer Access Required
+                </h3>
+                <p style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.6, margin: 0 }}>
+                  Attendees cannot list events. To publish live events and configure seating blueprints on EventLand, please log in or register with an Organizer account.
+                </p>
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                  <button
+                    onClick={() => setActiveView('explore')}
+                    className="btn btn-secondary"
+                    style={{ padding: '0.6rem 1.3rem' }}
+                  >
+                    Browse Events
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAuthModalRole('organizer');
+                      setIsAuthModalOpen(true);
+                    }}
+                    className="btn btn-primary"
+                    style={{ padding: '0.6rem 1.3rem' }}
+                  >
+                    Organizer Sign In
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
         )}
 
         {/* View: Attendee Dashboard & E-Tickets */}

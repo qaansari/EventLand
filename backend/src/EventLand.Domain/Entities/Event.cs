@@ -26,8 +26,6 @@ public class Event : BaseEntity
     public int? AuditoriumId { get; set; }
     public Auditorium? Auditorium { get; set; }
 
-    public string? Address { get; set; }
-
     // Structured dates
     public DateTimeOffset StartDateUtc { get; set; }
     public DateTimeOffset EndDateUtc { get; set; }

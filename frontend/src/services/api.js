@@ -1,16 +1,27 @@
 const rawBackend = (import.meta.env.VITE_BACKEND_URL || '').trim();
 const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim();
 
-// Failsafe: If running on remote host (Vercel) but env var points to localhost, fallback to ngrok URL
-const isProductionDomain = typeof window !== 'undefined' && !window.location.hostname.includes('localhost') && window.location.hostname !== '127.0.0.1';
+// True when deployed to a remote host (e.g. Vercel) — NOT localhost / 127.0.0.1
+const isProductionDomain =
+  typeof window !== 'undefined' &&
+  !window.location.hostname.includes('localhost') &&
+  window.location.hostname !== '127.0.0.1';
 
-export const BACKEND_URL = (isProductionDomain && (!rawBackend || rawBackend.includes('localhost')))
-  ? 'https://celiac-briley-commandingly.ngrok-free.dev'
-  : (rawBackend || 'https://celiac-briley-commandingly.ngrok-free.dev');
+// In local dev: use empty string so every call uses a relative path (/api/...) and
+// Vite's dev-server proxy forwards it to the backend. This avoids the CORS preflight
+// that fires when the browser directly hits the cross-origin ngrok URL.
+// In production: fall back to the configured env var or the ngrok URL.
+export const BACKEND_URL = isProductionDomain
+  ? ((!rawBackend || rawBackend.includes('localhost'))
+      ? 'https://celiac-briley-commandingly.ngrok-free.dev'
+      : rawBackend)
+  : (rawBackend.includes('localhost') ? '' : rawBackend);
 
-export const BASE_URL = (isProductionDomain && (!rawApiUrl || rawApiUrl.includes('localhost')))
-  ? `${BACKEND_URL}/api`
-  : (rawApiUrl || `${BACKEND_URL}/api`);
+export const BASE_URL = isProductionDomain
+  ? ((!rawApiUrl || rawApiUrl.includes('localhost'))
+      ? `${BACKEND_URL}/api`
+      : rawApiUrl)
+  : (rawApiUrl && !rawApiUrl.includes('localhost') ? rawApiUrl : `${BACKEND_URL}/api`);
 
 export const SERVER_BASE = BASE_URL.replace(/\/api\/?$/, '') || BACKEND_URL;
 

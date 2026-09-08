@@ -12,23 +12,27 @@ export default defineConfig({
       '/api': {
         target: 'https://celiac-briley-commandingly.ngrok-free.dev',
         changeOrigin: true,
-        secure: false
+        secure: true,
+        headers: { 'ngrok-skip-browser-warning': '1' }
       },
       '/hubs': {
         target: 'https://celiac-briley-commandingly.ngrok-free.dev',
         ws: true,
         changeOrigin: true,
-        secure: false
+        secure: true,
+        headers: { 'ngrok-skip-browser-warning': '1' }
       },
       '/uploads': {
         target: 'https://celiac-briley-commandingly.ngrok-free.dev',
         changeOrigin: true,
-        secure: false
+        secure: true,
+        headers: { 'ngrok-skip-browser-warning': '1' }
       },
       '/assets': {
         target: 'https://celiac-briley-commandingly.ngrok-free.dev',
         changeOrigin: true,
-        secure: false
+        secure: true,
+        headers: { 'ngrok-skip-browser-warning': '1' }
       }
     }
   }

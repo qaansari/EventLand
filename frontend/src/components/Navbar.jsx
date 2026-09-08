@@ -40,6 +40,18 @@ export default function Navbar({
     setIsMobileMenuOpen(false);
   };
 
+  const handleListEventClick = () => {
+    setIsMobileMenuOpen(false);
+    if (!currentUser) {
+      if (onOpenAuthModal) onOpenAuthModal('organizer');
+      return;
+    }
+    if (currentUser.role !== 'organizer' && currentUser.role !== 'admin') {
+      return;
+    }
+    onNavigate('organizer-wizard');
+  };
+
   return (
     <header className="navbar-header" style={{
       position: 'sticky',
@@ -274,13 +286,15 @@ export default function Navbar({
             </button>
           )}
 
-          <button
-            onClick={() => handleNavClick('organizer-wizard')}
-            className="btn btn-primary"
-            style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
-          >
-            <PlusCircle size={14} /> List Event
-          </button>
+          {(!currentUser || currentUser.role === 'organizer' || currentUser.role === 'admin') && (
+            <button
+              onClick={handleListEventClick}
+              className="btn btn-primary"
+              style={{ fontSize: '0.82rem', padding: '0.45rem 0.85rem' }}
+            >
+              <PlusCircle size={14} /> List Event
+            </button>
+          )}
 
           {/* User Auth Profile Badge / Sign In Button */}
           {currentUser ? (
@@ -464,13 +478,15 @@ export default function Navbar({
               </button>
             )}
 
-            <button
-              onClick={() => handleNavClick('organizer-wizard')}
-              className="btn btn-primary"
-              style={{ padding: '0.85rem 1rem', marginTop: '0.25rem', justifyContent: 'center' }}
-            >
-              <PlusCircle size={18} /> List Your Event Live
-            </button>
+            {(!currentUser || currentUser.role === 'organizer' || currentUser.role === 'admin') && (
+              <button
+                onClick={handleListEventClick}
+                className="btn btn-primary"
+                style={{ padding: '0.85rem 1rem', marginTop: '0.25rem', justifyContent: 'center' }}
+              >
+                <PlusCircle size={18} /> List Your Event Live
+              </button>
+            )}
 
             {currentUser ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '10px', marginTop: '0.5rem', border: '1px solid rgba(255, 255, 255, 0.1)' }}>

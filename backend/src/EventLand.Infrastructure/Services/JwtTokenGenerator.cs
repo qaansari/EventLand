@@ -9,7 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 
 public interface IJwtTokenGenerator
 {
-    (string Token, DateTimeOffset ExpiresAt) GenerateToken(User user);
+    (string Token, DateTimeOffset ExpiresAt) GenerateToken(User user, int? organizerId = null);
 }
 
 public class JwtTokenGenerator : IJwtTokenGenerator
@@ -21,7 +21,7 @@ public class JwtTokenGenerator : IJwtTokenGenerator
         _configuration = configuration;
     }
 
-    public (string Token, DateTimeOffset ExpiresAt) GenerateToken(User user)
+    public (string Token, DateTimeOffset ExpiresAt) GenerateToken(User user, int? organizerId = null)
     {
         var secretKey = _configuration["Jwt:SecretKey"]
             ?? throw new InvalidOperationException("Configuration 'Jwt:SecretKey' is required to issue JWT tokens.");
@@ -32,7 +32,7 @@ public class JwtTokenGenerator : IJwtTokenGenerator
 
         var expiresAt = DateTimeOffset.UtcNow.AddHours(8);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
@@ -40,6 +40,11 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             new Claim(ClaimTypes.Role, user.Role?.Name ?? "Customer"),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
+
+        if (organizerId.HasValue && organizerId.Value > 0)
+        {
+            claims.Add(new Claim("organizerId", organizerId.Value.ToString()));
+        }
 
         var token = new JwtSecurityToken(
             issuer: issuer,

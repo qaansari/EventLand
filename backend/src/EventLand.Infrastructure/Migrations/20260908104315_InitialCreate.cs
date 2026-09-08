@@ -341,7 +341,6 @@ namespace EventLand.Infrastructure.Migrations
                     CityId = table.Column<int>(type: "int", nullable: false),
                     VenueId = table.Column<int>(type: "int", nullable: false),
                     AuditoriumId = table.Column<int>(type: "int", nullable: true),
-                    Address = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     StartDateUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     EndDateUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     PriceRange = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
@@ -569,6 +568,9 @@ namespace EventLand.Infrastructure.Migrations
                     PaidAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     BankTransactionRef = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     PaymentProofUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    SenderAccountTitle = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: true),
+                    SenderBankName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    SenderAccountLast4 = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: true),
                     VerifiedByAdminId = table.Column<int>(type: "int", nullable: true),
                     VerifiedByAdminEmail = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     VerifiedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
@@ -736,7 +738,7 @@ namespace EventLand.Infrastructure.Migrations
             migrationBuilder.InsertData(
                 table: "Users",
                 columns: new[] { "Id", "CountryId", "CreatedAt", "CreatedBy", "DeletedAt", "Email", "FullName", "ImageUrl", "IsActive", "IsDeleted", "LastLoginAt", "PasswordHash", "PhoneNumber", "RoleId", "UpdatedAt", "UpdatedBy" },
-                values: new object[] { 1, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "admin@eventland.pk", "Super Admin", null, true, false, null, "AQAAAAIAAYagAAAAENG4wsxNaY8HzMLppm+krVBdOe6xCL6XSwBqivW71fBgOJdat/lKZZFdsdv7u1pZXg==", "+92 331 2541767", 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null });
+                values: new object[] { 1, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "admin@eventland.pk", "Super Admin", null, true, false, null, "AQAAAAIAAYagAAAAEJuRZYVt0Vxo3wCpule4RLcu1qynbbLJFRfk/I/jZt2E+SZZzXBlnONUEWbzCe/f3w==", "+92 331 2541767", 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Artists_IsFeatured",
@@ -917,6 +919,13 @@ namespace EventLand.Infrastructure.Migrations
                 column: "Email",
                 unique: true,
                 filter: "[IsDeleted] = 0");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_PhoneNumber",
+                table: "Users",
+                column: "PhoneNumber",
+                unique: true,
+                filter: "[IsDeleted] = 0 AND [PhoneNumber] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_RoleId",

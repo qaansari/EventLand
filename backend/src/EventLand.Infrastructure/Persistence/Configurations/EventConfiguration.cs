@@ -17,9 +17,6 @@ public sealed class EventConfiguration : IEntityTypeConfiguration<Event>
                .IsRequired()
                .HasMaxLength(300);
 
-        builder.Property(e => e.Address)
-               .HasMaxLength(500);
-
         builder.Property(e => e.PriceRange)
                .HasMaxLength(100);
 

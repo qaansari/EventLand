@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/admin/bookings")]
-[Authorize(Roles = "SuperAdmin,Admin")]
+[Authorize(Roles = "SuperAdmin,Admin,Organizer,organizer,admin,superadmin")]
 [Produces("application/json")]
 public class AdminBookingsController : ControllerBase
 {
@@ -25,7 +25,17 @@ public class AdminBookingsController : ControllerBase
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 10)
     {
-        var bookings = await _adminService.GetBookingsAsync(eventId, search, pageNumber, pageSize);
+        int? organizerId = null;
+        if (User.IsInRole("Organizer") || User.IsInRole("organizer"))
+        {
+            var orgClaim = User.FindFirst("organizerId")?.Value;
+            if (int.TryParse(orgClaim, out var parsedOrgId))
+            {
+                organizerId = parsedOrgId;
+            }
+        }
+
+        var bookings = await _adminService.GetBookingsAsync(eventId, search, pageNumber, pageSize, organizerId);
         return Ok(bookings);
     }
 

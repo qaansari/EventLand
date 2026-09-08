@@ -79,7 +79,7 @@ public interface IAdminService
     Task<bool> DeleteSeatingZoneAsync(int id);
 
     // --- Bookings CRUD ---
-    Task<PagedResult<BookingDto>> GetBookingsAsync(int? eventId, string? search, int pageNumber = 1, int pageSize = 10);
+    Task<PagedResult<BookingDto>> GetBookingsAsync(int? eventId, string? search, int pageNumber = 1, int pageSize = 10, int? organizerId = null);
     Task<BookingDto?> GetBookingByIdAsync(int id);
     Task<BookingDto> UpdateBookingStatusAsync(int id, UpdateBookingStatusDto dto);
     Task<bool> DeleteBookingAsync(int id);

@@ -10,7 +10,7 @@ import { parseAuditoriumLayout } from '../data/auditoriumLayouts';
 
 const makePreviewId = () => `user-created-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities = [] }) {
+export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities = [], currentUser = null }) {
   const { showError, showSuccess } = useToast();
   const [tagsList, setTagsList] = useState([]);
   const [auditoriumsList, setAuditoriumsList] = useState([]);
@@ -27,7 +27,6 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
     category: 'Concerts',
     city: 'Karachi',
     venue: '',
-    address: '',
     date: '',
     time: '7:00 PM Onwards',
     priceRange: 'PKR 2,000 - PKR 5,000',
@@ -85,7 +84,6 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
     isPublished: true,
     city: eventForm.city,
     venue: eventForm.venue || 'Venue Address, City',
-    address: eventForm.address || 'Street Address, City',
     date: eventForm.date || 'TBD 2026',
     startDateUtc: eventForm.date,
     endDateUtc: eventForm.date,

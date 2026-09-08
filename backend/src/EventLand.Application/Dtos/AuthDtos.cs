@@ -26,7 +26,8 @@ public record UserDto(
     string? PhoneNumber = null,
     int? CountryId = null,
     string? CountryName = null,
-    string? DialingCode = null
+    string? DialingCode = null,
+    int? OrganizerId = null
 );
 
 public record ChangePasswordDto(

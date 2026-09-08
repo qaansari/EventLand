@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EventLand.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260902101405_InitialCreate")]
+    [Migration("20260908104315_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -312,6 +312,18 @@ namespace EventLand.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("RefundedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("SenderAccountLast4")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("SenderAccountTitle")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("SenderBankName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
@@ -574,10 +586,6 @@ namespace EventLand.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
-
-                    b.Property<string>("Address")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
 
                     b.Property<int?>("AuditoriumId")
                         .HasColumnType("int");
@@ -1479,6 +1487,11 @@ namespace EventLand.Infrastructure.Migrations
                         .HasDatabaseName("IX_Users_Email")
                         .HasFilter("[IsDeleted] = 0");
 
+                    b.HasIndex("PhoneNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Users_PhoneNumber")
+                        .HasFilter("[IsDeleted] = 0 AND [PhoneNumber] IS NOT NULL");
+
                     b.HasIndex("RoleId");
 
                     b.ToTable("Users");
@@ -1492,7 +1505,7 @@ namespace EventLand.Infrastructure.Migrations
                             FullName = "Super Admin",
                             IsActive = true,
                             IsDeleted = false,
-                            PasswordHash = "AQAAAAIAAYagAAAAENG4wsxNaY8HzMLppm+krVBdOe6xCL6XSwBqivW71fBgOJdat/lKZZFdsdv7u1pZXg==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEJuRZYVt0Vxo3wCpule4RLcu1qynbbLJFRfk/I/jZt2E+SZZzXBlnONUEWbzCe/f3w==",
                             PhoneNumber = "+92 331 2541767",
                             RoleId = 1,
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))

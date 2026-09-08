@@ -387,7 +387,7 @@ public class BookingService : IBookingService
             b.VerifiedAt,
             b.PaymentExpiresAt,
             FileUrlHelper.FormatEventBannerUrl(b.Event?.Banner),
-            b.Event?.Venue?.Name ?? b.Event?.Address
+            b.Event?.Venue?.Name
         );
     }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ShieldCheck, 
   TrendingUp, 
@@ -37,7 +37,8 @@ import {
   GripVertical,
   CreditCard,
   MessageSquare,
-  Lock
+  Lock,
+  FileSpreadsheet
 } from 'lucide-react';
 import { adminApi, locationsApi, uploadApi, faqsApi, footerApi, paymentsApi, bankAccountsApi, bookingsApi, getEventImageUrl, getOrganizerImageUrl, getUserImageUrl, getPaymentSlipUrl, getQrCodeImageUrl, formatPhoneNumberOnSubmit, splitPhoneNumberForEdit } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -167,6 +168,111 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [bookingSearch, setBookingSearch] = useState('');
   const [adminPreviewTicket, setAdminPreviewTicket] = useState(null);
 
+  // Cascading & filtered bookings for Super Admin
+  const filteredBookings = useMemo(() => {
+    return bookingsList.filter(b => {
+      const matchedEv = eventsList.find(e => String(e.id) === String(b.eventId) || e.title === b.eventTitle);
+      const shows = matchedEv?.shows || matchedEv?.eventShows || [];
+      const matchedShow = shows.find(s => String(s.id) === String(b.eventShowId) || s.showTitle === b.showTitle);
+
+      if (bookingEventFilter !== 'All') {
+        if (b.eventTitle !== bookingEventFilter && String(b.eventId) !== String(bookingEventFilter) && matchedEv?.title !== bookingEventFilter) {
+          return false;
+        }
+      }
+
+      if (bookingShowFilter !== 'All') {
+        if (b.showTitle !== bookingShowFilter && String(b.eventShowId) !== String(bookingShowFilter) && matchedShow?.showTitle !== bookingShowFilter) {
+          return false;
+        }
+      }
+
+      if (bookingStatusFilter !== 'All') {
+        const isPaid = b.paymentStatus === 'Paid' || b.paymentStatus === 'PAID' || b.paymentStatus === 1 || b.status === 'Confirmed';
+        if (bookingStatusFilter === 'Paid' && !isPaid) return false;
+        if (bookingStatusFilter === 'Pending' && isPaid) return false;
+        if (bookingStatusFilter === 'Confirmed' && b.status !== 'Confirmed') return false;
+        if (bookingStatusFilter === 'Cancelled' && b.status !== 'Cancelled') return false;
+      }
+
+      if (bookingSearch.trim()) {
+        const q = bookingSearch.toLowerCase();
+        const ref = (b.bookingRef || `EVL-${b.id}`).toLowerCase();
+        const name = (b.customerName || '').toLowerCase();
+        const email = (b.customerEmail || '').toLowerCase();
+        const eventT = (b.eventTitle || '').toLowerCase();
+        if (!ref.includes(q) && !name.includes(q) && !email.includes(q) && !eventT.includes(q)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [bookingsList, eventsList, bookingEventFilter, bookingShowFilter, bookingStatusFilter, bookingSearch]);
+
+  // Live KPI Calculations across all loaded data (default) or filtered data
+  const adminTotalOrdersPlaced = filteredBookings.length;
+  const adminTotalTicketsSold = filteredBookings.reduce((sum, b) => sum + (Number(b.quantity) || 1), 0);
+  const adminTotalRevenue = filteredBookings
+    .filter(b => b.paymentStatus === 'Paid' || b.paymentStatus === 'PAID' || b.paymentStatus === 1 || b.status === 'Confirmed' || !b.paymentStatus)
+    .reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
+
+  // Export Bookings function for Admin (CSV & Excel)
+  const handleExportAdminOrders = (format = 'csv') => {
+    if (filteredBookings.length === 0) {
+      showError('Export Empty', 'No bookings found matching selected filters.');
+      return;
+    }
+
+    const headers = [
+      'Booking Ref',
+      'Customer Name',
+      'Customer Email',
+      'Customer Phone',
+      'Event Title',
+      'Show Slot',
+      'Quantity',
+      'Total Amount (PKR)',
+      'Status',
+      'Payment Status',
+      'Payment Method',
+      'Transaction Ref',
+      'Booking Date'
+    ];
+
+    const rows = filteredBookings.map(b => [
+      `"${(b.bookingRef || `EVL-${b.id}`).replace(/"/g, '""')}"`,
+      `"${(b.customerName || '').replace(/"/g, '""')}"`,
+      `"${(b.customerEmail || '').replace(/"/g, '""')}"`,
+      `"${(b.customerPhone || '').replace(/"/g, '""')}"`,
+      `"${(b.eventTitle || '').replace(/"/g, '""')}"`,
+      `"${(b.showTitle || b.showDate || '').replace(/"/g, '""')}"`,
+      b.quantity || 1,
+      b.totalAmount || 0,
+      `"${(b.status || 'Confirmed').replace(/"/g, '""')}"`,
+      `"${(b.paymentStatus || 'Paid').replace(/"/g, '""')}"`,
+      `"${(b.paymentMethod || 'Online').replace(/"/g, '""')}"`,
+      `"${(b.bankTransactionRef || '').replace(/"/g, '""')}"`,
+      `"${b.createdAt ? new Date(b.createdAt).toLocaleDateString() : ''}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const mimeType = format === 'excel' ? 'application/vnd.ms-excel;charset=utf-8;' : 'text/csv;charset=utf-8;';
+    const ext = format === 'excel' ? 'xls' : 'csv';
+    const blob = new Blob([csvContent], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const cleanEvName = bookingEventFilter !== 'All' ? bookingEventFilter.replace(/[^a-zA-Z0-9]/g, '_') : 'All_Events';
+    link.download = `Admin_Orders_${cleanEvName}_${Date.now()}.${ext}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showSuccess(`Orders Exported (${ext.toUpperCase()}) 📥`, `Successfully exported ${filteredBookings.length} order(s).`);
+  };
+
   const defaultFooterForm = {
     brandName: 'EventLand',
     tagline: 'Event Land is a single, user-friendly platform, we link fans, artists, and organizers for everything from comedy nights to concerts. 🎵🎭',
@@ -205,7 +311,6 @@ export default function AdminDashboard({ onSelectEvent }) {
     cityId: '',
     venueId: '',
     auditoriumId: '',
-    address: '',
     startDateUtc: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
     endDateUtc: new Date(Date.now() + 172800000).toISOString().slice(0, 16),
     priceRange: 'PKR 1,500 - PKR 5,000',
@@ -507,7 +612,6 @@ export default function AdminDashboard({ onSelectEvent }) {
         cityId: cityId,
         venueId: venueId,
         auditoriumId: auditoriumId,
-        address: eventForm.address || '',
         startDateUtc: startDate.toISOString(),
         endDateUtc: endDate.toISOString(),
         startingPrice: parseFloat(eventForm.startingPrice) || 0,
@@ -606,7 +710,6 @@ export default function AdminDashboard({ onSelectEvent }) {
       cityId: fullEv.cityId || (citiesList[0]?.id || ''),
       venueId: fullEv.venueId || (venuesList[0]?.id || ''),
       auditoriumId: fullEv.auditoriumId || '',
-      address: fullEv.address || '',
       startDateUtc: fullEv.startDateUtc ? fullEv.startDateUtc.slice(0, 16) : new Date().toISOString().slice(0, 16),
       endDateUtc: fullEv.endDateUtc ? fullEv.endDateUtc.slice(0, 16) : new Date().toISOString().slice(0, 16),
       priceRange: fullEv.priceRange || '',
@@ -2381,6 +2484,95 @@ export default function AdminDashboard({ onSelectEvent }) {
                 placeholder="All Statuses"
               />
             </div>
+
+            {/* Export Buttons */}
+            <div>
+              <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.25rem', fontWeight: 600 }}>
+                Export Bookings
+              </label>
+              <div style={{ display: 'flex', gap: '0.4rem' }}>
+                <button
+                  type="button"
+                  onClick={() => handleExportAdminOrders('csv')}
+                  className="btn btn-secondary"
+                  style={{ flex: 1, fontSize: '0.8rem', padding: '0.52rem 0.6rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                  title="Export filtered orders to CSV"
+                >
+                  <Download size={14} color="#2dd4bf" /> CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportAdminOrders('excel')}
+                  className="btn btn-primary"
+                  style={{ flex: 1, fontSize: '0.8rem', padding: '0.52rem 0.6rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                  title="Export filtered orders to Excel (.xls)"
+                >
+                  <FileSpreadsheet size={14} /> Excel
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Dynamic Live KPI Cards */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '1.25rem',
+            marginBottom: '1.5rem'
+          }}>
+            {/* KPI 1: TOTAL ORDERS PLACED */}
+            <div className="glass-card" style={{ padding: '1.25rem', borderLeft: '4px solid #3b82f6', backgroundColor: 'rgba(15, 23, 42, 0.6)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  TOTAL ORDERS PLACED
+                </span>
+                <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
+                  <FileSpreadsheet size={18} color="#60a5fa" />
+                </div>
+              </div>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.85rem', fontWeight: 900, color: '#fff', margin: 0 }}>
+                {adminTotalOrdersPlaced.toLocaleString()}
+              </h2>
+              <span style={{ fontSize: '0.78rem', color: '#60a5fa', fontWeight: 600, display: 'block', marginTop: '0.35rem' }}>
+                {bookingEventFilter === 'All' ? 'Across all events' : bookingEventFilter}
+              </span>
+            </div>
+
+            {/* KPI 2: TOTAL TICKETS SOLD */}
+            <div className="glass-card" style={{ padding: '1.25rem', borderLeft: '4px solid #a855f7', backgroundColor: 'rgba(15, 23, 42, 0.6)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  TOTAL TICKETS SOLD
+                </span>
+                <div style={{ backgroundColor: 'rgba(168, 85, 247, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
+                  <Ticket size={18} color="#c084fc" />
+                </div>
+              </div>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.85rem', fontWeight: 900, color: '#fff', margin: 0 }}>
+                {adminTotalTicketsSold.toLocaleString()}
+              </h2>
+              <span style={{ fontSize: '0.78rem', color: '#c084fc', fontWeight: 600, display: 'block', marginTop: '0.35rem' }}>
+                {bookingShowFilter === 'All' ? 'All show slots' : bookingShowFilter}
+              </span>
+            </div>
+
+            {/* KPI 3: TOTAL REVENUE */}
+            <div className="glass-card" style={{ padding: '1.25rem', borderLeft: '4px solid #0d9488', backgroundColor: 'rgba(15, 23, 42, 0.6)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  TOTAL REVENUE
+                </span>
+                <div style={{ backgroundColor: 'rgba(13, 148, 136, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
+                  <DollarSign size={18} color="#2dd4bf" />
+                </div>
+              </div>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.85rem', fontWeight: 900, color: '#2dd4bf', margin: 0 }}>
+                PKR {adminTotalRevenue.toLocaleString()}
+              </h2>
+              <span style={{ fontSize: '0.78rem', color: '#2dd4bf', fontWeight: 600, display: 'block', marginTop: '0.35rem' }}>
+                Live aggregated revenue
+              </span>
+            </div>
           </div>
 
           {/* Bookings Table */}
@@ -2397,57 +2589,14 @@ export default function AdminDashboard({ onSelectEvent }) {
                 </tr>
               </thead>
               <tbody>
-                {(() => {
-                  const filtered = bookingsList.filter(b => {
-                    const matchedEv = eventsList.find(e => String(e.id) === String(b.eventId) || e.title === b.eventTitle);
-                    const shows = matchedEv?.shows || matchedEv?.eventShows || [];
-                    const matchedShow = shows.find(s => String(s.id) === String(b.eventShowId) || s.showTitle === b.showTitle);
-
-                    if (bookingEventFilter !== 'All') {
-                      if (b.eventTitle !== bookingEventFilter && String(b.eventId) !== String(bookingEventFilter) && matchedEv?.title !== bookingEventFilter) {
-                        return false;
-                      }
-                    }
-
-                    if (bookingShowFilter !== 'All') {
-                      if (b.showTitle !== bookingShowFilter && String(b.eventShowId) !== String(bookingShowFilter) && matchedShow?.showTitle !== bookingShowFilter) {
-                        return false;
-                      }
-                    }
-
-                    if (bookingStatusFilter !== 'All') {
-                      const isPaid = b.paymentStatus === 'Paid' || b.paymentStatus === 'PAID' || b.paymentStatus === 1 || b.status === 'Confirmed';
-                      if (bookingStatusFilter === 'Paid' && !isPaid) return false;
-                      if (bookingStatusFilter === 'Pending' && isPaid) return false;
-                      if (bookingStatusFilter === 'Confirmed' && b.status !== 'Confirmed') return false;
-                      if (bookingStatusFilter === 'Cancelled' && b.status !== 'Cancelled') return false;
-                    }
-
-                    if (bookingSearch.trim()) {
-                      const q = bookingSearch.toLowerCase();
-                      const ref = (b.bookingRef || `EVL-${b.id}`).toLowerCase();
-                      const name = (b.customerName || '').toLowerCase();
-                      const email = (b.customerEmail || '').toLowerCase();
-                      const eventT = (b.eventTitle || '').toLowerCase();
-                      if (!ref.includes(q) && !name.includes(q) && !email.includes(q) && !eventT.includes(q)) {
-                        return false;
-                      }
-                    }
-
-                    return true;
-                  });
-
-                  if (filtered.length === 0) {
-                    return (
-                      <tr>
-                        <td colSpan={6} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-                          No bookings found matching selected filters.
-                        </td>
-                      </tr>
-                    );
-                  }
-
-                  return filtered.map(b => {
+                {filteredBookings.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                      No bookings found matching selected filters.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredBookings.map(b => {
                     const matchedEvent = eventsList.find(e => String(e.id) === String(b.eventId) || e.title === b.eventTitle) || {};
                     const shows = matchedEvent.shows || matchedEvent.eventShows || [];
                     const matchedShow = shows.find(s => String(s.id) === String(b.eventShowId) || s.showTitle === b.showTitle);
@@ -2689,8 +2838,8 @@ export default function AdminDashboard({ onSelectEvent }) {
                         </td>
                       </tr>
                     );
-                  });
-                })()}
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -2905,48 +3054,59 @@ export default function AdminDashboard({ onSelectEvent }) {
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
-              {auditoriumsList.map(aud => (
-                <div key={aud.id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <span className="badge" style={{ backgroundColor: 'rgba(13, 148, 136, 0.15)', color: '#2dd4bf', border: '1px solid rgba(13, 148, 136, 0.3)', marginBottom: '0.35rem' }}>
-                        {aud.city} • {aud.totalCapacity} Seats
-                      </span>
-                      <h4 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', marginTop: '0.2rem' }}>
-                        {aud.name}
-                      </h4>
-                      <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                        <MapPin size={13} style={{ display: 'inline', marginRight: '3px' }} /> {aud.venue}
-                      </span>
+              {auditoriumsList.map(aud => {
+                const matchedVenue = venuesList.find(v => v.id === aud.venueId || (aud.venueName && v.name.toLowerCase() === aud.venueName.toLowerCase()));
+                const venueName = aud.venueName || matchedVenue?.name || aud.venue || '';
+                const matchedCity = citiesList.find(c => c.id === matchedVenue?.cityId) || citiesList.find(c => aud.city && c.name.toLowerCase() === aud.city.toLowerCase());
+                const cityName = matchedVenue?.cityName || matchedCity?.name || aud.city || '';
+                const matchedCountry = countriesList.find(co => co.id === matchedCity?.countryId);
+                const countryName = matchedCity?.countryName || matchedCountry?.name || '';
+                const locationText = [venueName, cityName, countryName].filter(Boolean).join(', ');
+
+                return (
+                  <div key={aud.id} className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <span className="badge" style={{ backgroundColor: 'rgba(13, 148, 136, 0.15)', color: '#2dd4bf', border: '1px solid rgba(13, 148, 136, 0.3)', marginBottom: '0.35rem' }}>
+                          {cityName ? `${cityName} • ` : ''}{aud.totalCapacity} Seats
+                        </span>
+                        <h4 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', marginTop: '0.2rem' }}>
+                          {aud.name}
+                        </h4>
+                        <span style={{ fontSize: '0.82rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '0.25rem', flexWrap: 'wrap' }}>
+                          <MapPin size={13} style={{ flexShrink: 0, color: '#2dd4bf' }} />
+                          <span>{locationText || 'Location not specified'}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <p style={{ fontSize: '0.83rem', color: '#cbd5e1', lineHeight: 1.4, flexGrow: 1 }}>
+                      {aud.description || 'Custom interactive venue blueprint.'}
+                    </p>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      <button
+                        onClick={() => setPreviewAuditorium(aud)}
+                        style={{ padding: '0.5rem 0.85rem', background: 'rgba(13, 148, 136, 0.18)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600 }}
+                      >
+                        <Eye size={14} /> Preview Chart
+                      </button>
+                      <button
+                        onClick={() => handleEditAuditorium(aud)}
+                        style={{ flex: 1, padding: '0.5rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600 }}
+                      >
+                        <Edit3 size={14} /> Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAuditorium(aud.id)}
+                        style={{ padding: '0.5rem 0.8rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.82rem' }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </div>
-
-                  <p style={{ fontSize: '0.83rem', color: '#cbd5e1', lineHeight: 1.4, flexGrow: 1 }}>
-                    {aud.description || 'Custom interactive venue blueprint.'}
-                  </p>
-
-                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                    <button
-                      onClick={() => setPreviewAuditorium(aud)}
-                      style={{ padding: '0.5rem 0.85rem', background: 'rgba(13, 148, 136, 0.18)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600 }}
-                    >
-                      <Eye size={14} /> Preview Chart
-                    </button>
-                    <button
-                      onClick={() => handleEditAuditorium(aud)}
-                      style={{ flex: 1, padding: '0.5rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600 }}
-                    >
-                      <Edit3 size={14} /> Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteAuditorium(aud.id)}
-                      style={{ padding: '0.5rem 0.8rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.82rem' }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -3524,12 +3684,10 @@ export default function AdminDashboard({ onSelectEvent }) {
                             value={eventForm.venueId || ''}
                             onChange={e => {
                               const venueId = e.target.value;
-                              const selVenue = venuesList.find(v => String(v.id) === String(venueId));
                               const filteredAuds = auditoriumsList.filter(a => String(a.venueId) === String(venueId));
                               setEventForm(prev => ({
                                 ...prev,
                                 venueId,
-                                address: selVenue?.address || prev.address,
                                 auditoriumId: filteredAuds[0]?.id || ''
                               }));
                             }}
@@ -3558,11 +3716,6 @@ export default function AdminDashboard({ onSelectEvent }) {
                             placeholder="Select Auditorium Hall (Optional)..."
                           />
                         </div>
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Full Street Address</label>
-                        <input type="text" placeholder="e.g. M.R. Kiyani Road, Saddar, Karachi" value={eventForm.address || ''} onChange={e => setEventForm({ ...eventForm, address: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.9rem' }} />
                       </div>
                     </div>
 
@@ -3654,7 +3807,13 @@ export default function AdminDashboard({ onSelectEvent }) {
                                   city: prev.city || foundAud?.city || prev.city
                                 }));
                               }}
-                              options={auditoriumsList.map(a => ({ value: a.layoutCode || a.name, label: `${a.name} (${a.city} • ${a.totalCapacity} Seats)` }))}
+                              options={auditoriumsList.map(a => {
+                                const cName = venuesList.find(v => v.id === a.venueId)?.cityName || a.city;
+                                return {
+                                  value: a.layoutCode || a.name,
+                                  label: `${a.name} (${cName ? `${cName} • ` : ''}${a.totalCapacity} Seats)`
+                                };
+                              })}
                             />
                           )}
                         </div>
@@ -5445,29 +5604,36 @@ export default function AdminDashboard({ onSelectEvent }) {
       )}
 
       {/* --- BLUEPRINT PREVIEW MODAL --- */}
-      {previewAuditorium && (
-        <InteractiveSeatPicker
-          isPreview={true}
-          event={{
-            id: 'preview-' + previewAuditorium.id,
-            title: `${previewAuditorium.name} (Blueprint Preview)`,
-            venue: `${previewAuditorium.venue}, ${previewAuditorium.city}`,
-            totalCapacity: previewAuditorium.totalCapacity,
-            seatingZones: [
-              {
-                id: 1,
-                zone: previewAuditorium.name,
-                rows: 14,
-                cols: 98,
-                price: 2500,
-                layoutJson: previewAuditorium.layoutJson,
-                totalCapacity: previewAuditorium.totalCapacity
-              }
-            ]
-          }}
-          onClose={() => setPreviewAuditorium(null)}
-        />
-      )}
+      {previewAuditorium && (() => {
+        const pVenue = previewAuditorium.venueName || venuesList.find(v => v.id === previewAuditorium.venueId)?.name || previewAuditorium.venue || '';
+        const pCityObj = citiesList.find(c => c.id === venuesList.find(v => v.id === previewAuditorium.venueId)?.cityId);
+        const pCity = pCityObj?.name || previewAuditorium.city || '';
+        const pCountry = pCityObj?.countryName || countriesList.find(co => co.id === pCityObj?.countryId)?.name || '';
+        const pLocation = [pVenue, pCity, pCountry].filter(Boolean).join(', ');
+        return (
+          <InteractiveSeatPicker
+            isPreview={true}
+            event={{
+              id: 'preview-' + previewAuditorium.id,
+              title: `${previewAuditorium.name} (Blueprint Preview)`,
+              venue: pLocation || previewAuditorium.name,
+              totalCapacity: previewAuditorium.totalCapacity,
+              seatingZones: [
+                {
+                  id: 1,
+                  zone: previewAuditorium.name,
+                  rows: 14,
+                  cols: 98,
+                  price: 2500,
+                  layoutJson: previewAuditorium.layoutJson,
+                  totalCapacity: previewAuditorium.totalCapacity
+                }
+              ]
+            }}
+            onClose={() => setPreviewAuditorium(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

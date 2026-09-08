@@ -600,7 +600,6 @@ public class AdminService : IAdminService
                 e.Venue != null ? e.Venue.Name : "",
                 e.AuditoriumId,
                 e.Auditorium != null ? e.Auditorium.Name : null,
-                e.Address ?? (e.Venue != null ? e.Venue.Address : null),
                 e.StartDateUtc,
                 e.EndDateUtc,
                 e.PriceRange,
@@ -680,7 +679,7 @@ public class AdminService : IAdminService
             var venueEntity = await _context.Venues.FirstOrDefaultAsync(v => v.CityId == cityId && v.Name.ToLower() == venueName.ToLower());
             if (venueEntity == null)
             {
-                venueEntity = new Venue { CityId = cityId, Name = venueName, Address = dto.Address ?? "", IsActive = true };
+                venueEntity = new Venue { CityId = cityId, Name = venueName, Address = "", IsActive = true };
                 _context.Venues.Add(venueEntity);
                 await _context.SaveChangesAsync();
             }
@@ -709,7 +708,6 @@ public class AdminService : IAdminService
             CityId = cityId,
             VenueId = venueId,
             AuditoriumId = auditoriumId,
-            Address = dto.Address,
             StartDateUtc = dto.StartDateUtc,
             EndDateUtc = dto.EndDateUtc,
             PriceRange = !string.IsNullOrWhiteSpace(dto.PriceRange) ? dto.PriceRange : $"PKR {dto.StartingPrice:N0}+",
@@ -877,7 +875,6 @@ public class AdminService : IAdminService
         ev.Status = status;
         ev.IsFeatured = dto.IsFeatured;
         ev.IsPublished = dto.IsPublished;
-        ev.Address = dto.Address;
         ev.StartDateUtc = dto.StartDateUtc;
         ev.EndDateUtc = dto.EndDateUtc;
         ev.PriceRange = !string.IsNullOrWhiteSpace(dto.PriceRange) ? dto.PriceRange : $"PKR {dto.StartingPrice:N0}+";
@@ -1357,7 +1354,7 @@ public class AdminService : IAdminService
     }
 
     // --- Bookings CRUD ---
-    public async Task<PagedResult<BookingDto>> GetBookingsAsync(int? eventId, string? search, int pageNumber = 1, int pageSize = 10)
+    public async Task<PagedResult<BookingDto>> GetBookingsAsync(int? eventId, string? search, int pageNumber = 1, int pageSize = 10, int? organizerId = null)
     {
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 100);
@@ -1367,6 +1364,9 @@ public class AdminService : IAdminService
             .Include(b => b.TicketTier)
             .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
             .Where(b => !b.IsDeleted);
+
+        if (organizerId.HasValue && organizerId.Value > 0)
+            query = query.Where(b => b.Event != null && b.Event.OrganizerId == organizerId.Value);
 
         if (eventId.HasValue && eventId.Value > 0)
             query = query.Where(b => b.EventId == eventId.Value);
@@ -1539,7 +1539,6 @@ public class AdminService : IAdminService
             ev.Venue?.Name ?? "",
             ev.AuditoriumId,
             ev.Auditorium?.Name,
-            ev.Address ?? ev.Venue?.Address,
             ev.StartDateUtc,
             ev.EndDateUtc,
             ev.PriceRange,

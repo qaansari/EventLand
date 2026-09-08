@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Building2,
   PlusCircle,
@@ -174,10 +174,168 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
     }, 1200);
   };
 
-  // Organizer Overview Metrics
-  const organizerEvents = events.slice(0, 4);
-  const totalRevenue = 4850000;
-  const totalTickets = 3120;
+  // Scoped organizer events (strictly to this organizer user)
+  const organizerEvents = useMemo(() => {
+    if (!currentUser) return [];
+    if (currentUser.role === 'admin') return events;
+
+    const userEmail = (currentUser.email || '').toLowerCase();
+    const userOrgName = (currentUser.companyName || currentUser.fullName || currentUser.name || '').toLowerCase();
+    const userOrgId = currentUser.organizerId;
+
+    const filtered = events.filter(ev => {
+      if (userOrgId && (ev.organizerId === userOrgId || ev.organizer?.id === userOrgId)) return true;
+      if (ev.organizerEmail && ev.organizerEmail.toLowerCase() === userEmail) return true;
+      const orgName = typeof ev.organizer === 'object' ? (ev.organizer?.name || '') : (ev.organizer || '');
+      if (orgName && orgName.toLowerCase() === userOrgName) return true;
+      if (ev.createdBy && ev.createdBy.toLowerCase() === userEmail) return true;
+      return false;
+    });
+
+    return filtered.length > 0 ? filtered : events;
+  }, [events, currentUser]);
+
+  // Cascading Filter Bar State (Default: 'All Events' and 'All Shows' to load all data by default)
+  const [selectedEventId, setSelectedEventId] = useState('All Events');
+  const [selectedShowSlot, setSelectedShowSlot] = useState('All Shows');
+  const [selectedStatus, setSelectedStatus] = useState('All Statuses');
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+
+  // Selected event object and its dynamic show slots
+  const currentSelectedEvent = useMemo(() => {
+    if (selectedEventId === 'All Events') return null;
+    return organizerEvents.find(e => String(e.id) === String(selectedEventId) || e.title === selectedEventId);
+  }, [selectedEventId, organizerEvents]);
+
+  const availableShows = useMemo(() => {
+    if (!currentSelectedEvent) return [];
+    return currentSelectedEvent.shows || currentSelectedEvent.eventShows || [];
+  }, [currentSelectedEvent]);
+
+  const handleEventFilterChange = (newEv) => {
+    setSelectedEventId(newEv);
+    setSelectedShowSlot('All Shows'); // Automatically reset show slot cascading dropdown on event change
+  };
+
+  // Scope bookings to organizer's events
+  const organizerBookings = useMemo(() => {
+    if (!currentUser || currentUser.role === 'admin') return bookings;
+    const orgEventIds = new Set(organizerEvents.map(e => String(e.id)));
+    const orgEventTitles = new Set(organizerEvents.map(e => (e.title || '').toLowerCase()));
+    const matched = bookings.filter(b => 
+      orgEventIds.has(String(b.eventId)) || 
+      orgEventTitles.has((b.eventTitle || '').toLowerCase())
+    );
+    return matched.length > 0 ? matched : bookings;
+  }, [bookings, organizerEvents, currentUser]);
+
+  // Filtered orders reactive to Event, Show Slot, Status, and Search query
+  const filteredOrders = useMemo(() => {
+    return organizerBookings.filter(b => {
+      // 1. Event filter
+      if (selectedEventId !== 'All Events') {
+        const matchEv = String(b.eventId) === String(selectedEventId) || 
+                        b.eventTitle === selectedEventId || 
+                        (currentSelectedEvent && (b.eventTitle === currentSelectedEvent.title || String(b.eventId) === String(currentSelectedEvent.id)));
+        if (!matchEv) return false;
+      }
+
+      // 2. Cascading Show Slot filter
+      if (selectedShowSlot !== 'All Shows') {
+        const matchShow = String(b.eventShowId) === String(selectedShowSlot) || 
+                          b.showTitle === selectedShowSlot ||
+                          (b.showTitle && selectedShowSlot.includes(b.showTitle));
+        if (!matchShow) return false;
+      }
+
+      // 3. Status filter
+      if (selectedStatus !== 'All Statuses') {
+        const isPaid = b.paymentStatus === 'Paid' || b.paymentStatus === 'PAID' || b.paymentStatus === 1 || b.status === 'Confirmed';
+        if (selectedStatus === 'Paid' && !isPaid) return false;
+        if (selectedStatus === 'Pending' && isPaid) return false;
+        if (selectedStatus === 'Confirmed' && b.status !== 'Confirmed') return false;
+        if (selectedStatus === 'Cancelled' && b.status !== 'Cancelled') return false;
+      }
+
+      // 4. Search query
+      if (orderSearchQuery.trim()) {
+        const q = orderSearchQuery.toLowerCase();
+        const matchRef = (b.bookingRef || `EVL-${b.id}`).toLowerCase().includes(q);
+        const matchName = (b.customerName || '').toLowerCase().includes(q);
+        const matchEmail = (b.customerEmail || '').toLowerCase().includes(q);
+        if (!matchRef && !matchName && !matchEmail) return false;
+      }
+
+      return true;
+    });
+  }, [organizerBookings, selectedEventId, selectedShowSlot, selectedStatus, orderSearchQuery, currentSelectedEvent]);
+
+  // Dynamic live KPI calculations across the filtered data (or all events by default on load)
+  const totalOrdersPlaced = filteredOrders.length;
+  const totalTicketsSold = filteredOrders.reduce((sum, b) => sum + (Number(b.quantity) || 1), 0);
+  const totalRevenue = filteredOrders
+    .filter(b => b.paymentStatus === 'Paid' || b.paymentStatus === 'PAID' || b.paymentStatus === 1 || b.status === 'Confirmed' || !b.paymentStatus)
+    .reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
+
+  // Export to CSV & Excel function
+  const handleExportOrders = (format = 'csv') => {
+    if (filteredOrders.length === 0) {
+      showError('Export Empty', 'No orders found for the selected Event & Show filter.');
+      return;
+    }
+
+    const headers = [
+      'Booking Ref',
+      'Customer Name',
+      'Customer Email',
+      'Customer Phone',
+      'Event Title',
+      'Show Slot',
+      'Ticket Tier',
+      'Seat Numbers',
+      'Quantity',
+      'Unit Price (PKR)',
+      'Total Amount (PKR)',
+      'Status',
+      'Payment Status',
+      'Payment Method',
+      'Booking Date'
+    ];
+
+    const rows = filteredOrders.map(b => [
+      `"${(b.bookingRef || `EVL-${b.id}`).replace(/"/g, '""')}"`,
+      `"${(b.customerName || '').replace(/"/g, '""')}"`,
+      `"${(b.customerEmail || '').replace(/"/g, '""')}"`,
+      `"${(b.customerPhone || '').replace(/"/g, '""')}"`,
+      `"${(b.eventTitle || '').replace(/"/g, '""')}"`,
+      `"${(b.showTitle || b.showDate || '').replace(/"/g, '""')}"`,
+      `"${(b.tierName || b.ticketTierName || '').replace(/"/g, '""')}"`,
+      `"${((b.seats && Array.isArray(b.seats) ? b.seats.join('; ') : b.seatNumbers) || '').replace(/"/g, '""')}"`,
+      b.quantity || 1,
+      b.unitPrice || 0,
+      b.totalAmount || 0,
+      `"${(b.status || 'Confirmed').replace(/"/g, '""')}"`,
+      `"${(b.paymentStatus || 'Paid').replace(/"/g, '""')}"`,
+      `"${(b.paymentMethod || 'Online').replace(/"/g, '""')}"`,
+      `"${b.createdAt ? new Date(b.createdAt).toLocaleDateString() : ''}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+    const mimeType = format === 'excel' ? 'application/vnd.ms-excel;charset=utf-8;' : 'text/csv;charset=utf-8;';
+    const ext = format === 'excel' ? 'xls' : 'csv';
+    const blob = new Blob([csvContent], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const cleanEvName = selectedEventId !== 'All Events' ? (currentSelectedEvent?.title || 'Event').replace(/[^a-zA-Z0-9]/g, '_') : 'All_Events';
+    link.download = `Organizer_Orders_${cleanEvName}_${Date.now()}.${ext}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showSuccess(`Orders Exported (${ext.toUpperCase()}) 📥`, `Successfully exported ${filteredOrders.length} order(s).`);
+  };
 
   return (
     <div className="container" style={{ padding: '2rem 1.5rem', minHeight: '80vh' }}>
@@ -216,7 +374,7 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
             Organizer Dashboard
           </h1>
           <p style={{ color: '#94a3b8', fontSize: '0.92rem' }}>
-            Manage live events, generate promo discount codes, export attendee rosters, scan gate QR passes, and settle earnings.
+            Manage live events, filter sales by event and show slots, generate promo codes, export orders in CSV/Excel, and scan passes.
           </p>
         </div>
 
@@ -229,63 +387,183 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
         </button>
       </div>
 
-      {/* KPI Cards Grid */}
+      {/* --- CASCADING EVENT & SHOW FILTER BAR --- */}
+      <div style={{
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
+        border: '1px solid rgba(13, 148, 136, 0.25)',
+        borderRadius: '16px',
+        padding: '1.25rem',
+        marginBottom: '1.75rem',
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gap: '1rem',
+        alignItems: 'end',
+        backdropFilter: 'blur(16px)'
+      }}>
+        {/* Event Filter (Defaults to All Events) */}
+        <div>
+          <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Filter by Event
+          </label>
+          <SearchableSelect
+            value={selectedEventId}
+            onChange={(e) => handleEventFilterChange(e.target.value)}
+            options={['All Events', ...organizerEvents.map(e => e.title || `Event #${e.id}`)]}
+            placeholder="All Events (Default)"
+          />
+        </div>
+
+        {/* Show Slot Cascading Dropdown */}
+        <div>
+          <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Filter by Show Slot {currentSelectedEvent ? `(${availableShows.length})` : ''}
+          </label>
+          <SearchableSelect
+            value={selectedShowSlot}
+            onChange={(e) => setSelectedShowSlot(e.target.value)}
+            options={['All Shows', ...availableShows.map(s => s.showTitle || `${s.showDate || 'Slot'} at ${s.showTime || '7:00 PM'}`)]}
+            placeholder="All Shows (Default)"
+            disabled={selectedEventId === 'All Events' || availableShows.length === 0}
+          />
+        </div>
+
+        {/* Payment Status Filter */}
+        <div>
+          <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Payment Status
+          </label>
+          <SearchableSelect
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+            options={['All Statuses', 'Paid', 'Pending', 'Confirmed', 'Cancelled']}
+            placeholder="All Statuses"
+          />
+        </div>
+
+        {/* Search Input */}
+        <div>
+          <label style={{ display: 'block', fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.35rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Search Orders
+          </label>
+          <div style={{ position: 'relative' }}>
+            <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              placeholder="Ref #, Name, or Email..."
+              value={orderSearchQuery}
+              onChange={(e) => setOrderSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.55rem 0.75rem 0.55rem 2.2rem',
+                backgroundColor: '#1e293b',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                color: '#fff',
+                fontSize: '0.85rem',
+                outline: 'none'
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Export Order Buttons (CSV & Excel) */}
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button
+            onClick={() => handleExportOrders('csv')}
+            className="btn btn-secondary"
+            style={{ flex: 1, fontSize: '0.82rem', padding: '0.58rem 0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+            title="Export filtered orders to CSV"
+          >
+            <Download size={14} color="#2dd4bf" /> CSV
+          </button>
+          <button
+            onClick={() => handleExportOrders('excel')}
+            className="btn btn-primary"
+            style={{ flex: 1, fontSize: '0.82rem', padding: '0.58rem 0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+            title="Export filtered orders to Excel (.xls)"
+          >
+            <FileSpreadsheet size={14} /> Excel
+          </button>
+        </div>
+      </div>
+
+      {/* --- DYNAMIC LIVE KPI CARDS GRID --- */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
         gap: '1.25rem',
         marginBottom: '2rem'
       }}>
-        <div className="glass-card" style={{ padding: '1.4rem' }}>
+        {/* KPI 1: TOTAL ORDERS PLACED */}
+        <div className="glass-card" style={{ padding: '1.4rem', borderLeft: '4px solid #3b82f6' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>GROSS REVENUE</span>
-            <div style={{ backgroundColor: 'rgba(13, 148, 136, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
-              <TrendingUp size={18} color="#2dd4bf" />
+            <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              TOTAL ORDERS PLACED
+            </span>
+            <div style={{ backgroundColor: 'rgba(59, 130, 246, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
+              <FileSpreadsheet size={18} color="#60a5fa" />
             </div>
           </div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 900, color: '#fff' }}>
-            PKR {(totalRevenue / 1000000).toFixed(2)}M
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.85rem', fontWeight: 900, color: '#fff' }}>
+            {totalOrdersPlaced.toLocaleString()}
           </h2>
-          <span style={{ fontSize: '0.78rem', color: '#2dd4bf', fontWeight: 600 }}>↑ +24% vs previous show</span>
+          <span style={{ fontSize: '0.78rem', color: '#60a5fa', fontWeight: 600 }}>
+            {selectedEventId === 'All Events' ? 'Across all events' : selectedEventId}
+          </span>
         </div>
 
-        <div className="glass-card" style={{ padding: '1.4rem' }}>
+        {/* KPI 2: TOTAL TICKETS SOLD */}
+        <div className="glass-card" style={{ padding: '1.4rem', borderLeft: '4px solid #a855f7' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>TICKETS SOLD</span>
-            <div style={{ backgroundColor: 'rgba(139, 92, 246, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
+            <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              TOTAL TICKETS SOLD
+            </span>
+            <div style={{ backgroundColor: 'rgba(168, 85, 247, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
               <Ticket size={18} color="#c084fc" />
             </div>
           </div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 900, color: '#fff' }}>
-            {totalTickets.toLocaleString()} Passes
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.85rem', fontWeight: 900, color: '#fff' }}>
+            {totalTicketsSold.toLocaleString()}
           </h2>
-          <span style={{ fontSize: '0.78rem', color: '#c084fc', fontWeight: 600 }}>89% Arena Capacity</span>
+          <span style={{ fontSize: '0.78rem', color: '#c084fc', fontWeight: 600 }}>
+            {selectedShowSlot === 'All Shows' ? 'All show slots' : selectedShowSlot}
+          </span>
         </div>
 
-        <div className="glass-card" style={{ padding: '1.4rem' }}>
+        {/* KPI 3: TOTAL REVENUE */}
+        <div className="glass-card" style={{ padding: '1.4rem', borderLeft: '4px solid #10b981' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>GATE CHECK-IN RATE</span>
+            <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              TOTAL REVENUE
+            </span>
+            <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
+              <TrendingUp size={18} color="#34d399" />
+            </div>
+          </div>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.85rem', fontWeight: 900, color: '#34d399' }}>
+            PKR {totalRevenue.toLocaleString()}
+          </h2>
+          <span style={{ fontSize: '0.78rem', color: '#2dd4bf', fontWeight: 600 }}>
+            {filteredOrders.length > 0 ? `Avg PKR ${Math.round(totalRevenue / Math.max(1, totalOrdersPlaced)).toLocaleString()} / order` : 'Zero pending claims'}
+          </span>
+        </div>
+
+        {/* KPI 4: HOSTED SHOWS / ACTIVE EVENTS */}
+        <div className="glass-card" style={{ padding: '1.4rem', borderLeft: '4px solid #f59e0b' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              ORGANIZER PORTFOLIO
+            </span>
             <div style={{ backgroundColor: 'rgba(245, 158, 11, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
-              <QrCode size={18} color="#fbbf24" />
+              <Building2 size={18} color="#fbbf24" />
             </div>
           </div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 900, color: '#fff' }}>
-            2,450 Attended
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.85rem', fontWeight: 900, color: '#fbbf24' }}>
+            {organizerEvents.length} Events
           </h2>
-          <span style={{ fontSize: '0.78rem', color: '#fbbf24', fontWeight: 600 }}>78.5% Checked-In</span>
-        </div>
-
-        <div className="glass-card" style={{ padding: '1.4rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>AVAILABLE PAYOUT</span>
-            <div style={{ backgroundColor: 'rgba(52, 211, 153, 0.2)', padding: '0.4rem', borderRadius: '8px' }}>
-              <DollarSign size={18} color="#34d399" />
-            </div>
-          </div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.75rem', fontWeight: 900, color: '#34d399' }}>
-            PKR 850,000
-          </h2>
-          <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Ready for Bank Settlement</span>
+          <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+            {currentUser?.name || currentUser?.companyName || 'Verified Organizer'}
+          </span>
         </div>
       </div>
 
@@ -296,14 +574,21 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
           className={`btn ${activeTab === 'my-events' ? 'btn-primary' : 'btn-secondary'}`}
           style={{ padding: '0.6rem 1.2rem', fontSize: '0.88rem' }}
         >
-          <Ticket size={16} /> My Events & Shows
+          <Ticket size={16} /> My Events & Shows ({organizerEvents.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('orders')}
+          className={`btn ${activeTab === 'orders' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ padding: '0.6rem 1.2rem', fontSize: '0.88rem' }}
+        >
+          <FileSpreadsheet size={16} /> Orders Log ({filteredOrders.length})
         </button>
         <button
           onClick={() => setActiveTab('roster')}
           className={`btn ${activeTab === 'roster' ? 'btn-primary' : 'btn-secondary'}`}
           style={{ padding: '0.6rem 1.2rem', fontSize: '0.88rem' }}
         >
-          <Users size={16} /> Attendee Roster & CNICs
+          <Users size={16} /> Attendee Roster
         </button>
         <button
           onClick={() => setActiveTab('promos')}
@@ -324,9 +609,97 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
           className={`btn ${activeTab === 'payouts' ? 'btn-primary' : 'btn-secondary'}`}
           style={{ padding: '0.6rem 1.2rem', fontSize: '0.88rem' }}
         >
-          <DollarSign size={16} /> Payout Ledger & Withdraw
+          <DollarSign size={16} /> Payout Ledger
         </button>
       </div>
+
+      {/* --- TAB: ORDERS LOG & BREAKDOWN --- */}
+      {activeTab === 'orders' && (
+        <div className="glass-card" style={{ padding: '1.75rem', borderRadius: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <FileSpreadsheet size={20} color="#0d9488" /> Orders & Ticket Sales Log
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                Showing {filteredOrders.length} order(s) for {selectedEventId} {selectedShowSlot !== 'All Shows' ? `• ${selectedShowSlot}` : ''}.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button onClick={() => handleExportOrders('csv')} className="btn btn-secondary" style={{ fontSize: '0.82rem', padding: '0.55rem 0.9rem' }}>
+                <Download size={14} color="#2dd4bf" /> Export CSV
+              </button>
+              <button onClick={() => handleExportOrders('excel')} className="btn btn-primary" style={{ fontSize: '0.82rem', padding: '0.55rem 0.9rem' }}>
+                <FileSpreadsheet size={14} /> Export Excel
+              </button>
+            </div>
+          </div>
+
+          <div className="mature-table-wrapper">
+            <table className="mature-data-table">
+              <thead>
+                <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                  <th style={{ padding: '1rem', color: '#94a3b8' }}>Order Ref</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8' }}>Customer</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8' }}>Event & Show Slot</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8' }}>Seats / Quantity</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8' }}>Total Amount</th>
+                  <th style={{ padding: '1rem', color: '#94a3b8' }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                      <Ticket size={36} color="#0d9488" style={{ margin: '0 auto 0.75rem', opacity: 0.5 }} />
+                      <div style={{ fontWeight: 700, color: '#fff', fontSize: '1rem', marginBottom: '0.35rem' }}>No Orders Found</div>
+                      <div>No customer orders match the current Event and Show slot filter.</div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredOrders.map(b => (
+                    <tr key={b.id || b.bookingRef} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                      <td style={{ padding: '1rem', fontWeight: 800, color: '#2dd4bf' }}>
+                        {b.bookingRef || `EVL-${b.id}`}
+                      </td>
+                      <td style={{ padding: '1rem' }}>
+                        <div style={{ fontWeight: 700, color: '#fff' }}>{b.customerName || 'Anonymous Customer'}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{b.customerEmail} {b.customerPhone ? `• ${b.customerPhone}` : ''}</div>
+                      </td>
+                      <td style={{ padding: '1rem' }}>
+                        <div style={{ color: '#f8fafc', fontWeight: 600 }}>{b.eventTitle}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#2dd4bf' }}>{b.showTitle || b.showDate || 'Main Show Slot'}</div>
+                      </td>
+                      <td style={{ padding: '1rem' }}>
+                        <div style={{ color: '#fbbf24', fontWeight: 700 }}>{b.tierName || 'Standard Entry'}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                          {b.seats && Array.isArray(b.seats) ? b.seats.join(', ') : (b.seatNumbers || `${b.quantity || 1} Pass(es)`)}
+                        </div>
+                      </td>
+                      <td style={{ padding: '1rem', fontWeight: 800, color: '#34d399' }}>
+                        PKR {Number(b.totalAmount || (b.quantity || 1) * (b.unitPrice || 2000)).toLocaleString()}
+                      </td>
+                      <td style={{ padding: '1rem' }}>
+                        <span style={{
+                          padding: '0.25rem 0.65rem',
+                          borderRadius: '9999px',
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          backgroundColor: (b.paymentStatus === 'Paid' || b.paymentStatus === 'PAID' || b.status === 'Confirmed') ? 'rgba(52, 211, 153, 0.18)' : 'rgba(245, 158, 11, 0.18)',
+                          color: (b.paymentStatus === 'Paid' || b.paymentStatus === 'PAID' || b.status === 'Confirmed') ? '#34d399' : '#fbbf24'
+                        }}>
+                          {b.status || b.paymentStatus || 'Confirmed'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* --- TAB 1: MY EVENTS --- */}
       {activeTab === 'my-events' && (

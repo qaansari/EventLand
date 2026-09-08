@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/admin/events")]
-[Authorize(Roles = "SuperAdmin,Admin")]
+[Authorize(Roles = "SuperAdmin,Admin,Organizer,organizer,admin,superadmin")]
 [Produces("application/json")]
 public class AdminEventsController : ControllerBase
 {
@@ -37,6 +37,15 @@ public class AdminEventsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<EventDetailDto>> CreateEvent([FromBody] CreateAdminEventDto dto)
     {
+        if (User.IsInRole("Organizer") || User.IsInRole("organizer"))
+        {
+            var orgClaim = User.FindFirst("organizerId")?.Value;
+            if (int.TryParse(orgClaim, out var parsedOrgId) && parsedOrgId > 0)
+            {
+                dto = dto with { OrganizerId = parsedOrgId };
+            }
+        }
+
         var created = await _adminService.CreateEventAsync(dto);
         return CreatedAtAction(nameof(GetEvents), new { id = created.Id }, created);
     }
