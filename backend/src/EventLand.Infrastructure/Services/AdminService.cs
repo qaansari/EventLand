@@ -853,15 +853,15 @@ public class AdminService : IAdminService
         }
     }
 
-    public async Task<EventDetailDto> UpdateEventAsync(int id, UpdateAdminEventDto dto)
+    public async Task<EventDetailDto> UpdateEventAsync(int id, UpdateAdminEventDto dto, int? organizerId = null)
     {
         var ev = await _context.Events
             .Include(e => e.EventTags)
             .Include(e => e.Shows)
-            .FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted);
+            .FirstOrDefaultAsync(e => e.Id == id && (!organizerId.HasValue || e.OrganizerId == organizerId.Value) && !e.IsDeleted);
 
         if (ev is null)
-            throw new KeyNotFoundException($"Event with ID '{id}' not found.");
+            throw new KeyNotFoundException($"Event with ID '{id}' not found or access denied.");
 
         Enum.TryParse<TicketingType>(dto.TicketingType, true, out var ticketingType);
         Enum.TryParse<EventStatus>(dto.Status, true, out var status);
@@ -991,9 +991,9 @@ public class AdminService : IAdminService
         return await GetEventDetailDtoAsync(id);
     }
 
-    public async Task<bool> DeleteEventAsync(int id)
+    public async Task<bool> DeleteEventAsync(int id, int? organizerId = null)
     {
-        var ev = await _context.Events.FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted);
+        var ev = await _context.Events.FirstOrDefaultAsync(e => e.Id == id && (!organizerId.HasValue || e.OrganizerId == organizerId.Value) && !e.IsDeleted);
         if (ev is null) return false;
 
         ev.IsDeleted = true;
@@ -1386,26 +1386,26 @@ public class AdminService : IAdminService
         return new PagedResult<BookingDto>(items, totalCount, pageNumber, pageSize);
     }
 
-    public async Task<BookingDto?> GetBookingByIdAsync(int id)
+    public async Task<BookingDto?> GetBookingByIdAsync(int id, int? organizerId = null)
     {
         var b = await _context.Bookings.AsNoTracking()
             .Include(x => x.Event)
             .Include(x => x.TicketTier)
             .Include(x => x.BookingSeats).ThenInclude(bs => bs.Seat)
-            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            .FirstOrDefaultAsync(x => x.Id == id && (!organizerId.HasValue || (x.Event != null && x.Event.OrganizerId == organizerId.Value)) && !x.IsDeleted);
         if (b is null) return null;
         return MapBookingToDto(b);
     }
 
-    public async Task<BookingDto> UpdateBookingStatusAsync(int id, UpdateBookingStatusDto dto)
+    public async Task<BookingDto> UpdateBookingStatusAsync(int id, UpdateBookingStatusDto dto, int? organizerId = null)
     {
         var booking = await _context.Bookings
             .Include(b => b.Event)
             .Include(b => b.TicketTier)
             .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
-            .FirstOrDefaultAsync(b => b.Id == id && !b.IsDeleted);
+            .FirstOrDefaultAsync(b => b.Id == id && (!organizerId.HasValue || (b.Event != null && b.Event.OrganizerId == organizerId.Value)) && !b.IsDeleted);
 
-        if (booking is null) throw new KeyNotFoundException($"Booking '{id}' not found.");
+        if (booking is null) throw new KeyNotFoundException($"Booking '{id}' not found or access denied.");
 
         if (Enum.TryParse<BookingStatus>(dto.Status, true, out var status)) booking.Status = status;
         if (Enum.TryParse<PaymentStatus>(dto.PaymentStatus, true, out var payStatus)) booking.PaymentStatus = payStatus;

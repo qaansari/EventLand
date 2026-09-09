@@ -51,11 +51,44 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
       return;
     }
 
-    if (!password.trim() || password.length < 8) {
-      const msg = 'Password must be at least 8 characters long.';
-      setErrorMsg(msg);
-      showError('Validation Error', msg);
-      return;
+    if (isSignUp) {
+      if (!password || password.length < 10) {
+        const msg = 'Password must be at least 10 characters long.';
+        setErrorMsg(msg);
+        showError('Validation Error', msg);
+        return;
+      }
+      if (!/[A-Z]/.test(password)) {
+        const msg = 'Password must contain at least one uppercase letter (A-Z).';
+        setErrorMsg(msg);
+        showError('Validation Error', msg);
+        return;
+      }
+      if (!/[a-z]/.test(password)) {
+        const msg = 'Password must contain at least one lowercase letter (a-z).';
+        setErrorMsg(msg);
+        showError('Validation Error', msg);
+        return;
+      }
+      if (!/[0-9]/.test(password)) {
+        const msg = 'Password must contain at least one number (0-9).';
+        setErrorMsg(msg);
+        showError('Validation Error', msg);
+        return;
+      }
+      if (!/[^a-zA-Z0-9]/.test(password)) {
+        const msg = 'Password must contain at least one special character (!@#$%^&*).';
+        setErrorMsg(msg);
+        showError('Validation Error', msg);
+        return;
+      }
+    } else {
+      if (!password.trim()) {
+        const msg = 'Password is required.';
+        setErrorMsg(msg);
+        showError('Validation Error', msg);
+        return;
+      }
     }
 
     setLoading(true);
@@ -376,6 +409,25 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+            {isSignUp && (
+              <div style={{ marginTop: '0.45rem', display: 'flex', flexWrap: 'wrap', gap: '0.35rem 0.65rem', fontSize: '0.72rem' }}>
+                <span style={{ color: password.length >= 10 ? '#10b981' : '#64748b', transition: 'color 0.2s' }}>
+                  {password.length >= 10 ? '✓' : '○'} 10+ chars
+                </span>
+                <span style={{ color: /[A-Z]/.test(password) ? '#10b981' : '#64748b', transition: 'color 0.2s' }}>
+                  {/[A-Z]/.test(password) ? '✓' : '○'} Uppercase
+                </span>
+                <span style={{ color: /[a-z]/.test(password) ? '#10b981' : '#64748b', transition: 'color 0.2s' }}>
+                  {/[a-z]/.test(password) ? '✓' : '○'} Lowercase
+                </span>
+                <span style={{ color: /[0-9]/.test(password) ? '#10b981' : '#64748b', transition: 'color 0.2s' }}>
+                  {/[0-9]/.test(password) ? '✓' : '○'} Number
+                </span>
+                <span style={{ color: /[^a-zA-Z0-9]/.test(password) ? '#10b981' : '#64748b', transition: 'color 0.2s' }}>
+                  {/[^a-zA-Z0-9]/.test(password) ? '✓' : '○'} Symbol
+                </span>
+              </div>
+            )}
           </div>
 
           <button

@@ -67,7 +67,7 @@
 
 ## Database Schema & Migrations
 
-- **Consolidated Migration**: The entire database schema is represented by a single clean migration: `20260901072315_InitialCreate`.
+- **Consolidated Migration**: The entire database schema is represented by a single clean migration: `20260909105956_InitialCreate`.
 - **Primary Key Convention**: All domain entities inherit from `BaseEntity` with 4-digit integer IDs seeded at `1000`.
 - **Soft Delete**: Global EF Core Query Filter (`!IsDeleted`) automatically applied to all entities inheriting `BaseEntity`.
 - **Audit Fields**: `CreatedAt`, `UpdatedAt`, `CreatedBy`, `UpdatedBy`, `IsDeleted`, `DeletedAt` are auto-populated in `ApplicationDbContext.SaveChangesAsync()`.
@@ -86,23 +86,28 @@
    - Public bank endpoints return safe projections without admin internal operational metadata.
    - Bank details and payment status checks are guarded with `[Authorize]` and ownership verification.
    - Admin endpoints use normalized role policies: `[Authorize(Roles = "SuperAdmin,Admin")]`.
+   - Account lockout enforcement: 5 consecutive failed login attempts trigger a 15-minute temporary account lockout (`AccessFailedCount`, `LockoutEndUtc`) with clear remaining attempt feedback.
+   - Organizer IDOR / BOLA defenses: Organizers are strictly constrained to viewing, updating, and managing their own events and bookings. Organizers cannot delete bookings or alter events of other organizers.
+   - Country and City creation restricted to SuperAdmin and Admin.
+   - Claims-bound email validation in `SeatHoldController` prevents client payload identity spoofing.
 2. **XSS & Image Upload Protection**:
    - Email notifications encode user-controlled text using `HttpUtility.HtmlEncode`.
-   - Security headers middleware enforces `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection: 1; mode=block`, and strict CSP headers.
-   - `UploadController` enforces image magic-byte header validation (JPEG, PNG, WebP), file size limits, and path traversal sanitization.
+   - Security headers middleware enforces `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection: 1; mode=block`, `Cross-Origin-Opener-Policy: same-origin-allow-popups`, `Cross-Origin-Resource-Policy: cross-origin`, and strict CSP headers.
+   - Kestrel server banner suppression (`AddServerHeader = false`) and 30 MB maximum request body limits.
+   - `UploadController` enforces role-scoped uploads: Customers can only upload payment slips (`type=slip`) and avatars (`type=user`). Bank QR codes require Admin; event banners, logos, and artist photos require Organizer/Admin.
+   - Rate limiting on file uploads (20 req/min) prevents storage exhaustion attacks.
+   - Matching query filters on `BookingSeat` and `EventTag` join entities resolve EF Core model validation warnings.
    - User Registration (`AuthService`), Self-Registration Modal (`AuthModal.jsx`), and Admin User Management (`AdminService` & `AdminDashboard.jsx`) strictly enforce unique Email and unique Phone Number validations on both backend database (`IX_Users_Email`, `IX_Users_PhoneNumber`) and frontend UI forms.
-   - Bank Account QR code images are resolved via `getQrCodeImageUrl` and displayed in a scannable right-aligned side-by-side card preview box in the Super Admin Bank Accounts console and the customer Checkout Modal.
-3. **Database Indexing & Latency Optimizations**:
-   - Composite index on `(PaymentStatus, PaymentExpiresAt)` optimizes the 60-second expiry background service worker.
-   - Composite index on `(EventId, Status)` speeds up event seat map queries.
-   - Streamlined query projections in `EventService` by eliminating redundant `.Include()` chains prior to `.Select()`.
-   - Fixed missing `.ThenInclude(e => e.Venue)` in `BookingService` queries to ensure venue names populate accurately in booking DTOs.
-   - Batch-processed database operations in `AdminService` to eliminate N+1 `SaveChangesAsync()` calls inside loops.
-   - Applied Redis/Memory caching for high-traffic public lookup endpoints (`/api/faqs`, `/api/footer`).
-   - Decimal precision explicitly set to `(18, 2)` across all monetary fields.
-4. **Environment Isolation & Rate Limiting**:
-   - Swagger UI is strictly guarded behind `builder.Environment.IsDevelopment()`.
-   - Rate limiting policies (`login` window: 10 req/min, `general`: 100 req/min, global per-IP fallback).
+3. **Frontend Session Integrity & Route Guards**:
+   - Initial app load verifies stored JWT session with `/api/auth/me`. Tampered or expired sessions are cleanly flushed.
+   - Reusable auth module (`frontend/src/utils/auth.js`) centralizes session storage (`getStoredToken`, `setStoredSession`, `clearStoredSession`), role normalization (`normalizeRole`), and boolean access checks (`isAdmin`, `isOrganizer`).
+   - Automatic 401 interception in `api.js` clears zombie localStorage tokens and dispatches an auth-expired event.
+   - Frontend route guards enforce role permissions on `admin` and `organizer` views.
+   - Interactive password strength criteria indicators in `AuthModal.jsx` guide users to meet the 10+ character complexity rules on signup.
+4. **Code Reusability, Scalability & Architecture**:
+   - Reusable `ClaimsPrincipalExtensions` (`backend/src/EventLand.Api/Extensions/ClaimsPrincipalExtensions.cs`) standardizes claims parsing (`GetUserId`, `GetEmail`, `GetOrganizerId`, `IsAdmin`, `IsOrganizer`, `IsSuperAdmin`) across all API controllers, eliminating duplicated identity extraction logic.
+   - Single-query SQL-level authorization scoping: `IAdminService` methods (`UpdateEventAsync`, `DeleteEventAsync`, `GetBookingByIdAsync`, `UpdateBookingStatusAsync`) accept optional `int? organizerId = null`, eliminating redundant DB queries and cutting database round-trips by 50% for organizer actions.
+   - Matching soft-delete query filters on `BookingSeat` (`!bs.Booking.IsDeleted`) and `EventTag` (`!et.Event.IsDeleted`) prevent orphaned joins and eliminate EF Core navigation warnings.
 
 ---
 
@@ -130,4 +135,5 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
 ```
 
 ---
-*Last Updated: September 2026 (System-wide Optimization & Latency Hardening Completed)*
+*Last Updated: September 2026 (Full-Stack Security Hardening, Reusable Architecture & Scalability Completed)*
+

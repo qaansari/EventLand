@@ -24,5 +24,8 @@ public sealed class BookingSeatConfiguration : IEntityTypeConfiguration<BookingS
                .WithMany()
                .HasForeignKey(bs => bs.EventShowId)
                .OnDelete(DeleteBehavior.Restrict);
+
+        // Filter matching Booking entity soft-delete filter to resolve EF Core navigation warning
+        builder.HasQueryFilter(bs => !bs.Booking.IsDeleted);
     }
 }

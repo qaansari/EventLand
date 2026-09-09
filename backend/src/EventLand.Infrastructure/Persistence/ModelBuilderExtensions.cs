@@ -83,8 +83,8 @@ public static class ModelBuilderExtensions
             new Faq
             {
                 Id = 1,
-                Question = "How do I book tickets on EventLand?",
-                Answer = "Browse events on EventLand, select your desired city and ticket tier or interactive seat, and complete your booking via direct bank transfer. Once payment is verified by our team, your official digital E-Ticket with QR code is generated instantly.",
+                Question = "How do I book tickets on Event Land?",
+                Answer = "Browse events on Event Land, select your desired city and ticket tier or interactive seat, and complete your booking via direct bank transfer. Once payment is verified by our team, your official digital E-Ticket with QR code is generated instantly.",
                 DisplayOrder = 1,
                 IsActive = true,
                 CreatedAt = fixedDateTime,
@@ -93,7 +93,7 @@ public static class ModelBuilderExtensions
             new Faq
             {
                 Id = 2,
-                Question = "What is EventLand's refund policy?",
+                Question = "What is Event Land's refund policy?",
                 Answer = "Tickets are non-refundable unless an event is cancelled or rescheduled. If an event is cancelled, full refunds are issued within 5 business days.",
                 DisplayOrder = 2,
                 IsActive = true,
@@ -104,7 +104,7 @@ public static class ModelBuilderExtensions
             {
                 Id = 3,
                 Question = "Which major Pakistani cities are covered?",
-                Answer = "EventLand features live concerts, comedy shows, bazaars, and theatre across Karachi, Lahore, Islamabad, Rawalpindi, Multan, Faisalabad, and Hyderabad.",
+                Answer = "Event Land features live concerts, comedy shows, bazaars, and theatre across Karachi, Lahore, Islamabad, Rawalpindi, Multan, Faisalabad, and Hyderabad.",
                 DisplayOrder = 3,
                 IsActive = true,
                 CreatedAt = fixedDateTime,
@@ -127,12 +127,12 @@ public static class ModelBuilderExtensions
             new FooterInfo
             {
                 Id = 1,
-                BrandName = "EventLand",
+                BrandName = "Event Land",
                 Tagline = "Event Land is a single, user-friendly platform, we link fans, artists, and organizers for everything from comedy nights to concerts. 🎵🎭",
                 Phone = "+92 307 9353185",
                 Email = "support@eventland.pk",
                 Address = "Karachi, Pakistan",
-                CopyrightText = "© 2026 EventLand Pakistan. All rights reserved.",
+                CopyrightText = "© 2026 Event Land Pakistan. All rights reserved.",
                 PrivacyPolicyUrl = "#",
                 TermsOfServiceUrl = "#",
                 OrganizerSupportUrl = "#",

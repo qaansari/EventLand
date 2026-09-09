@@ -19,5 +19,8 @@ public sealed class EventTagConfiguration : IEntityTypeConfiguration<EventTag>
                .WithMany(t => t.EventTags)
                .HasForeignKey(et => et.TagId)
                .OnDelete(DeleteBehavior.Cascade);
+
+        // Filter matching Event entity soft-delete filter to resolve EF Core navigation warning
+        builder.HasQueryFilter(et => !et.Event.IsDeleted);
     }
 }

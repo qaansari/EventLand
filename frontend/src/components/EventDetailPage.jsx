@@ -46,7 +46,7 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
   useEffect(() => {
     if (!event) return;
 
-    const pageTitle = `${event.title} - ${event.cityName || event.city || 'Pakistan'} | EventLand`;
+    const pageTitle = `${event.title} - ${event.cityName || event.city || 'Pakistan'} | Event Land`;
     document.title = pageTitle;
 
     // Helper to update meta tag content
@@ -61,7 +61,7 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
     };
 
     const eventBannerUrl = getEventImageUrl(event.banner);
-    const eventDescription = event.description ? event.description.slice(0, 160) : `Book tickets for ${event.title} on EventLand Pakistan.`;
+    const eventDescription = event.description ? event.description.slice(0, 160) : `Book tickets for ${event.title} on Event Land Pakistan.`;
 
     updateMetaTag('name', 'description', eventDescription);
     updateMetaTag('property', 'og:title', pageTitle);

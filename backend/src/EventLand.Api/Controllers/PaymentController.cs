@@ -3,6 +3,7 @@ namespace EventLand.Api.Controllers;
 using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using EventLand.Api.Extensions;
 using EventLand.Application.Interfaces;
 using EventLand.Domain.Entities;
 using EventLand.Domain.Enums;
@@ -35,19 +36,6 @@ public class PaymentController : ControllerBase
         _cacheService = cacheService;
     }
 
-    private string? GetAuthenticatedEmail() =>
-        User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue("email");
-
-    private int? GetAuthenticatedUserId()
-    {
-        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-        return int.TryParse(raw, out var id) ? id : (int?)null;
-    }
-
-    private bool IsAdmin() =>
-        User.IsInRole("SuperAdmin") || User.IsInRole("Admin") ||
-        User.IsInRole("superadmin") || User.IsInRole("admin");
-
     /// <summary>
     /// Checks booking bank transfer payment status and remaining 30-minute hold countdown timer.
     /// Requires authentication — the caller must be the booking owner or an admin.
@@ -63,9 +51,9 @@ public class PaymentController : ControllerBase
         if (booking is null) return NotFound(new { message = $"Booking ref '{bookingRef}' not found." });
 
         // Authorization: only the booking owner or an admin can view payment status.
-        if (!IsAdmin())
+        if (!User.IsAdmin())
         {
-            var callerEmail = GetAuthenticatedEmail();
+            var callerEmail = User.GetEmail();
             if (string.IsNullOrWhiteSpace(callerEmail) ||
                 !string.Equals(callerEmail, booking.CustomerEmail, StringComparison.OrdinalIgnoreCase))
             {
@@ -102,8 +90,8 @@ public class PaymentController : ControllerBase
     [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
     public async Task<IActionResult> ProcessRefund([FromBody] ProcessBankRefundRequestDto dto)
     {
-        var adminId = GetAuthenticatedUserId();
-        var adminEmail = GetAuthenticatedEmail() ?? "admin@eventland.pk";
+        var adminId = User.GetUserId();
+        var adminEmail = User.GetEmail() ?? "admin@eventland.pk";
 
         var booking = await _context.Bookings
             .Include(b => b.TicketTier)

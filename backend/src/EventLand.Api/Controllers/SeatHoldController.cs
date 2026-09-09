@@ -4,6 +4,7 @@ using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 
@@ -26,14 +27,17 @@ public class SeatHoldController : ControllerBase
     /// <summary>Hold seats for 10 minutes in Redis for checkout. Requires authentication.</summary>
     [HttpPost("hold")]
     [Authorize]
+    [EnableRateLimiting("general")]
     public async Task<ActionResult<HoldSeatsResponseDto>> HoldSeats([FromBody] HoldSeatsRequestDto dto)
     {
         if (dto.SeatIds == null || !dto.SeatIds.Any())
             return BadRequest(new HoldSeatsResponseDto(false, "No seat IDs provided.", new List<int>(), null));
 
         var authenticatedEmail = User.FindFirstValue(System.Security.Claims.ClaimTypes.Email) 
-            ?? User.FindFirstValue("email") 
-            ?? dto.CustomerEmail;
+            ?? User.FindFirstValue("email");
+
+        if (string.IsNullOrWhiteSpace(authenticatedEmail))
+            return Unauthorized();
 
         var holdDuration = TimeSpan.FromMinutes(10);
         var success = await _cacheService.HoldSeatsAsync(dto.EventId, dto.SeatIds, authenticatedEmail, holdDuration, dto.EventShowId);

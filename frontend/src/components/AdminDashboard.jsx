@@ -274,12 +274,12 @@ export default function AdminDashboard({ onSelectEvent }) {
   };
 
   const defaultFooterForm = {
-    brandName: 'EventLand',
+    brandName: 'Event Land',
     tagline: 'Event Land is a single, user-friendly platform, we link fans, artists, and organizers for everything from comedy nights to concerts. 🎵🎭',
     phone: '+92 307 9353185',
     email: 'support@eventland.pk',
     address: 'Karachi, Pakistan',
-    copyrightText: '© 2026 EventLand Pakistan. All rights reserved.',
+    copyrightText: '© 2026 Event Land Pakistan. All rights reserved.',
     privacyPolicyUrl: '#',
     termsOfServiceUrl: '#',
     organizerSupportUrl: '#'
@@ -485,7 +485,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       setFaqsList(faqs || []);
       if (ftr) {
         setFooterForm({
-          brandName: ftr.brandName || 'EventLand',
+          brandName: ftr.brandName || 'Event Land',
           tagline: ftr.tagline || '',
           phone: ftr.phone || '',
           email: ftr.email || '',
@@ -3515,7 +3515,7 @@ export default function AdminDashboard({ onSelectEvent }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
             <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
               <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700 }}>Brand Name</span>
-              <div style={{ fontSize: '1.1rem', color: '#fff', fontWeight: 600, marginTop: '0.25rem' }}>{footerForm.brandName || 'EventLand'}</div>
+              <div style={{ fontSize: '1.1rem', color: '#fff', fontWeight: 600, marginTop: '0.25rem' }}>{footerForm.brandName || 'Event Land'}</div>
             </div>
 
             <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.25rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -4879,7 +4879,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. How do I book tickets on EventLand?"
+                  placeholder="e.g. How do I book tickets on Event Land?"
                   value={faqForm.question}
                   onChange={e => setFaqForm({ ...faqForm, question: e.target.value })}
                   style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
@@ -5315,7 +5315,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. EventLand Official Pvt Ltd"
+                    placeholder="e.g. Event Land Official Pvt Ltd"
                     value={bankAccountForm.accountTitle}
                     onChange={e => setBankAccountForm({ ...bankAccountForm, accountTitle: e.target.value })}
                     style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff' }}

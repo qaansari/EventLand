@@ -4,11 +4,13 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using EventLand.Api.Extensions;
 using EventLand.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using SkiaSharp;
 
 [ApiController]
@@ -27,6 +29,7 @@ public class UploadController : ControllerBase
     }
 
     [HttpPost]
+    [EnableRateLimiting("upload")]
     public async Task<IActionResult> UploadFile(
         IFormFile? file,
         [FromQuery] string? type = "events",
@@ -67,7 +70,36 @@ public class UploadController : ControllerBase
             }
         }
 
-        var subFolder = (type?.ToLowerInvariant()) switch
+        var normalizedType = (type ?? "events").ToLowerInvariant();
+
+        // Role-based upload restrictions:
+        // Customers are ONLY permitted to upload payment slips ('slip', 'proof', etc.) or user avatars ('user', 'users').
+        // Events, artists, and organizers require admin or organizer privileges.
+        // Bank QR codes require Admin or SuperAdmin privileges.
+        bool isAdmin = User.IsAdmin();
+        bool isOrganizer = User.IsOrganizer();
+
+        bool isPrivilegedType = normalizedType switch
+        {
+            "qrcode" or "qr_code" or "qr_codes" or "bank" or "bankaccount" or "bankaccounts" => true,
+            "organizer" or "organizers" => true,
+            "artist" or "artists" => true,
+            "event" or "events" => true,
+            _ => false
+        };
+
+        if (isPrivilegedType && !isAdmin && !isOrganizer)
+        {
+            return Forbid();
+        }
+
+        // Bank QR code upload is restricted to administrators only
+        if ((normalizedType.Contains("qr") || normalizedType.Contains("bank")) && !isAdmin)
+        {
+            return Forbid();
+        }
+
+        var subFolder = normalizedType switch
         {
             "organizer" or "organizers" => Path.Combine("assets", "images", "organizers"),
             "user" or "users" => Path.Combine("assets", "images", "users"),

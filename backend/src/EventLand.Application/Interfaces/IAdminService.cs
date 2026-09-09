@@ -46,8 +46,8 @@ public interface IAdminService
     Task<PagedResult<EventSummaryDto>> GetEventsAsync(int pageNumber = 1, int pageSize = 10);
     Task<EventDetailDto> GetEventByIdAsync(int eventId);
     Task<EventDetailDto> CreateEventAsync(CreateAdminEventDto dto);
-    Task<EventDetailDto> UpdateEventAsync(int id, UpdateAdminEventDto dto);
-    Task<bool> DeleteEventAsync(int id);
+    Task<EventDetailDto> UpdateEventAsync(int id, UpdateAdminEventDto dto, int? organizerId = null);
+    Task<bool> DeleteEventAsync(int id, int? organizerId = null);
 
     // --- EventShows CRUD ---
     Task<EventShowDto> CreateEventShowAsync(CreateEventShowDto dto);
@@ -80,8 +80,8 @@ public interface IAdminService
 
     // --- Bookings CRUD ---
     Task<PagedResult<BookingDto>> GetBookingsAsync(int? eventId, string? search, int pageNumber = 1, int pageSize = 10, int? organizerId = null);
-    Task<BookingDto?> GetBookingByIdAsync(int id);
-    Task<BookingDto> UpdateBookingStatusAsync(int id, UpdateBookingStatusDto dto);
+    Task<BookingDto?> GetBookingByIdAsync(int id, int? organizerId = null);
+    Task<BookingDto> UpdateBookingStatusAsync(int id, UpdateBookingStatusDto dto, int? organizerId = null);
     Task<bool> DeleteBookingAsync(int id);
 
     // --- Tags CRUD ---

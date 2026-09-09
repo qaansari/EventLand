@@ -69,6 +69,7 @@ public class AuthController : ControllerBase
     /// <summary>Change current user's password (requires old password verification).</summary>
     [HttpPost("change-password")]
     [Authorize]
+    [EnableRateLimiting("login")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
     {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");

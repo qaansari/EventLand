@@ -11,26 +11,26 @@ export default function Footer({ onSelectCity }) {
 
   // Dynamic state loaded from Database/API
   const [footerData, setFooterData] = useState({
-    brandName: 'EventLand',
+    brandName: 'Event Land',
     tagline: "Event Land is a single, user-friendly platform, we link fans, artists, and organizers for everything from comedy nights to concerts. 🎵🎭",
     phone: '+92 307 9353185',
     email: 'support@eventland.pk',
-    copyrightText: '© 2026 EventLand Pakistan. All rights reserved.',
+    copyrightText: '© 2026 Event Land Pakistan. All rights reserved.',
     privacyPolicyUrl: '#',
     termsOfServiceUrl: '#',
     organizerSupportUrl: '#',
     faqs: [
       {
-        q: "How do I book tickets on EventLand?",
-        a: "Browse events on EventLand, select your desired city and ticket tier or interactive seat, and pay securely via JazzCash, EasyPaisa, bank transfer, or card. Your official digital E-Ticket with QR code is generated instantly."
+        q: "How do I book tickets on Event Land?",
+        a: "Browse events on Event Land, select your desired city and ticket tier or interactive seat, and pay securely via JazzCash, EasyPaisa, bank transfer, or card. Your official digital E-Ticket with QR code is generated instantly."
       },
       {
-        q: "What is EventLand's refund policy?",
+        q: "What is Event Land's refund policy?",
         a: "Tickets are non-refundable unless an event is cancelled or rescheduled. If an event is cancelled, full refunds are issued within 5 business days."
       },
       {
         q: "Which major Pakistani cities are covered?",
-        a: "EventLand features live concerts, comedy shows, bazaars, and theatre across Karachi, Lahore, Islamabad, Rawalpindi, Multan, Faisalabad, and Hyderabad."
+        a: "Event Land features live concerts, comedy shows, bazaars, and theatre across Karachi, Lahore, Islamabad, Rawalpindi, Multan, Faisalabad, and Hyderabad."
       },
       {
         q: "Can I list my own event and sell tickets?",

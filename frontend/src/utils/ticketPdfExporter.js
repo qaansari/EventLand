@@ -47,7 +47,7 @@ export async function exportTicketPdf(ticketData = {}) {
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>EventLand E-Ticket - ${ticketId}</title>
+  <title>Event Land E-Ticket - ${ticketId}</title>
   <style>
     @page {
       size: A4 portrait;
@@ -393,7 +393,7 @@ export async function exportTicketPdf(ticketData = {}) {
 
       <!-- Footer Info -->
       <div class="footer-bar">
-        <span>EventLand Pakistan • Official Ticketing & Auditorium Platform</span>
+        <span>Event Land Pakistan • Official Ticketing & Auditorium Platform</span>
         <span>Issued: ${bookingDateStr}</span>
       </div>
 

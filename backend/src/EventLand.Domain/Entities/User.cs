@@ -26,4 +26,9 @@ public class User : BaseEntity
 
     public bool      IsActive      { get; set; } = true;
     public DateTimeOffset? LastLoginAt { get; set; }
+
+    // Account lockout & brute-force defense
+    public int       AccessFailedCount { get; set; } = 0;
+    public DateTimeOffset? LockoutEndUtc { get; set; }
 }
+

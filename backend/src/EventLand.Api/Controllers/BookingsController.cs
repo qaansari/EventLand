@@ -1,6 +1,7 @@
 namespace EventLand.Api.Controllers;
 
 using System.Security.Claims;
+using EventLand.Api.Extensions;
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -23,11 +24,11 @@ public class BookingsController : ControllerBase
     [Authorize]
     public async Task<ActionResult<BookingDto>> CreateBooking([FromBody] CreateBookingDto dto)
     {
-        var email = GetAuthenticatedEmail();
+        var email = User.GetEmail();
         if (string.IsNullOrWhiteSpace(email))
             return Unauthorized();
 
-        var booking = await _bookingService.CreateBookingAsync(dto, GetAuthenticatedUserId(), email);
+        var booking = await _bookingService.CreateBookingAsync(dto, User.GetUserId(), email);
         return CreatedAtAction(nameof(GetBookingById), new { id = booking.Id }, booking);
     }
 
@@ -104,8 +105,8 @@ public class BookingsController : ControllerBase
     [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
     public async Task<ActionResult<BookingDto>> ConfirmBankPayment(int id, [FromBody] ConfirmBankPaymentDto dto)
     {
-        var adminId = GetAuthenticatedUserId();
-        var adminEmail = GetAuthenticatedEmail();
+        var adminId = User.GetUserId();
+        var adminEmail = User.GetEmail();
 
         try
         {
@@ -123,8 +124,8 @@ public class BookingsController : ControllerBase
     [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
     public async Task<ActionResult<BookingDto>> RejectBankPayment(int id, [FromBody] RejectBankPaymentDto dto)
     {
-        var adminId = GetAuthenticatedUserId();
-        var adminEmail = GetAuthenticatedEmail();
+        var adminId = User.GetUserId();
+        var adminEmail = User.GetEmail();
 
         try
         {
@@ -138,23 +139,11 @@ public class BookingsController : ControllerBase
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
-    private string? GetAuthenticatedEmail() =>
-        User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue("email");
-
-    private int? GetAuthenticatedUserId()
-    {
-        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-        return int.TryParse(raw, out var id) ? id : (int?)null;
-    }
-
-    private bool IsAdmin() =>
-        User.IsInRole("SuperAdmin") || User.IsInRole("Admin");
-
     /// <summary>A caller may access a booking if they are an admin or the booking belongs to their email.</summary>
     private bool CanAccess(string bookingEmail)
     {
-        if (IsAdmin()) return true;
-        var email = GetAuthenticatedEmail();
+        if (User.IsAdmin()) return true;
+        var email = User.GetEmail();
         return !string.IsNullOrWhiteSpace(email)
                && string.Equals(email, bookingEmail, StringComparison.OrdinalIgnoreCase);
     }

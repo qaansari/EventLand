@@ -243,6 +243,8 @@ namespace EventLand.Infrastructure.Migrations
                     RoleId = table.Column<int>(type: "int", nullable: false),
                     IsActive = table.Column<bool>(type: "bit", nullable: false),
                     LastLoginAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    AccessFailedCount = table.Column<int>(type: "int", nullable: false),
+                    LockoutEndUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
@@ -686,16 +688,16 @@ namespace EventLand.Infrastructure.Migrations
                 columns: new[] { "Id", "Answer", "CreatedAt", "DisplayOrder", "IsActive", "IsDeleted", "Question", "UpdatedAt" },
                 values: new object[,]
                 {
-                    { 1, "Browse events on EventLand, select your desired city and ticket tier or interactive seat, and complete your booking via direct bank transfer. Once payment is verified by our team, your official digital E-Ticket with QR code is generated instantly.", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), 1, true, false, "How do I book tickets on EventLand?", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc) },
-                    { 2, "Tickets are non-refundable unless an event is cancelled or rescheduled. If an event is cancelled, full refunds are issued within 5 business days.", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), 2, true, false, "What is EventLand's refund policy?", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc) },
-                    { 3, "EventLand features live concerts, comedy shows, bazaars, and theatre across Karachi, Lahore, Islamabad, Rawalpindi, Multan, Faisalabad, and Hyderabad.", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), 3, true, false, "Which major Pakistani cities are covered?", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc) },
+                    { 1, "Browse events on Event Land, select your desired city and ticket tier or interactive seat, and complete your booking via direct bank transfer. Once payment is verified by our team, your official digital E-Ticket with QR code is generated instantly.", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), 1, true, false, "How do I book tickets on Event Land?", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc) },
+                    { 2, "Tickets are non-refundable unless an event is cancelled or rescheduled. If an event is cancelled, full refunds are issued within 5 business days.", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), 2, true, false, "What is Event Land's refund policy?", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc) },
+                    { 3, "Event Land features live concerts, comedy shows, bazaars, and theatre across Karachi, Lahore, Islamabad, Rawalpindi, Multan, Faisalabad, and Hyderabad.", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), 3, true, false, "Which major Pakistani cities are covered?", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc) },
                     { 4, "Yes! Event organizers can list their event using our instant 'List Your Event' portal, set ticket tiers, and start selling tickets to audiences across Pakistan immediately.", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), 4, true, false, "Can I list my own event and sell tickets?", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc) }
                 });
 
             migrationBuilder.InsertData(
                 table: "FooterInfo",
                 columns: new[] { "Id", "Address", "BrandName", "CopyrightText", "Email", "OrganizerSupportUrl", "Phone", "PrivacyPolicyUrl", "Tagline", "TermsOfServiceUrl", "UpdatedAt" },
-                values: new object[] { 1, "Karachi, Pakistan", "EventLand", "© 2026 EventLand Pakistan. All rights reserved.", "support@eventland.pk", "#", "+92 307 9353185", "#", "Event Land is a single, user-friendly platform, we link fans, artists, and organizers for everything from comedy nights to concerts. 🎵🎭", "#", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc) });
+                values: new object[] { 1, "Karachi, Pakistan", "Event Land", "© 2026 Event Land Pakistan. All rights reserved.", "support@eventland.pk", "#", "+92 307 9353185", "#", "Event Land is a single, user-friendly platform, we link fans, artists, and organizers for everything from comedy nights to concerts. 🎵🎭", "#", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc) });
 
             migrationBuilder.InsertData(
                 table: "Organizers",
@@ -737,8 +739,8 @@ namespace EventLand.Infrastructure.Migrations
 
             migrationBuilder.InsertData(
                 table: "Users",
-                columns: new[] { "Id", "CountryId", "CreatedAt", "CreatedBy", "DeletedAt", "Email", "FullName", "ImageUrl", "IsActive", "IsDeleted", "LastLoginAt", "PasswordHash", "PhoneNumber", "RoleId", "UpdatedAt", "UpdatedBy" },
-                values: new object[] { 1, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "admin@eventland.pk", "Super Admin", null, true, false, null, "AQAAAAIAAYagAAAAEJuRZYVt0Vxo3wCpule4RLcu1qynbbLJFRfk/I/jZt2E+SZZzXBlnONUEWbzCe/f3w==", "+92 331 2541767", 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null });
+                columns: new[] { "Id", "AccessFailedCount", "CountryId", "CreatedAt", "CreatedBy", "DeletedAt", "Email", "FullName", "ImageUrl", "IsActive", "IsDeleted", "LastLoginAt", "LockoutEndUtc", "PasswordHash", "PhoneNumber", "RoleId", "UpdatedAt", "UpdatedBy" },
+                values: new object[] { 1, 0, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "admin@eventland.pk", "Super Admin", null, true, false, null, null, "AQAAAAIAAYagAAAAEHmufhGsvmYBwIEyjQ5YdStLNQqn9TFxCdT61rU/W2AWNRPx8HvWLmGl8Ae9b31riw==", "+92 331 2541767", 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Artists_IsFeatured",

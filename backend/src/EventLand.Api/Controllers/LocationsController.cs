@@ -35,7 +35,7 @@ public class LocationsController : ControllerBase
     }
 
     [HttpPost("api/countries")]
-    [Authorize(Roles = "SuperAdmin,Admin,Organizer")]
+    [Authorize(Roles = "SuperAdmin,Admin")]
     public async Task<ActionResult<CountryDto>> CreateCountry([FromBody] CreateCountryDto dto)
     {
         try
@@ -124,7 +124,7 @@ public class LocationsController : ControllerBase
     }
 
     [HttpPost("api/cities")]
-    [Authorize(Roles = "SuperAdmin,Admin,Organizer")]
+    [Authorize(Roles = "SuperAdmin,Admin")]
     public async Task<ActionResult<CityDto>> CreateCity([FromBody] CreateCityDto dto)
     {
         try

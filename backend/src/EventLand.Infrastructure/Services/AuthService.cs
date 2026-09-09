@@ -20,6 +20,8 @@ public class AuthService : IAuthService
     private readonly bool _passwordRequireDigit;
     private readonly bool _passwordRequireUppercase;
     private readonly bool _passwordRequireLowercase;
+    private readonly int _maxLoginAttempts;
+    private readonly int _lockoutDurationMinutes;
 
     public AuthService(
         IApplicationDbContext context,
@@ -38,6 +40,8 @@ public class AuthService : IAuthService
         _passwordRequireDigit = configuration.GetValue<bool>("Security:PasswordRequireDigit", true);
         _passwordRequireUppercase = configuration.GetValue<bool>("Security:PasswordRequireUppercase", true);
         _passwordRequireLowercase = configuration.GetValue<bool>("Security:PasswordRequireLowercase", true);
+        _maxLoginAttempts = configuration.GetValue<int>("Security:MaxLoginAttempts", 5);
+        _lockoutDurationMinutes = configuration.GetValue<int>("Security:LockoutDurationMinutes", 15);
     }
 
     public async Task<LoginResponseDto> LoginAsync(LoginRequestDto dto)
@@ -53,11 +57,34 @@ public class AuthService : IAuthService
         if (user is null || !user.IsActive)
             throw new UnauthorizedAccessException("Invalid email or password.");
 
+        // Check if account is currently locked out
+        if (user.LockoutEndUtc.HasValue && user.LockoutEndUtc.Value > DateTimeOffset.UtcNow)
+        {
+            var remaining = user.LockoutEndUtc.Value - DateTimeOffset.UtcNow;
+            var minutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
+            throw new UnauthorizedAccessException($"Account is temporarily locked due to multiple failed login attempts. Please try again in {minutes} minute(s).");
+        }
+
         var verificationResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.Password);
         if (verificationResult == PasswordVerificationResult.Failed)
-            throw new UnauthorizedAccessException("Invalid email or password.");
+        {
+            user.AccessFailedCount++;
+            if (user.AccessFailedCount >= _maxLoginAttempts)
+            {
+                user.LockoutEndUtc = DateTimeOffset.UtcNow.AddMinutes(_lockoutDurationMinutes);
+                user.AccessFailedCount = 0; // reset counter after triggering lockout
+                await _context.SaveChangesAsync();
+                throw new UnauthorizedAccessException($"Account is temporarily locked due to multiple failed login attempts. Please try again in {_lockoutDurationMinutes} minutes.");
+            }
 
-        // Update last login
+            await _context.SaveChangesAsync();
+            var remainingAttempts = _maxLoginAttempts - user.AccessFailedCount;
+            throw new UnauthorizedAccessException($"Invalid email or password. {remainingAttempts} attempt(s) remaining before temporary lockout.");
+        }
+
+        // On successful login, reset failed count & lockout timer
+        user.AccessFailedCount = 0;
+        user.LockoutEndUtc = null;
         user.LastLoginAt = DateTimeOffset.UtcNow;
         await _context.SaveChangesAsync();
 

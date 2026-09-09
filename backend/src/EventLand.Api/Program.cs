@@ -11,6 +11,19 @@ using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Suppress Kestrel server header to prevent banner enumeration & enforce max request body size
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.AddServerHeader = false;
+    serverOptions.Limits.MaxRequestBodySize = 30 * 1024 * 1024; // 30 MB
+});
+
+// Configure multipart form body length limit
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 30 * 1024 * 1024; // 30 MB
+});
+
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -33,7 +46,7 @@ builder.Services.AddHealthChecks()
         return HealthCheckResult.Healthy();
     });
 
-// Rate limiting: login is strict, general API is more permissive
+// Rate limiting: login is strict, upload is scoped, general API is more permissive
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -54,7 +67,16 @@ builder.Services.AddRateLimiter(options =>
     // Strict rate limiting for authentication endpoints
     options.AddFixedWindowLimiter("login", opt =>
     {
-        opt.PermitLimit = 5;  // Reduced from 10 to 5 for better brute-force protection
+        opt.PermitLimit = 5;  // 5 requests per minute for brute-force protection
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 0;
+    });
+
+    // Rate limiting for file uploads to prevent storage abuse
+    options.AddFixedWindowLimiter("upload", opt =>
+    {
+        opt.PermitLimit = 20;
         opt.Window = TimeSpan.FromMinutes(1);
         opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
         opt.QueueLimit = 0;

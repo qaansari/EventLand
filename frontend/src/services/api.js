@@ -1,3 +1,5 @@
+import { getStoredToken, setStoredSession, clearStoredSession } from '../utils/auth';
+
 const rawBackend = (import.meta.env.VITE_BACKEND_URL || '').trim();
 const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim();
 
@@ -62,7 +64,7 @@ export function getQrCodeImageUrl(qrUrl) {
 }
 
 async function request(endpoint, options = {}) {
-  const token = localStorage.getItem('eventland_jwt_token');
+  const token = getStoredToken();
 
   const headers = {
     'Content-Type': 'application/json',
@@ -83,6 +85,14 @@ async function request(endpoint, options = {}) {
   const response = await fetch(`${BASE_URL}${endpoint}`, config);
 
   if (!response.ok) {
+    // If token is invalid or expired (401), cleanly clear session cache and notify app
+    if (response.status === 401 && !endpoint.includes('/auth/login')) {
+      clearStoredSession();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('eventland:auth-expired'));
+      }
+    }
+
     let errorText = 'API Request Failed';
     try {
       const rawText = await response.text();
@@ -117,7 +127,7 @@ export const authApi = {
       body: JSON.stringify({ email, password })
     });
     if (data.token) {
-      localStorage.setItem('eventland_jwt_token', data.token);
+      setStoredSession(data.token, data.user);
     }
     return data;
   },
@@ -127,7 +137,7 @@ export const authApi = {
       body: JSON.stringify({ fullName, email, password, phoneNumber, countryId })
     });
     if (data.token) {
-      localStorage.setItem('eventland_jwt_token', data.token);
+      setStoredSession(data.token, data.user);
     }
     return data;
   },

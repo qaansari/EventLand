@@ -1,5 +1,6 @@
 namespace EventLand.Api.Controllers.Admin;
 
+using EventLand.Api.Extensions;
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -37,12 +38,12 @@ public class AdminEventsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<EventDetailDto>> CreateEvent([FromBody] CreateAdminEventDto dto)
     {
-        if (User.IsInRole("Organizer") || User.IsInRole("organizer"))
+        if (!User.IsAdmin())
         {
-            var orgClaim = User.FindFirst("organizerId")?.Value;
-            if (int.TryParse(orgClaim, out var parsedOrgId) && parsedOrgId > 0)
+            var orgId = User.GetOrganizerId();
+            if (orgId.HasValue && orgId.Value > 0)
             {
-                dto = dto with { OrganizerId = parsedOrgId };
+                dto = dto with { OrganizerId = orgId.Value };
             }
         }
 
@@ -53,14 +54,32 @@ public class AdminEventsController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<EventDetailDto>> UpdateEvent(int id, [FromBody] UpdateAdminEventDto dto)
     {
-        var updated = await _adminService.UpdateEventAsync(id, dto);
-        return Ok(updated);
+        int? scopedOrgId = User.IsAdmin() ? null : User.GetOrganizerId();
+        if (!User.IsAdmin() && !scopedOrgId.HasValue) return Forbid();
+
+        if (scopedOrgId.HasValue)
+        {
+            dto = dto with { OrganizerId = scopedOrgId.Value };
+        }
+
+        try
+        {
+            var updated = await _adminService.UpdateEventAsync(id, dto, scopedOrgId);
+            return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
     }
 
     [HttpDelete("{id:int}")]
     public async Task<ActionResult> DeleteEvent(int id)
     {
-        var success = await _adminService.DeleteEventAsync(id);
+        int? scopedOrgId = User.IsAdmin() ? null : User.GetOrganizerId();
+        if (!User.IsAdmin() && !scopedOrgId.HasValue) return Forbid();
+
+        var success = await _adminService.DeleteEventAsync(id, scopedOrgId);
         if (!success) return NotFound();
         return NoContent();
     }

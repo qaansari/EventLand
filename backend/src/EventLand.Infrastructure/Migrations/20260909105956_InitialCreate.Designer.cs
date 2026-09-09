@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EventLand.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260908104315_InitialCreate")]
+    [Migration("20260909105956_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -796,12 +796,12 @@ namespace EventLand.Infrastructure.Migrations
                         new
                         {
                             Id = 1,
-                            Answer = "Browse events on EventLand, select your desired city and ticket tier or interactive seat, and complete your booking via direct bank transfer. Once payment is verified by our team, your official digital E-Ticket with QR code is generated instantly.",
+                            Answer = "Browse events on Event Land, select your desired city and ticket tier or interactive seat, and complete your booking via direct bank transfer. Once payment is verified by our team, your official digital E-Ticket with QR code is generated instantly.",
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DisplayOrder = 1,
                             IsActive = true,
                             IsDeleted = false,
-                            Question = "How do I book tickets on EventLand?",
+                            Question = "How do I book tickets on Event Land?",
                             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -812,13 +812,13 @@ namespace EventLand.Infrastructure.Migrations
                             DisplayOrder = 2,
                             IsActive = true,
                             IsDeleted = false,
-                            Question = "What is EventLand's refund policy?",
+                            Question = "What is Event Land's refund policy?",
                             UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = 3,
-                            Answer = "EventLand features live concerts, comedy shows, bazaars, and theatre across Karachi, Lahore, Islamabad, Rawalpindi, Multan, Faisalabad, and Hyderabad.",
+                            Answer = "Event Land features live concerts, comedy shows, bazaars, and theatre across Karachi, Lahore, Islamabad, Rawalpindi, Multan, Faisalabad, and Hyderabad.",
                             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DisplayOrder = 3,
                             IsActive = true,
@@ -895,8 +895,8 @@ namespace EventLand.Infrastructure.Migrations
                         {
                             Id = 1,
                             Address = "Karachi, Pakistan",
-                            BrandName = "EventLand",
-                            CopyrightText = "© 2026 EventLand Pakistan. All rights reserved.",
+                            BrandName = "Event Land",
+                            CopyrightText = "© 2026 Event Land Pakistan. All rights reserved.",
                             Email = "support@eventland.pk",
                             OrganizerSupportUrl = "#",
                             Phone = "+92 307 9353185",
@@ -1425,6 +1425,9 @@ namespace EventLand.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
 
+                    b.Property<int>("AccessFailedCount")
+                        .HasColumnType("int");
+
                     b.Property<int?>("CountryId")
                         .HasColumnType("int");
 
@@ -1458,6 +1461,9 @@ namespace EventLand.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<DateTimeOffset?>("LastLoginAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("LockoutEndUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("PasswordHash")
@@ -1500,12 +1506,13 @@ namespace EventLand.Infrastructure.Migrations
                         new
                         {
                             Id = 1,
+                            AccessFailedCount = 0,
                             CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             Email = "admin@eventland.pk",
                             FullName = "Super Admin",
                             IsActive = true,
                             IsDeleted = false,
-                            PasswordHash = "AQAAAAIAAYagAAAAEJuRZYVt0Vxo3wCpule4RLcu1qynbbLJFRfk/I/jZt2E+SZZzXBlnONUEWbzCe/f3w==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEHmufhGsvmYBwIEyjQ5YdStLNQqn9TFxCdT61rU/W2AWNRPx8HvWLmGl8Ae9b31riw==",
                             PhoneNumber = "+92 331 2541767",
                             RoleId = 1,
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))

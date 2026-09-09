@@ -37,7 +37,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
   // Active Bank Account from DB
   const [bankAccount, setBankAccount] = useState({
     bankName: 'Meezan Bank Limited',
-    accountTitle: 'EventLand Official Pvt Ltd',
+    accountTitle: 'Event Land Official Pvt Ltd',
     accountNumber: '0102030405060701',
     iban: 'PK64MEZN0001020304050607',
     branchCode: '0102',
