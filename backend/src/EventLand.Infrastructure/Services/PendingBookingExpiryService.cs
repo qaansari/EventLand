@@ -91,6 +91,9 @@ public sealed class PendingBookingExpiryService : BackgroundService
 
         if (expiredBookings.Count == 0) return;
 
+        // Collect seat IDs grouped by eventId for batched cache release
+        var seatsByEvent = new Dictionary<int, List<int>>();
+
         foreach (var booking in expiredBookings)
         {
             booking.PaymentStatus = PaymentStatus.Expired;
@@ -109,21 +112,37 @@ public sealed class PendingBookingExpiryService : BackgroundService
                 }
             }
 
+            // Group seat IDs by eventId for batched Redis release below
             var seatIds = booking.BookingSeats.Select(bs => bs.SeatId).ToList();
-            if (seatIds.Count > 0 && cacheService != null)
+            if (seatIds.Count > 0)
             {
-                try
-                {
-                    await cacheService.ReleaseSeatsAsync(booking.EventId, seatIds, null);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Could not release cache lock for booking {BookingRef}", booking.BookingRef);
-                }
+                if (!seatsByEvent.ContainsKey(booking.EventId))
+                    seatsByEvent[booking.EventId] = new List<int>();
+                seatsByEvent[booking.EventId].AddRange(seatIds);
             }
         }
 
+        // Flush all DB changes in a single round-trip
         await context.SaveChangesAsync(cancellationToken);
+
+        // Batch release: one ReleaseSeatsAsync + one ClearEventCacheAsync per unique event
+        if (cacheService != null)
+        {
+            var cacheTasks = seatsByEvent.Select(async kvp =>
+            {
+                try
+                {
+                    await cacheService.ReleaseSeatsAsync(kvp.Key, kvp.Value, null);
+                    await cacheService.ClearEventCacheAsync(kvp.Key);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not release cache locks for EventId {EventId}", kvp.Key);
+                }
+            });
+            await Task.WhenAll(cacheTasks);
+        }
+
         _logger.LogInformation("Expired {Count} pending bookings exceeding 30-minute hold window. Seats returned to pool.", expiredBookings.Count);
     }
 }

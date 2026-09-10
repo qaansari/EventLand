@@ -119,10 +119,8 @@ public class RedisCacheService : ICacheService
             .Where(k => k.StartsWith(prefixKey, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        foreach (var key in matchingKeys)
-        {
-            await RemoveAsync(key);
-        }
+        // Remove all matching keys in parallel to reduce Redis round-trip latency
+        await Task.WhenAll(matchingKeys.Select(key => RemoveAsync(key)));
     }
 
     public async Task ClearEventCacheAsync(int? eventId = null)

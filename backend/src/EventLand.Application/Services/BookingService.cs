@@ -92,11 +92,17 @@ public class BookingService : IBookingService
         var effectiveEmail = string.IsNullOrWhiteSpace(userEmail) ? dto.CustomerEmail : userEmail;
 
         // Collision-safe booking reference: CSPRNG + uniqueness check before insert.
-        string bookingRef;
-        do
+        // Cap iterations at 100 to prevent infinite loops under adversarial collision flooding.
+        string bookingRef = string.Empty;
+        const int maxAttempts = 100;
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
             bookingRef = $"EVL-{System.Security.Cryptography.RandomNumberGenerator.GetInt32(100000, 1000000)}";
-        } while (await _context.Bookings.AnyAsync(b => b.BookingRef == bookingRef));
+            if (!await _context.Bookings.AnyAsync(b => b.BookingRef == bookingRef))
+                break;
+            if (attempt == maxAttempts - 1)
+                throw new InvalidOperationException("Failed to generate a unique booking reference after multiple attempts. Please try again.");
+        }
 
         // Exactly 30-minute reservation hold window for bank transfer
         var holdExpiresAt = DateTimeOffset.UtcNow.AddMinutes(30);
@@ -332,12 +338,15 @@ public class BookingService : IBookingService
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+
         var query = _context.Bookings
             .AsNoTracking()
             .Include(x => x.Event).ThenInclude(e => e!.Venue)
             .Include(x => x.TicketTier)
             .Include(x => x.BookingSeats).ThenInclude(bs => bs.Seat)
-            .Where(b => b.CustomerEmail.ToLower() == email.ToLower() && !b.IsDeleted);
+            // Use EF.Functions.Like for a sargable, index-friendly case-insensitive comparison
+            .Where(b => EF.Functions.Like(b.CustomerEmail, normalizedEmail) && !b.IsDeleted);
 
         var totalCount = await query.CountAsync();
 

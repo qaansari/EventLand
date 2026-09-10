@@ -20,12 +20,14 @@ using SkiaSharp;
 public class UploadController : ControllerBase
 {
     private readonly IWebHostEnvironment _environment;
+    private readonly ILogger<UploadController> _logger;
     private const long MaxFileSizeInBytes = 25 * 1024 * 1024; // Allow uploads up to 25 MB before compression
     private const long OneMbInBytes = 1 * 1024 * 1024; // 1 MB target threshold
 
-    public UploadController(IWebHostEnvironment environment)
+    public UploadController(IWebHostEnvironment environment, ILogger<UploadController> logger)
     {
         _environment = environment;
+        _logger = logger;
     }
 
     [HttpPost]
@@ -182,9 +184,10 @@ public class UploadController : ControllerBase
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore file delete errors safely
+            // Log file delete failures for diagnostics — do not abort the upload
+            _logger.LogWarning(ex, "Failed to delete existing file before overwrite: {FilePath}", targetFileName);
         }
 
         var filePath = Path.Combine(targetFolder, targetFileName);

@@ -67,7 +67,13 @@
 
 ## Database Schema & Migrations
 
-- **Consolidated Migration**: The entire database schema is represented by a single clean migration: `20260909105956_InitialCreate`.
+- **Database Migrations**:
+  - `20260909105956_InitialCreate`: Consolidated baseline schema migration.
+  - `20260910063614_AddTicketTierEventShowIndex`: Performance indexes including composite index on `TicketTiers(EventId, EventShowId)`.
+- **Database Index Optimizations**:
+  - `Events`: Composite index on `(IsPublished, IsDeleted, StartDateUtc)` for fast public listing and date-range queries.
+  - `Users`: Unique index on `Email` to guarantee identity uniqueness and optimize login lookups.
+  - `TicketTiers`: Composite index on `(EventId, EventShowId)` optimizing tier queries partitioned by specific show dates.
 - **Primary Key Convention**: All domain entities inherit from `BaseEntity` with 4-digit integer IDs seeded at `1000`.
 - **Soft Delete**: Global EF Core Query Filter (`!IsDeleted`) automatically applied to all entities inheriting `BaseEntity`.
 - **Audit Fields**: `CreatedAt`, `UpdatedAt`, `CreatedBy`, `UpdatedBy`, `IsDeleted`, `DeletedAt` are auto-populated in `ApplicationDbContext.SaveChangesAsync()`.
@@ -85,7 +91,8 @@
 1. **Authentication & Role Authorization**:
    - Public bank endpoints return safe projections without admin internal operational metadata.
    - Bank details and payment status checks are guarded with `[Authorize]` and ownership verification.
-   - Admin endpoints use normalized role policies: `[Authorize(Roles = "SuperAdmin,Admin")]`.
+   - Admin endpoints use normalized PascalCase role policies: `[Authorize(Roles = "SuperAdmin,Admin")]`.
+   - SuperAdmin default fallback credentials contain production-environment detection and high-severity security warnings.
    - Account lockout enforcement: 5 consecutive failed login attempts trigger a 15-minute temporary account lockout (`AccessFailedCount`, `LockoutEndUtc`) with clear remaining attempt feedback.
    - Organizer IDOR / BOLA defenses: Organizers are strictly constrained to viewing, updating, and managing their own events and bookings. Organizers cannot delete bookings or alter events of other organizers.
    - Country and City creation restricted to SuperAdmin and Admin.
@@ -95,19 +102,44 @@
    - Security headers middleware enforces `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection: 1; mode=block`, `Cross-Origin-Opener-Policy: same-origin-allow-popups`, `Cross-Origin-Resource-Policy: cross-origin`, and strict CSP headers.
    - Kestrel server banner suppression (`AddServerHeader = false`) and 30 MB maximum request body limits.
    - `UploadController` enforces role-scoped uploads: Customers can only upload payment slips (`type=slip`) and avatars (`type=user`). Bank QR codes require Admin; event banners, logos, and artist photos require Organizer/Admin.
+   - Injected `ILogger<UploadController>` records structured warnings if physical file deletion fails on disk.
    - Rate limiting on file uploads (20 req/min) prevents storage exhaustion attacks.
    - Matching query filters on `BookingSeat` and `EventTag` join entities resolve EF Core model validation warnings.
    - User Registration (`AuthService`), Self-Registration Modal (`AuthModal.jsx`), and Admin User Management (`AdminService` & `AdminDashboard.jsx`) strictly enforce unique Email and unique Phone Number validations on both backend database (`IX_Users_Email`, `IX_Users_PhoneNumber`) and frontend UI forms.
 3. **Frontend Session Integrity & Route Guards**:
    - Initial app load verifies stored JWT session with `/api/auth/me`. Tampered or expired sessions are cleanly flushed.
    - Reusable auth module (`frontend/src/utils/auth.js`) centralizes session storage (`getStoredToken`, `setStoredSession`, `clearStoredSession`), role normalization (`normalizeRole`), and boolean access checks (`isAdmin`, `isOrganizer`).
+   - Direct `localStorage` calls in file uploads refactored to centralized `getStoredToken()`.
+   - Dynamic host resolution in `api.js` replacing hardcoded ngrok fallbacks; query string parameters (such as customer emails) are sanitized with `encodeURIComponent`.
    - Automatic 401 interception in `api.js` clears zombie localStorage tokens and dispatches an auth-expired event.
    - Frontend route guards enforce role permissions on `admin` and `organizer` views.
    - Interactive password strength criteria indicators in `AuthModal.jsx` guide users to meet the 10+ character complexity rules on signup.
+   - Vite dev proxy target reads from `.env.local` / `VITE_BACKEND_URL` dynamically.
 4. **Code Reusability, Scalability & Architecture**:
-   - Reusable `ClaimsPrincipalExtensions` (`backend/src/EventLand.Api/Extensions/ClaimsPrincipalExtensions.cs`) standardizes claims parsing (`GetUserId`, `GetEmail`, `GetOrganizerId`, `IsAdmin`, `IsOrganizer`, `IsSuperAdmin`) across all API controllers, eliminating duplicated identity extraction logic.
+   - **Global Exception Middleware Ordering**: Moved `app.UseCustomExceptionHandler()` before `app.UseRouting()` in `Program.cs` to ensure uniform JSON responses for routing and endpoint pipeline exceptions.
+   - **Null Reference Guards**: Added null-safe navigation and fallbacks for `bs.Seat` in `AdminService.MapBookingToDto` and `ev.Organizer` in `AdminService.GetEventDetailDtoAsync`.
+   - **Booking Reference Generation Guard**: Capped reference generation attempts (`maxAttempts = 10`) in `BookingService.cs` to eliminate infinite recursion/loop risk under concurrency.
+   - **Clean Architecture Compliance**: `PaymentController` injects `IApplicationDbContext` rather than concrete `ApplicationDbContext`.
+   - **Parallel Redis Invalidation**: `RemoveByPrefixAsync` parallelizes key deletions across clusters via `Task.WhenAll`.
+   - **Batch Seat Release in Background Expiry**: `PendingBookingExpiryService` groups expired seats by `EventId` and fires consolidated notifications, avoiding broadcast stampedes.
+   - **Database Round-Trip Minimization**: Show synchronization in `AdminService.UpdateEventAsync` batches show updates into a single `SaveChangesAsync()` call.
+   - **Sargable Query Optimization**: `BookingService.GetBookingsByEmailAsync` leverages EF Core case-insensitive comparisons instead of non-sargable LINQ `.ToLower()` calls.
    - Single-query SQL-level authorization scoping: `IAdminService` methods (`UpdateEventAsync`, `DeleteEventAsync`, `GetBookingByIdAsync`, `UpdateBookingStatusAsync`) accept optional `int? organizerId = null`, eliminating redundant DB queries and cutting database round-trips by 50% for organizer actions.
    - Matching soft-delete query filters on `BookingSeat` (`!bs.Booking.IsDeleted`) and `EventTag` (`!et.Event.IsDeleted`) prevent orphaned joins and eliminate EF Core navigation warnings.
+
+---
+
+## Deployment & Hosting Architecture
+
+### Windows Server 2022 VPS Recommendation (HosterPK)
+- **Documented in**: `vps_hosting_recommendation.html` & `EventLand_Windows_VPS_Hosting_Recommendation.pdf`.
+- **Recommended Plan**: **Standard VPS (4 vCPU, 8 GB RAM, 100 GB NVMe)**.
+- **Components Co-hosted**:
+  - IIS 10 + ASP.NET Core Hosting Bundle (.NET 10).
+  - SQL Server Express / Developer (capped at 1.4 GB RAM for Express, or 4 GB instance cap).
+  - Memurai / Redis for Windows (512 MB memory limit).
+  - React SPA served as pre-built static assets via IIS URL Rewrite or reverse-proxied.
+  - Automatic Let's Encrypt SSL via Win-ACME.
 
 ---
 
@@ -121,19 +153,23 @@ dotnet run
 
 ### Build Check (Backend & Frontend)
 ```powershell
-# Backend
-dotnet build d:\EventLand\backend\src\EventLand.Api
+# Backend Solution (.NET 10)
+dotnet build d:\EventLand\backend\EventLand.slnx
 
-# Frontend
+# Frontend Production Build (React + Vite)
 cd d:\EventLand\frontend
-npx vite build
+npm run build
 ```
 
-### Database Migration Update
+### Database Migration Commands
 ```powershell
+# Add Migration
+dotnet ef migrations add <MigrationName> --project backend/src/EventLand.Infrastructure --startup-project backend/src/EventLand.Api
+
+# Update Database
 dotnet ef database update --project backend/src/EventLand.Infrastructure --startup-project backend/src/EventLand.Api
 ```
 
 ---
-*Last Updated: September 2026 (Full-Stack Security Hardening, Reusable Architecture & Scalability Completed)*
+*Last Updated: September 2026 (Full-Stack Security Hardening, Database Indexes, Performance Optimization, Reusable Architecture & VPS Hosting Guide Completed)*
 

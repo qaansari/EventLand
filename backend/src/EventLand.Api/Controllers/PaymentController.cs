@@ -4,10 +4,10 @@ using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using EventLand.Api.Extensions;
+using EventLand.Application.Common.Interfaces;
 using EventLand.Application.Interfaces;
 using EventLand.Domain.Entities;
 using EventLand.Domain.Enums;
-using EventLand.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -27,10 +27,10 @@ public record ProcessBankRefundResponseDto(
 [Route("api/payments")]
 public class PaymentController : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IApplicationDbContext _context;
     private readonly ICacheService? _cacheService;
 
-    public PaymentController(ApplicationDbContext context, ICacheService? cacheService = null)
+    public PaymentController(IApplicationDbContext context, ICacheService? cacheService = null)
     {
         _context = context;
         _cacheService = cacheService;

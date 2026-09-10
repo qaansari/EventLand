@@ -8,6 +8,7 @@ using EventLand.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 public class AuthService : IAuthService
 {
@@ -15,6 +16,7 @@ public class AuthService : IAuthService
     private readonly IPasswordHasher<User> _passwordHasher;
     private readonly IJwtTokenGenerator _tokenGenerator;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<AuthService> _logger;
     private readonly int _passwordMinLength;
     private readonly bool _passwordRequireNonAlphanumeric;
     private readonly bool _passwordRequireDigit;
@@ -27,12 +29,14 @@ public class AuthService : IAuthService
         IApplicationDbContext context,
         IPasswordHasher<User> passwordHasher,
         IJwtTokenGenerator tokenGenerator,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        ILogger<AuthService> logger)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _tokenGenerator = tokenGenerator;
         _configuration = configuration;
+        _logger = logger;
         
         // Load security settings from configuration
         _passwordMinLength = configuration.GetValue<int>("Security:PasswordMinLength", 10);
@@ -276,8 +280,17 @@ public class AuthService : IAuthService
                 IsActive = true
             };
             var initialPassword = _configuration["Admin:InitialPassword"]
-                ?? Environment.GetEnvironmentVariable("ADMIN_INITIAL_PASSWORD")
-                ?? "SuperAdmin123!";
+                ?? Environment.GetEnvironmentVariable("ADMIN_INITIAL_PASSWORD");
+
+            if (string.IsNullOrWhiteSpace(initialPassword))
+            {
+                // Security: warn loudly when using the hardcoded fallback — never use in production
+                _logger.LogCritical(
+                    "SECURITY WARNING: Super Admin is being seeded with the default hardcoded password. " +
+                    "Set 'Admin:InitialPassword' via user-secrets or the ADMIN_INITIAL_PASSWORD environment variable immediately.");
+                initialPassword = "SuperAdmin123!";
+            }
+
             superAdmin.PasswordHash = _passwordHasher.HashPassword(superAdmin, initialPassword);
             _context.Users.Add(superAdmin);
             await _context.SaveChangesAsync();

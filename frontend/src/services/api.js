@@ -10,20 +10,29 @@ const isProductionDomain =
   window.location.hostname !== '127.0.0.1';
 
 // In local dev: use empty string so every call uses a relative path (/api/...) and
-// Vite's dev-server proxy forwards it to the backend. This avoids the CORS preflight
-// that fires when the browser directly hits the cross-origin ngrok URL.
-// In production: fall back to the configured env var or the ngrok URL.
-export const BACKEND_URL = isProductionDomain
-  ? ((!rawBackend || rawBackend.includes('localhost'))
-      ? 'https://celiac-briley-commandingly.ngrok-free.dev'
-      : rawBackend)
-  : (rawBackend.includes('localhost') ? '' : rawBackend);
+// Vite's dev-server proxy forwards it to the backend.
+// In production: use the configured env var. If not set, emit a warning — do NOT
+// fall back to a hardcoded ngrok URL that will be gone after the tunnel closes.
+const resolveBackendUrl = () => {
+  if (!isProductionDomain) {
+    return rawBackend && !rawBackend.includes('localhost') ? rawBackend : '';
+  }
+  if (!rawBackend || rawBackend.includes('localhost')) {
+    console.warn(
+      '[EventLand] VITE_BACKEND_URL is not configured for production. ' +
+      'Set VITE_BACKEND_URL to your backend domain in the deployment environment.'
+    );
+    return '';
+  }
+  return rawBackend;
+};
 
-export const BASE_URL = isProductionDomain
-  ? ((!rawApiUrl || rawApiUrl.includes('localhost'))
-      ? `${BACKEND_URL}/api`
-      : rawApiUrl)
-  : (rawApiUrl && !rawApiUrl.includes('localhost') ? rawApiUrl : `${BACKEND_URL}/api`);
+export const BACKEND_URL = resolveBackendUrl();
+
+export const BASE_URL = (() => {
+  if (rawApiUrl && !rawApiUrl.includes('localhost')) return rawApiUrl;
+  return `${BACKEND_URL}/api`;
+})();
 
 export const SERVER_BASE = BASE_URL.replace(/\/api\/?$/, '') || BACKEND_URL;
 
@@ -206,7 +215,7 @@ export const bookingsApi = {
   }),
   getBookingById: async (id) => request(`/bookings/${id}`),
   getBookingByRef: async (ref) => request(`/bookings/ref/${ref}`),
-  getBookingsByEmail: async (email, pageNumber = 1, pageSize = 10) => request(`/bookings/user/${email}?pageNumber=${pageNumber}&pageSize=${pageSize}`),
+  getBookingsByEmail: async (email, pageNumber = 1, pageSize = 10) => request(`/bookings/user/${encodeURIComponent(email)}?pageNumber=${pageNumber}&pageSize=${pageSize}`),
   submitPaymentProof: async (id, dto) => request(`/bookings/${id}/submit-proof`, {
     method: 'POST',
     body: JSON.stringify(dto)
@@ -365,7 +374,8 @@ export const uploadApi = {
 
     const formData = new FormData();
     formData.append('file', file);
-    const token = localStorage.getItem('eventland_jwt_token');
+    // Use canonical getStoredToken() so the storage key is managed in one place (utils/auth.js)
+    const token = getStoredToken();
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 

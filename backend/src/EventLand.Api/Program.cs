@@ -157,12 +157,13 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-app.UseRouting();
-app.UseCors("AllowFrontend");
-
-// Global Exception Handler & Security Headers
+// Global Exception Handler & Security Headers must be FIRST so they catch
+// exceptions from every subsequent middleware (routing, auth, rate limiting, etc.)
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 app.UseMiddleware<SecurityHeadersMiddleware>();
+
+app.UseRouting();
+app.UseCors("AllowFrontend");
 
 // Enable Swagger & Swagger UI only in Development (Served at application root http://localhost:4257/)
 if (app.Environment.IsDevelopment())

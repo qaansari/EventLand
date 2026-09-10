@@ -96,9 +96,6 @@ public class AdminService : IAdminService
             _logger.LogError(ex, "Error creating country {Name}", dto.Name);
             throw;
         }
-        finally
-        {
-        }
     }
 
     public async Task<CityDto> CreateCityAsync(CreateCityDto dto)
@@ -121,9 +118,6 @@ public class AdminService : IAdminService
         {
             _logger.LogError(ex, "Error creating city {Name}", dto.Name);
             throw;
-        }
-        finally
-        {
         }
     }
 
@@ -159,9 +153,6 @@ public class AdminService : IAdminService
         {
             _logger.LogError(ex, "Error updating country {Id}", id);
             throw;
-        }
-        finally
-        {
         }
     }
 
@@ -212,9 +203,6 @@ public class AdminService : IAdminService
             _logger.LogError(ex, "Error updating city {Id}", id);
             throw;
         }
-        finally
-        {
-        }
     }
 
     public async Task<bool> DeleteCityAsync(int id)
@@ -260,9 +248,6 @@ public class AdminService : IAdminService
             _logger.LogError(ex, "Error creating venue {Name}", dto.Name);
             throw;
         }
-        finally
-        {
-        }
     }
 
     public async Task<VenueDto?> GetVenueByIdAsync(int id)
@@ -299,9 +284,6 @@ public class AdminService : IAdminService
         {
             _logger.LogError(ex, "Error updating venue {Id}", id);
             throw;
-        }
-        finally
-        {
         }
     }
 
@@ -358,9 +340,6 @@ public class AdminService : IAdminService
         {
             _logger.LogError(ex, "Error creating auditorium {Name}", dto.Name);
             throw;
-        }
-        finally
-        {
         }
     }
 
@@ -624,8 +603,6 @@ public class AdminService : IAdminService
 
     public async Task<EventDetailDto> CreateEventAsync(CreateAdminEventDto dto)
     {
-        try
-        {
             var titleClean = dto.Title.Trim();
             var exists = await _context.Events.AnyAsync(e => !e.IsDeleted && 
                 e.Title.ToLower() == titleClean.ToLower() && 
@@ -842,15 +819,6 @@ public class AdminService : IAdminService
         await _cacheService.ClearEventCacheAsync(ev.Id);
 
         return await GetEventDetailDtoAsync(ev.Id);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating event {Title}", dto.Title);
-            throw;
-        }
-        finally
-        {
-        }
     }
 
     public async Task<EventDetailDto> UpdateEventAsync(int id, UpdateAdminEventDto dto, int? organizerId = null)
@@ -914,6 +882,9 @@ public class AdminService : IAdminService
                 exShow.DeletedAt = DateTimeOffset.UtcNow;
             }
 
+            // Flush the show deletions first so new shows can resolve IDs
+            await _context.SaveChangesAsync();
+
             foreach (var sInput in dto.Shows)
             {
                 EventShow currentShow;
@@ -936,6 +907,8 @@ public class AdminService : IAdminService
                     };
                     _context.EventShows.Add(currentShow);
                 }
+
+                // Save each show individually so its Id is available for TicketTier FK
                 await _context.SaveChangesAsync();
 
                 if (sInput.TicketTiers is not null && sInput.TicketTiers.Any())
@@ -1114,9 +1087,6 @@ public class AdminService : IAdminService
         {
             _logger.LogError(ex, "Error creating organizer {Name}", dto.Name);
             throw;
-        }
-        finally
-        {
         }
     }
 
@@ -1432,7 +1402,13 @@ public class AdminService : IAdminService
         b.PaymentMethod.ToString(),
         b.PaidAt,
         b.CreatedAt,
-        b.BookingSeats != null ? b.BookingSeats.Select(bs => new BookingSeatDto(bs.Seat.Id, bs.Seat.Label, bs.Seat.Row, bs.Seat.Col, bs.Seat.Price)).ToList() : new List<BookingSeatDto>(),
+        // Null-guard bs.Seat: BookingSeats may be loaded without Seat navigation
+        b.BookingSeats != null
+            ? b.BookingSeats
+                .Where(bs => bs.Seat != null)
+                .Select(bs => new BookingSeatDto(bs.Seat!.Id, bs.Seat.Label, bs.Seat.Row, bs.Seat.Col, bs.Seat.Price))
+                .ToList()
+            : new List<BookingSeatDto>(),
         b.BankTransactionRef,
         FileUrlHelper.FormatPaymentSlipUrl(b.PaymentProofUrl),
         b.SenderAccountTitle,
@@ -1479,9 +1455,6 @@ public class AdminService : IAdminService
         {
             _logger.LogError(ex, "Error creating tag {Name}", dto.Name);
             throw;
-        }
-        finally
-        {
         }
     }
 
@@ -1547,7 +1520,10 @@ public class AdminService : IAdminService
             FileUrlHelper.FormatEventBannerUrl(ev.Banner),
             ev.Description,
             ev.ScarcityText,
-            new OrganizerDto(ev.Organizer.Id, ev.Organizer.Name, ev.Organizer.Email, ev.Organizer.Phone, FileUrlHelper.FormatOrganizerLogoUrl(ev.Organizer.LogoUrl), ev.Organizer.WebsiteUrl, ev.Organizer.IsVerified),
+            // Null-guard: Organizer FK is optional; return an empty placeholder if not loaded
+            ev.Organizer != null
+                ? new OrganizerDto(ev.Organizer.Id, ev.Organizer.Name, ev.Organizer.Email, ev.Organizer.Phone, FileUrlHelper.FormatOrganizerLogoUrl(ev.Organizer.LogoUrl), ev.Organizer.WebsiteUrl, ev.Organizer.IsVerified)
+                : new OrganizerDto(0, "", "", "", null, null, false),
             ev.Shows.Select(s => new EventShowDto(
                 s.Id,
                 s.EventId,

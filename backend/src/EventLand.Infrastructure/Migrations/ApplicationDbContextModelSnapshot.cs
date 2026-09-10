@@ -1405,6 +1405,9 @@ namespace EventLand.Infrastructure.Migrations
 
                     b.HasIndex("EventShowId");
 
+                    b.HasIndex("EventId", "EventShowId")
+                        .HasDatabaseName("IX_TicketTiers_EventId_EventShowId");
+
                     b.HasIndex("EventId", "SortOrder")
                         .HasDatabaseName("IX_TicketTiers_EventId_SortOrder");
 
@@ -1509,7 +1512,7 @@ namespace EventLand.Infrastructure.Migrations
                             FullName = "Super Admin",
                             IsActive = true,
                             IsDeleted = false,
-                            PasswordHash = "AQAAAAIAAYagAAAAEHmufhGsvmYBwIEyjQ5YdStLNQqn9TFxCdT61rU/W2AWNRPx8HvWLmGl8Ae9b31riw==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEHlvRJk+0aGoMT+j70pF93yX5wjh0ewSxoIVz0qx59qFpv6f7Auqsom9HDU+wn0EFA==",
                             PhoneNumber = "+92 331 2541767",
                             RoleId = 1,
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
