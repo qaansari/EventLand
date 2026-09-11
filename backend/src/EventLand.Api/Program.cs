@@ -5,11 +5,36 @@ using EventLand.Application.Interfaces;
 using EventLand.Infrastructure;
 using EventLand.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Forwarded Headers for reverse proxies (IIS, Nginx, Cloudflare, Docker)
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// Response compression for optimal network scalability (Brotli & Gzip)
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[]
+    {
+        "application/json",
+        "application/javascript",
+        "text/css",
+        "text/plain"
+    });
+});
 
 // Suppress Kestrel server header to prevent banner enumeration & enforce max request body size
 builder.WebHost.ConfigureKestrel(serverOptions =>
@@ -157,10 +182,15 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Forwarded headers must run before any middleware relying on remote IP (rate limiting, logging)
+app.UseForwardedHeaders();
+
 // Global Exception Handler & Security Headers must be FIRST so they catch
 // exceptions from every subsequent middleware (routing, auth, rate limiting, etc.)
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 app.UseMiddleware<SecurityHeadersMiddleware>();
+
+app.UseResponseCompression();
 
 app.UseRouting();
 app.UseCors("AllowFrontend");
@@ -176,7 +206,15 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseStaticFiles();
+// Serve static files with aggressive client/CDN caching headers for high performance
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        // Static assets (images, logos, QR codes, avatars) are cached for 7 days
+        ctx.Context.Response.Headers.Append("Cache-Control", "public,max-age=604800,immutable");
+    }
+});
 
 // Health endpoints — must be mapped before auth so probes work without credentials
 app.MapHealthChecks("/health");

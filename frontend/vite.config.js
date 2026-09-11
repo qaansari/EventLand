@@ -43,6 +43,33 @@ export default defineConfig(({ mode }) => {
           headers: { 'ngrok-skip-browser-warning': '1' }
         }
       }
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('react-dom')) {
+                return 'vendor-react';
+              }
+              if (id.includes('@microsoft/signalr')) {
+                return 'vendor-signalr';
+              }
+              if (id.includes('lucide-react')) {
+                return 'vendor-lucide';
+              }
+              if (id.includes('html2pdf')) {
+                return 'vendor-pdf';
+              }
+              if (id.includes('dompurify') || id.includes('qrcode')) {
+                return 'vendor-utils';
+              }
+              return 'vendor';
+            }
+          }
+        }
+      },
+      chunkSizeWarningLimit: 600
     }
   };
 })

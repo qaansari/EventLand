@@ -38,6 +38,8 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
         <img
           src={getEventImageUrl(event.banner)}
           alt={`${event.title} live event banner - ${event.cityName || event.city || 'Pakistan'}`}
+          loading="lazy"
+          decoding="async"
           style={{
             width: '100%',
             height: '100%',
