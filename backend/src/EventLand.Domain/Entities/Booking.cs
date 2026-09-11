@@ -28,10 +28,14 @@ public class Booking : BaseEntity
     public string       CustomerEmail   { get; set; } = string.Empty;
     public string       CustomerPhone   { get; set; } = string.Empty;
 
-    // Ticket details
-    public int          Quantity        { get; set; } = 1;
-    public decimal      UnitPrice       { get; set; }
-    public decimal      TotalAmount     { get; set; } // Canonical total ticket amount
+    // Ticket details & Authoritative Pricing Snapshot
+    public int          Quantity                 { get; set; } = 1;
+    public decimal      UnitPrice                { get; set; }
+    public decimal      SubtotalAmount           { get; set; } // Raw ticket price before fees (Quantity * UnitPrice or Sum of seats)
+    public decimal      PlatformFee              { get; set; } // EventLand platform tier fee (49/99/149/199 PKR)
+    public decimal      PaymentProcessingFee     { get; set; } // Payment gateway processing fee
+    public decimal      FeePercentageAtPurchase  { get; set; } // Snapshot of % fee at checkout (e.g. 2.80% or 0.80%)
+    public decimal      TotalAmount              { get; set; } // Final total payable: Subtotal + PlatformFee + ProcessingFee
 
     // Status & payment
     public BookingStatus  Status          { get; set; } = BookingStatus.Pending;
@@ -57,5 +61,6 @@ public class Booking : BaseEntity
     public string?        RefundReason         { get; set; }
 
     // Navigation
-    public ICollection<BookingSeat> BookingSeats { get; set; } = new List<BookingSeat>();
+    public ICollection<BookingSeat>        BookingSeats        { get; set; } = new List<BookingSeat>();
+    public ICollection<PaymentTransaction> PaymentTransactions { get; set; } = new List<PaymentTransaction>();
 }

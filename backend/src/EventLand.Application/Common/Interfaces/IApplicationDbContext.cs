@@ -27,6 +27,8 @@ public interface IApplicationDbContext
     DbSet<FooterInfo>  FooterInfo   { get; }
     DbSet<RefundRecord> RefundRecords { get; }
     DbSet<BankAccount> BankAccounts { get; }
+    DbSet<PaymentConfig> PaymentConfigs { get; }
+    DbSet<PaymentTransaction> PaymentTransactions { get; }
 
     DatabaseFacade Database { get; }
 

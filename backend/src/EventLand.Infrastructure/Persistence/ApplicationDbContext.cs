@@ -34,6 +34,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<FooterInfo>  FooterInfo   => Set<FooterInfo>();
     public DbSet<RefundRecord> RefundRecords => Set<RefundRecord>();
     public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
+    public DbSet<PaymentConfig> PaymentConfigs => Set<PaymentConfig>();
+    public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
 
     // ── Model Configuration ──────────────────────────────────────────────────
     protected override void OnModelCreating(ModelBuilder modelBuilder)

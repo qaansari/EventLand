@@ -14,17 +14,20 @@ public class BookingService : IBookingService
     private readonly IApplicationDbContext _context;
     private readonly ICacheService _cacheService;
     private readonly INotificationService _notificationService;
+    private readonly IPaymentFeeService _paymentFeeService;
     private readonly ILogger<BookingService> _logger;
 
     public BookingService(
         IApplicationDbContext context, 
         ICacheService cacheService,
         INotificationService notificationService,
+        IPaymentFeeService paymentFeeService,
         ILogger<BookingService> logger)
     {
         _context = context;
         _cacheService = cacheService;
         _notificationService = notificationService;
+        _paymentFeeService = paymentFeeService;
         _logger = logger;
     }
 
@@ -56,7 +59,7 @@ public class BookingService : IBookingService
         // ── Pricing ──────────────────────────────────────────────────────────
         // Seated events price per seat; general-admission events price by tier.
         decimal unitPrice;
-        decimal totalAmount;
+        decimal subtotalAmount;
         List<Seat> seats = new();
 
         if (isSeated)
@@ -73,13 +76,13 @@ public class BookingService : IBookingService
             if (seats.Any(s => s.Zone == null || s.Zone.EventId != dto.EventId))
                 throw new InvalidOperationException("One or more selected seats do not belong to this event.");
 
-            totalAmount = seats.Sum(s => s.Price ?? s.Zone!.Price);
-            unitPrice = Math.Round(totalAmount / effectiveQuantity, 2);
+            subtotalAmount = seats.Sum(s => s.Price ?? s.Zone!.Price);
+            unitPrice = Math.Round(subtotalAmount / effectiveQuantity, 2);
         }
         else
         {
             unitPrice = tier.Price;
-            totalAmount = tier.Price * effectiveQuantity;
+            subtotalAmount = tier.Price * effectiveQuantity;
         }
 
         Enum.TryParse<PaymentMethod>(dto.PaymentMethod, true, out var paymentMethod);
@@ -87,6 +90,28 @@ public class BookingService : IBookingService
         {
             paymentMethod = PaymentMethod.BankTransfer;
         }
+
+        // Authoritative pricing breakdown via IPaymentFeeService
+        decimal platformFee = 0m;
+        decimal processingFee = 0m;
+        decimal feePercentage = 0m;
+
+        var normalizedMethod = dto.PaymentMethod?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (normalizedMethod is "easypaisa_jazzcash" or "qr_code" or "paypro" or "payproeasypaisajazzcash" or "payproqrcode")
+        {
+            var lookupMethod = normalizedMethod == "qr_code" || normalizedMethod == "payproqrcode" ? "qr_code" : "easypaisa_jazzcash";
+            var feeResult = await _paymentFeeService.CalculateTotalAsync(subtotalAmount, lookupMethod);
+            platformFee = feeResult.PlatformFee;
+            processingFee = feeResult.ProcessingFee;
+            feePercentage = feeResult.FeePercentageAtPurchase;
+        }
+        else
+        {
+            // Direct bank transfer / default
+            platformFee = _paymentFeeService.CalculatePlatformFee(subtotalAmount);
+        }
+
+        decimal totalPayableAmount = subtotalAmount + platformFee + processingFee;
 
         // Authenticated identity is authoritative over any client-supplied email.
         var effectiveEmail = string.IsNullOrWhiteSpace(userEmail) ? dto.CustomerEmail : userEmail;
@@ -118,7 +143,11 @@ public class BookingService : IBookingService
             CustomerPhone = dto.CustomerPhone.Trim(),
             Quantity = effectiveQuantity,
             UnitPrice = unitPrice,
-            TotalAmount = totalAmount,
+            SubtotalAmount = subtotalAmount,
+            PlatformFee = platformFee,
+            PaymentProcessingFee = processingFee,
+            FeePercentageAtPurchase = feePercentage,
+            TotalAmount = totalPayableAmount,
             Status = BookingStatus.Pending,
             PaymentStatus = PaymentStatus.Pending,
             PaymentMethod = paymentMethod,
@@ -396,7 +425,10 @@ public class BookingService : IBookingService
             b.VerifiedAt,
             b.PaymentExpiresAt,
             FileUrlHelper.FormatEventBannerUrl(b.Event?.Banner),
-            b.Event?.Venue?.Name
+            b.Event?.Venue?.Name,
+            b.SubtotalAmount,
+            b.PlatformFee,
+            b.PaymentProcessingFee
         );
     }
 }

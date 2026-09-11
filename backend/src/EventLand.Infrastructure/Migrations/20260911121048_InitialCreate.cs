@@ -162,6 +162,33 @@ namespace EventLand.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PaymentConfigs",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1000, 1"),
+                    Provider = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    PaymentMethod = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    DisplayName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    PercentageFee = table.Column<decimal>(type: "decimal(5,2)", precision: 5, scale: 2, nullable: false),
+                    FixedFee = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    Currency = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    SortOrder = table.Column<int>(type: "int", nullable: false),
+                    MetadataJson = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PaymentConfigs", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Roles",
                 columns: table => new
                 {
@@ -563,6 +590,10 @@ namespace EventLand.Infrastructure.Migrations
                     CustomerPhone = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
                     Quantity = table.Column<int>(type: "int", nullable: false),
                     UnitPrice = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    SubtotalAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    PlatformFee = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    PaymentProcessingFee = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    FeePercentageAtPurchase = table.Column<decimal>(type: "decimal(5,2)", precision: 5, scale: 2, nullable: false),
                     TotalAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
                     Status = table.Column<int>(type: "int", nullable: false),
                     PaymentStatus = table.Column<int>(type: "int", nullable: false),
@@ -641,6 +672,43 @@ namespace EventLand.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PaymentTransactions",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1000, 1"),
+                    BookingId = table.Column<int>(type: "int", nullable: false),
+                    Provider = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    ProviderTransactionId = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    PaymentMethod = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    Amount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    Currency = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    InternalReference = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    ProviderReference = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    PaidAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    FailedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    FailureReason = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    MetadataJson = table.Column<string>(type: "nvarchar(4000)", maxLength: 4000, nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PaymentTransactions", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_PaymentTransactions_Bookings_BookingId",
+                        column: x => x.BookingId,
+                        principalTable: "Bookings",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "RefundRecords",
                 columns: table => new
                 {
@@ -705,6 +773,15 @@ namespace EventLand.Infrastructure.Migrations
                 values: new object[] { 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "support@eventland.pk", false, true, "org_eventland_01.png", "Event Land", "+92 307 9353185", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "https://www.eventland.pk" });
 
             migrationBuilder.InsertData(
+                table: "PaymentConfigs",
+                columns: new[] { "Id", "CreatedAt", "CreatedBy", "Currency", "DeletedAt", "DisplayName", "FixedFee", "IsActive", "IsDeleted", "MetadataJson", "PaymentMethod", "PercentageFee", "Provider", "SortOrder", "UpdatedAt", "UpdatedBy" },
+                values: new object[,]
+                {
+                    { 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "PKR", null, "EasyPaisa / JazzCash", 0m, true, false, null, "easypaisa_jazzcash", 2.8m, "paypro", 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null },
+                    { 2, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, "PKR", null, "PayPro QR Code", 0m, true, false, null, "qr_code", 0.8m, "paypro", 2, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null }
+                });
+
+            migrationBuilder.InsertData(
                 table: "Roles",
                 columns: new[] { "Id", "CreatedAt", "CreatedBy", "DeletedAt", "Description", "IsDeleted", "Name", "UpdatedAt", "UpdatedBy" },
                 values: new object[,]
@@ -740,7 +817,7 @@ namespace EventLand.Infrastructure.Migrations
             migrationBuilder.InsertData(
                 table: "Users",
                 columns: new[] { "Id", "AccessFailedCount", "CountryId", "CreatedAt", "CreatedBy", "DeletedAt", "Email", "FullName", "ImageUrl", "IsActive", "IsDeleted", "LastLoginAt", "LockoutEndUtc", "PasswordHash", "PhoneNumber", "RoleId", "UpdatedAt", "UpdatedBy" },
-                values: new object[] { 1, 0, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "admin@eventland.pk", "Super Admin", null, true, false, null, null, "AQAAAAIAAYagAAAAELvZ4LHuseZb7mZZpCR/34qDlCcxfxY+I3FHHcvQw7k1vRTl4NYsLFIfRW1t768NSg==", "+92 331 2541767", 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null });
+                values: new object[] { 1, 0, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "admin@eventland.pk", "Super Admin", null, true, false, null, null, "AQAAAAIAAYagAAAAECgRlR/0KDmv61u80Wt24hRgSE3iMdEt9dsDbEk5BQ5fmpGtMevDyzKGHPVji6tEvQ==", "+92 331 2541767", 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Artists_IsFeatured",
@@ -866,6 +943,33 @@ namespace EventLand.Infrastructure.Migrations
                 filter: "[IsDeleted] = 0");
 
             migrationBuilder.CreateIndex(
+                name: "IX_PaymentConfigs_IsActive_SortOrder",
+                table: "PaymentConfigs",
+                columns: new[] { "IsActive", "SortOrder" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PaymentConfigs_Provider_PaymentMethod",
+                table: "PaymentConfigs",
+                columns: new[] { "Provider", "PaymentMethod" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PaymentTransactions_BookingId",
+                table: "PaymentTransactions",
+                column: "BookingId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PaymentTransactions_InternalReference",
+                table: "PaymentTransactions",
+                column: "InternalReference",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PaymentTransactions_ProviderTransactionId",
+                table: "PaymentTransactions",
+                column: "ProviderTransactionId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_RefundRecords_BookingId",
                 table: "RefundRecords",
                 column: "BookingId");
@@ -965,6 +1069,12 @@ namespace EventLand.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "FooterInfo");
+
+            migrationBuilder.DropTable(
+                name: "PaymentConfigs");
+
+            migrationBuilder.DropTable(
+                name: "PaymentTransactions");
 
             migrationBuilder.DropTable(
                 name: "RefundRecords");

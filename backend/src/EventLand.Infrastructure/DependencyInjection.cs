@@ -129,6 +129,17 @@ public static class DependencyInjection
         services.AddScoped<IBankAccountService, BankAccountService>();
         services.AddScoped<INotificationService, NotificationService>();
 
+        // Payment Gateway & Fee Services (PayPro Pakistan)
+        services.Configure<EventLand.Application.Common.Models.PayProOptions>(
+            configuration.GetSection(EventLand.Application.Common.Models.PayProOptions.SectionName));
+
+        services.AddScoped<IPaymentFeeService, PaymentFeeService>();
+
+        services.AddHttpClient<IPayProService, PayProService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
+
         return services;
     }
 }

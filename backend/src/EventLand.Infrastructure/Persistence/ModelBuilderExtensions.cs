@@ -139,5 +139,37 @@ public static class ModelBuilderExtensions
                 UpdatedAt = fixedDateTime
             }
         );
+
+        // 8. Default Payment Configs (PayPro EasyPaisa / JazzCash & QR Code)
+        modelBuilder.Entity<PaymentConfig>().HasData(
+            new PaymentConfig
+            {
+                Id = 1,
+                Provider = "paypro",
+                PaymentMethod = "easypaisa_jazzcash",
+                DisplayName = "EasyPaisa / JazzCash",
+                PercentageFee = 2.8m,
+                FixedFee = 0m,
+                Currency = "PKR",
+                IsActive = true,
+                SortOrder = 1,
+                CreatedAt = fixedDateOffset,
+                UpdatedAt = fixedDateOffset
+            },
+            new PaymentConfig
+            {
+                Id = 2,
+                Provider = "paypro",
+                PaymentMethod = "qr_code",
+                DisplayName = "PayPro QR Code",
+                PercentageFee = 0.8m,
+                FixedFee = 0m,
+                Currency = "PKR",
+                IsActive = true,
+                SortOrder = 2,
+                CreatedAt = fixedDateOffset,
+                UpdatedAt = fixedDateOffset
+            }
+        );
     }
 }

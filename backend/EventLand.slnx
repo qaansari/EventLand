@@ -5,4 +5,7 @@
     <Project Path="src/EventLand.Domain/EventLand.Domain.csproj" />
     <Project Path="src/EventLand.Infrastructure/EventLand.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EventLand.UnitTests/EventLand.UnitTests.csproj" />
+  </Folder>
 </Solution>

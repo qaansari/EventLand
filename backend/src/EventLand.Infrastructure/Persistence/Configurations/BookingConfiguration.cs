@@ -37,6 +37,18 @@ public sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(b => b.UnitPrice)
                .HasPrecision(18, 2);
 
+        builder.Property(b => b.SubtotalAmount)
+               .HasPrecision(18, 2);
+
+        builder.Property(b => b.PlatformFee)
+               .HasPrecision(18, 2);
+
+        builder.Property(b => b.PaymentProcessingFee)
+               .HasPrecision(18, 2);
+
+        builder.Property(b => b.FeePercentageAtPurchase)
+               .HasPrecision(5, 2);
+
         builder.Property(b => b.TotalAmount)
                .HasPrecision(18, 2);
 

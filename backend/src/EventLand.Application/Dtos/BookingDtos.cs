@@ -36,7 +36,10 @@ public record BookingDto(
     DateTimeOffset? VerifiedAt = null,
     DateTimeOffset? PaymentExpiresAt = null,
     string? EventBanner = null,
-    string? EventVenue = null
+    string? EventVenue = null,
+    decimal SubtotalAmount = 0m,
+    decimal PlatformFee = 0m,
+    decimal PaymentProcessingFee = 0m
 );
 
 public record CreateBookingDto(
