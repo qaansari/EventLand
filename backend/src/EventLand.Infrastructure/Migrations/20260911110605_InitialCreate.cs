@@ -740,7 +740,7 @@ namespace EventLand.Infrastructure.Migrations
             migrationBuilder.InsertData(
                 table: "Users",
                 columns: new[] { "Id", "AccessFailedCount", "CountryId", "CreatedAt", "CreatedBy", "DeletedAt", "Email", "FullName", "ImageUrl", "IsActive", "IsDeleted", "LastLoginAt", "LockoutEndUtc", "PasswordHash", "PhoneNumber", "RoleId", "UpdatedAt", "UpdatedBy" },
-                values: new object[] { 1, 0, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "admin@eventland.pk", "Super Admin", null, true, false, null, null, "AQAAAAIAAYagAAAAEHmufhGsvmYBwIEyjQ5YdStLNQqn9TFxCdT61rU/W2AWNRPx8HvWLmGl8Ae9b31riw==", "+92 331 2541767", 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null });
+                values: new object[] { 1, 0, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "admin@eventland.pk", "Super Admin", null, true, false, null, null, "AQAAAAIAAYagAAAAELvZ4LHuseZb7mZZpCR/34qDlCcxfxY+I3FHHcvQw7k1vRTl4NYsLFIfRW1t768NSg==", "+92 331 2541767", 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Artists_IsFeatured",
@@ -899,6 +899,11 @@ namespace EventLand.Infrastructure.Migrations
                 column: "Slug",
                 unique: true,
                 filter: "[IsDeleted] = 0");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TicketTiers_EventId_EventShowId",
+                table: "TicketTiers",
+                columns: new[] { "EventId", "EventShowId" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_TicketTiers_EventId_SortOrder",

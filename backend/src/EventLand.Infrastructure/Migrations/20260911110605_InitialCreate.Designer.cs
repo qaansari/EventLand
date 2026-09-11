@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EventLand.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260909105956_InitialCreate")]
+    [Migration("20260911110605_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -1408,6 +1408,9 @@ namespace EventLand.Infrastructure.Migrations
 
                     b.HasIndex("EventShowId");
 
+                    b.HasIndex("EventId", "EventShowId")
+                        .HasDatabaseName("IX_TicketTiers_EventId_EventShowId");
+
                     b.HasIndex("EventId", "SortOrder")
                         .HasDatabaseName("IX_TicketTiers_EventId_SortOrder");
 
@@ -1512,7 +1515,7 @@ namespace EventLand.Infrastructure.Migrations
                             FullName = "Super Admin",
                             IsActive = true,
                             IsDeleted = false,
-                            PasswordHash = "AQAAAAIAAYagAAAAEHmufhGsvmYBwIEyjQ5YdStLNQqn9TFxCdT61rU/W2AWNRPx8HvWLmGl8Ae9b31riw==",
+                            PasswordHash = "AQAAAAIAAYagAAAAELvZ4LHuseZb7mZZpCR/34qDlCcxfxY+I3FHHcvQw7k1vRTl4NYsLFIfRW1t768NSg==",
                             PhoneNumber = "+92 331 2541767",
                             RoleId = 1,
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))

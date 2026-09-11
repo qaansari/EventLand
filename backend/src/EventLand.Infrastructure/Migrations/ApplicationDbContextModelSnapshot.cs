@@ -1512,7 +1512,7 @@ namespace EventLand.Infrastructure.Migrations
                             FullName = "Super Admin",
                             IsActive = true,
                             IsDeleted = false,
-                            PasswordHash = "AQAAAAIAAYagAAAAEHlvRJk+0aGoMT+j70pF93yX5wjh0ewSxoIVz0qx59qFpv6f7Auqsom9HDU+wn0EFA==",
+                            PasswordHash = "AQAAAAIAAYagAAAAELvZ4LHuseZb7mZZpCR/34qDlCcxfxY+I3FHHcvQw7k1vRTl4NYsLFIfRW1t768NSg==",
                             PhoneNumber = "+92 331 2541767",
                             RoleId = 1,
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))

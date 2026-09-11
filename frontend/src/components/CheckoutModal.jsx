@@ -35,16 +35,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
   });
 
   // Active Bank Account from DB
-  const [bankAccount, setBankAccount] = useState({
-    bankName: 'Meezan Bank Limited',
-    accountTitle: 'Event Land Official Pvt Ltd',
-    accountNumber: '0102030405060701',
-    iban: 'PK64MEZN0001020304050607',
-    branchCode: '0102',
-    branchName: 'Clifton Branch, Karachi',
-    qrCodeImageUrl: '',
-    instructions: 'Please transfer the exact booking amount via Mobile Banking App, Raast ID, or ATM. Mention your Booking Ref in transfer remarks.'
-  });
+  const [bankAccount, setBankAccount] = useState(null);
   const [bankQrDataUrl, setBankQrDataUrl] = useState('');
 
   // Copy Feedback states
@@ -101,11 +92,13 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
           setBankAccount(active);
           generateBankQr(active);
         } else {
-          generateBankQr(bankAccount);
+          setBankAccount(null);
+          setBankQrDataUrl('');
         }
       } catch (err) {
-        console.warn('Using default bank account fallback:', err);
-        generateBankQr(bankAccount);
+        console.warn('No active bank account found:', err);
+        setBankAccount(null);
+        setBankQrDataUrl('');
       }
     }
     loadActiveBank();
@@ -574,132 +567,148 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
             </div>
 
             {/* Official Bank Account Card with 1-Click Copy Buttons */}
-            <div style={{
-              background: 'rgba(10, 18, 30, 0.7)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '16px',
-              padding: '1.5rem',
-              marginBottom: '1.5rem'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
-                <Building2 size={20} color="#2dd4bf" />
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: 0 }}>
-                  {bankAccount.bankName}
-                </h3>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {/* Account Title */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                  <div>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Account Title</span>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>{bankAccount.accountTitle}</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(bankAccount.accountTitle, 'Account Title')}
-                    style={{ background: copiedField === 'Account Title' ? '#059669' : 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', padding: '0.4rem 0.75rem', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
-                  >
-                    {copiedField === 'Account Title' ? <><Check size={13} color="#fff" /> Copied!</> : <><Copy size={13} /> Copy</>}
-                  </button>
+            {bankAccount ? (
+              <div style={{
+                background: 'rgba(10, 18, 30, 0.7)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '16px',
+                padding: '1.5rem',
+                marginBottom: '1.5rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
+                  <Building2 size={20} color="#2dd4bf" />
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: 0 }}>
+                    {bankAccount.bankName}
+                  </h3>
                 </div>
 
-                {/* Account Number */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                  <div>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Account Number</span>
-                    <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#2dd4bf', letterSpacing: '0.05em' }}>{bankAccount.accountNumber}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Account Title */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Account Title</span>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>{bankAccount.accountTitle}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(bankAccount.accountTitle, 'Account Title')}
+                      style={{ background: copiedField === 'Account Title' ? '#059669' : 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', padding: '0.4rem 0.75rem', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
+                    >
+                      {copiedField === 'Account Title' ? <><Check size={13} color="#fff" /> Copied!</> : <><Copy size={13} /> Copy</>}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(bankAccount.accountNumber, 'Account Number')}
-                    style={{ background: copiedField === 'Account Number' ? '#059669' : 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', padding: '0.4rem 0.75rem', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
-                  >
-                    {copiedField === 'Account Number' ? <><Check size={13} color="#fff" /> Copied!</> : <><Copy size={13} /> Copy</>}
-                  </button>
+
+                  {/* Account Number */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Account Number</span>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#2dd4bf', letterSpacing: '0.05em' }}>{bankAccount.accountNumber}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(bankAccount.accountNumber, 'Account Number')}
+                      style={{ background: copiedField === 'Account Number' ? '#059669' : 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', padding: '0.4rem 0.75rem', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
+                    >
+                      {copiedField === 'Account Number' ? <><Check size={13} color="#fff" /> Copied!</> : <><Copy size={13} /> Copy</>}
+                    </button>
+                  </div>
+
+                  {/* IBAN */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                    <div>
+                      <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>IBAN Number</span>
+                      <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fff', letterSpacing: '0.04em' }}>{bankAccount.iban}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(bankAccount.iban, 'IBAN Number')}
+                      style={{ background: copiedField === 'IBAN Number' ? '#059669' : 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', padding: '0.4rem 0.75rem', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
+                    >
+                      {copiedField === 'IBAN Number' ? <><Check size={13} color="#fff" /> Copied!</> : <><Copy size={13} /> Copy</>}
+                    </button>
+                  </div>
+
+                  {/* Branch details if present */}
+                  {bankAccount.branchName && (
+                    <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                      Branch: <strong>{bankAccount.branchName}</strong> {bankAccount.branchCode ? `(Code: ${bankAccount.branchCode})` : ''}
+                    </div>
+                  )}
                 </div>
 
-                {/* IBAN */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                  <div>
-                    <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>IBAN Number</span>
-                    <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fff', letterSpacing: '0.04em' }}>{bankAccount.iban}</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(bankAccount.iban, 'IBAN Number')}
-                    style={{ background: copiedField === 'IBAN Number' ? '#059669' : 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', padding: '0.4rem 0.75rem', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
-                  >
-                    {copiedField === 'IBAN Number' ? <><Check size={13} color="#fff" /> Copied!</> : <><Copy size={13} /> Copy</>}
-                  </button>
-                </div>
+                {/* Bank QR Code & Scan Option */}
+                {(bankAccount.qrCodeImageUrl || bankQrDataUrl) && (
+                  <div style={{
+                    marginTop: '1.25rem',
+                    padding: '1.25rem',
+                    border: '1px solid rgba(13, 148, 136, 0.3)',
+                    borderRadius: '16px',
+                    background: 'rgba(13, 148, 136, 0.08)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.85rem',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#2dd4bf', fontWeight: 800, fontSize: '0.95rem' }}>
+                      <QrCode size={20} /> Instant Banking App / Raast QR Scan
+                    </div>
 
-                {/* Branch details if present */}
-                {bankAccount.branchName && (
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                    Branch: <strong>{bankAccount.branchName}</strong> {bankAccount.branchCode ? `(Code: ${bankAccount.branchCode})` : ''}
+                    <div style={{
+                      background: '#ffffff',
+                      padding: '0.85rem',
+                      borderRadius: '16px',
+                      boxShadow: '0 0 25px rgba(13, 148, 136, 0.4), 0 10px 25px rgba(0, 0, 0, 0.5)',
+                      border: '2px solid rgba(45, 212, 191, 0.6)',
+                      display: 'inline-block'
+                    }}>
+                      <img
+                        src={bankAccount.qrCodeImageUrl ? getQrCodeImageUrl(bankAccount.qrCodeImageUrl) : bankQrDataUrl}
+                        alt="Bank QR Code"
+                        style={{
+                          width: '220px',
+                          height: '220px',
+                          display: 'block',
+                          objectFit: 'contain',
+                          borderRadius: '6px'
+                        }}
+                        onError={(e) => {
+                          if (bankQrDataUrl && e.target.src !== bankQrDataUrl) {
+                            e.target.src = bankQrDataUrl;
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <p style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0, maxWidth: '440px', lineHeight: 1.45 }}>
+                      Scan directly using your mobile banking app (Meezan / HBL / UBL / Raast / EasyPaisa / JazzCash / Any 1Link App) for instant transfer.
+                    </p>
+                  </div>
+                )}
+
+                {/* Instructions */}
+                {bankAccount.instructions && (
+                  <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'rgba(13, 148, 136, 0.1)', border: '1px solid rgba(13, 148, 136, 0.25)', borderRadius: '8px', fontSize: '0.78rem', color: '#cbd5e1' }}>
+                    💡 <strong>Instruction:</strong> {bankAccount.instructions}
                   </div>
                 )}
               </div>
-
-              {/* Bank QR Code & Scan Option */}
-              {(bankAccount.qrCodeImageUrl || bankQrDataUrl) && (
-                <div style={{
-                  marginTop: '1.25rem',
-                  padding: '1.25rem',
-                  border: '1px solid rgba(13, 148, 136, 0.3)',
-                  borderRadius: '16px',
-                  background: 'rgba(13, 148, 136, 0.08)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '0.85rem',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#2dd4bf', fontWeight: 800, fontSize: '0.95rem' }}>
-                    <QrCode size={20} /> Instant Banking App / Raast QR Scan
-                  </div>
-
-                  <div style={{
-                    background: '#ffffff',
-                    padding: '0.85rem',
-                    borderRadius: '16px',
-                    boxShadow: '0 0 25px rgba(13, 148, 136, 0.4), 0 10px 25px rgba(0, 0, 0, 0.5)',
-                    border: '2px solid rgba(45, 212, 191, 0.6)',
-                    display: 'inline-block'
-                  }}>
-                    <img
-                      src={bankAccount.qrCodeImageUrl ? getQrCodeImageUrl(bankAccount.qrCodeImageUrl) : bankQrDataUrl}
-                      alt="Bank QR Code"
-                      style={{
-                        width: '220px',
-                        height: '220px',
-                        display: 'block',
-                        objectFit: 'contain',
-                        borderRadius: '6px'
-                      }}
-                      onError={(e) => {
-                        // Fall back to generated payload QR code if image is missing
-                        if (bankQrDataUrl && e.target.src !== bankQrDataUrl) {
-                          e.target.src = bankQrDataUrl;
-                        }
-                      }}
-                    />
-                  </div>
-
-                  <p style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0, maxWidth: '440px', lineHeight: 1.45 }}>
-                    Scan directly using your mobile banking app (Meezan / HBL / UBL / Raast / EasyPaisa / JazzCash / Any 1Link App) for instant transfer.
-                  </p>
-                </div>
-              )}
-
-              {/* Instructions */}
-              {bankAccount.instructions && (
-                <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'rgba(13, 148, 136, 0.1)', border: '1px solid rgba(13, 148, 136, 0.25)', borderRadius: '8px', fontSize: '0.78rem', color: '#cbd5e1' }}>
-                  💡 <strong>Instruction:</strong> {bankAccount.instructions}
-                </div>
-              )}
-            </div>
+            ) : (
+              <div style={{
+                background: 'rgba(10, 18, 30, 0.7)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '16px',
+                padding: '1.5rem',
+                marginBottom: '1.5rem',
+                textAlign: 'center'
+              }}>
+                <Building2 size={28} color="#0d9488" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
+                <h4 style={{ color: '#fff', fontSize: '1rem', margin: '0 0 0.5rem 0' }}>Bank Account Setup Pending</h4>
+                <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0, lineHeight: 1.5 }}>
+                  The organizer or administrator has not yet configured active bank transfer details. You may still proceed with your booking reference.
+                </p>
+              </div>
+            )}
 
             {/* Proof Submission Form */}
             <form onSubmit={handleSubmitBankTransfer}>

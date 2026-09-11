@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 /// <summary>
 /// Database Initializer & Seeder.
-/// Applies EF Core migrations automatically on startup and seeds default Roles, SuperAdmin User, "Event Land" Organizer, Tags, Country & Cities, FAQs, Footer Info, and Bank Account.
+/// Applies EF Core migrations automatically on startup and seeds default Roles, SuperAdmin User, "Event Land" Organizer, Tags, Country & Cities, FAQs, and Footer Info.
 /// </summary>
 public static class DataSeeder
 {
@@ -201,22 +201,12 @@ public static class DataSeeder
             await context.SaveChangesAsync();
         }
 
-        // 8. Default Active Bank Account Seeding
-        if (!await context.BankAccounts.AnyAsync())
+        // 8. Clean up any legacy default bank account info if present
+        var legacyDefaultBank = await context.BankAccounts
+            .FirstOrDefaultAsync(b => b.AccountTitle == "Event Land Official Pvt Ltd" || b.AccountNumber == "0102030405060701");
+        if (legacyDefaultBank != null)
         {
-            context.BankAccounts.Add(new BankAccount
-            {
-                BankName = "Meezan Bank Limited",
-                AccountTitle = "Event Land Official Pvt Ltd",
-                AccountNumber = "0102030405060701",
-                Iban = "PK64MEZN0001020304050607",
-                BranchCode = "0102",
-                BranchName = "Clifton Branch, Karachi",
-                QrCodeImageUrl = "qr_meezanbank_1000.png",
-                Instructions = "Please transfer the exact booking amount via Mobile Banking App, Raast ID, or ATM. Mention your Booking Ref in transfer remarks.",
-                IsActive = true,
-                DisplayOrder = 1
-            });
+            context.BankAccounts.Remove(legacyDefaultBank);
             await context.SaveChangesAsync();
         }
     }
