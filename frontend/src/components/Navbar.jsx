@@ -1,6 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { MapPin, Search, PlusCircle, User, Sparkles, Music, Calendar, Menu, X, ShieldCheck, Building2, LogIn, LogOut, FileText } from 'lucide-react';
-import SearchableSelect from './SearchableSelect';
+import React, { useState } from 'react';
+import { PlusCircle, User, Music, Calendar, Menu, X, ShieldCheck, Building2, LogIn, LogOut, FileText } from 'lucide-react';
 import { getUserImageUrl } from '../services/api';
 
 export default function Navbar({ 
@@ -30,10 +29,7 @@ export default function Navbar({
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${bgHex}&color=ffffff&bold=true&rounded=true`;
   };
 
-  const cityOptions = useMemo(
-    () => ['All Cities', ...(cities || []).map(c => typeof c === 'string' ? c : c.name).filter(Boolean)],
-    [cities]
-  );
+
 
   const handleNavClick = (view) => {
     onNavigate(view);
@@ -128,45 +124,7 @@ export default function Navbar({
           </div>
         </div>
 
-        {/* Desktop City Selector & Search Bar */}
-        <div className="navbar-search-bar desktop-only" style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.45rem',
-          flexShrink: 1,
-          minWidth: 0
-        }}>
-          <div style={{ width: '130px', flexShrink: 0 }}>
-            <SearchableSelect
-              value={selectedCity}
-              onChange={(e) => onSelectCity(e.target.value)}
-              options={cityOptions}
-              icon={MapPin}
-              placeholder="City..."
-            />
-          </div>
 
-          <div style={{ position: 'relative', width: '150px', flexShrink: 1 }}>
-            <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              style={{
-                width: '100%',
-                backgroundColor: 'rgba(255, 255, 255, 0.07)',
-                color: '#f8fafc',
-                border: '1px solid rgba(13, 148, 136, 0.3)',
-                borderRadius: '9999px',
-                padding: '0.45rem 0.85rem 0.45rem 2.2rem',
-                fontSize: '0.82rem',
-                outline: 'none',
-                transition: 'all 0.25s ease'
-              }}
-            />
-          </div>
-        </div>
 
         {/* Desktop Navigation Links */}
         <nav style={{
@@ -203,52 +161,57 @@ export default function Navbar({
             <Music size={14} /> Artists
           </button>
 
-          <button
-            onClick={() => handleNavClick('my-tickets')}
-            className="btn"
-            style={{
-              position: 'relative',
-              background: activeView === 'my-tickets' ? 'rgba(13, 148, 136, 0.18)' : 'transparent',
-              color: activeView === 'my-tickets' ? '#2dd4bf' : '#cbd5e1',
-              fontSize: '0.82rem',
-              padding: '0.45rem 0.75rem'
-            }}
-          >
-            <User size={14} /> My Tickets
-            {savedTicketsCount > 0 && (
-              <span style={{
-                position: 'absolute',
-                top: '0px',
-                right: '0px',
-                backgroundColor: '#059669',
-                color: '#ffffff',
-                borderRadius: '50%',
-                width: '16px',
-                height: '16px',
-                fontSize: '0.65rem',
-                fontWeight: 800,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                {savedTicketsCount}
-              </span>
-            )}
-          </button>
+          {/* Authenticated-only links: My Tickets & Unpaid Invoices */}
+          {currentUser && (
+            <>
+              <button
+                onClick={() => handleNavClick('my-tickets')}
+                className="btn"
+                style={{
+                  position: 'relative',
+                  background: activeView === 'my-tickets' ? 'rgba(13, 148, 136, 0.18)' : 'transparent',
+                  color: activeView === 'my-tickets' ? '#2dd4bf' : '#cbd5e1',
+                  fontSize: '0.82rem',
+                  padding: '0.45rem 0.75rem'
+                }}
+              >
+                <User size={14} /> My Tickets
+                {savedTicketsCount > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '0px',
+                    right: '0px',
+                    backgroundColor: '#059669',
+                    color: '#ffffff',
+                    borderRadius: '50%',
+                    width: '16px',
+                    height: '16px',
+                    fontSize: '0.65rem',
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {savedTicketsCount}
+                  </span>
+                )}
+              </button>
 
-          <button
-            onClick={() => handleNavClick('unpaid-invoices')}
-            className="btn"
-            style={{
-              position: 'relative',
-              background: activeView === 'unpaid-invoices' ? 'rgba(245, 158, 11, 0.18)' : 'transparent',
-              color: activeView === 'unpaid-invoices' ? '#fbbf24' : '#cbd5e1',
-              fontSize: '0.82rem',
-              padding: '0.45rem 0.75rem'
-            }}
-          >
-            <FileText size={14} color="#fbbf24" /> Unpaid Invoices
-          </button>
+              <button
+                onClick={() => handleNavClick('unpaid-invoices')}
+                className="btn"
+                style={{
+                  position: 'relative',
+                  background: activeView === 'unpaid-invoices' ? 'rgba(245, 158, 11, 0.18)' : 'transparent',
+                  color: activeView === 'unpaid-invoices' ? '#fbbf24' : '#cbd5e1',
+                  fontSize: '0.82rem',
+                  padding: '0.45rem 0.75rem'
+                }}
+              >
+                <FileText size={14} color="#fbbf24" /> Unpaid Invoices
+              </button>
+            </>
+          )}
 
           {/* Special Console Button for Organizers */}
           {currentUser && currentUser.role === 'organizer' && (
@@ -391,38 +354,7 @@ export default function Navbar({
           padding: '1.25rem 1rem',
           gap: '1rem'
         }}>
-          {/* Mobile Search & City */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ position: 'relative' }}>
-              <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-              <input
-                type="text"
-                placeholder="Search concerts, shows..."
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                style={{
-                  width: '100%',
-                  backgroundColor: '#16233f',
-                  color: '#fff',
-                  border: '1px solid rgba(13, 148, 136, 0.25)',
-                  borderRadius: '10px',
-                  padding: '0.65rem 1rem 0.65rem 2.3rem',
-                  fontSize: '0.9rem',
-                  outline: 'none'
-                }}
-              />
-            </div>
 
-            <div>
-              <SearchableSelect
-                value={selectedCity}
-                onChange={(e) => onSelectCity(e.target.value)}
-                options={cityOptions}
-                icon={MapPin}
-                placeholder="Select City..."
-              />
-            </div>
-          </div>
 
           {/* Mobile Nav Links */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
@@ -442,21 +374,25 @@ export default function Navbar({
               <Music size={18} color="#0d9488" /> Artists Bookings
             </button>
 
-            <button
-              onClick={() => handleNavClick('my-tickets')}
-              className="btn btn-secondary"
-              style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
-            >
-              <User size={18} color="#2dd4bf" /> My Saved Tickets ({savedTicketsCount})
-            </button>
+            {currentUser && (
+              <>
+                <button
+                  onClick={() => handleNavClick('my-tickets')}
+                  className="btn btn-secondary"
+                  style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
+                >
+                  <User size={18} color="#2dd4bf" /> My Saved Tickets ({savedTicketsCount})
+                </button>
 
-            <button
-              onClick={() => handleNavClick('unpaid-invoices')}
-              className="btn btn-secondary"
-              style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
-            >
-              <FileText size={18} color="#fbbf24" /> Unpaid Invoices
-            </button>
+                <button
+                  onClick={() => handleNavClick('unpaid-invoices')}
+                  className="btn btn-secondary"
+                  style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
+                >
+                  <FileText size={18} color="#fbbf24" /> Unpaid Invoices
+                </button>
+              </>
+            )}
 
             {currentUser && (currentUser.role === 'organizer' || currentUser.role === 'admin') && (
               <button

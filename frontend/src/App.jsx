@@ -53,6 +53,7 @@ export default function App() {
   const [tags, setTags] = useState([]);
   const [countries, setCountries] = useState([]);
   const [cities, setCities] = useState([]);
+  const [venues, setVenues] = useState([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
 
   // Pagination state for the explore events grid
@@ -62,6 +63,10 @@ export default function App() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   const [selectedCity, setSelectedCity] = useState('All Cities');
+  const [selectedVenue, setSelectedVenue] = useState('All Venues');
+  const [selectedDateFilter, setSelectedDateFilter] = useState('all');
+  const [customDate, setCustomDate] = useState(''); // 'YYYY-MM-DD'
+  const [selectedPriceFilter, setSelectedPriceFilter] = useState('all');
   const [selectedTag, setSelectedTag] = useState('All');
 
   // Fetch live tags, countries, and cities on mount
@@ -205,6 +210,13 @@ export default function App() {
         setIsAuthModalOpen(true);
         setActiveView('explore');
       }
+    } else if (activeView === 'my-tickets' || activeView === 'unpaid-invoices') {
+      if (!currentUser) {
+        showWarning('Sign In Required', `Please sign in to view your ${activeView === 'my-tickets' ? 'tickets' : 'unpaid invoices'}.`);
+        setAuthModalRole('customer');
+        setIsAuthModalOpen(true);
+        setActiveView('explore');
+      }
     }
   }, [activeView, currentUser, showError, showWarning]);
 
@@ -245,7 +257,10 @@ export default function App() {
   const handleLogout = () => {
     setCurrentUser(null);
     setUserRole('customer');
-    setActiveView('explore');
+    setPurchasedTickets([]);
+    if (activeView === 'my-tickets' || activeView === 'unpaid-invoices' || activeView === 'admin' || activeView === 'organizer' || activeView === 'organizer-wizard') {
+      setActiveView('explore');
+    }
     clearStoredSession();
     showInfo('Logged Out', 'You have been logged out successfully.');
   };
@@ -284,22 +299,95 @@ export default function App() {
     return events.filter((e) => savedEventIds.includes(e.id));
   }, [events, savedEventIds]);
 
-  // User Purchased Tickets
-  const [purchasedTickets, setPurchasedTickets] = useState(() => {
-    const tickets = localStorage.getItem('eventland_purchased_tickets');
-    return tickets ? JSON.parse(tickets) : [];
-  });
+  // User Purchased Tickets (Scoped strictly to the authenticated user)
+  const [purchasedTickets, setPurchasedTickets] = useState([]);
+
+  useEffect(() => {
+    if (!currentUser?.email) {
+      setPurchasedTickets([]);
+      return;
+    }
+
+    const userEmail = currentUser.email.toLowerCase();
+    const storageKey = `eventland_purchased_tickets_${userEmail}`;
+
+    // Read cached tickets for this user
+    let userTickets = [];
+    const cached = localStorage.getItem(storageKey);
+    if (cached) {
+      try {
+        userTickets = JSON.parse(cached).filter(t => (t.attendeeEmail || '').toLowerCase() === userEmail);
+      } catch (e) {}
+    }
+
+    // Migrate any legacy tickets belonging to this user
+    const legacy = localStorage.getItem('eventland_purchased_tickets');
+    if (legacy) {
+      try {
+        const legacyList = JSON.parse(legacy);
+        const matched = legacyList.filter(t => (t.attendeeEmail || '').toLowerCase() === userEmail);
+        matched.forEach(t => {
+          if (!userTickets.some(ut => ut.ticketId === t.ticketId)) {
+            userTickets.push(t);
+          }
+        });
+      } catch (e) {}
+    }
+
+    setPurchasedTickets(userTickets);
+
+    // Fetch verified/confirmed bookings for this user from backend API
+    bookingsApi.getBookingsByEmail(currentUser.email, 1, 50)
+      .then(res => {
+        const list = Array.isArray(res) ? res : (res?.items || []);
+        const confirmedBookings = list.filter(b => b.paymentStatus === 'Paid' || b.status === 'Confirmed');
+        const apiTickets = confirmedBookings.map(b => ({
+          ticketId: b.bookingRef || `EVL-${b.id}`,
+          bookingId: b.id,
+          eventTitle: b.eventTitle,
+          venue: b.venueName || 'Arts Council of Pakistan, Karachi',
+          date: b.showDate || b.eventDate || 'Upcoming Show',
+          time: b.showTime || b.showTitle || '08:00 PM PKT',
+          showTitle: b.showTitle || 'Main Show Slot',
+          showDateTime: (b.showDate && b.showTime) ? `${b.showDate} at ${b.showTime}` : (b.showDate || b.showTime || 'Upcoming Show'),
+          attendeeName: b.customerName,
+          attendeeEmail: b.customerEmail || currentUser.email,
+          phone: b.customerPhone,
+          seats: (b.selectedSeats || []).map(s => ({ id: s.label || s.id, zone: s.label })),
+          paymentMethod: b.paymentMethod || 'PAID',
+          totalPaid: b.totalAmount,
+          bookingTime: new Date(b.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+        }));
+
+        const mergedMap = new Map();
+        [...apiTickets, ...userTickets].forEach(t => {
+          if ((t.attendeeEmail || '').toLowerCase() === userEmail) {
+            mergedMap.set(t.ticketId, t);
+          }
+        });
+        const finalTickets = Array.from(mergedMap.values());
+        setPurchasedTickets(finalTickets);
+        localStorage.setItem(storageKey, JSON.stringify(finalTickets));
+      })
+      .catch(err => {
+        console.warn('Could not load user bookings from backend:', err);
+      });
+  }, [currentUser]);
 
   const handleRemoveTicket = (ticketId) => {
     const updated = purchasedTickets.filter((t) => t.ticketId !== ticketId);
     setPurchasedTickets(updated);
-    localStorage.setItem('eventland_purchased_tickets', JSON.stringify(updated));
+    if (currentUser?.email) {
+      localStorage.setItem(`eventland_purchased_tickets_${currentUser.email.toLowerCase()}`, JSON.stringify(updated));
+    }
     showInfo('Pass Removed 🎫', `Digital pass #${ticketId} removed from saved tickets.`);
   };
 
   const handleClearAllTickets = () => {
     setPurchasedTickets([]);
-    localStorage.removeItem('eventland_purchased_tickets');
+    if (currentUser?.email) {
+      localStorage.removeItem(`eventland_purchased_tickets_${currentUser.email.toLowerCase()}`);
+    }
     showInfo('Passes Cleared 🎫', 'All saved digital ticket passes have been cleared.');
   };
 
@@ -309,27 +397,43 @@ export default function App() {
 
   const handleLookupTickets = async (e) => {
     e?.preventDefault();
-    const query = ticketLookupQuery.trim();
-    if (!query) {
-      showWarning('Lookup Query Required', 'Please enter your email or booking reference (e.g. EVL-123456)');
+    if (!currentUser) {
+      showWarning('Authentication Required', 'Please sign in to view or lookup bookings.');
+      setAuthModalRole('customer');
+      setIsAuthModalOpen(true);
       return;
     }
 
+    const query = ticketLookupQuery.trim();
+    if (!query) {
+      showWarning('Lookup Query Required', 'Please enter your booking reference (e.g. EVL-123456) or email');
+      return;
+    }
+
+    const userEmail = (currentUser.email || '').toLowerCase();
     setIsLookingUpTicket(true);
     try {
       if (query.toUpperCase().startsWith('EVL-')) {
         const booking = await bookingsApi.getBookingByRef(query.toUpperCase());
         if (booking) {
+          const bookingEmail = (booking.customerEmail || '').toLowerCase();
+          // Strict user scoping: regular users can only access bookings matching their email
+          if (bookingEmail && bookingEmail !== userEmail && !isAdmin(currentUser)) {
+            showError('Access Denied', 'This booking does not belong to your signed-in account.');
+            return;
+          }
+
           const tObj = {
             ticketId: booking.bookingRef,
+            bookingId: booking.id,
             eventTitle: booking.eventTitle,
             venue: booking.venueName || 'Arts Council of Pakistan, Karachi',
-            date: booking.showDate || booking.eventDate || 'Saturday, 10th January 2027',
+            date: booking.showDate || booking.eventDate || 'Upcoming Show',
             time: booking.showTime || booking.showTitle || '08:00 PM PKT',
             showTitle: booking.showTitle || 'Main Show Slot',
-            showDateTime: (booking.showDate && booking.showTime) ? `${booking.showDate} at ${booking.showTime}` : (booking.showDate || booking.showTime || 'Saturday, 10th January 2027 at 08:00 PM PKT'),
+            showDateTime: (booking.showDate && booking.showTime) ? `${booking.showDate} at ${booking.showTime}` : (booking.showDate || booking.showTime || 'Upcoming Show'),
             attendeeName: booking.customerName,
-            attendeeEmail: booking.customerEmail,
+            attendeeEmail: booking.customerEmail || currentUser.email,
             phone: booking.customerPhone,
             seats: (booking.selectedSeats || []).map(s => ({ id: s.label || s.id, zone: s.label })),
             paymentMethod: booking.paymentMethod || 'PAID',
@@ -341,38 +445,55 @@ export default function App() {
           if (!exists) {
             const updated = [tObj, ...purchasedTickets];
             setPurchasedTickets(updated);
-            localStorage.setItem('eventland_purchased_tickets', JSON.stringify(updated));
+            localStorage.setItem(`eventland_purchased_tickets_${userEmail}`, JSON.stringify(updated));
           }
           showSuccess('Booking Retrieved', `Found booking ${booking.bookingRef} for ${booking.customerName}`);
           setActiveTicketView(tObj);
+        } else {
+          showInfo('Not Found', `Booking reference ${query.toUpperCase()} was not found.`);
         }
       } else {
+        // Looking up by email: enforce user can only lookup their own email (unless admin)
+        if (query.toLowerCase() !== userEmail && !isAdmin(currentUser)) {
+          showWarning('Access Restricted', `You can only look up bookings for your signed-in account (${currentUser.email}).`);
+          return;
+        }
+
         const res = await bookingsApi.getBookingsByEmail(query, 1, 20);
-        const list = res.items || [];
+        const list = Array.isArray(res) ? res : (res?.items || []);
         if (list.length === 0) {
           showInfo('No Bookings Found', `No bookings found for email: ${query}`);
         } else {
-          const newTickets = list.map(b => ({
-            ticketId: b.bookingRef,
-            eventTitle: b.eventTitle,
-            venue: b.venueName || 'Arts Council of Pakistan, Karachi',
-            date: b.showDate || b.eventDate || 'Saturday, 10th January 2027',
-            time: b.showTime || b.showTitle || '08:00 PM PKT',
-            showTitle: b.showTitle || 'Main Show Slot',
-            showDateTime: (b.showDate && b.showTime) ? `${b.showDate} at ${b.showTime}` : (b.showDate || b.showTime || 'Saturday, 10th January 2027 at 08:00 PM PKT'),
-            attendeeName: b.customerName,
-            attendeeEmail: b.customerEmail,
-            phone: b.customerPhone,
-            seats: (b.selectedSeats || []).map(s => ({ id: s.label || s.id, zone: s.label })),
-            paymentMethod: b.paymentMethod || 'PAID',
-            totalPaid: b.totalAmount,
-            bookingTime: new Date(b.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
-          }));
+          const newTickets = list
+            .filter(b => b.paymentStatus === 'Paid' || b.status === 'Confirmed')
+            .map(b => ({
+              ticketId: b.bookingRef || `EVL-${b.id}`,
+              bookingId: b.id,
+              eventTitle: b.eventTitle,
+              venue: b.venueName || 'Arts Council of Pakistan, Karachi',
+              date: b.showDate || b.eventDate || 'Upcoming Show',
+              time: b.showTime || b.showTitle || '08:00 PM PKT',
+              showTitle: b.showTitle || 'Main Show Slot',
+              showDateTime: (b.showDate && b.showTime) ? `${b.showDate} at ${b.showTime}` : (b.showDate || b.showTime || 'Upcoming Show'),
+              attendeeName: b.customerName,
+              attendeeEmail: b.customerEmail || currentUser.email,
+              phone: b.customerPhone,
+              seats: (b.selectedSeats || []).map(s => ({ id: s.label || s.id, zone: s.label })),
+              paymentMethod: b.paymentMethod || 'PAID',
+              totalPaid: b.totalAmount,
+              bookingTime: new Date(b.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+            }));
 
-          const merged = [...newTickets, ...purchasedTickets.filter(t => !newTickets.some(nt => nt.ticketId === t.ticketId))];
+          const mergedMap = new Map();
+          [...newTickets, ...purchasedTickets].forEach(t => {
+            if ((t.attendeeEmail || '').toLowerCase() === userEmail) {
+              mergedMap.set(t.ticketId, t);
+            }
+          });
+          const merged = Array.from(mergedMap.values());
           setPurchasedTickets(merged);
-          localStorage.setItem('eventland_purchased_tickets', JSON.stringify(merged));
-          showSuccess('Bookings Retrieved', `Found ${list.length} booking(s) for ${query}`);
+          localStorage.setItem(`eventland_purchased_tickets_${userEmail}`, JSON.stringify(merged));
+          showSuccess('Bookings Retrieved', `Found ${newTickets.length} confirmed booking(s) for ${query}`);
         }
       }
     } catch (err) {
@@ -498,6 +619,14 @@ export default function App() {
   };
 
   const handleNavigateView = (view) => {
+    if (view === 'my-tickets' || view === 'unpaid-invoices') {
+      if (!currentUser) {
+        setAuthModalRole('customer');
+        setIsAuthModalOpen(true);
+        showWarning('Sign In Required', `Please sign in to view your ${view === 'my-tickets' ? 'tickets' : 'unpaid invoices'}.`);
+        return;
+      }
+    }
     if (view === 'organizer-wizard') {
       if (!currentUser) {
         setAuthModalRole('organizer');
@@ -584,9 +713,27 @@ export default function App() {
 
   const handleBookingSuccess = (newTicket) => {
     setCheckoutData(null);
-    setPurchasedTickets([newTicket, ...purchasedTickets]);
+    const updated = [newTicket, ...purchasedTickets];
+    setPurchasedTickets(updated);
+    if (currentUser?.email) {
+      localStorage.setItem(`eventland_purchased_tickets_${currentUser.email.toLowerCase()}`, JSON.stringify(updated));
+    }
     setActiveTicketView(newTicket);
-    showSuccess('Booking Confirmed! 🎟️', `Pass #${newTicket.ticketId} issued successfully for ${newTicket.eventTitle}.`);
+    showSuccess('Booking Confirmed! 🎟️', `Pass #${newTicket.ticketId || newTicket.bookingRef} issued successfully for ${newTicket.eventTitle}.`);
+  };
+
+  const handleInvoiceCreated = (invoice) => {
+    if (!currentUser?.email) return;
+    const userEmail = currentUser.email.toLowerCase();
+    const storageKey = `eventland_unpaid_invoices_${userEmail}`;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      const existing = raw ? JSON.parse(raw) : [];
+      const updated = [invoice, ...existing.filter(i => (i.bookingRef || i.id) !== (invoice.bookingRef || invoice.id))];
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Could not cache created invoice:', e);
+    }
   };
 
   const handlePublishNewEvent = async (newEvent) => {
@@ -627,6 +774,58 @@ export default function App() {
     }
   };
 
+  // Identify active city object and cityId
+  const selectedCityObj = useMemo(() => {
+    if (!selectedCity || selectedCity === 'All Cities') return null;
+    return (cities || []).find(c => {
+      const cName = typeof c === 'string' ? c : c.name;
+      return cName && cName.toLowerCase() === selectedCity.toLowerCase();
+    });
+  }, [cities, selectedCity]);
+
+  const selectedCityId = selectedCityObj?.id || null;
+
+  // Cascading Venues: Loaded ONLY when a city is selected (via cityId)
+  const [cityVenues, setCityVenues] = useState([]);
+  const [loadingVenues, setLoadingVenues] = useState(false);
+
+  useEffect(() => {
+    if (!selectedCityId) {
+      setCityVenues([]);
+      setSelectedVenue('All Venues');
+      return;
+    }
+
+    setLoadingVenues(true);
+    locationsApi.getVenues(selectedCityId)
+      .then(res => {
+        const list = Array.isArray(res) ? res : (res?.items || []);
+        const venueNames = list.map(v => typeof v === 'string' ? v : v.name).filter(Boolean);
+        setCityVenues(venueNames);
+        // If current selected venue is not in this city, reset to 'All Venues'
+        setSelectedVenue(prev => (prev !== 'All Venues' && !venueNames.includes(prev)) ? 'All Venues' : prev);
+      })
+      .catch(err => {
+        console.error('Failed to load venues for cityId:', selectedCityId, err);
+        setCityVenues([]);
+        setSelectedVenue('All Venues');
+      })
+      .finally(() => setLoadingVenues(false));
+  }, [selectedCityId]);
+
+  // Reset all search and filter criteria in 1 click
+  const handleClearAllFilters = () => {
+    setSearchQuery('');
+    setSelectedCity('All Cities');
+    setSelectedVenue('All Venues');
+    setSelectedTag('All');
+    setSelectedDateFilter('all');
+    setCustomDate('');
+    setSelectedPriceFilter('all');
+    setSortBy('featured');
+    showInfo('Filters Cleared', 'All discovery filters have been reset.');
+  };
+
   // Filter & Sort Events — memoized so typing in search does not re-scan the
   // list on every render, and debounced so each keystroke does not re-filter.
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -638,28 +837,47 @@ export default function App() {
   const sortedEvents = useMemo(() => {
     const needle = debouncedSearch.trim().toLowerCase();
     const citySel = selectedCity.toLowerCase();
+    const venueSel = selectedVenue.toLowerCase();
     const tagSel = selectedTag.toLowerCase().trim();
 
+    const now = new Date();
+    const todayStr = now.toDateString();
+
+    // Weekend range: next Friday start of day to Sunday end of day
+    const dayOfWeek = now.getDay(); // 0 is Sunday, 5 is Friday, 6 is Saturday
+    const daysUntilFriday = (5 - dayOfWeek + 7) % 7;
+    const thisFriday = new Date(now);
+    thisFriday.setDate(now.getDate() + (dayOfWeek === 0 ? -2 : (dayOfWeek === 6 ? -1 : daysUntilFriday)));
+    thisFriday.setHours(0, 0, 0, 0);
+
+    const thisSunday = new Date(thisFriday);
+    thisSunday.setDate(thisFriday.getDate() + 2);
+    thisSunday.setHours(23, 59, 59, 999);
+
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
     const filtered = events.filter((ev) => {
+      // 1. City Match
       const matchCity = selectedCity === 'All Cities' || (ev.city && ev.city.toLowerCase() === citySel);
 
+      // 2. Venue Match
+      const evVenue = (ev.venue || ev.venueName || '').toLowerCase();
+      const matchVenue = selectedVenue === 'All Venues' || (evVenue && evVenue.includes(venueSel));
+
+      // 3. Category / Tag Match
       let matchTag = true;
       if (selectedTag !== 'All') {
         const evTagNames = [];
-        
         if (ev.tag) {
           if (typeof ev.tag === 'string') evTagNames.push(ev.tag);
           else if (typeof ev.tag === 'object' && ev.tag.name) evTagNames.push(ev.tag.name);
         }
-        
         if (ev.category) {
           if (typeof ev.category === 'string') evTagNames.push(ev.category);
           else if (typeof ev.category === 'object' && ev.category.name) evTagNames.push(ev.category.name);
         }
-
-        if (ev.categoryName) {
-          evTagNames.push(String(ev.categoryName));
-        }
+        if (ev.categoryName) evTagNames.push(String(ev.categoryName));
 
         const rawTags = ev.tags || ev.eventTags || [];
         if (Array.isArray(rawTags)) {
@@ -677,7 +895,6 @@ export default function App() {
             }
           });
         }
-
         if (Array.isArray(ev.tagNames)) {
           ev.tagNames.forEach(t => typeof t === 'string' && evTagNames.push(t));
         }
@@ -688,21 +905,90 @@ export default function App() {
         });
       }
 
-      const matchSearch =
-        !needle ||
-        ev.title.toLowerCase().includes(needle) ||
-        (ev.venue && ev.venue.toLowerCase().includes(needle)) ||
-        (ev.city && ev.city.toLowerCase().includes(needle));
+      // 4. Date Match
+      let matchDate = true;
+      if (selectedDateFilter !== 'all') {
+        if (selectedDateFilter === 'custom' && customDate) {
+          const targetDateStr = new Date(customDate + 'T00:00:00').toDateString();
+          const targetIso = customDate; // 'YYYY-MM-DD'
 
-      return matchCity && matchTag && matchSearch;
+          const checkDate = (dateVal) => {
+            if (!dateVal) return false;
+            if (typeof dateVal === 'string' && dateVal.startsWith(targetIso)) return true;
+            const d = new Date(dateVal);
+            if (isNaN(d.getTime())) return false;
+            return d.toDateString() === targetDateStr || (!isNaN(d.getTime()) && d.toISOString().split('T')[0] === targetIso);
+          };
+
+          const primaryMatch = checkDate(ev.startDateUtc || ev.startDate || ev.date);
+          const showsMatch = Array.isArray(ev.shows) && ev.shows.some(s => 
+            checkDate(s.showDate || s.startTimeUtc || s.startDateUtc)
+          );
+
+          matchDate = primaryMatch || showsMatch;
+        } else if (selectedDateFilter !== 'custom') {
+          const dStr = ev.startDateUtc || ev.startDate || ev.date;
+          if (!dStr) {
+            matchDate = false;
+          } else {
+            const evDate = new Date(dStr);
+            if (isNaN(evDate.getTime())) {
+              matchDate = false;
+            } else {
+              if (selectedDateFilter === 'today') {
+                matchDate = evDate.toDateString() === todayStr;
+              } else if (selectedDateFilter === 'this-weekend') {
+                matchDate = evDate >= thisFriday && evDate <= thisSunday;
+              } else if (selectedDateFilter === 'this-month') {
+                matchDate = evDate.getMonth() === currentMonth && evDate.getFullYear() === currentYear;
+              }
+            }
+          }
+        }
+      }
+
+      // 5. Price Match
+      let matchPrice = true;
+      if (selectedPriceFilter !== 'all') {
+        const price = Number(ev.startingPrice ?? ev.price ?? 0);
+        if (selectedPriceFilter === 'free') {
+          matchPrice = price === 0 || ev.isFree === true;
+        } else if (selectedPriceFilter === 'under-2000') {
+          matchPrice = price > 0 && price <= 2000;
+        } else if (selectedPriceFilter === '2000-5000') {
+          matchPrice = price >= 2000 && price <= 5000;
+        } else if (selectedPriceFilter === 'above-5000') {
+          matchPrice = price > 5000;
+        }
+      }
+
+      // 6. Search Query Match (Title, Venue, City, Description, Artists, Organizer)
+      let matchSearch = true;
+      if (needle) {
+        const titleMatch = ev.title && ev.title.toLowerCase().includes(needle);
+        const venueMatch = evVenue && evVenue.includes(needle);
+        const cityMatch = ev.city && ev.city.toLowerCase().includes(needle);
+        const descMatch = ev.description && ev.description.toLowerCase().includes(needle);
+        const artistMatch = (ev.artist || ev.artistName || (Array.isArray(ev.artists) ? ev.artists.map(a => a.name || a).join(' ') : ''))
+          .toLowerCase().includes(needle);
+        const organizerMatch = (ev.organizer?.name || ev.organizerName || '').toLowerCase().includes(needle);
+        matchSearch = titleMatch || venueMatch || cityMatch || descMatch || artistMatch || organizerMatch;
+      }
+
+      return matchCity && matchVenue && matchTag && matchDate && matchPrice && matchSearch;
     });
 
     return filtered.sort((a, b) => {
-      if (sortBy === 'price-asc') return a.startingPrice - b.startingPrice;
-      if (sortBy === 'price-desc') return b.startingPrice - a.startingPrice;
+      if (sortBy === 'soonest') {
+        const dateA = new Date(a.startDateUtc || a.startDate || a.date || 0).getTime();
+        const dateB = new Date(b.startDateUtc || b.startDate || b.date || 0).getTime();
+        return dateA - dateB;
+      }
+      if (sortBy === 'price-asc') return (a.startingPrice || 0) - (b.startingPrice || 0);
+      if (sortBy === 'price-desc') return (b.startingPrice || 0) - (a.startingPrice || 0);
       return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
     });
-  }, [events, selectedCity, selectedTag, debouncedSearch, sortBy]);
+  }, [events, selectedCity, selectedVenue, selectedTag, selectedDateFilter, customDate, selectedPriceFilter, debouncedSearch, sortBy]);
 
   const featuredEvents = useMemo(() => events.filter((e) => e.isFeatured), [events]);
 
@@ -735,17 +1021,32 @@ export default function App() {
               onSelectEvent={handleSelectEventForDetail}
             />
 
-            {/* Filter Bar */}
+            {/* Discovery & Search Hub */}
             <EventFilterBar
               tags={tags}
               events={events}
               cities={cities}
+              venues={cityVenues}
+              loadingVenues={loadingVenues}
+              isCitySelected={Boolean(selectedCityId)}
               selectedTag={selectedTag}
               onSelectTag={setSelectedTag}
               selectedCity={selectedCity}
               onSelectCity={setSelectedCity}
+              selectedVenue={selectedVenue}
+              onSelectVenue={setSelectedVenue}
+              selectedDateFilter={selectedDateFilter}
+              onSelectDateFilter={setSelectedDateFilter}
+              customDate={customDate}
+              onCustomDateChange={setCustomDate}
+              selectedPriceFilter={selectedPriceFilter}
+              onSelectPriceFilter={setSelectedPriceFilter}
               sortBy={sortBy}
               onSortChange={setSortBy}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              totalResults={sortedEvents.length}
+              onClearAllFilters={handleClearAllFilters}
             />
 
             {/* Events Grid Header */}
@@ -772,17 +1073,13 @@ export default function App() {
                 <Ticket size={48} color="#94a3b8" style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
                 <h3 style={{ fontSize: '1.3rem', color: '#fff', marginBottom: '0.5rem' }}>No events found</h3>
                 <p style={{ color: '#94a3b8', marginBottom: '1.5rem' }}>
-                  Try adjusting your city filter or search query.
+                  Try adjusting your city filter, venue, date, or search query.
                 </p>
                 <button
-                  onClick={() => {
-                    setSelectedCity('All Cities');
-                    setSelectedTag('All');
-                    setSearchQuery('');
-                  }}
+                  onClick={handleClearAllFilters}
                   className="btn btn-primary"
                 >
-                  Reset Filters
+                  Reset All Filters
                 </button>
               </div>
             ) : (
@@ -941,6 +1238,7 @@ export default function App() {
             selectedSeats={checkoutData.seats}
             onClose={() => setCheckoutData(null)}
             onBookingSuccess={handleBookingSuccess}
+            onInvoiceCreated={handleInvoiceCreated}
           />
         </Suspense>
       )}

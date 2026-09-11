@@ -63,14 +63,14 @@ export default function SearchableSelect({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
         style={{
           width: '100%',
           padding: '0.7rem 0.9rem',
-          backgroundColor: 'rgba(13, 30, 43, 0.75)',
-          border: isOpen ? '1px solid #0d9488' : '1px solid rgba(255, 255, 255, 0.12)',
+          backgroundColor: disabled ? 'rgba(15, 23, 42, 0.4)' : 'rgba(13, 30, 43, 0.75)',
+          border: isOpen ? '1px solid #0d9488' : (disabled ? '1px solid rgba(255, 255, 255, 0.06)' : '1px solid rgba(255, 255, 255, 0.12)'),
           borderRadius: '10px',
-          color: selectedOption ? '#f8fafc' : '#94a3b8',
+          color: disabled ? '#64748b' : (selectedOption ? '#f8fafc' : '#94a3b8'),
           fontSize: '0.875rem',
           fontWeight: 500,
           display: 'flex',
@@ -78,6 +78,7 @@ export default function SearchableSelect({
           justifyContent: 'space-between',
           gap: '0.5rem',
           cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.5 : 1,
           boxShadow: isOpen ? '0 0 12px rgba(13, 148, 136, 0.3)' : 'none',
           backdropFilter: 'blur(8px)',
           transition: 'all 0.2s ease'

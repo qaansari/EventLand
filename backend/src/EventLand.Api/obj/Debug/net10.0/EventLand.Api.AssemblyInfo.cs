@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("EventLand.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9d904f9e5b6517ed823bcd27b2d7e275c894587d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+defb614105984225ec8bf2cbbedf87eed7bf759a")]
 [assembly: System.Reflection.AssemblyProductAttribute("EventLand.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("EventLand.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

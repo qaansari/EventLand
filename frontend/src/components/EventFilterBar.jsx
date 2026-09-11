@@ -1,8 +1,49 @@
 import React, { useMemo } from 'react';
-import { SlidersHorizontal, Tag as TagIcon, Music, Mic, Theater, Sparkles, Trophy, Users, Film, Compass, Calendar } from 'lucide-react';
+import { 
+  Search, 
+  X, 
+  MapPin, 
+  Building2, 
+  Calendar, 
+  Coins, 
+  SlidersHorizontal, 
+  RotateCcw, 
+  Sparkles, 
+  Music, 
+  Mic, 
+  Theater, 
+  Trophy, 
+  Users, 
+  Film, 
+  Compass, 
+  Tag as TagIcon,
+  Filter
+} from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 
-const CITIES = ['All Cities', 'Karachi', 'Lahore', 'Islamabad'];
+const DEFAULT_CITIES = ['All Cities', 'Karachi', 'Lahore', 'Islamabad', 'Rawalpindi'];
+
+const DATE_OPTIONS = [
+  { value: 'all', label: 'All Dates' },
+  { value: 'today', label: 'Today' },
+  { value: 'this-weekend', label: 'This Weekend' },
+  { value: 'this-month', label: 'This Month' }
+];
+
+const PRICE_OPTIONS = [
+  { value: 'all', label: 'Any Price' },
+  { value: 'free', label: 'Free Admission' },
+  { value: 'under-2000', label: 'Under Rs. 2,000' },
+  { value: '2000-5000', label: 'Rs. 2,000 – 5,000' },
+  { value: 'above-5000', label: 'Rs. 5,000+' }
+];
+
+const SORT_OPTIONS = [
+  { value: 'featured', label: 'Featured First' },
+  { value: 'soonest', label: 'Date: Soonest' },
+  { value: 'price-asc', label: 'Price: Low to High' },
+  { value: 'price-desc', label: 'Price: High to Low' }
+];
 
 // Helper to get matching category icon for quick visual discovery
 function getCategoryIcon(name) {
@@ -22,23 +63,37 @@ export default function EventFilterBar({
   tags = [],
   events = [],
   cities = [],
+  venues = [],
+  loadingVenues = false,
+  isCitySelected = false,
   selectedTag = 'All',
   onSelectTag,
   selectedCity = 'All Cities',
   onSelectCity,
+  selectedVenue = 'All Venues',
+  onSelectVenue,
+  selectedDateFilter = 'all',
+  onSelectDateFilter,
+  customDate = '',
+  onCustomDateChange,
+  selectedPriceFilter = 'all',
+  onSelectPriceFilter,
   sortBy = 'featured',
-  onSortChange
+  onSortChange,
+  searchQuery = '',
+  onSearchChange,
+  totalResults = 0,
+  onClearAllFilters
 }) {
+  // Extract all categories / tags from API and events
   const allTags = useMemo(() => {
     const set = new Set();
 
-    // 1. Tags passed from API
     (tags || []).forEach(t => {
       const name = typeof t === 'string' ? t : (t?.name || t?.tagName);
       if (name) set.add(name);
     });
 
-    // 2. Extract tags from events
     (events || []).forEach(ev => {
       if (ev.tag) set.add(typeof ev.tag === 'string' ? ev.tag : ev.tag.name);
       if (ev.category) set.add(typeof ev.category === 'string' ? ev.category : ev.category.name);
@@ -50,7 +105,6 @@ export default function EventFilterBar({
       }
     });
 
-    // 3. Popular defaults if set is small
     if (set.size === 0) {
       ['Concert', 'Music', 'Comedy', 'Theatre', 'Festival', 'Workshop', 'Family'].forEach(t => set.add(t));
     }
@@ -58,145 +112,384 @@ export default function EventFilterBar({
     return ['All', ...Array.from(set).filter(Boolean)];
   }, [tags, events]);
 
-  const cityList = cities && cities.length > 0
-    ? ['All Cities', ...cities.map(c => typeof c === 'string' ? c : c.name)]
-    : CITIES;
+  const cityList = useMemo(() => {
+    if (cities && cities.length > 0) {
+      return ['All Cities', ...cities.map(c => typeof c === 'string' ? c : c.name).filter(Boolean)];
+    }
+    return DEFAULT_CITIES;
+  }, [cities]);
+
+  // Cascading venue state: disabled unless a city is explicitly chosen
+  const isCityChosen = Boolean(isCitySelected || (selectedCity && selectedCity !== 'All Cities'));
+  const isVenueDisabled = !isCityChosen;
+
+  // Options for venue select: disabled until city is chosen, then populated with cityId venues
+  const formattedVenueOptions = useMemo(() => {
+    if (isVenueDisabled) {
+      return [{ value: 'All Venues', label: 'Select a city first' }];
+    }
+    if (loadingVenues) {
+      return [{ value: 'All Venues', label: `Loading venues in ${selectedCity}...` }];
+    }
+    const cleanVenues = (venues || []).map(v => {
+      const val = typeof v === 'object' && v !== null ? (v.name || v.label || v.value) : v;
+      return String(val);
+    }).filter(Boolean);
+
+    if (cleanVenues.length === 0) {
+      return [{ value: 'All Venues', label: `No venues found in ${selectedCity}` }];
+    }
+
+    return [
+      { value: 'All Venues', label: `All ${selectedCity} Venues` },
+      ...cleanVenues.map(v => ({ value: v, label: v }))
+    ];
+  }, [isVenueDisabled, loadingVenues, venues, selectedCity]);
+
+  const venuePlaceholder = useMemo(() => {
+    if (isVenueDisabled) return 'Select a city first...';
+    if (loadingVenues) return `Loading ${selectedCity} venues...`;
+    if (!venues || venues.length === 0) return `No venues in ${selectedCity}`;
+    return `Venues in ${selectedCity}...`;
+  }, [isVenueDisabled, loadingVenues, venues, selectedCity]);
+
+  // Date options with custom date dynamic display
+  const dateOptions = useMemo(() => [
+    { value: 'all', label: 'All Dates' },
+    { value: 'today', label: 'Today' },
+    { value: 'this-weekend', label: 'This Weekend' },
+    { value: 'this-month', label: 'This Month' },
+    { 
+      value: 'custom', 
+      label: customDate 
+        ? `📅 ${new Date(customDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` 
+        : 'Pick Specific Date...' 
+    }
+  ], [customDate]);
+
+  // Determine active filters
+  const activeFilters = useMemo(() => {
+    const list = [];
+    if (searchQuery.trim()) {
+      list.push({ type: 'search', label: `Search: "${searchQuery.trim()}"`, clear: () => onSearchChange && onSearchChange('') });
+    }
+    if (selectedCity && selectedCity !== 'All Cities') {
+      list.push({ type: 'city', label: `City: ${selectedCity}`, clear: () => onSelectCity && onSelectCity('All Cities') });
+    }
+    if (isCityChosen && selectedVenue && selectedVenue !== 'All Venues') {
+      list.push({ type: 'venue', label: `Venue: ${selectedVenue}`, clear: () => onSelectVenue && onSelectVenue('All Venues') });
+    }
+    if (selectedDateFilter && selectedDateFilter !== 'all') {
+      if (selectedDateFilter === 'custom') {
+        const formatted = customDate 
+          ? new Date(customDate + 'T00:00:00').toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+          : 'Specific Date';
+        list.push({ 
+          type: 'date', 
+          label: `Date: ${formatted}`, 
+          clear: () => {
+            onSelectDateFilter && onSelectDateFilter('all');
+            onCustomDateChange && onCustomDateChange('');
+          } 
+        });
+      } else {
+        const opt = dateOptions.find(o => o.value === selectedDateFilter);
+        list.push({ type: 'date', label: `Date: ${opt?.label || selectedDateFilter}`, clear: () => onSelectDateFilter && onSelectDateFilter('all') });
+      }
+    }
+    if (selectedPriceFilter && selectedPriceFilter !== 'all') {
+      const opt = PRICE_OPTIONS.find(o => o.value === selectedPriceFilter);
+      list.push({ type: 'price', label: `Price: ${opt?.label || selectedPriceFilter}`, clear: () => onSelectPriceFilter && onSelectPriceFilter('all') });
+    }
+    if (selectedTag && selectedTag !== 'All') {
+      list.push({ type: 'tag', label: `Category: ${selectedTag}`, clear: () => onSelectTag && onSelectTag('All') });
+    }
+    return list;
+  }, [searchQuery, selectedCity, selectedVenue, isCityChosen, selectedDateFilter, customDate, dateOptions, selectedPriceFilter, selectedTag, onSearchChange, onSelectCity, onSelectVenue, onSelectDateFilter, onCustomDateChange, onSelectPriceFilter, onSelectTag]);
+
+  const hasActiveFilters = activeFilters.length > 0;
 
   return (
-    <div style={{
-      marginBottom: '2.25rem',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '1rem'
-    }}>
-      {/* Dynamic Tag Pills Row with Smooth Scroll */}
-      <div className="filter-tags-row hide-scrollbar" style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.65rem',
-        overflowX: 'auto',
-        paddingBottom: '0.6rem',
-        scrollbarWidth: 'none',
-        msOverflowStyle: 'none'
-      }}>
-        {allTags.map((tagName) => {
-          const isActive = selectedTag === tagName;
-          return (
-            <button
-              key={tagName}
-              onClick={() => onSelectTag && onSelectTag(tagName)}
-              style={{
-                fontFamily: 'var(--font-display)',
-                background: isActive 
-                  ? 'linear-gradient(135deg, #0d9488 0%, #059669 100%)' 
-                  : 'rgba(255, 255, 255, 0.06)',
-                color: isActive ? '#ffffff' : '#cbd5e1',
-                border: isActive ? '1px solid rgba(45, 212, 191, 0.6)' : '1px solid rgba(255, 255, 255, 0.12)',
-                padding: '0.55rem 1.25rem',
-                borderRadius: '9999px',
-                fontWeight: isActive ? 700 : 500,
-                fontSize: '0.88rem',
-                letterSpacing: '0.01em',
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
-                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                boxShadow: 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                transform: isActive ? 'scale(1.02)' : 'scale(1)'
-              }}
-              onMouseEnter={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
-                  e.currentTarget.style.borderColor = 'rgba(45, 212, 191, 0.4)';
-                  e.currentTarget.style.color = '#ffffff';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive) {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.06)';
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
-                  e.currentTarget.style.color = '#cbd5e1';
-                }
-              }}
-            >
-              {getCategoryIcon(tagName)}
-              <span>{tagName === 'All' ? 'All Events' : tagName}</span>
-            </button>
-          );
-        })}
+    <section 
+      id="discovery-search-hub"
+      aria-label="Event Discovery and Filters"
+      className="discovery-hub-card"
+    >
+      {/* ── 1. Prominent Centerpiece Search Bar ────────────────────────── */}
+      <div className="discovery-search-wrapper">
+        <div className="discovery-search-icon-badge">
+          <Search size={22} className="discovery-search-icon" />
+        </div>
+        
+        <input
+          id="discovery-search-input"
+          type="text"
+          value={searchQuery}
+          onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
+          placeholder="Search live concerts, standup comedy, festivals, venues, artists..."
+          className="discovery-search-input"
+          autoComplete="off"
+        />
+
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => onSearchChange && onSearchChange('')}
+            className="discovery-search-clear-btn"
+            title="Clear search query"
+            aria-label="Clear search input"
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
 
-      {/* City & Sorting Strip */}
-      <div className="filter-strip" style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        backgroundColor: 'rgba(13, 30, 43, 0.65)',
-        backdropFilter: 'blur(16px)',
-        padding: '0.85rem 1.35rem',
-        borderRadius: '16px',
-        border: '1px solid rgba(13, 148, 136, 0.25)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>Quick City:</span>
-          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
-            {cityList.map((city) => {
-              const isSelected = selectedCity === city;
-              return (
-                <button
-                  key={city}
-                  onClick={() => onSelectCity(city)}
-                  style={{
-                    backgroundColor: isSelected ? 'rgba(13, 148, 136, 0.25)' : 'rgba(255, 255, 255, 0.04)',
-                    color: isSelected ? '#2dd4bf' : '#94a3b8',
-                    border: isSelected ? '1px solid rgba(45, 212, 191, 0.55)' : '1px solid rgba(255, 255, 255, 0.08)',
-                    padding: '0.35rem 0.85rem',
-                    borderRadius: '8px',
-                    fontSize: '0.82rem',
-                    fontWeight: isSelected ? 700 : 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    boxShadow: 'none'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.09)';
-                      e.currentTarget.style.color = '#fff';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.04)';
-                      e.currentTarget.style.color = '#94a3b8';
-                    }
-                  }}
-                >
-                  {city}
-                </button>
-              );
-            })}
-          </div>
+      {/* ── 2. Filter Controls Grid ───────────────────────────────────── */}
+      <div className="discovery-filters-grid">
+        {/* City Filter */}
+        <div className="discovery-filter-item">
+          <label className="discovery-filter-label">
+            <MapPin size={13} className="discovery-label-icon" />
+            <span>City</span>
+          </label>
+          <SearchableSelect
+            value={selectedCity}
+            onChange={(e) => onSelectCity && onSelectCity(e.target.value)}
+            options={cityList}
+            icon={MapPin}
+            placeholder="Select City..."
+            className="discovery-select"
+          />
         </div>
 
-        <div className="filter-sort-group" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <SlidersHorizontal size={16} color="#94a3b8" />
-          <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>Sort:</span>
+        {/* Venue Filter (Disabled until City is chosen) */}
+        <div className="discovery-filter-item">
+          <label 
+            className="discovery-filter-label"
+            style={{ 
+              opacity: isVenueDisabled ? 0.45 : 1,
+              transition: 'opacity 0.2s ease'
+            }}
+          >
+            <Building2 size={13} className="discovery-label-icon" style={{ color: isVenueDisabled ? '#64748b' : '#2dd4bf' }} />
+            <span>Venue {isCityChosen ? `(${selectedCity})` : ''}</span>
+          </label>
+          <SearchableSelect
+            value={isVenueDisabled ? 'All Venues' : selectedVenue}
+            onChange={(e) => onSelectVenue && onSelectVenue(e.target.value)}
+            options={formattedVenueOptions}
+            icon={Building2}
+            placeholder={venuePlaceholder}
+            disabled={isVenueDisabled || loadingVenues}
+            className="discovery-select"
+          />
+        </div>
+
+        {/* Date Range & Custom Date Filter */}
+        <div className="discovery-filter-item">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem' }}>
+            <label className="discovery-filter-label">
+              <Calendar size={13} className="discovery-label-icon" />
+              <span>When</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedDateFilter === 'custom') {
+                  onSelectDateFilter && onSelectDateFilter('all');
+                  onCustomDateChange && onCustomDateChange('');
+                } else {
+                  onSelectDateFilter && onSelectDateFilter('custom');
+                  if (!customDate) {
+                    const todayIso = new Date().toISOString().split('T')[0];
+                    onCustomDateChange && onCustomDateChange(todayIso);
+                  }
+                }
+              }}
+              style={{
+                background: selectedDateFilter === 'custom' ? 'rgba(45, 212, 191, 0.22)' : 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid',
+                borderColor: selectedDateFilter === 'custom' ? 'rgba(45, 212, 191, 0.6)' : 'rgba(255, 255, 255, 0.12)',
+                borderRadius: '6px',
+                padding: '2px 7px',
+                fontSize: '0.68rem',
+                fontWeight: 600,
+                color: selectedDateFilter === 'custom' ? '#2dd4bf' : '#94a3b8',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+                transition: 'all 0.2s ease',
+                lineHeight: 1.2
+              }}
+              title={selectedDateFilter === 'custom' ? "Switch to date presets" : "Pick a specific calendar date"}
+            >
+              <Calendar size={10} />
+              <span>{selectedDateFilter === 'custom' ? 'Presets' : 'Custom'}</span>
+            </button>
+          </div>
+
+          <SearchableSelect
+            value={selectedDateFilter}
+            onChange={(e) => {
+              const val = e.target.value;
+              onSelectDateFilter && onSelectDateFilter(val);
+              if (val === 'custom' && !customDate) {
+                const todayIso = new Date().toISOString().split('T')[0];
+                onCustomDateChange && onCustomDateChange(todayIso);
+              }
+            }}
+            options={dateOptions}
+            icon={Calendar}
+            placeholder="Select Date..."
+            className="discovery-select"
+          />
+
+          {selectedDateFilter === 'custom' && (
+            <div style={{ marginTop: '0.45rem', display: 'flex', alignItems: 'center', gap: '0.4rem', animation: 'fadeIn 0.2s ease-out' }}>
+              <input
+                type="date"
+                value={customDate || ''}
+                onChange={(e) => onCustomDateChange && onCustomDateChange(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem 0.75rem',
+                  backgroundColor: 'rgba(15, 23, 42, 0.88)',
+                  border: '1px solid rgba(45, 212, 191, 0.5)',
+                  borderRadius: '10px',
+                  color: '#ffffff',
+                  fontSize: '0.84rem',
+                  fontFamily: 'var(--font-body)',
+                  outline: 'none',
+                  boxShadow: '0 0 10px rgba(13, 148, 136, 0.25)',
+                  colorScheme: 'dark'
+                }}
+              />
+              {customDate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCustomDateChange && onCustomDateChange('');
+                    onSelectDateFilter && onSelectDateFilter('all');
+                  }}
+                  title="Clear custom date"
+                  aria-label="Clear custom date"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    border: 'none',
+                    color: '#94a3b8',
+                    borderRadius: '8px',
+                    padding: '0.55rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#ef4444';
+                    e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = '#94a3b8';
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Price Range Filter */}
+        <div className="discovery-filter-item">
+          <label className="discovery-filter-label">
+            <Coins size={13} className="discovery-label-icon" />
+            <span>Price</span>
+          </label>
+          <SearchableSelect
+            value={selectedPriceFilter}
+            onChange={(e) => onSelectPriceFilter && onSelectPriceFilter(e.target.value)}
+            options={PRICE_OPTIONS}
+            icon={Coins}
+            placeholder="Any Price..."
+            className="discovery-select"
+          />
+        </div>
+
+        {/* Sort By Filter */}
+        <div className="discovery-filter-item">
+          <label className="discovery-filter-label">
+            <SlidersHorizontal size={13} className="discovery-label-icon" />
+            <span>Sort By</span>
+          </label>
           <SearchableSelect
             value={sortBy}
-            onChange={(e) => onSortChange(e.target.value)}
-            options={[
-              { value: 'featured', label: 'Featured First' },
-              { value: 'price-asc', label: 'Price: Low to High' },
-              { value: 'price-desc', label: 'Price: High to Low' }
-            ]}
-            style={{ width: '180px' }}
+            onChange={(e) => onSortChange && onSortChange(e.target.value)}
+            options={SORT_OPTIONS}
+            icon={SlidersHorizontal}
+            placeholder="Sort by..."
+            className="discovery-select"
           />
         </div>
       </div>
-    </div>
+
+      {/* ── 3. Category Tag Pills Row ──────────────────────────────────── */}
+      <div className="discovery-categories-wrapper">
+        <div className="filter-tags-row hide-scrollbar discovery-tags-scroll">
+          {allTags.map((tagName) => {
+            const isActive = selectedTag === tagName;
+            return (
+              <button
+                key={tagName}
+                type="button"
+                onClick={() => onSelectTag && onSelectTag(tagName)}
+                className={`discovery-tag-pill ${isActive ? 'active' : ''}`}
+              >
+                {getCategoryIcon(tagName)}
+                <span>{tagName === 'All' ? 'All Events' : tagName}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── 4. Active Filter Chips & Reset Row ─────────────────────────── */}
+      {hasActiveFilters && (
+        <div className="discovery-active-filters-row">
+          <div className="discovery-active-chips-list">
+            <span className="discovery-active-label">
+              <Filter size={13} /> Active Filters:
+            </span>
+
+            {activeFilters.map((af, idx) => (
+              <span key={`${af.type}-${idx}`} className="discovery-active-chip">
+                <span>{af.label}</span>
+                <button
+                  type="button"
+                  onClick={af.clear}
+                  className="discovery-chip-remove-btn"
+                  title="Remove this filter"
+                  aria-label={`Remove filter ${af.label}`}
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={onClearAllFilters}
+            className="discovery-reset-all-btn"
+            title="Reset all search filters"
+          >
+            <RotateCcw size={13} />
+            <span>Reset All</span>
+          </button>
+        </div>
+      )}
+    </section>
   );
 }

@@ -58,52 +58,82 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
     setTimeout(() => setCopiedField(null), 2500);
   };
 
-  // Fetch unpaid / pending verification invoices from API and localStorage
+  // Fetch unpaid / pending verification invoices from API and localStorage strictly for currentUser
   const loadUnpaidInvoices = async () => {
-    setLoading(true);
-    try {
-      const localInvoicesRaw = localStorage.getItem('eventland_unpaid_invoices');
-      let localInvoices = localInvoicesRaw ? JSON.parse(localInvoicesRaw) : [];
+    if (!currentUser?.email) {
+      setInvoices([]);
+      setLoading(false);
+      return;
+    }
 
-      let apiInvoices = [];
-      const userEmail = currentUser?.email || localStorage.getItem('eventland_user_email');
-      
-      if (userEmail) {
+    setLoading(true);
+    const userEmail = currentUser.email.toLowerCase();
+    const storageKey = `eventland_unpaid_invoices_${userEmail}`;
+
+    try {
+      // 1. Read local invoices cached specifically for this user
+      let localInvoices = [];
+      const userLocalRaw = localStorage.getItem(storageKey);
+      if (userLocalRaw) {
         try {
-          const bksRes = await bookingsApi.getBookingsByEmail(userEmail, 1, 50);
-          const bksList = Array.isArray(bksRes) ? bksRes : (bksRes?.items || []);
-          
-          apiInvoices = bksList
-            .filter(b => b.paymentStatus !== 'Paid' && b.status !== 'Confirmed')
-            .map(b => {
-              const baseAmt = b.totalAmount || b.unitPrice * b.quantity || 1500;
-              return {
-                id: b.id,
-                bookingId: b.id,
-                bookingRef: b.bookingRef || `EVL-${b.id}`,
-                bankTransactionRef: b.bankTransactionRef || '',
-                paymentProofUrl: b.paymentProofUrl || null,
-                customerName: b.customerName,
-                customerEmail: b.customerEmail,
-                customerPhone: b.customerPhone,
-                eventTitle: b.eventTitle || 'Live Event',
-                venueName: b.venueName || 'Arts Council of Pakistan, Karachi',
-                date: b.showDate || 'Upcoming Show',
-                time: b.showTime || '08:00 PM PKT',
-                totalAmount: baseAmt,
-                quantity: b.quantity || 1,
-                paymentStatus: b.paymentStatus || 'Pending',
-                createdAt: b.createdAt || new Date().toISOString(),
-                expiresAt: b.paymentExpiresAt || new Date(Date.now() + 1800000).toISOString()
-              };
-            });
-        } catch (e) {
-          console.warn('Could not fetch API bookings for unpaid invoices:', e);
-        }
+          localInvoices = JSON.parse(userLocalRaw).filter(inv => (inv.customerEmail || '').toLowerCase() === userEmail);
+        } catch (e) {}
       }
 
+      // 2. Also check legacy storage for any invoices matching this user's email
+      const legacyInvoicesRaw = localStorage.getItem('eventland_unpaid_invoices');
+      if (legacyInvoicesRaw) {
+        try {
+          const legacyList = JSON.parse(legacyInvoicesRaw);
+          const matched = legacyList.filter(inv => (inv.customerEmail || '').toLowerCase() === userEmail);
+          matched.forEach(inv => {
+            const key = inv.bookingRef || String(inv.bookingId || inv.id);
+            if (!localInvoices.some(li => (li.bookingRef || String(li.bookingId || li.id)) === key)) {
+              localInvoices.push(inv);
+            }
+          });
+        } catch (e) {}
+      }
+
+      // 3. Fetch unpaid / pending bookings from backend API for this user
+      let apiInvoices = [];
+      try {
+        const bksRes = await bookingsApi.getBookingsByEmail(currentUser.email, 1, 50);
+        const bksList = Array.isArray(bksRes) ? bksRes : (bksRes?.items || []);
+        
+        apiInvoices = bksList
+          .filter(b => b.paymentStatus !== 'Paid' && b.status !== 'Confirmed')
+          .filter(b => (b.customerEmail || '').toLowerCase() === userEmail)
+          .map(b => {
+            const baseAmt = b.totalAmount || b.unitPrice * b.quantity || 1500;
+            return {
+              id: b.id,
+              bookingId: b.id,
+              bookingRef: b.bookingRef || `EVL-${b.id}`,
+              bankTransactionRef: b.bankTransactionRef || '',
+              paymentProofUrl: b.paymentProofUrl || null,
+              customerName: b.customerName,
+              customerEmail: b.customerEmail,
+              customerPhone: b.customerPhone,
+              eventTitle: b.eventTitle || 'Live Event',
+              venueName: b.venueName || 'Arts Council of Pakistan, Karachi',
+              date: b.showDate || 'Upcoming Show',
+              time: b.showTime || '08:00 PM PKT',
+              totalAmount: baseAmt,
+              quantity: b.quantity || 1,
+              paymentStatus: b.paymentStatus || 'Pending',
+              createdAt: b.createdAt || new Date().toISOString(),
+              expiresAt: b.paymentExpiresAt || new Date(Date.now() + 1800000).toISOString()
+            };
+          });
+      } catch (e) {
+        console.warn('Could not fetch API bookings for unpaid invoices:', e);
+      }
+
+      // 4. Merge and enforce strict user ownership
       const mergedMap = new Map();
       [...localInvoices, ...apiInvoices].forEach(inv => {
+        if ((inv.customerEmail || '').toLowerCase() !== userEmail) return;
         const key = inv.bookingRef || String(inv.bookingId || inv.id);
         if (!mergedMap.has(key)) {
           mergedMap.set(key, inv);
@@ -112,6 +142,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
 
       const finalInvoices = Array.from(mergedMap.values());
       setInvoices(finalInvoices);
+      localStorage.setItem(storageKey, JSON.stringify(finalInvoices));
 
       // Initialize 30-minute hold countdown timers
       const initTimers = {};
@@ -221,11 +252,10 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
     const updatedList = invoices.filter(inv => (inv.bookingRef || inv.id) !== refKey);
     setInvoices(updatedList);
 
-    const localInvoicesRaw = localStorage.getItem('eventland_unpaid_invoices');
-    if (localInvoicesRaw) {
-      const localList = JSON.parse(localInvoicesRaw);
-      const filteredLocal = localList.filter(inv => (inv.bookingRef || inv.id) !== refKey);
-      localStorage.setItem('eventland_unpaid_invoices', JSON.stringify(filteredLocal));
+    if (currentUser?.email) {
+      const userEmail = currentUser.email.toLowerCase();
+      const storageKey = `eventland_unpaid_invoices_${userEmail}`;
+      localStorage.setItem(storageKey, JSON.stringify(updatedList));
     }
 
     showSuccess('Invoice Cancelled', `Unpaid invoice #${refKey} has been removed.`);
@@ -243,6 +273,33 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
   });
 
   const totalOutstanding = filteredInvoices.reduce((sum, i) => sum + (i.totalAmount || 0), 0);
+
+  if (!currentUser) {
+    return (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(3, 7, 18, 0.85)',
+        backdropFilter: 'blur(12px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: '1.5rem'
+      }}>
+        <div className="card" style={{ maxWidth: '420px', width: '100%', textAlign: 'center', padding: '2rem' }}>
+          <AlertCircle size={44} color="#fbbf24" style={{ margin: '0 auto 1rem' }} />
+          <h3 style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.5rem' }}>Authentication Required</h3>
+          <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+            Please sign in to view and manage your unpaid invoices and payment receipts.
+          </p>
+          <button onClick={onClose} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{

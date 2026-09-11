@@ -1347,3 +1347,379 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   DISCOVERY SEARCH HUB & ADVANCED FILTERS STYLING (RESPONSIVE)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.discovery-hub-card {
+  margin-bottom: 2.25rem;
+  background: linear-gradient(180deg, rgba(13, 30, 43, 0.78) 0%, rgba(6, 16, 23, 0.92) 100%);
+  border: 1px solid rgba(13, 148, 136, 0.35);
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.55), 0 0 24px -4px rgba(13, 148, 136, 0.12);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.discovery-hub-card:focus-within {
+  border-color: rgba(45, 212, 191, 0.55);
+  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.6), 0 0 32px -4px rgba(45, 212, 191, 0.2);
+}
+
+/* ── 1. Search Bar Wrapper ─────────────────────────────────────────────── */
+.discovery-search-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(13, 148, 136, 0.35);
+  border-radius: 14px;
+  padding: 0.5rem 0.85rem;
+  transition: all 0.25s ease;
+  position: relative;
+}
+
+.discovery-search-wrapper:focus-within {
+  background: rgba(15, 23, 42, 0.95);
+  border-color: #2dd4bf;
+  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.2);
+}
+
+.discovery-search-icon-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(13, 148, 136, 0.18);
+  border: 1px solid rgba(45, 212, 191, 0.3);
+  flex-shrink: 0;
+}
+
+.discovery-search-icon {
+  color: #2dd4bf;
+  transition: transform 0.2s ease;
+}
+
+.discovery-search-wrapper:focus-within .discovery-search-icon {
+  transform: scale(1.1);
+}
+
+.discovery-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-family: var(--font-body);
+  font-size: 1.02rem;
+  font-weight: 500;
+  outline: none;
+  padding: 0.35rem 0;
+  min-width: 0;
+}
+
+.discovery-search-input::placeholder {
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.discovery-search-clear-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #94a3b8;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.discovery-search-clear-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  transform: scale(1.08);
+}
+
+.discovery-results-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: rgba(13, 148, 136, 0.18);
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  border-radius: 9999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.82rem;
+  color: #cbd5e1;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.discovery-results-count {
+  font-weight: 800;
+  color: #2dd4bf;
+}
+
+.discovery-results-label {
+  color: #94a3b8;
+}
+
+/* ── 2. Filter Controls Grid ───────────────────────────────────────────── */
+.discovery-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.discovery-filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.discovery-filter-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+}
+
+.discovery-label-icon {
+  color: #2dd4bf;
+}
+
+.discovery-select {
+  width: 100% !important;
+}
+
+/* ── 3. Category Tag Pills Row ─────────────────────────────────────────── */
+.discovery-categories-wrapper {
+  overflow: hidden;
+  padding-top: 0.25rem;
+}
+
+.discovery-tags-scroll {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.discovery-tag-pill {
+  font-family: var(--font-display);
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 1.15rem;
+  border-radius: 9999px;
+  font-weight: 500;
+  font-size: 0.86rem;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.discovery-tag-pill:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(45, 212, 191, 0.4);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.discovery-tag-pill.active {
+  background: linear-gradient(135deg, #0d9488 0%, #059669 100%);
+  color: #ffffff;
+  border-color: rgba(45, 212, 191, 0.65);
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
+  transform: scale(1.02);
+}
+
+/* ── 4. Active Filter Chips & Reset Row ────────────────────────────────── */
+.discovery-active-filters-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(13, 148, 136, 0.2);
+  animation: fadeIn 0.25s ease-out;
+}
+
+.discovery-active-chips-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.discovery-active-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #94a3b8;
+  margin-right: 0.25rem;
+}
+
+.discovery-active-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(13, 148, 136, 0.2);
+  border: 1px solid rgba(45, 212, 191, 0.4);
+  color: #e2e8f0;
+  padding: 0.3rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  animation: scaleIn 0.2s ease;
+}
+
+.discovery-chip-remove-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  transition: all 0.15s ease;
+}
+
+.discovery-chip-remove-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+}
+
+.discovery-reset-all-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #f87171;
+  padding: 0.4rem 0.95rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.discovery-reset-all-btn:hover {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: #ef4444;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* ── 5. Responsive Breakpoints ─────────────────────────────────────────── */
+
+/* Large Tablets / Small Desktops (max-width: 1200px) */
+@media (max-width: 1200px) {
+  .discovery-filters-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Tablets (max-width: 900px) */
+@media (max-width: 900px) {
+  .discovery-hub-card {
+    padding: 1.25rem;
+    border-radius: 16px;
+    gap: 1rem;
+  }
+
+  .discovery-filters-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+}
+
+/* Mobile Phones (max-width: 640px) */
+@media (max-width: 640px) {
+  .discovery-hub-card {
+    padding: 1rem 0.85rem;
+    margin-bottom: 1.5rem;
+    border-radius: 14px;
+    gap: 0.85rem;
+  }
+
+  .discovery-search-wrapper {
+    flex-wrap: wrap;
+    padding: 0.45rem 0.65rem;
+    gap: 0.5rem;
+  }
+
+  .discovery-search-icon-badge {
+    width: 32px;
+    height: 32px;
+  }
+
+  .discovery-search-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .discovery-search-input {
+    font-size: 0.92rem;
+  }
+
+  .discovery-results-pill {
+    margin-left: auto;
+    font-size: 0.74rem;
+    padding: 0.25rem 0.65rem;
+  }
+
+  .discovery-filters-grid {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .discovery-tag-pill {
+    padding: 0.45rem 0.95rem;
+    font-size: 0.8rem;
+  }
+
+  .discovery-active-filters-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .discovery-reset-all-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.55rem;
+  }
+}
+
+
