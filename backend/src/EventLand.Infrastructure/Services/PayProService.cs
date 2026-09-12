@@ -300,8 +300,13 @@ public class PayProService : IPayProService
         var verified = await VerifyInvoiceStatusAsync(ipnDto.InvoiceId ?? $"PP-{booking.BookingRef}", booking.TotalAmount, cancellationToken);
         if (!verified)
         {
-            _logger.LogWarning("Server-side verification with PayPro failed for Invoice {InvoiceId}. Relying on verified IPN transaction ID {TxId}.",
-                ipnDto.InvoiceId, ipnDto.TransactionId);
+            var (isConfigValid, _) = _options.Validate();
+            if (isConfigValid)
+            {
+                _logger.LogError("PayPro IPN callback rejected: Server-side invoice verification failed for Invoice {InvoiceId}.", ipnDto.InvoiceId);
+                return new PayProIpnResponseDto(false, "VERIFICATION_FAILED", "Upstream payment provider verification failed.");
+            }
+            _logger.LogWarning("Server-side verification with PayPro failed for Invoice {InvoiceId}. In test mode without credentials; allowing simulation.", ipnDto.InvoiceId);
         }
 
         // Transition Booking to Paid & Confirmed

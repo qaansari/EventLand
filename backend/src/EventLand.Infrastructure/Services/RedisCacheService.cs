@@ -208,11 +208,21 @@ public class RedisCacheService : ICacheService
         }
     }
 
-    public async Task ReleaseSeatsAsync(int eventId, List<int> seatIds, int? eventShowId = null)
+    public async Task ReleaseSeatsAsync(int eventId, List<int> seatIds, int? eventShowId = null, string? expectedOwnerEmail = null)
     {
         foreach (var seatId in seatIds)
         {
-            await RemoveAsync(SeatLockKey(eventId, seatId, eventShowId));
+            var key = SeatLockKey(eventId, seatId, eventShowId);
+            if (!string.IsNullOrWhiteSpace(expectedOwnerEmail))
+            {
+                var holder = await GetAsync<string>(key);
+                if (!string.IsNullOrEmpty(holder) && !string.Equals(holder, expectedOwnerEmail, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Caller is not the owner of this seat hold; prevent unauthorized eviction
+                    continue;
+                }
+            }
+            await RemoveAsync(key);
         }
     }
 

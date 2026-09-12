@@ -71,7 +71,9 @@ public class SeatHoldController : ControllerBase
     {
         if (dto.SeatIds != null && dto.SeatIds.Any())
         {
-            await _cacheService.ReleaseSeatsAsync(dto.EventId, dto.SeatIds, dto.EventShowId);
+            var callerEmail = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue("email");
+            bool isAdmin = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+            await _cacheService.ReleaseSeatsAsync(dto.EventId, dto.SeatIds, dto.EventShowId, isAdmin ? null : callerEmail);
 
             await _hubContext.Clients.Group(Hubs.SeatingHub.GetGroupName(dto.EventId))
                 .SeatsReleased(dto.EventId, dto.SeatIds);

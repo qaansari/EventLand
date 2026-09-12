@@ -10,6 +10,6 @@ public interface ICacheService
 
     // Real-time Seat Locking (Redis Hash + Expiration)
     Task<bool> HoldSeatsAsync(int eventId, List<int> seatIds, string email, TimeSpan holdDuration, int? eventShowId = null);
-    Task ReleaseSeatsAsync(int eventId, List<int> seatIds, int? eventShowId = null);
+    Task ReleaseSeatsAsync(int eventId, List<int> seatIds, int? eventShowId = null, string? expectedOwnerEmail = null);
     Task<List<int>> GetHeldSeatIdsAsync(int eventId, int? eventShowId = null);
 }
