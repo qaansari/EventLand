@@ -162,7 +162,7 @@
 - **Database-Wide Search**:
   - Connected `debouncedSearch` to backend `eventsApi.getEvents({ search })` so typing in the search bar queries the entire database, not just currently loaded items.
 - **Clean Production API Layer** (`api.js`):
-  - Removed obsolete development headers (`ngrok-skip-browser-warning`).
+  - Standardized `ngrok-skip-browser-warning` header on all API and multipart upload requests to prevent ngrok edge HTML interstitial blocks on remote deployments (e.g. Vercel).
   - Centralized host resolution and 401 session clearing.
 - **Performance & Hardware Acceleration**:
   - Added `willChange: 'transform'` in `EventCard.jsx` for smooth 60fps card hover transitions.
@@ -198,4 +198,4 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
 ```
 
 ---
-*Last Updated: September 2026 (Modern Security Hardening: Anti-Virus/Malware Pixel Re-encoding, App-Wide Cloudflare Turnstile Auto-Hide, Per-IP Rate Limiting, Full-Stack Latency & Index Optimizations Completed)*
+*Last Updated: September 2026 (Modern Security Hardening: Anti-Virus/Malware Pixel Re-encoding, App-Wide Cloudflare Turnstile Auto-Hide, Dynamic CORS & Vercel/Ngrok Reverse-Proxy Ingress, Per-IP Rate Limiting, Full-Stack Latency & Index Optimizations Completed)*
