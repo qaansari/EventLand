@@ -1023,33 +1023,35 @@ export default function App() {
               onSelectEvent={handleSelectEventForDetail}
             />
 
-            {/* Cloudflare CAPTCHA Verification Banner on Homepage */}
-            <div className="glass-card" style={{
-              margin: '1.5rem 0',
-              padding: '1rem 1.5rem',
-              borderRadius: '16px',
-              backgroundColor: 'rgba(12, 20, 39, 0.7)',
-              border: '1px solid rgba(13, 148, 136, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: '1rem'
-            }}>
-              <div>
-                <h4 style={{ color: '#fff', fontSize: '1.05rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <ShieldCheck color="#2dd4bf" size={20} /> EventLand Cloudflare Security Challenge
-                </h4>
-                <p style={{ color: '#94a3b8', fontSize: '0.82rem', margin: '0.25rem 0 0 0' }}>
-                  Protected by Cloudflare Turnstile CAPTCHA to guard against automated bots & ticket scalpers.
-                </p>
+            {/* Cloudflare CAPTCHA Verification Banner on Homepage (Hidden once verified) */}
+            {!homepageCaptchaToken && (
+              <div className="glass-card" style={{
+                margin: '1.5rem 0',
+                padding: '1rem 1.5rem',
+                borderRadius: '16px',
+                backgroundColor: 'rgba(12, 20, 39, 0.7)',
+                border: '1px solid rgba(13, 148, 136, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '1rem'
+              }}>
+                <div>
+                  <h4 style={{ color: '#fff', fontSize: '1.05rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <ShieldCheck color="#2dd4bf" size={20} /> EventLand Cloudflare Security Challenge
+                  </h4>
+                  <p style={{ color: '#94a3b8', fontSize: '0.82rem', margin: '0.25rem 0 0 0' }}>
+                    Protected by Cloudflare Turnstile CAPTCHA to guard against automated bots & ticket scalpers.
+                  </p>
+                </div>
+                <CloudflareTurnstile
+                  onVerify={(token) => setHomepageCaptchaToken(token)}
+                  onExpire={() => setHomepageCaptchaToken('')}
+                  style={{ margin: 0 }}
+                />
               </div>
-              <CloudflareTurnstile
-                onVerify={(token) => setHomepageCaptchaToken(token)}
-                onExpire={() => setHomepageCaptchaToken('')}
-                style={{ margin: 0 }}
-              />
-            </div>
+            )}
 
             {/* Discovery & Search Hub */}
             <EventFilterBar
