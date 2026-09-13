@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Lock, Mail, X, LogIn, UserPlus, Eye, EyeOff, Phone, Globe } from 'lucide-react';
 import { authApi, locationsApi, formatPhoneNumberOnSubmit } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import CloudflareTurnstile from './CloudflareTurnstile';
 
 export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'login' }) {
   const { showSuccess, showError } = useToast();
@@ -11,6 +12,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
   const [countries, setCountries] = useState([
     { id: 1, name: 'Pakistan', code: 'PK', dialingCode: '+92' },
     { id: 2, name: 'United Arab Emirates', code: 'AE', dialingCode: '+971' },
@@ -429,6 +431,12 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
               </div>
             )}
           </div>
+
+          <CloudflareTurnstile
+            onVerify={(token) => setCaptchaToken(token)}
+            onExpire={() => setCaptchaToken('')}
+            onError={() => setCaptchaToken('')}
+          />
 
           <button
             type="submit"

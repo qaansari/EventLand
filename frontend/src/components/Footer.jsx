@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { ChevronDown, Send, Phone, Mail } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { footerApi } from '../services/api';
+import CloudflareTurnstile from './CloudflareTurnstile';
 
 export default function Footer({ onSelectCity }) {
   const { showSuccess } = useToast();
   const [openFaq, setOpenFaq] = useState(null);
   const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterCaptcha, setNewsletterCaptcha] = useState('');
   const [subscribedToast, setSubscribedToast] = useState(false);
 
   // Dynamic state loaded from Database/API
@@ -230,26 +232,34 @@ export default function Footer({ onSelectCity }) {
             <p style={{ fontSize: '0.82rem', marginBottom: '1rem' }}>
               Subscribe to receive instant alerts on upcoming concerts and early bird ticket drops.
             </p>
-            <form onSubmit={handleSubscribe} style={{ display: 'flex', gap: '0.5rem' }}>
-              <input
-                type="email"
-                placeholder="Enter your email"
-                value={newsletterEmail}
-                onChange={(e) => setNewsletterEmail(e.target.value)}
-                style={{
-                  backgroundColor: '#10192d',
-                  border: '1px solid rgba(13, 148, 136, 0.25)',
-                  borderRadius: '8px',
-                  padding: '0.5rem 0.75rem',
-                  color: '#fff',
-                  fontSize: '0.82rem',
-                  outline: 'none',
-                  flexGrow: 1
-                }}
+            <form onSubmit={handleSubscribe} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={newsletterEmail}
+                  onChange={(e) => setNewsletterEmail(e.target.value)}
+                  style={{
+                    backgroundColor: '#10192d',
+                    border: '1px solid rgba(13, 148, 136, 0.25)',
+                    borderRadius: '8px',
+                    padding: '0.5rem 0.75rem',
+                    color: '#fff',
+                    fontSize: '0.82rem',
+                    outline: 'none',
+                    flexGrow: 1
+                  }}
+                />
+                <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 0.85rem' }}>
+                  <Send size={15} />
+                </button>
+              </div>
+              <CloudflareTurnstile
+                onVerify={(token) => setNewsletterCaptcha(token)}
+                onExpire={() => setNewsletterCaptcha('')}
+                size="compact"
+                style={{ margin: '0.4rem 0 0 0', width: '100%' }}
               />
-              <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 0.85rem' }}>
-                <Send size={15} />
-              </button>
             </form>
             {subscribedToast && (
               <span style={{ display: 'block', color: '#2dd4bf', fontSize: '0.75rem', marginTop: '0.5rem' }}>

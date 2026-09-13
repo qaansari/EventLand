@@ -473,5 +473,8 @@ export const splitPhoneNumberForEdit = (fullPhone, countryList = [], countryId =
     countryId: foundCountry?.id || countryId || 1
   };
 };
-
+export const captchaApi = {
+  getConfig: async () => request('/captcha/config'),
+  verifyToken: async (token) => request('/captcha/verify', { method: 'POST', body: JSON.stringify({ token }) })
+};
 

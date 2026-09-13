@@ -140,6 +140,15 @@ public static class DependencyInjection
             client.Timeout = TimeSpan.FromSeconds(15);
         });
 
+        // Cloudflare Turnstile / CAPTCHA Verification Service
+        services.Configure<EventLand.Application.Common.Models.CaptchaOptions>(
+            configuration.GetSection(EventLand.Application.Common.Models.CaptchaOptions.SectionName));
+
+        services.AddHttpClient<ICaptchaService, TurnstileService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+
         return services;
     }
 }
