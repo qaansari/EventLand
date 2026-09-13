@@ -192,10 +192,37 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins(effectiveOrigins)
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
+        policy.SetIsOriginAllowed(origin =>
+        {
+            if (string.IsNullOrWhiteSpace(origin)) return false;
+
+            // 1. Direct match with configured or dev origins
+            if (effectiveOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase)) return true;
+
+            // 2. Allow all Vercel domains (*.vercel.app), localhost, and ngrok tunnels
+            try
+            {
+                var host = new Uri(origin).Host;
+                if (host.EndsWith("vercel.app", StringComparison.OrdinalIgnoreCase) ||
+                    host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+                    host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+                    host.EndsWith("ngrok-free.dev", StringComparison.OrdinalIgnoreCase) ||
+                    host.EndsWith("ngrok-free.app", StringComparison.OrdinalIgnoreCase) ||
+                    host.EndsWith("ngrok.io", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return false;
+        })
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials();
     });
 });
 

@@ -125,6 +125,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
         const builder = new sig.HubConnectionBuilder()
           .withUrl(`${BACKEND_URL}/hubs/seating`, {
             accessTokenFactory: () => token,
+            headers: { 'ngrok-skip-browser-warning': 'true' },
             transport: sig.HttpTransportType.WebSockets | sig.HttpTransportType.LongPolling,
           })
           .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])

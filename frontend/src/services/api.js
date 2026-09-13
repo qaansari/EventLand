@@ -78,6 +78,7 @@ async function request(endpoint, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
     ...(options.headers || {})
   };
 
@@ -381,7 +382,9 @@ export const uploadApi = {
     formData.append('file', file);
     // Use canonical getStoredToken() so the storage key is managed in one place (utils/auth.js)
     const token = getStoredToken();
-    const headers = {};
+    const headers = {
+      'ngrok-skip-browser-warning': 'true'
+    };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
     const query = new URLSearchParams({ type });

@@ -141,6 +141,9 @@
   - Whitelists Cloudflare Turnstile (`challenges.cloudflare.com`) and Google reCAPTCHA in `script-src` and `frame-src`.
   - Enforces `frame-ancestors 'none'` to eliminate iframe clickjacking.
   - Headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection: 1; mode=block`, `Referrer-Policy: strict-origin-when-cross-origin`, `Cross-Origin-Opener-Policy: same-origin-allow-popups`.
+- **CORS & Reverse Proxy Ingress Policy** (`Program.cs`, `api.js`):
+  - Dynamic CORS Validator (`SetIsOriginAllowed`): Permits explicitly configured origins (`Cors:AllowedOrigins`), all Vercel deployments (`*.vercel.app` production and preview domains), localhost dev ports, and ngrok tunnels with full credential support for SignalR.
+  - Ngrok Interstitial Bypass: `api.js` and SignalR connection include `'ngrok-skip-browser-warning': 'true'` to prevent free ngrok tunnels from intercepting API calls with HTML interstitial warning pages (`ERR_NGROK_6024`) that lack CORS headers.
 - **IDOR / Object-Level Authorization**:
   - `BookingsController` (`GetBookingById`, `GetBookingByRef`, `GetBookingsByEmail`, `SubmitPaymentProof`) strictly verifies that the booking's email matches `User.GetEmail()` or the user has Admin privileges (`User.IsAdmin()`).
 - **Clean Exception Handling** (`GlobalExceptionHandlerMiddleware.cs`):
