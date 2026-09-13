@@ -26,7 +26,18 @@
 
 ## Key Domain Workflows & Business Rules
 
-### 1. Direct Bank Transfer Payment Workflow
+### 1. Dual Payment Gateway & Direct Bank Transfer Workflows
+
+#### A. PayPro 1Pay Instant Online Gateway Integration
+1. **Payment Channel Selection**: Customer selects **PayPro Online Gateway ⚡** on `CheckoutModal.jsx` and chooses channel (`easypaisa_jazzcash` for 1Pay Portal/Cards/Wallets or `qr_code` for Dynamic Banking App QR Code).
+2. **Invoice Generation**: Clicking proceed invokes `POST /api/payments/paypro/checkout` via `paymentsApi.initiatePayProCheckout` in `api.js`.
+3. **PayPro Service & API Execution**: Backend `PayProService.cs` connects to PayPro API (`https://demoapi.paypro.com.pk` with credentials in `appsettings.Development.json`) to generate a unique **PayPro Consumer Voucher / OTC Number** and 1Pay portal URL (`connectUrl`).
+4. **Instant Online Payment & IPN Webhook**:
+   - Checkout modal displays the Consumer Voucher Number (with 1-click copy) and a direct **Pay Online via PayPro 1Pay** button opening `connectUrl`.
+   - Customer pays via JazzCash app, EasyPaisa app, 1Link ATM, or Debit/Credit Card.
+   - PayPro IPN Webhook (`POST /api/payments/paypro-ipn`) receives payment callback, validates signatures server-side, automatically updates booking status to `Paid`/`Confirmed`, permanently marks seats as `Booked`, and issues digital E-Ticket with QR code.
+
+#### B. Direct Bank Transfer Payment Workflow
 1. **Seat/Tier Selection**: Customer selects seats or ticket tier for an event.
 2. **Booking & Seat Hold**:
    - Creating a booking issues a unique `EVL-XXXXXX` reference code.
@@ -34,7 +45,7 @@
    - Ephemeral locks in Redis are released once the DB transaction commits.
 3. **Customer Transfer & Proof Submission**:
    - Checkout displays verified Bank Account details (Bank Name, Account Title, Account Number, IBAN, Branch Code, QR Code).
-   - Customer completes bank transfer and submits `BankTransactionRef` and optional `PaymentProofUrl`.
+   - Customer completes bank transfer and submits `BankTransactionRef` and optional `PaymentProofUrl` OR alternative sender fields (`SenderAccountTitle`, `SenderBankName`, `SenderAccountLast4`).
    - Booking status changes to `PendingVerification`.
 4. **Admin Manual Verification & Ticket Issuance**:
    - Super Admin or Admin verifies the transfer in the Admin Dashboard (`Unpaid Payment Invoices` modal / `Bookings` section).

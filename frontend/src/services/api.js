@@ -358,8 +358,14 @@ export const tagsApi = {
   getAll: async () => request('/tags')
 };
 
-// --- Payments & Refunds API ---
+// --- Payments & Refunds API (PayPro Gateway Integration) ---
 export const paymentsApi = {
+  getMethods: async (subtotal = 0) => request(`/payments/methods?subtotal=${subtotal}`),
+  initiatePayProCheckout: async (bookingRef, paymentMethod = 'easypaisa_jazzcash', returnUrl = window.location.href) => request('/payments/paypro/checkout', {
+    method: 'POST',
+    body: JSON.stringify({ bookingRef, paymentMethod, returnUrl })
+  }),
+  getStatus: async (bookingRef) => request(`/payments/status/${bookingRef}`),
   getPaymentStatus: async (bookingRef) => request(`/payments/status/${bookingRef}`),
   processRefund: async (dto) => request('/payments/refund', { method: 'POST', body: JSON.stringify(dto) })
 };
