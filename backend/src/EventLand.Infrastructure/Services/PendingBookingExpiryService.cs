@@ -116,9 +116,12 @@ public sealed class PendingBookingExpiryService : BackgroundService
             var seatIds = booking.BookingSeats.Select(bs => bs.SeatId).ToList();
             if (seatIds.Count > 0)
             {
-                if (!seatsByEvent.ContainsKey(booking.EventId))
-                    seatsByEvent[booking.EventId] = new List<int>();
-                seatsByEvent[booking.EventId].AddRange(seatIds);
+                if (!seatsByEvent.TryGetValue(booking.EventId, out var eventSeats))
+                {
+                    eventSeats = new List<int>();
+                    seatsByEvent[booking.EventId] = eventSeats;
+                }
+                eventSeats.AddRange(seatIds);
             }
         }
 

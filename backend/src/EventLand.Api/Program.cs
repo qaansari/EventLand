@@ -71,58 +71,77 @@ builder.Services.AddHealthChecks()
         return HealthCheckResult.Healthy();
     });
 
-// Rate limiting: login is strict, upload is scoped, general API is more permissive
+// Production-Grade Per-Client-IP Rate Limiting (Partitioned by CF-Connecting-IP / X-Forwarded-For / RemoteIp)
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.OnRejected = async (context, _) =>
     {
-        context.HttpContext.Response.Headers.Append("X-RateLimit-Limit", "10");
-        context.HttpContext.Response.Headers.Append("X-RateLimit-Remaining", "0");
         context.HttpContext.Response.Headers.Append("Retry-After", "60");
         
         await context.HttpContext.Response.WriteAsJsonAsync(new
         {
             statusCode = 429,
-            message = "Too many requests. Please try again later.",
+            message = "Too many requests from your IP address. Please slow down and try again shortly.",
             retryAfter = 60
         });
     };
 
-    // Strict rate limiting for authentication endpoints
-    options.AddFixedWindowLimiter("login", opt =>
+    // Partition key resolver: Cloudflare -> Reverse Proxy XFF -> Direct Remote IP
+    static string ResolveClientIp(HttpContext ctx)
     {
-        opt.PermitLimit = 5;  // 5 requests per minute for brute-force protection
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        opt.QueueLimit = 0;
-    });
+        if (ctx.Request.Headers.TryGetValue("CF-Connecting-IP", out var cfIp) && !string.IsNullOrWhiteSpace(cfIp))
+            return cfIp.ToString().Trim();
 
-    // Rate limiting for file uploads to prevent storage abuse
-    options.AddFixedWindowLimiter("upload", opt =>
-    {
-        opt.PermitLimit = 20;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        opt.QueueLimit = 0;
-    });
+        if (ctx.Request.Headers.TryGetValue("X-Forwarded-For", out var xff) && !string.IsNullOrWhiteSpace(xff))
+        {
+            var first = xff.ToString().Split(',')[0].Trim();
+            if (!string.IsNullOrWhiteSpace(first)) return first;
+        }
 
-    // General API rate limiting
-    options.AddFixedWindowLimiter("general", opt =>
-    {
-        opt.PermitLimit = 100;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        opt.QueueLimit = 0;
-    });
+        return ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown-client";
+    }
 
-    // Fallback partition for endpoints without explicit policy — per-IP general limit
-    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    // Per-IP rate limiting for authentication (30 attempts/min per IP — stops single-IP credential brute-force)
+    options.AddPolicy("login", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            partitionKey: $"login_{ResolveClientIp(httpContext)}",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 100,
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // Per-IP rate limiting for ticket bookings (30 bookings/min per IP — blocks scalping bots without blocking concurrent buyers)
+    options.AddPolicy("booking", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"booking_{ResolveClientIp(httpContext)}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // Per-IP/User rate limiting for media uploads
+    options.AddPolicy("upload", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"upload_{ResolveClientIp(httpContext)}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // Global fallback limiter: 300 requests/minute per client IP
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"global_{ResolveClientIp(httpContext)}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 300,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
@@ -213,6 +232,7 @@ app.UseStaticFiles(new StaticFileOptions
     {
         // Static assets (images, logos, QR codes, avatars) are cached for 7 days
         ctx.Context.Response.Headers.Append("Cache-Control", "public,max-age=604800,immutable");
+        ctx.Context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
     }
 });
 

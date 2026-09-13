@@ -22,7 +22,8 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
         overflow: 'hidden',
         borderRadius: '16px',
         border: '1px solid rgba(13, 148, 136, 0.2)',
-        transition: 'transform 0.25s ease, border-color 0.25s ease'
+        transition: 'transform 0.25s ease, border-color 0.25s ease',
+        willChange: 'transform'
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-3px)';
@@ -37,7 +38,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
       <div className="event-card-image" style={{ position: 'relative', flex: '1 1 480px', minHeight: '260px', overflow: 'hidden' }}>
         <img
           src={getEventImageUrl(event.banner)}
-          alt={`${event.title} live event banner - ${event.cityName || event.city || 'Pakistan'}`}
+          alt={`${event.title || 'Event'} live event banner - ${event.cityName || event.city || 'Pakistan'}`}
           loading="lazy"
           decoding="async"
           style={{

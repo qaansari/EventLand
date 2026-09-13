@@ -20,6 +20,10 @@ public class GlobalExceptionHandlerMiddleware
         {
             await _next(context);
         }
+        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        {
+            _logger.LogDebug("Request execution was canceled by the client.");
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "An unhandled exception occurred during request processing.");
@@ -29,12 +33,17 @@ public class GlobalExceptionHandlerMiddleware
 
     private static Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
+        if (context.Response.HasStarted)
+        {
+            return Task.CompletedTask;
+        }
+
         context.Response.ContentType = "application/json";
 
         var statusCode = exception switch
         {
             KeyNotFoundException => HttpStatusCode.NotFound,
-            InvalidOperationException => HttpStatusCode.Conflict,
+            InvalidOperationException => HttpStatusCode.BadRequest,
             UnauthorizedAccessException => HttpStatusCode.Unauthorized,
             ArgumentException => HttpStatusCode.BadRequest,
             _ => HttpStatusCode.InternalServerError
@@ -43,12 +52,12 @@ public class GlobalExceptionHandlerMiddleware
         context.Response.StatusCode = (int)statusCode;
 
         // Client-facing errors (4xx) carry the exception message; 500s return a generic
-        // message so stack details never reach the caller.
+        // message so stack details and internal exceptions never reach the caller.
         var response = new
         {
             statusCode = context.Response.StatusCode,
             message = statusCode == HttpStatusCode.InternalServerError
-                ? "An unexpected error occurred processing your request."
+                ? "An unexpected error occurred processing your request. Please try again later."
                 : exception.Message
         };
 

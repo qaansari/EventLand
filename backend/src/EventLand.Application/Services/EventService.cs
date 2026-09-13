@@ -46,7 +46,7 @@ public class EventService : IEventService
             if (int.TryParse(city, out var cityId))
                 query = query.Where(e => e.CityId == cityId);
             else
-                query = query.Where(e => e.City != null && e.City.Name.ToLower() == city.ToLower());
+                query = query.Where(e => e.City != null && EF.Functions.Like(e.City.Name, city));
         }
 
         if (!string.IsNullOrWhiteSpace(search))
@@ -64,8 +64,8 @@ public class EventService : IEventService
         if (tagFilters.Count > 0)
         {
             query = query.Where(e => e.EventTags.Any(et =>
-                tagFilters.Contains(et.Tag.Slug.ToLower()) ||
-                tagFilters.Contains(et.Tag.Name.ToLower()) ||
+                tagFilters.Contains(et.Tag.Slug) ||
+                tagFilters.Contains(et.Tag.Name) ||
                 tagFilters.Contains(et.Tag.Id.ToString())
             ));
         }
@@ -145,10 +145,20 @@ public class EventService : IEventService
 
         var clean = identifier.Trim();
 
+        // Check identifier-level cache first
+        var identifierCacheKey = $"event:ident:{clean.ToLowerInvariant()}";
+        var cached = await _cacheService.GetAsync<EventDetailDto>(identifierCacheKey);
+        if (cached is not null) return cached;
+
         // 1. Direct numeric ID lookup
         if (int.TryParse(clean, out int directId))
         {
-            return await GetEventByIdAsync(directId);
+            var res = await GetEventByIdAsync(directId);
+            if (res is not null)
+            {
+                await _cacheService.SetAsync(identifierCacheKey, res, TimeSpan.FromMinutes(10));
+            }
+            return res;
         }
 
         // 2. Trailing ID extraction from slug (e.g. "atif-aslam-live-in-concert-12")
@@ -159,7 +169,11 @@ public class EventService : IEventService
             if (int.TryParse(trailingIdPart, out int extractedId))
             {
                 var evById = await GetEventByIdAsync(extractedId);
-                if (evById is not null) return evById;
+                if (evById is not null)
+                {
+                    await _cacheService.SetAsync(identifierCacheKey, evById, TimeSpan.FromMinutes(10));
+                    return evById;
+                }
             }
         }
 
@@ -167,13 +181,18 @@ public class EventService : IEventService
         var normalizedSlug = clean.ToLower().Replace("-", " ");
         var evByTitle = await _context.Events
             .AsNoTracking()
-            .Where(e => !e.IsDeleted && e.IsPublished && e.Title.ToLower() == normalizedSlug)
+            .Where(e => !e.IsDeleted && e.IsPublished && EF.Functions.Like(e.Title, normalizedSlug))
             .Select(e => e.Id)
             .FirstOrDefaultAsync();
 
         if (evByTitle > 0)
         {
-            return await GetEventByIdAsync(evByTitle);
+            var res = await GetEventByIdAsync(evByTitle);
+            if (res is not null)
+            {
+                await _cacheService.SetAsync(identifierCacheKey, res, TimeSpan.FromMinutes(10));
+            }
+            return res;
         }
 
         return null;

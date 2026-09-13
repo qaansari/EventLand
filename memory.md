@@ -1,7 +1,7 @@
 # EventLand Project Memory & Developer Documentation
 
 ## Overview
-**EventLand** is a modern, high-performance event ticketing and management application designed for Pakistan's event ecosystem. It enables customers to discover events, select interactive seats or categorized ticket tiers, place 30-minute holds on tickets/seats, and complete payments via direct manual bank transfer. Monitoring admins and super admins review bank transfer proofs, confirm bookings, and issue digital E-Tickets with QR codes.
+**EventLand** is a modern, high-performance event ticketing and management application designed for Pakistan's event ecosystem. It enables customers to discover events, select interactive seats or categorized ticket tiers, place 30-minute holds on tickets/seats, and complete payments via direct manual bank transfer or online payment gateway (PayPro). Monitoring admins and super admins review bank transfer proofs, confirm bookings, and issue digital E-Tickets with QR codes.
 
 ---
 
@@ -14,13 +14,15 @@
 - **Caching & Real-Time Locks**: Redis (`StackExchange.Redis`) with fallback to in-process `IMemoryCache`
 - **Real-Time Communication**: ASP.NET Core SignalR (`/hubs/seating`) for live seat reservation broadcasts
 - **Authentication**: JWT Bearer Authentication with ASP.NET Core Identity PasswordHasher
-- **Image Processing**: SkiaSharp (free, cross-platform image compression for uploads > 1 MB)
+- **Bot Defense & Captcha**: Cloudflare Turnstile & Google reCAPTCHA server-side validation (`ICaptchaService`, `TurnstileService`)
+- **Image Processing & Sanitization**: SkiaSharp (clean raster pixel re-encoding for all uploads, stripping malicious metadata/polyglots)
 
 ### Frontend
 - **Framework**: React 18 + Vite (`frontend/`)
 - **Styling**: Vanilla CSS with modern Glassmorphism, CSS variables, dark mode aesthetics, and responsive dynamic layouts
 - **Icons**: Lucide React icons
 - **State & SignalR**: SignalR `@microsoft/signalr` client for real-time seat lock synchronization across browsers
+- **Bot Defense**: `@marsidev/react-turnstile` Cloudflare Turnstile widget on landing page
 
 ---
 
@@ -31,7 +33,7 @@
 #### A. PayPro 1Pay Instant Online Gateway Integration
 1. **Payment Channel Selection**: Customer selects **PayPro Online Gateway ⚡** on `CheckoutModal.jsx` and chooses channel (`easypaisa_jazzcash` for 1Pay Portal/Cards/Wallets or `qr_code` for Dynamic Banking App QR Code).
 2. **Invoice Generation**: Clicking proceed invokes `POST /api/payments/paypro/checkout` via `paymentsApi.initiatePayProCheckout` in `api.js`.
-3. **PayPro Service & API Execution**: Backend `PayProService.cs` connects to PayPro API (`https://demoapi.paypro.com.pk` with credentials in `appsettings.Development.json`) to generate a unique **PayPro Consumer Voucher / OTC Number** and 1Pay portal URL (`connectUrl`).
+3. **PayPro Service & API Execution**: Backend `PayProService.cs` connects to PayPro API (`https://demoapi.paypro.com.pk`) to generate a unique **PayPro Consumer Voucher / OTC Number** and 1Pay portal URL (`connectUrl`).
 4. **Instant Online Payment & IPN Webhook**:
    - Checkout modal displays the Consumer Voucher Number (with 1-click copy) and a direct **Pay Online via PayPro 1Pay** button opening `connectUrl`.
    - Customer pays via JazzCash app, EasyPaisa app, 1Link ATM, or Debit/Credit Card.
@@ -52,22 +54,16 @@
    - Upon confirmation:
      - Booking status updates to `Paid` / `Confirmed`.
      - Seat status permanently changes from `Reserved` to `Booked`.
-     - Confirmation email with E-Ticket pass is dispatched.
+     - Confirmation email with E-Ticket pass is dispatched in background.
      - WhatsApp share link is generated.
    - If rejected, held seats are returned to `Available` pool and `SoldCount` is decremented.
 
 ### 2. Autonomous 30-Minute Hold Expiry (`PendingBookingExpiryService`)
 - A background worker (`PendingBookingExpiryService`) runs every 60 seconds.
-- Queries `Bookings` where `PaymentStatus == Pending` and `PaymentExpiresAt <= UtcNow`.
+- Queries `Bookings` where `PaymentStatus == Pending` and `PaymentExpiresAt <= UtcNow` utilizing the composite index `IX_Bookings_PaymentStatus_PaymentExpiresAt`.
 - Batches processing (200 records/tick) to prevent memory spikes.
 - Marks expired bookings as `Expired` / `Cancelled`, decrements `SoldCount`, and returns seats to `Available` status.
-- `BankAccountsController.GetActiveBankAccount` is annotated with `[AllowAnonymous]` so both guests and logged-in customers can fetch active bank details on checkout.
-- `DataSeeder.cs` seeds an initial active Bank Account record into the `BankAccounts` table if empty.
-- `CheckoutModal.jsx` imports `getQrCodeImageUrl` from `api.js` and fetches active bank details directly from `BankAccounts` DB table (`/api/bank-accounts/active`), displaying `qrCodeImageUrl` (e.g., United Bank Limited / active bank QR code) directly on the customer checkout page with fallbacks.
-- `CheckoutModal.jsx`, `Booking.cs`, `BookingService.cs`, and `AdminDashboard.jsx` support an alternative payment proof verification fallback (`SenderAccountTitle`, `SenderBankName`, `SenderAccountLast4`) for customers whose bank apps enforce screenshot blocks (e.g. Standard Chartered).
-- Event Detail pages use SEO URL Slugs (`/event/atif-aslam-live-in-concert-12`) via `toEventSlug` and `GetEventByIdentifierAsync`, completely hiding raw database numeric IDs from the frontend browser address bar.
-- Web app is 100% SEO-friendly with Canonical links, OpenGraph, Twitter Cards, dynamic Schema.org Event & Organization JSON-LD rich snippets (`EventDetailPage.jsx`), semantic `<article>` tags (`EventCard.jsx`), and backend dynamic `/sitemap.xml` & `/robots.txt` endpoints (`SeoController.cs`).
-- Vercel frontend (`https://eventland-qamar-ansari.vercel.app`) & Ngrok backend (`https://celiac-briley-commandingly.ngrok-free.dev`) connectivity configured with `isProductionDomain` failsafe in `api.js` (overriding any `localhost` env vars when deployed on Vercel), `ngrok-skip-browser-warning` header, `Accept: application/json`, top-level `UseCors` preflight middleware (`Program.cs`), and robust `Array.isArray(resEvents)` handling in `App.jsx`.
+- Groups seats by `EventId` using `TryGetValue` for single-batch Redis cache invalidation.
 
 ### 3. Bank Maintenance & Downtime Notice Guard
 - Super Admin can set maintenance details on the active bank account: `MaintenanceNotice`, `MaintenanceStartUtc`, `MaintenanceEndUtc`, or force `IsMaintenanceMode`.
@@ -81,76 +77,93 @@
 - **Database Migrations**:
   - `20260909105956_InitialCreate`: Consolidated baseline schema migration.
   - `20260910063614_AddTicketTierEventShowIndex`: Performance indexes including composite index on `TicketTiers(EventId, EventShowId)`.
-- **Database Index Optimizations**:
-  - `Events`: Composite index on `(IsPublished, IsDeleted, StartDateUtc)` for fast public listing and date-range queries.
-  - `Users`: Unique index on `Email` to guarantee identity uniqueness and optimize login lookups.
-  - `TicketTiers`: Composite index on `(EventId, EventShowId)` optimizing tier queries partitioned by specific show dates.
-- **Primary Key Convention**: All domain entities inherit from `BaseEntity` with 4-digit integer IDs seeded at `1000`.
-- **Soft Delete**: Global EF Core Query Filter (`!IsDeleted`) automatically applied to all entities inheriting `BaseEntity`.
-- **Audit Fields**: `CreatedAt`, `UpdatedAt`, `CreatedBy`, `UpdatedBy`, `IsDeleted`, `DeletedAt` are auto-populated in `ApplicationDbContext.SaveChangesAsync()`.
-- **Key Entities**:
-  - `User`, `Role`
-  - `Event`, `EventShow`, `Organizer`, `TicketTier`
-  - `Venue`, `Auditorium`, `City`, `Country`
-  - `SeatingZone`, `Seat`, `BookingSeat`, `Booking`
-  - `BankAccount`, `RefundRecord`, `Tag`, `EventTag`, `Faq`, `FooterInfo`
+- **Database Performance & Composite Indexing**:
+  - `Bookings`:
+    - `IX_Bookings_BookingRef`: Unique index on reference codes.
+    - `IX_Bookings_CustomerEmail`: Direct email lookup index.
+    - `IX_Bookings_CreatedAt`: High-performance index for admin sorting by creation timestamp.
+    - `IX_Bookings_PaymentStatus_PaymentExpiresAt`: Composite index for the background expiry worker.
+    - `IX_Bookings_EventId_Status`: Composite index for event booking state filtering.
+  - `Events`:
+    - `IX_Events_OrganizerId`: Fast join index for admin/organizer dashboards.
+    - `IX_Events_Published_City_Date`: Composite index covering public multi-filter queries (`IsPublished, CityId, StartDateUtc`).
+    - `IX_Events_Published_Date`: Index covering global published date ranges.
+    - `IX_Events_IsFeatured`: Fast filter index for homepage hero slider queries.
+  - `Tags`: `IX_Tags_Slug`: Unique index for tag route lookup.
+  - `Seats`: `IX_Seats_Zone_Row_Col` (unique) & `IX_Seats_ZoneId_Status`.
+  - `Users`: Unique index on `Email` and `PhoneNumber`.
+- **Primary Key Convention**: All domain entities inherit from `BaseEntity<int>` (or `BaseEntity<TKey>`).
+- **Zero-Reflection Auditing**: `BaseEntity<TKey>` implements the typed `IAuditableEntity` interface (`CreatedAt`, `UpdatedAt`, `IsDeleted`, `DeletedAt`). `ApplicationDbContext.SaveChangesAsync()` updates timestamps and soft-delete states with zero runtime reflection overhead.
+- **Soft Delete**: Global EF Core Query Filter (`!IsDeleted`) automatically applied to all entities.
 
 ---
 
-## Security Hardening & Optimizations
+## Security Hardening & Threat Prevention
 
-1. **Authentication & Role Authorization**:
-   - Public bank endpoints return safe projections without admin internal operational metadata.
-   - Bank details and payment status checks are guarded with `[Authorize]` and ownership verification.
-   - Admin endpoints use normalized PascalCase role policies: `[Authorize(Roles = "SuperAdmin,Admin")]`.
-   - SuperAdmin default fallback credentials contain production-environment detection and high-severity security warnings.
-   - Account lockout enforcement: 5 consecutive failed login attempts trigger a 15-minute temporary account lockout (`AccessFailedCount`, `LockoutEndUtc`) with clear remaining attempt feedback.
-   - Organizer IDOR / BOLA defenses: Organizers are strictly constrained to viewing, updating, and managing their own events and bookings. Organizers cannot delete bookings or alter events of other organizers.
-   - Country and City creation restricted to SuperAdmin and Admin.
-   - Claims-bound email validation in `SeatHoldController` prevents client payload identity spoofing.
-2. **XSS & Image Upload Protection**:
-   - Email notifications encode user-controlled text using `HttpUtility.HtmlEncode`.
-   - Security headers middleware enforces `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection: 1; mode=block`, `Cross-Origin-Opener-Policy: same-origin-allow-popups`, `Cross-Origin-Resource-Policy: cross-origin`, and strict CSP headers.
-   - Kestrel server banner suppression (`AddServerHeader = false`) and 30 MB maximum request body limits.
-   - `UploadController` enforces role-scoped uploads: Customers can only upload payment slips (`type=slip`) and avatars (`type=user`). Bank QR codes require Admin; event banners, logos, and artist photos require Organizer/Admin.
-   - Injected `ILogger<UploadController>` records structured warnings if physical file deletion fails on disk.
-   - Rate limiting on file uploads (20 req/min) prevents storage exhaustion attacks.
-   - Matching query filters on `BookingSeat` and `EventTag` join entities resolve EF Core model validation warnings.
-   - User Registration (`AuthService`), Self-Registration Modal (`AuthModal.jsx`), and Admin User Management (`AdminService` & `AdminDashboard.jsx`) strictly enforce unique Email and unique Phone Number validations on both backend database (`IX_Users_Email`, `IX_Users_PhoneNumber`) and frontend UI forms.
-3. **Frontend Session Integrity & Route Guards**:
-   - Initial app load verifies stored JWT session with `/api/auth/me`. Tampered or expired sessions are cleanly flushed.
-   - Reusable auth module (`frontend/src/utils/auth.js`) centralizes session storage (`getStoredToken`, `setStoredSession`, `clearStoredSession`), role normalization (`normalizeRole`), and boolean access checks (`isAdmin`, `isOrganizer`).
-   - Direct `localStorage` calls in file uploads refactored to centralized `getStoredToken()`.
-   - Dynamic host resolution in `api.js` replacing hardcoded ngrok fallbacks; query string parameters (such as customer emails) are sanitized with `encodeURIComponent`.
-   - Automatic 401 interception in `api.js` clears zombie localStorage tokens and dispatches an auth-expired event.
-   - Frontend route guards enforce role permissions on `admin` and `organizer` views.
-   - Interactive password strength criteria indicators in `AuthModal.jsx` guide users to meet the 10+ character complexity rules on signup.
-   - Vite dev proxy target reads from `.env.local` / `VITE_BACKEND_URL` dynamically.
-4. **Code Reusability, Scalability & Architecture**:
-   - **Global Exception Middleware Ordering**: Moved `app.UseCustomExceptionHandler()` before `app.UseRouting()` in `Program.cs` to ensure uniform JSON responses for routing and endpoint pipeline exceptions.
-   - **Null Reference Guards**: Added null-safe navigation and fallbacks for `bs.Seat` in `AdminService.MapBookingToDto` and `ev.Organizer` in `AdminService.GetEventDetailDtoAsync`.
-   - **Booking Reference Generation Guard**: Capped reference generation attempts (`maxAttempts = 10`) in `BookingService.cs` to eliminate infinite recursion/loop risk under concurrency.
-   - **Clean Architecture Compliance**: `PaymentController` injects `IApplicationDbContext` rather than concrete `ApplicationDbContext`.
-   - **Parallel Redis Invalidation**: `RemoveByPrefixAsync` parallelizes key deletions across clusters via `Task.WhenAll`.
-   - **Batch Seat Release in Background Expiry**: `PendingBookingExpiryService` groups expired seats by `EventId` and fires consolidated notifications, avoiding broadcast stampedes.
-   - **Database Round-Trip Minimization**: Show synchronization in `AdminService.UpdateEventAsync` batches show updates into a single `SaveChangesAsync()` call.
-   - **Sargable Query Optimization**: `BookingService.GetBookingsByEmailAsync` leverages EF Core case-insensitive comparisons instead of non-sargable LINQ `.ToLower()` calls.
-   - Single-query SQL-level authorization scoping: `IAdminService` methods (`UpdateEventAsync`, `DeleteEventAsync`, `GetBookingByIdAsync`, `UpdateBookingStatusAsync`) accept optional `int? organizerId = null`, eliminating redundant DB queries and cutting database round-trips by 50% for organizer actions.
-   - Matching soft-delete query filters on `BookingSeat` (`!bs.Booking.IsDeleted`) and `EventTag` (`!et.Event.IsDeleted`) prevent orphaned joins and eliminate EF Core navigation warnings.
+### 1. Virus, Malware & Malicious Upload Defense
+- **Executable & Script Signature Scanning** (`UploadController.cs`):
+  - Stream header inspection for PE executables (`MZ`), Linux ELF binaries (`\x7fELF`), and script signatures (`<?php`, `<script`, `<%`, `eval(`, `base64_decode(`, `system(`, `passthru(`). Disguised polyglots are rejected immediately.
+- **Mandatory Pixel Sanitization (Zero Raw Copy)**:
+  - All uploads are decoded into an in-memory `SKBitmap` and re-encoded into pure raster pixels (JPEG/WebP/PNG).
+  - Stream fallback copying (`file.CopyToAsync()`) is eliminated: if decoding fails, the file is rejected with `400 Bad Request`.
+  - Strips all executable steganography, embedded PHP web shells, malicious EXIF metadata, and corrupt chunk exploits.
+- **Image Decompression Bomb Protection**: Enforces strict pixel dimension caps (maximum 4096 × 4096 px) before full decoding into memory to stop RAM exhaustion DoS attacks.
+- **Path Traversal & Filename Sanitization**:
+  - Uploaded files receive cryptographically random GUID-based names (`Guid.NewGuid().ToString("N")[..8]`).
+  - Strict allowlisted folder paths (`assets/images/events`, `slips`, `qr_codes`, `organizers`, `users`).
+  - Path traversal characters (`..`, `/`, `\`) in names or types are rejected.
+- **Hardened Static File Serving**: Static files in `wwwroot` are served with `X-Content-Type-Options: nosniff` and client/CDN caching headers (`public,max-age=604800,immutable`).
+
+### 2. Bot Defense & Production-Grade Rate Limiting
+- **Global Application-Wide CAPTCHA / Cloudflare Turnstile Verification**:
+  - **Auto-Hide Across Entire Application**: Once a user successfully passes a CAPTCHA challenge anywhere in the app (homepage security banner, authentication sign-in/sign-up modal, or newsletter subscription in footer), the challenge is permanently hidden across the entire application for the active session.
+  - **State Persistence & Event Bus** (`frontend/src/utils/captcha.js`):
+    - Stores verification state and token in `sessionStorage` (`eventland_captcha_verified = 'true'`, `eventland_captcha_token`).
+    - Dispatches an application-wide custom window event (`eventland:captcha-verified` and `eventland:captcha-reset`) so all active components (`App.jsx`, `AuthModal.jsx`, `Footer.jsx`, `CloudflareTurnstile.jsx`) synchronize instantly.
+  - **Clean Component Unmounting** (`CloudflareTurnstile.jsx`):
+    - When `verified` is true (either on mount via `isCaptchaVerified()` or upon completing the challenge), the component returns `null`, removing the widget DOM tree.
+    - Outer challenge containers (such as the homepage security card banner in `App.jsx`) evaluate `!isCaptchaVerified()` and unmount immediately.
+  - **Backend Validation**:
+    - Backend `TurnstileService` implements `ICaptchaService`, checking token validity with Cloudflare's challenge verification API (`/api/captcha/verify`).
+- **Per-Client-IP Partitioned Rate Limiting** (`Program.cs`):
+  - Resolves client IP prioritizing `CF-Connecting-IP` (Cloudflare) -> `X-Forwarded-For` (first entry) -> `RemoteIpAddress`.
+  - **Login Policy (`"login"`)**: 30 attempts/min per IP (stops credential stuffing without causing global user collisions).
+  - **Booking Policy (`"booking"`)**: 30 requests/min per IP (blocks scalping/reservation bot floods).
+  - **Upload Policy (`"upload"`)**: 20 uploads/min per IP.
+  - **Global Fallback Policy**: 300 requests/min per IP.
+  - Controllers use `[EnableRateLimiting("login")]` and `[EnableRateLimiting("booking")]`.
+
+### 3. Anti-Hacker (OWASP Top 10) & Header Protections
+- **SQL Injection Prevention**:
+  - All queries in `EventService`, `BookingService`, `AuthService`, and `AdminService` use EF Core parameterized queries and index-sargable expressions (`EF.Functions.Like`).
+  - String concatenation in SQL is strictly prohibited.
+- **Content Security Policy & Clickjacking** (`SecurityHeadersMiddleware.cs`):
+  - Whitelists Cloudflare Turnstile (`challenges.cloudflare.com`) and Google reCAPTCHA in `script-src` and `frame-src`.
+  - Enforces `frame-ancestors 'none'` to eliminate iframe clickjacking.
+  - Headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection: 1; mode=block`, `Referrer-Policy: strict-origin-when-cross-origin`, `Cross-Origin-Opener-Policy: same-origin-allow-popups`.
+- **IDOR / Object-Level Authorization**:
+  - `BookingsController` (`GetBookingById`, `GetBookingByRef`, `GetBookingsByEmail`, `SubmitPaymentProof`) strictly verifies that the booking's email matches `User.GetEmail()` or the user has Admin privileges (`User.IsAdmin()`).
+- **Clean Exception Handling** (`GlobalExceptionHandlerMiddleware.cs`):
+  - Suppresses client disconnection exceptions (`OperationCanceledException`) so network drops do not pollute logs.
+  - Maps `InvalidOperationException` to `400 BadRequest`.
+  - Masks internal exception details/stack traces on 500 responses.
 
 ---
 
-## Deployment & Hosting Architecture
+## Frontend Architecture & Optimizations
 
-### Windows Server 2022 VPS Recommendation (HosterPK)
-- **Documented in**: `vps_hosting_recommendation.html` & `EventLand_Windows_VPS_Hosting_Recommendation.pdf`.
-- **Recommended Plan**: **Standard VPS (4 vCPU, 8 GB RAM, 100 GB NVMe)**.
-- **Components Co-hosted**:
-  - IIS 10 + ASP.NET Core Hosting Bundle (.NET 10).
-  - SQL Server Express / Developer (capped at 1.4 GB RAM for Express, or 4 GB instance cap).
-  - Memurai / Redis for Windows (512 MB memory limit).
-  - React SPA served as pre-built static assets via IIS URL Rewrite or reverse-proxied.
-  - Automatic Let's Encrypt SSL via Win-ACME.
+- **Vite & Clean CSS**:
+  - Purged ~185 lines of leftover Vite boilerplate classes from `App.css`, retaining only clean toast notification styles.
+- **Deduplication & DRY Helpers**:
+  - Extracted centralized `mapBookingToTicket()` utility in `App.jsx` replacing 3 identical 25-line mapping blocks.
+- **Database-Wide Search**:
+  - Connected `debouncedSearch` to backend `eventsApi.getEvents({ search })` so typing in the search bar queries the entire database, not just currently loaded items.
+- **Clean Production API Layer** (`api.js`):
+  - Removed obsolete development headers (`ngrok-skip-browser-warning`).
+  - Centralized host resolution and 401 session clearing.
+- **Performance & Hardware Acceleration**:
+  - Added `willChange: 'transform'` in `EventCard.jsx` for smooth 60fps card hover transitions.
+  - Fallback `alt` text on event cards for accessibility and SEO.
 
 ---
 
@@ -158,17 +171,17 @@
 
 ### Run Backend Locally
 ```powershell
-cd d:\EventLand\backend\src\EventLand.Api
+cd e:\EventLand\backend\src\EventLand.Api
 dotnet run
 ```
 
 ### Build Check (Backend & Frontend)
 ```powershell
 # Backend Solution (.NET 10)
-dotnet build d:\EventLand\backend\EventLand.slnx
+dotnet build e:\EventLand\backend\EventLand.slnx
 
 # Frontend Production Build (React + Vite)
-cd d:\EventLand\frontend
+cd e:\EventLand\frontend
 npm run build
 ```
 
@@ -182,5 +195,4 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
 ```
 
 ---
-*Last Updated: September 2026 (Full-Stack Security Hardening, Database Indexes, Performance Optimization, Reusable Architecture & VPS Hosting Guide Completed)*
-
+*Last Updated: September 2026 (Modern Security Hardening: Anti-Virus/Malware Pixel Re-encoding, App-Wide Cloudflare Turnstile Auto-Hide, Per-IP Rate Limiting, Full-Stack Latency & Index Optimizations Completed)*

@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { ChevronDown, Send, Phone, Mail } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { footerApi } from '../services/api';
+import { getStoredCaptchaToken } from '../utils/captcha';
 import CloudflareTurnstile from './CloudflareTurnstile';
 
 export default function Footer({ onSelectCity }) {
   const { showSuccess } = useToast();
   const [openFaq, setOpenFaq] = useState(null);
   const [newsletterEmail, setNewsletterEmail] = useState('');
-  const [newsletterCaptcha, setNewsletterCaptcha] = useState('');
+  const [newsletterCaptcha, setNewsletterCaptcha] = useState(() => getStoredCaptchaToken());
   const [subscribedToast, setSubscribedToast] = useState(false);
 
   // Dynamic state loaded from Database/API
@@ -90,6 +91,22 @@ export default function Footer({ onSelectCity }) {
       isMounted = false;
       window.removeEventListener('faqs-updated', handleFaqsUpdated);
       window.removeEventListener('footer-updated', loadFooterData);
+    };
+  }, []);
+
+  // Synchronize captcha token across app
+  useEffect(() => {
+    const handleVerified = (e) => {
+      if (e.detail?.token) setNewsletterCaptcha(e.detail.token);
+    };
+    const handleReset = () => {
+      setNewsletterCaptcha('');
+    };
+    window.addEventListener('eventland:captcha-verified', handleVerified);
+    window.addEventListener('eventland:captcha-reset', handleReset);
+    return () => {
+      window.removeEventListener('eventland:captcha-verified', handleVerified);
+      window.removeEventListener('eventland:captcha-reset', handleReset);
     };
   }, []);
 

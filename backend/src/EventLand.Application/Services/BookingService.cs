@@ -208,14 +208,7 @@ public class BookingService : IBookingService
 
     public async Task<BookingDto> SubmitPaymentProofAsync(int id, SubmitBankPaymentProofDto dto)
     {
-        var booking = await _context.Bookings
-            .Include(b => b.Event)
-            .Include(b => b.TicketTier)
-            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
-            .FirstOrDefaultAsync(b => b.Id == id && !b.IsDeleted);
-
-        if (booking is null)
-            throw new KeyNotFoundException($"Booking with ID '{id}' not found.");
+        var booking = await GetBookingForMutationAsync(id);
 
         if (booking.PaymentExpiresAt.HasValue && booking.PaymentExpiresAt.Value <= DateTimeOffset.UtcNow && booking.PaymentStatus == PaymentStatus.Pending)
         {
@@ -239,14 +232,7 @@ public class BookingService : IBookingService
 
     public async Task<BookingDto> ConfirmBankPaymentAsync(int id, ConfirmBankPaymentDto dto, int? adminId = null, string? adminEmail = null)
     {
-        var booking = await _context.Bookings
-            .Include(b => b.Event)
-            .Include(b => b.TicketTier)
-            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
-            .FirstOrDefaultAsync(b => b.Id == id && !b.IsDeleted);
-
-        if (booking is null)
-            throw new KeyNotFoundException($"Booking with ID '{id}' not found.");
+        var booking = await GetBookingForMutationAsync(id);
 
         if (booking.PaymentStatus == PaymentStatus.Paid)
             return MapToDto(booking);
@@ -279,8 +265,18 @@ public class BookingService : IBookingService
 
         var resultDto = MapToDto(booking);
 
-        // Dispatch E-Ticket pass via Email
-        _ = _notificationService.SendTicketConfirmationEmailAsync(resultDto);
+        // Dispatch E-Ticket pass via Email in background
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _notificationService.SendTicketConfirmationEmailAsync(resultDto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Background error sending ticket confirmation email for Booking {BookingRef}", booking.BookingRef);
+            }
+        });
 
         _logger.LogInformation("Admin {AdminEmail} verified & confirmed Bank Transfer for Booking {BookingRef}. E-Ticket generated!",
             adminEmail, booking.BookingRef);
@@ -290,14 +286,7 @@ public class BookingService : IBookingService
 
     public async Task<BookingDto> RejectBankPaymentAsync(int id, RejectBankPaymentDto dto, int? adminId = null, string? adminEmail = null)
     {
-        var booking = await _context.Bookings
-            .Include(b => b.Event)
-            .Include(b => b.TicketTier)
-            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
-            .FirstOrDefaultAsync(b => b.Id == id && !b.IsDeleted);
-
-        if (booking is null)
-            throw new KeyNotFoundException($"Booking with ID '{id}' not found.");
+        var booking = await GetBookingForMutationAsync(id);
 
         booking.PaymentStatus = PaymentStatus.Failed;
         booking.Status = BookingStatus.Cancelled;
@@ -332,6 +321,17 @@ public class BookingService : IBookingService
             adminEmail, booking.BookingRef);
 
         return MapToDto(booking);
+    }
+
+    private async Task<Booking> GetBookingForMutationAsync(int id)
+    {
+        var booking = await _context.Bookings
+            .Include(b => b.Event)
+            .Include(b => b.TicketTier)
+            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+            .FirstOrDefaultAsync(b => b.Id == id && !b.IsDeleted);
+
+        return booking ?? throw new KeyNotFoundException($"Booking with ID '{id}' not found.");
     }
 
     public async Task<BookingDto?> GetBookingByIdAsync(int id)
@@ -369,17 +369,16 @@ public class BookingService : IBookingService
 
         var normalizedEmail = email.Trim().ToLowerInvariant();
 
-        var query = _context.Bookings
+        var baseFilter = _context.Bookings
             .AsNoTracking()
+            .Where(b => EF.Functions.Like(b.CustomerEmail, normalizedEmail) && !b.IsDeleted);
+
+        var totalCount = await baseFilter.CountAsync();
+
+        var items = await baseFilter
             .Include(x => x.Event).ThenInclude(e => e!.Venue)
             .Include(x => x.TicketTier)
             .Include(x => x.BookingSeats).ThenInclude(bs => bs.Seat)
-            // Use EF.Functions.Like for a sargable, index-friendly case-insensitive comparison
-            .Where(b => EF.Functions.Like(b.CustomerEmail, normalizedEmail) && !b.IsDeleted);
-
-        var totalCount = await query.CountAsync();
-
-        var items = await query
             .OrderByDescending(b => b.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)

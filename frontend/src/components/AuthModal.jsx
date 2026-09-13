@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Lock, Mail, X, LogIn, UserPlus, Eye, EyeOff, Phone, Globe } from 'lucide-react';
 import { authApi, locationsApi, formatPhoneNumberOnSubmit } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { isCaptchaVerified, getStoredCaptchaToken } from '../utils/captcha';
 import CloudflareTurnstile from './CloudflareTurnstile';
 
 export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'login' }) {
@@ -12,7 +13,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaToken, setCaptchaToken] = useState(() => getStoredCaptchaToken());
   const [countries, setCountries] = useState([
     { id: 1, name: 'Pakistan', code: 'PK', dialingCode: '+92' },
     { id: 2, name: 'United Arab Emirates', code: 'AE', dialingCode: '+971' },
@@ -36,6 +37,22 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
       }
     }
     fetchCountries();
+  }, []);
+
+  // Synchronize captcha token across app
+  useEffect(() => {
+    const handleVerified = (e) => {
+      if (e.detail?.token) setCaptchaToken(e.detail.token);
+    };
+    const handleReset = () => {
+      setCaptchaToken('');
+    };
+    window.addEventListener('eventland:captcha-verified', handleVerified);
+    window.addEventListener('eventland:captcha-reset', handleReset);
+    return () => {
+      window.removeEventListener('eventland:captcha-verified', handleVerified);
+      window.removeEventListener('eventland:captcha-reset', handleReset);
+    };
   }, []);
 
   const activeCountry = countries.find(c => c.id === Number(selectedCountryId)) || countries[0];

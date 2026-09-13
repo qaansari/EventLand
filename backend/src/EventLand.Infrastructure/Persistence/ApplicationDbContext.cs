@@ -78,54 +78,25 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
         foreach (var entry in ChangeTracker.Entries())
         {
-            if (entry.Entity is BaseEntity baseEntity)
+            if (entry.Entity is IAuditableEntity auditable)
             {
                 switch (entry.State)
                 {
                     case EntityState.Added:
-                        baseEntity.CreatedAt = now;
-                        baseEntity.UpdatedAt = now;
+                        auditable.CreatedAt = now;
+                        auditable.UpdatedAt = now;
                         break;
 
                     case EntityState.Modified:
-                        entry.Property(nameof(BaseEntity.CreatedAt)).IsModified = false;
-                        baseEntity.UpdatedAt = now;
+                        entry.Property(nameof(IAuditableEntity.CreatedAt)).IsModified = false;
+                        auditable.UpdatedAt = now;
                         break;
 
                     case EntityState.Deleted:
                         entry.State = EntityState.Modified;
-                        baseEntity.IsDeleted = true;
-                        baseEntity.DeletedAt = now;
-                        baseEntity.UpdatedAt = now;
-                        break;
-                }
-            }
-            else if (entry.Entity.GetType().BaseType?.IsGenericType == true &&
-                     entry.Entity.GetType().BaseType?.GetGenericTypeDefinition() == typeof(BaseEntity<>))
-            {
-                var entity = entry.Entity;
-                var createdProp = entity.GetType().GetProperty("CreatedAt");
-                var updatedProp = entity.GetType().GetProperty("UpdatedAt");
-                var isDeletedProp = entity.GetType().GetProperty("IsDeleted");
-                var deletedAtProp = entity.GetType().GetProperty("DeletedAt");
-
-                switch (entry.State)
-                {
-                    case EntityState.Added:
-                        createdProp?.SetValue(entity, now);
-                        updatedProp?.SetValue(entity, now);
-                        break;
-
-                    case EntityState.Modified:
-                        if (createdProp != null) entry.Property("CreatedAt").IsModified = false;
-                        updatedProp?.SetValue(entity, now);
-                        break;
-
-                    case EntityState.Deleted:
-                        entry.State = EntityState.Modified;
-                        isDeletedProp?.SetValue(entity, true);
-                        deletedAtProp?.SetValue(entity, now);
-                        updatedProp?.SetValue(entity, now);
+                        auditable.IsDeleted = true;
+                        auditable.DeletedAt = now;
+                        auditable.UpdatedAt = now;
                         break;
                 }
             }

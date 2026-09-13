@@ -56,7 +56,7 @@ public class AuthService : IAuthService
         var user = await _context.Users
             .Include(u => u.Role)
             .Include(u => u.Country)
-            .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail && !u.IsDeleted);
+            .FirstOrDefaultAsync(u => EF.Functions.Like(u.Email, normalizedEmail) && !u.IsDeleted);
 
         if (user is null || !user.IsActive)
             throw new UnauthorizedAccessException("Invalid email or password.");
@@ -132,7 +132,7 @@ public class AuthService : IAuthService
         ValidatePassword(dto.Password);
 
         var normalizedEmail = email.ToLower();
-        var emailExists = await _context.Users.AnyAsync(u => u.Email.ToLower() == normalizedEmail && !u.IsDeleted);
+        var emailExists = await _context.Users.AnyAsync(u => EF.Functions.Like(u.Email, normalizedEmail) && !u.IsDeleted);
         if (emailExists)
             throw new InvalidOperationException("An account with this email address already exists.");
 

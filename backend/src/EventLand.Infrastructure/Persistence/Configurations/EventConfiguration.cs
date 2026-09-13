@@ -92,6 +92,12 @@ public sealed class EventConfiguration : IEntityTypeConfiguration<Event>
         builder.HasIndex(e => e.IsFeatured)
                .HasDatabaseName("IX_Events_IsFeatured");
 
+        builder.HasIndex(e => e.OrganizerId)
+               .HasDatabaseName("IX_Events_OrganizerId");
+
+        builder.HasIndex(e => new { e.IsPublished, e.CityId, e.StartDateUtc })
+               .HasDatabaseName("IX_Events_Published_City_Date");
+
         builder.HasIndex(e => new { e.IsDeleted, e.IsPublished, e.StartDateUtc })
                .HasDatabaseName("IX_Events_Published_Date");
 

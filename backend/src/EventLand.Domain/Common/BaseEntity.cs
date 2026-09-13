@@ -1,11 +1,19 @@
 namespace EventLand.Domain.Common;
 
+public interface IAuditableEntity
+{
+    DateTimeOffset CreatedAt { get; set; }
+    DateTimeOffset UpdatedAt { get; set; }
+    bool IsDeleted { get; set; }
+    DateTimeOffset? DeletedAt { get; set; }
+}
+
 /// <summary>
 /// Generic base entity supporting custom Primary Key types (int, Guid, etc.),
 /// full audit trail (CreatedAt, UpdatedAt, CreatedBy, UpdatedBy),
 /// and soft-delete support (IsDeleted, DeletedAt).
 /// </summary>
-public abstract class BaseEntity<TKey>
+public abstract class BaseEntity<TKey> : IAuditableEntity
 {
     public TKey Id { get; set; } = default!;
 

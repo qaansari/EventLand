@@ -104,6 +104,10 @@ public sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.HasIndex(b => new { b.PaymentStatus, b.PaymentExpiresAt })
                .HasDatabaseName("IX_Bookings_PaymentStatus_PaymentExpiresAt");
 
+        // Index for admin booking queries sorted by CreatedAt
+        builder.HasIndex(b => b.CreatedAt)
+               .HasDatabaseName("IX_Bookings_CreatedAt");
+
         // Note: Global soft-delete query filter (!IsDeleted) is applied in OnModelCreating.
         // Do NOT add a duplicate HasQueryFilter here — EF Core only supports one per entity.
     }

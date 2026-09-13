@@ -6,10 +6,12 @@ using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[EnableRateLimiting("booking")]
 public class BookingsController : ControllerBase
 {
     private readonly IBookingService _bookingService;

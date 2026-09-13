@@ -63,12 +63,18 @@ public class UploadController : ControllerBase
             return BadRequest(new { message = "Invalid content type for image upload." });
         }
 
-        // Validate image magic-byte signature to prevent extension spoofing
-        using (var headerStream = file.OpenReadStream())
+        // Validate image magic-byte signature & scan for executable/script malware payloads
+        using (var scanStream = file.OpenReadStream())
         {
-            if (!IsValidImageHeader(headerStream, extension))
+            if (!IsValidImageHeader(scanStream, extension))
             {
                 return BadRequest(new { message = "Corrupted or invalid image file signature." });
+            }
+
+            if (ContainsSuspiciousSignatures(scanStream))
+            {
+                _logger.LogWarning("Potential malware or script payload rejected during file upload: {FileName}", file.FileName);
+                return BadRequest(new { message = "File was rejected due to suspicious content detected." });
             }
         }
 
@@ -132,7 +138,6 @@ public class UploadController : ControllerBase
             // Reuse the same prefix/cleanName logic but with a Guid suffix
             var tmpName = FileUrlHelper.FormatEntityImageFileName(type ?? "events", name, 0, extension);
             var tmpBase = Path.GetFileNameWithoutExtension(tmpName);
-            // tmpBase is like "ev_name_0" — replace trailing "_0" with Guid
             var baseWithoutId = tmpBase[..tmpBase.LastIndexOf('_')];
             targetFileName = $"{baseWithoutId}_{guidSuffix}{extension}";
         }
@@ -145,9 +150,6 @@ public class UploadController : ControllerBase
             return BadRequest(new { message = "Invalid file name pattern." });
         }
 
-        // Delete any existing image for the same entity and same extension only.
-        // Previously used $"{basePattern}.*" which would delete all extensions; now
-        // we scope to the same extension to avoid removing unrelated variants.
         try
         {
             var existingFile = Path.Combine(targetFolder, targetFileName);
@@ -157,13 +159,6 @@ public class UploadController : ControllerBase
             }
             else
             {
-                // Fallback: if the stored file has a different extension but same base,
-                // only remove it when the extension matches the new upload's extension.
-                // This handles the case where the old file was uploaded as .jpg and the
-                // new one is .jpg — we already handled that above. For cross-extension
-                // cleanup we intentionally do NOT delete, to avoid surprising data loss.
-                // If strict replacement across extensions is desired, enumerate with
-                // $"{basePattern}.*" and filter by extension == this extension.
                 foreach (var candidate in Directory.GetFiles(targetFolder, $"{basePattern}.*"))
                 {
                     if (!string.Equals(Path.GetExtension(candidate), extension, StringComparison.OrdinalIgnoreCase))
@@ -186,50 +181,56 @@ public class UploadController : ControllerBase
         }
         catch (Exception ex)
         {
-            // Log file delete failures for diagnostics — do not abort the upload
             _logger.LogWarning(ex, "Failed to delete existing file before overwrite: {FilePath}", targetFileName);
         }
 
         var filePath = Path.Combine(targetFolder, targetFileName);
 
-        // Check if uploaded file is greater than 1 MB. If so, compress using free SkiaSharp library (MIT License)
-        if (file.Length > OneMbInBytes)
+        // MANDATORY PIXEL SANITIZATION & RE-ENCODING:
+        // Every image is decoded through SkiaSharp into pure raster pixels and re-encoded.
+        // This eliminates raw-stream copying and purges all executable polyglots, embedded PHP,
+        // and malicious metadata/EXIF payloads.
+        try
         {
-            try
-            {
-                using var inputStream = file.OpenReadStream();
-                using var originalBitmap = SKBitmap.Decode(inputStream);
+            using var inputStream = file.OpenReadStream();
+            using var originalBitmap = SKBitmap.Decode(inputStream);
 
-                if (originalBitmap != null)
-                {
-                    var format = extension switch
-                    {
-                        ".png" => SKEncodedImageFormat.Png,
-                        ".webp" => SKEncodedImageFormat.Webp,
-                        _ => SKEncodedImageFormat.Jpeg
-                    };
-
-                    byte[] compressedBytes = CompressBitmapToUnder1Mb(originalBitmap, format);
-                    await System.IO.File.WriteAllBytesAsync(filePath, compressedBytes);
-                }
-                else
-                {
-                    // Fallback to direct stream copy if bitmap decoding fails
-                    using var stream = new FileStream(filePath, FileMode.Create);
-                    await file.CopyToAsync(stream);
-                }
-            }
-            catch
+            if (originalBitmap == null)
             {
-                // Fallback safely to direct stream copy
-                using var stream = new FileStream(filePath, FileMode.Create);
-                await file.CopyToAsync(stream);
+                return BadRequest(new { message = "Invalid or corrupted image data. The file could not be parsed." });
             }
+
+            // Image decompression bomb defense: reject excessive pixel resolutions
+            if (originalBitmap.Width > 4096 || originalBitmap.Height > 4096)
+            {
+                return BadRequest(new { message = "Image resolution exceeds maximum allowed limit (4096 x 4096)." });
+            }
+
+            var format = extension switch
+            {
+                ".png" => SKEncodedImageFormat.Png,
+                ".webp" => SKEncodedImageFormat.Webp,
+                _ => SKEncodedImageFormat.Jpeg
+            };
+
+            byte[] safeBytes;
+            if (file.Length > OneMbInBytes || originalBitmap.Width > 2400 || originalBitmap.Height > 2400)
+            {
+                safeBytes = CompressBitmapToUnder1Mb(originalBitmap, format);
+            }
+            else
+            {
+                using var image = SKImage.FromBitmap(originalBitmap);
+                using var data = image.Encode(format, 90);
+                safeBytes = data != null ? data.ToArray() : CompressBitmapToUnder1Mb(originalBitmap, format);
+            }
+
+            await System.IO.File.WriteAllBytesAsync(filePath, safeBytes);
         }
-        else
+        catch (Exception ex)
         {
-            using var stream = new FileStream(filePath, FileMode.Create);
-            await file.CopyToAsync(stream);
+            _logger.LogError(ex, "Error processing and sanitizing uploaded image {FileName}", file.FileName);
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Failed to safely process image." });
         }
 
         var relativePath = subFolder.Replace('\\', '/');
@@ -280,10 +281,50 @@ public class UploadController : ControllerBase
         return result;
     }
 
+    private static bool ContainsSuspiciousSignatures(Stream stream)
+    {
+        try
+        {
+            if (stream.CanSeek) stream.Position = 0;
+
+            // Inspect the first 16KB of file content for embedded scripts or executable signatures
+            byte[] buffer = new byte[Math.Min(stream.Length, 16384)];
+            int bytesRead = stream.Read(buffer, 0, buffer.Length);
+            if (stream.CanSeek) stream.Position = 0;
+
+            if (bytesRead < 4) return false;
+
+            // Reject PE executable (MZ = 0x4D, 0x5A) or ELF executable (0x7F, 'E', 'L', 'F')
+            if (buffer[0] == 0x4D && buffer[1] == 0x5A) return true;
+            if (buffer[0] == 0x7F && buffer[1] == 0x45 && buffer[2] == 0x4C && buffer[3] == 0x46) return true;
+
+            // Reject files containing web shell or script tags disguised as images
+            var text = System.Text.Encoding.ASCII.GetString(buffer).ToLowerInvariant();
+            string[] forbiddenSignatures = 
+            { 
+                "<?php", "<script", "<%", "eval(", "base64_decode(", 
+                "system(", "passthru(", "shell_exec(", "popen(" 
+            };
+
+            foreach (var sig in forbiddenSignatures)
+            {
+                if (text.Contains(sig, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool IsValidImageHeader(Stream stream, string extension)
     {
+        if (stream.CanSeek) stream.Position = 0;
         byte[] header = new byte[12];
         int bytesRead = stream.Read(header, 0, header.Length);
+        if (stream.CanSeek) stream.Position = 0;
         if (bytesRead < 4) return false;
 
         return extension switch

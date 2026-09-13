@@ -12,6 +12,7 @@ import { Ticket, MapPin, Trash2, Search, RefreshCw, ShieldCheck } from 'lucide-r
 import { eventsApi, bookingsApi, tagsApi, locationsApi, adminApi, authApi, toEventSlug } from './services/api';
 import { getStoredUser, getStoredToken, setStoredSession, clearStoredSession, normalizeRole, isAdmin, isOrganizer } from './utils/auth';
 import { useToast } from './context/ToastContext';
+import { isCaptchaVerified, getStoredCaptchaToken } from './utils/captcha';
 import './App.css';
 
 // Code-split heavy / role-gated views and on-demand modals into separate chunks
@@ -47,6 +48,26 @@ const getEventIdFromUrl = () => {
   return null;
 };
 
+function mapBookingToTicket(b, fallbackEmail = '') {
+  return {
+    ticketId: b.bookingRef || `EVL-${b.id}`,
+    bookingId: b.id,
+    eventTitle: b.eventTitle,
+    venue: b.venueName || 'Arts Council of Pakistan, Karachi',
+    date: b.showDate || b.eventDate || 'Upcoming Show',
+    time: b.showTime || b.showTitle || '08:00 PM PKT',
+    showTitle: b.showTitle || 'Main Show Slot',
+    showDateTime: (b.showDate && b.showTime) ? `${b.showDate} at ${b.showTime}` : (b.showDate || b.showTime || 'Upcoming Show'),
+    attendeeName: b.customerName,
+    attendeeEmail: b.customerEmail || fallbackEmail,
+    phone: b.customerPhone,
+    seats: (b.selectedSeats || []).map(s => ({ id: s.label || s.id, zone: s.label })),
+    paymentMethod: b.paymentMethod || 'PAID',
+    totalPaid: b.totalAmount,
+    bookingTime: new Date(b.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+  };
+}
+
 export default function App() {
   const { showSuccess, showInfo, showError, showWarning } = useToast();
   const [events, setEvents] = useState([]);
@@ -56,7 +77,23 @@ export default function App() {
   const [cities, setCities] = useState([]);
   const [venues, setVenues] = useState([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
-  const [homepageCaptchaToken, setHomepageCaptchaToken] = useState('');
+  const [homepageCaptchaToken, setHomepageCaptchaToken] = useState(() => getStoredCaptchaToken());
+
+  // Listen for global CAPTCHA verification across all app components
+  useEffect(() => {
+    const handleCaptchaVerified = (e) => {
+      setHomepageCaptchaToken(e.detail?.token || getStoredCaptchaToken());
+    };
+    const handleCaptchaReset = () => {
+      setHomepageCaptchaToken('');
+    };
+    window.addEventListener('eventland:captcha-verified', handleCaptchaVerified);
+    window.addEventListener('eventland:captcha-reset', handleCaptchaReset);
+    return () => {
+      window.removeEventListener('eventland:captcha-verified', handleCaptchaVerified);
+      window.removeEventListener('eventland:captcha-reset', handleCaptchaReset);
+    };
+  }, []);
 
   // Pagination state for the explore events grid
   const [pageNumber, setPageNumber] = useState(1);
@@ -70,6 +107,13 @@ export default function App() {
   const [customDate, setCustomDate] = useState(''); // 'YYYY-MM-DD'
   const [selectedPriceFilter, setSelectedPriceFilter] = useState('all');
   const [selectedTag, setSelectedTag] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Fetch live tags, countries, and cities on mount
   useEffect(() => {
@@ -84,12 +128,13 @@ export default function App() {
     }).catch(console.error);
   }, []);
 
-  // Fetch events from backend API whenever selectedTag or selectedCity changes
+  // Fetch events from backend API whenever selectedTag, selectedCity, or debouncedSearch changes
   useEffect(() => {
     setLoadingEvents(true);
     eventsApi.getEvents({
       category: selectedTag !== 'All' ? selectedTag : null,
       city: selectedCity !== 'All Cities' ? selectedCity : null,
+      search: debouncedSearch.trim() || null,
       pageNumber: 1,
       pageSize: PAGE_SIZE
     })
@@ -104,7 +149,7 @@ export default function App() {
         console.error('Could not load events from API:', err);
       })
       .finally(() => setLoadingEvents(false));
-  }, [selectedTag, selectedCity]);
+  }, [selectedTag, selectedCity, debouncedSearch]);
 
   const hasMoreEvents = totalEvents !== null
     ? events.length < totalEvents
@@ -117,6 +162,7 @@ export default function App() {
       const res = await eventsApi.getEvents({
         category: selectedTag !== 'All' ? selectedTag : null,
         city: selectedCity !== 'All Cities' ? selectedCity : null,
+        search: debouncedSearch.trim() || null,
         pageNumber: nextPage,
         pageSize: PAGE_SIZE
       });
@@ -135,7 +181,6 @@ export default function App() {
   const [urlEventId, setUrlEventId] = useState(getEventIdFromUrl);
   const [activeView, setActiveView] = useState(() => getEventIdFromUrl() ? 'event-detail' : 'explore'); // explore, event-detail, artists, organizer-wizard, my-tickets, organizer, admin
   const [userRole, setUserRole] = useState('customer'); // customer, organizer, admin
-  const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('featured');
 
   // User Authentication State
@@ -343,23 +388,7 @@ export default function App() {
       .then(res => {
         const list = Array.isArray(res) ? res : (res?.items || []);
         const confirmedBookings = list.filter(b => b.paymentStatus === 'Paid' || b.status === 'Confirmed');
-        const apiTickets = confirmedBookings.map(b => ({
-          ticketId: b.bookingRef || `EVL-${b.id}`,
-          bookingId: b.id,
-          eventTitle: b.eventTitle,
-          venue: b.venueName || 'Arts Council of Pakistan, Karachi',
-          date: b.showDate || b.eventDate || 'Upcoming Show',
-          time: b.showTime || b.showTitle || '08:00 PM PKT',
-          showTitle: b.showTitle || 'Main Show Slot',
-          showDateTime: (b.showDate && b.showTime) ? `${b.showDate} at ${b.showTime}` : (b.showDate || b.showTime || 'Upcoming Show'),
-          attendeeName: b.customerName,
-          attendeeEmail: b.customerEmail || currentUser.email,
-          phone: b.customerPhone,
-          seats: (b.selectedSeats || []).map(s => ({ id: s.label || s.id, zone: s.label })),
-          paymentMethod: b.paymentMethod || 'PAID',
-          totalPaid: b.totalAmount,
-          bookingTime: new Date(b.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
-        }));
+        const apiTickets = confirmedBookings.map(b => mapBookingToTicket(b, currentUser.email));
 
         const mergedMap = new Map();
         [...apiTickets, ...userTickets].forEach(t => {
@@ -425,23 +454,7 @@ export default function App() {
             return;
           }
 
-          const tObj = {
-            ticketId: booking.bookingRef,
-            bookingId: booking.id,
-            eventTitle: booking.eventTitle,
-            venue: booking.venueName || 'Arts Council of Pakistan, Karachi',
-            date: booking.showDate || booking.eventDate || 'Upcoming Show',
-            time: booking.showTime || booking.showTitle || '08:00 PM PKT',
-            showTitle: booking.showTitle || 'Main Show Slot',
-            showDateTime: (booking.showDate && booking.showTime) ? `${booking.showDate} at ${booking.showTime}` : (booking.showDate || booking.showTime || 'Upcoming Show'),
-            attendeeName: booking.customerName,
-            attendeeEmail: booking.customerEmail || currentUser.email,
-            phone: booking.customerPhone,
-            seats: (booking.selectedSeats || []).map(s => ({ id: s.label || s.id, zone: s.label })),
-            paymentMethod: booking.paymentMethod || 'PAID',
-            totalPaid: booking.totalAmount,
-            bookingTime: new Date(booking.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
-          };
+          const tObj = mapBookingToTicket(booking, currentUser.email);
 
           const exists = purchasedTickets.some(t => t.ticketId === tObj.ticketId);
           if (!exists) {
@@ -468,23 +481,7 @@ export default function App() {
         } else {
           const newTickets = list
             .filter(b => b.paymentStatus === 'Paid' || b.status === 'Confirmed')
-            .map(b => ({
-              ticketId: b.bookingRef || `EVL-${b.id}`,
-              bookingId: b.id,
-              eventTitle: b.eventTitle,
-              venue: b.venueName || 'Arts Council of Pakistan, Karachi',
-              date: b.showDate || b.eventDate || 'Upcoming Show',
-              time: b.showTime || b.showTitle || '08:00 PM PKT',
-              showTitle: b.showTitle || 'Main Show Slot',
-              showDateTime: (b.showDate && b.showTime) ? `${b.showDate} at ${b.showTime}` : (b.showDate || b.showTime || 'Upcoming Show'),
-              attendeeName: b.customerName,
-              attendeeEmail: b.customerEmail || currentUser.email,
-              phone: b.customerPhone,
-              seats: (b.selectedSeats || []).map(s => ({ id: s.label || s.id, zone: s.label })),
-              paymentMethod: b.paymentMethod || 'PAID',
-              totalPaid: b.totalAmount,
-              bookingTime: new Date(b.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
-            }));
+            .map(b => mapBookingToTicket(b, currentUser.email));
 
           const mergedMap = new Map();
           [...newTickets, ...purchasedTickets].forEach(t => {
@@ -828,14 +825,6 @@ export default function App() {
     showInfo('Filters Cleared', 'All discovery filters have been reset.');
   };
 
-  // Filter & Sort Events — memoized so typing in search does not re-scan the
-  // list on every render, and debounced so each keystroke does not re-filter.
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 250);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
   const sortedEvents = useMemo(() => {
     const needle = debouncedSearch.trim().toLowerCase();
     const citySel = selectedCity.toLowerCase();
@@ -1024,7 +1013,7 @@ export default function App() {
             />
 
             {/* Cloudflare CAPTCHA Verification Banner on Homepage (Hidden once verified) */}
-            {!homepageCaptchaToken && (
+            {!homepageCaptchaToken && !isCaptchaVerified() && (
               <div className="glass-card" style={{
                 margin: '1.5rem 0',
                 padding: '1rem 1.5rem',

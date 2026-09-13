@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
 import { captchaApi } from '../services/api';
+import { isCaptchaVerified, getStoredCaptchaToken, setCaptchaVerified, clearCaptchaVerified } from '../utils/captcha';
 
 const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 const TEST_SITEKEY = '1x00000000000000000000AA'; // Cloudflare's official test sitekey
@@ -19,10 +20,37 @@ export default function CloudflareTurnstile({
   const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
-  const [verified, setVerified] = useState(false);
+  const [verified, setVerified] = useState(() => isCaptchaVerified());
+
+  // Listen for global captcha verification across the application
+  useEffect(() => {
+    const handleGlobalVerified = (e) => {
+      setVerified(true);
+      if (onVerify && e.detail?.token) {
+        onVerify(e.detail.token);
+      }
+    };
+    const handleGlobalReset = () => {
+      setVerified(false);
+    };
+
+    window.addEventListener('eventland:captcha-verified', handleGlobalVerified);
+    window.addEventListener('eventland:captcha-reset', handleGlobalReset);
+
+    if (isCaptchaVerified() && onVerify) {
+      onVerify(getStoredCaptchaToken());
+    }
+
+    return () => {
+      window.removeEventListener('eventland:captcha-verified', handleGlobalVerified);
+      window.removeEventListener('eventland:captcha-reset', handleGlobalReset);
+    };
+  }, []);
 
   // Fetch SiteKey & Enabled state from backend API
   useEffect(() => {
+    if (verified) return; // Don't fetch if already verified
+
     let isMounted = true;
     captchaApi.getConfig()
       .then((config) => {
@@ -37,10 +65,14 @@ export default function CloudflareTurnstile({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [verified]);
 
   // Dynamically load Cloudflare Turnstile Script & Render Widget
   useEffect(() => {
+    if (verified) {
+      return; // Do not initialize widget if already verified anywhere in the app
+    }
+
     if (!enabled) {
       setLoading(false);
       // If captcha is disabled in configuration, notify parent as auto-verified
@@ -65,21 +97,23 @@ export default function CloudflareTurnstile({
           size: size,
           callback: (token) => {
             if (!isMounted) return;
+            setCaptchaVerified(token);
             setVerified(true);
             setErrorMsg(null);
             if (onVerify) onVerify(token);
           },
           'expired-callback': () => {
             if (!isMounted) return;
+            clearCaptchaVerified();
             setVerified(false);
             if (onExpire) onExpire();
           },
           'error-callback': (err) => {
             if (!isMounted) return;
-            setVerified(false);
             console.warn('[Turnstile] Render error encountered:', err);
             // Fall back gracefully for local dev environments if domain is not registered
             const fallbackToken = `test-pass-${Date.now()}`;
+            setCaptchaVerified(fallbackToken);
             setVerified(true);
             if (onVerify) onVerify(fallbackToken);
             if (onError) onError(err);
@@ -93,7 +127,10 @@ export default function CloudflareTurnstile({
         setLoading(false);
         setErrorMsg('Failed to load Turnstile widget');
         // Provide test pass-through fallback for dev
-        if (onVerify) onVerify(`test-pass-${Date.now()}`);
+        const fallbackToken = `test-pass-${Date.now()}`;
+        setCaptchaVerified(fallbackToken);
+        setVerified(true);
+        if (onVerify) onVerify(fallbackToken);
       }
     };
 
@@ -115,7 +152,10 @@ export default function CloudflareTurnstile({
             if (isMounted) {
               setLoading(false);
               setErrorMsg('Security challenge unavailable');
-              if (onVerify) onVerify(`test-pass-offline-${Date.now()}`);
+              const fallbackToken = `test-pass-offline-${Date.now()}`;
+              setCaptchaVerified(fallbackToken);
+              setVerified(true);
+              if (onVerify) onVerify(fallbackToken);
             }
           };
           document.head.appendChild(script);
@@ -133,19 +173,10 @@ export default function CloudflareTurnstile({
         } catch (e) {}
       }
     };
-  }, [siteKey, enabled, theme, size]);
+  }, [siteKey, enabled, theme, size, verified]);
 
-  const handleReset = () => {
-    setVerified(false);
-    setErrorMsg(null);
-    if (widgetIdRef.current !== null && window.turnstile) {
-      try {
-        window.turnstile.reset(widgetIdRef.current);
-      } catch (e) {}
-    }
-  };
-
-  if (!enabled) {
+  // Permanently hide captcha across the entire application once verified
+  if (!enabled || verified) {
     return null;
   }
 
@@ -167,30 +198,11 @@ export default function CloudflareTurnstile({
         ...style
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', width: '100%', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', width: '100%', justifyContent: 'flex-start' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#38bdf8', fontSize: '0.78rem', fontWeight: 600 }}>
-          <ShieldCheck size={16} color={verified ? '#10b981' : '#38bdf8'} />
-          <span>{verified ? 'Cloudflare Verified' : 'Cloudflare Turnstile Protection'}</span>
+          <ShieldCheck size={16} color="#38bdf8" />
+          <span>Cloudflare Turnstile Security Challenge</span>
         </div>
-        {verified && (
-          <button
-            type="button"
-            onClick={handleReset}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#94a3b8',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.2rem',
-              fontSize: '0.72rem'
-            }}
-            title="Reset CAPTCHA Challenge"
-          >
-            <RefreshCw size={12} /> Reset
-          </button>
-        )}
       </div>
 
       {loading && (

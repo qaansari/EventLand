@@ -37,10 +37,10 @@ public class SecurityHeadersMiddleware
         // Allow cross-origin static resource loading (images, QR codes, avatars) while protecting resources
         context.Response.Headers.Append("Cross-Origin-Resource-Policy", "cross-origin");
         
-        // Content Security Policy - restrict resource loading
+        // Content Security Policy - restrict resource loading, prevent clickjacking & XSS
         var cspPolicy = _environment.IsDevelopment()
-            ? "default-src 'self'; img-src 'self' data: https: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' wss: https: http://localhost:* ws://localhost:*;"
-            : "default-src 'self'; img-src 'self' data: https: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'self' wss: https:;";
+            ? "default-src 'self'; img-src 'self' data: https: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://www.google.com https://www.gstatic.com; frame-src 'self' https://challenges.cloudflare.com https://www.google.com; frame-ancestors 'none'; connect-src 'self' wss: https: http://localhost:* ws://localhost:*;"
+            : "default-src 'self'; img-src 'self' data: https: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' https://challenges.cloudflare.com https://www.google.com https://www.gstatic.com; frame-src 'self' https://challenges.cloudflare.com https://www.google.com; frame-ancestors 'none'; connect-src 'self' wss: https:;";
         
         context.Response.Headers.Append("Content-Security-Policy", cspPolicy);
 
