@@ -40,7 +40,7 @@ import {
   Lock,
   FileSpreadsheet
 } from 'lucide-react';
-import { adminApi, locationsApi, uploadApi, faqsApi, footerApi, paymentsApi, bankAccountsApi, bookingsApi, getEventImageUrl, getOrganizerImageUrl, getUserImageUrl, getPaymentSlipUrl, getQrCodeImageUrl, formatPhoneNumberOnSubmit, splitPhoneNumberForEdit } from '../services/api';
+import { adminApi, eventsApi, locationsApi, uploadApi, faqsApi, footerApi, paymentsApi, bankAccountsApi, bookingsApi, getEventImageUrl, getOrganizerImageUrl, getUserImageUrl, getPaymentSlipUrl, getQrCodeImageUrl, formatPhoneNumberOnSubmit, splitPhoneNumberForEdit } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
@@ -126,6 +126,9 @@ export default function AdminDashboard({ onSelectEvent }) {
 
   // Loaded Data States
   const [eventsList, setEventsList] = useState([]);  
+  const [ticketTiersList, setTicketTiersList] = useState([]);
+  const [tierEventFilter, setTierEventFilter] = useState('All');
+  const [tierSearch, setTierSearch] = useState('');
   const [organizersList, setOrganizersList] = useState([]);
   const [artistsList, setArtistsList] = useState([]);
   const [bookingsList, setBookingsList] = useState([]);
@@ -441,7 +444,7 @@ export default function AdminDashboard({ onSelectEvent }) {
     if (isInitial) setLoading(true);
     setErrorMsg('');
     try {
-      const [orgs, evs, arts, bks, rls, usrs, tgs, auds, cnts, cts, vns, faqs, ftr, banks] = await Promise.all([
+      const [orgs, evs, arts, bks, rls, usrs, tgs, auds, cnts, cts, vns, faqs, ftr, banks, tiers] = await Promise.all([
         adminApi.organizers.getAll().catch(() => []),
         adminApi.events.getAll(1, 50).catch(() => ({ items: [] })),
         adminApi.artists.getAll(1, 50).catch(() => ({ items: [] })),
@@ -455,7 +458,8 @@ export default function AdminDashboard({ onSelectEvent }) {
         locationsApi.getVenues().catch(() => []),
         faqsApi.adminGetAll().catch(() => []),
         footerApi.get().catch(() => null),
-        bankAccountsApi.adminGetAll().catch(() => [])
+        bankAccountsApi.adminGetAll().catch(() => []),
+        adminApi.ticketTiers.getAll().catch(() => [])
       ]);
 
       if (Array.isArray(banks)) setBankAccountsList(banks);
@@ -472,7 +476,40 @@ export default function AdminDashboard({ onSelectEvent }) {
       }));
 
       setOrganizersList(normalizedOrgs);
-      setEventsList(evs.items || evs || []);
+      const loadedEvents = evs.items || evs || [];
+      setEventsList(loadedEvents);
+
+      // Resilient ticket tier resolution:
+      let resolvedTiers = Array.isArray(tiers) && tiers.length > 0 ? tiers : [];
+      if (resolvedTiers.length === 0 && loadedEvents.length > 0) {
+        try {
+          const fullDetails = await Promise.all(
+            loadedEvents.map(e => eventsApi.getEventById(e.id).catch(() => null))
+          );
+          const extractedTiers = [];
+          for (const fd of fullDetails) {
+            if (!fd) continue;
+            for (const t of (fd.ticketTiers || [])) {
+              if (!extractedTiers.some(x => x.id === t.id)) {
+                extractedTiers.push({ ...t, eventTitle: fd.title });
+              }
+            }
+            for (const s of (fd.shows || [])) {
+              for (const st of (s.ticketTiers || [])) {
+                if (!extractedTiers.some(x => x.id === st.id)) {
+                  extractedTiers.push({ ...st, eventTitle: fd.title, showTitle: s.showTitle });
+                }
+              }
+            }
+          }
+          if (extractedTiers.length > 0) {
+            resolvedTiers = extractedTiers;
+          }
+        } catch (err) {
+          console.warn('Fallback ticket tier extraction failed:', err);
+        }
+      }
+      setTicketTiersList(resolvedTiers);
       setArtistsList(arts.items || arts || []);
       setBookingsList(bks.items || bks || []);
       setRolesList(rls || []);
@@ -579,7 +616,44 @@ export default function AdminDashboard({ onSelectEvent }) {
         ? (eventForm.status === 1 ? 'Live' : (eventForm.status === 2 ? 'Completed' : (eventForm.status === 3 ? 'Cancelled' : 'Draft')))
         : (eventForm.status || 'Live');
 
+      // Validate shows and ticket tiers for duplicates
+      const seenShowKeys = new Set();
+      for (const s of (eventForm.shows || [])) {
+        const sTitle = (s.showTitle || 'Show Slot').trim().toLowerCase();
+        const sTime = s.startTimeUtc ? new Date(s.startTimeUtc.includes('+') || s.startTimeUtc.includes('Z') ? s.startTimeUtc : `${s.startTimeUtc}:00+05:00`).getTime() : 0;
+        const sKey = `${sTitle}_${sTime}`;
+        if (seenShowKeys.has(sKey)) {
+          const msg = `Duplicate show slot detected: '${s.showTitle || 'Show Slot'}' at the same start time.`;
+          setErrorMsg(msg);
+          showError('Duplicate Show', msg);
+          setIsSaving(false);
+          return;
+        }
+        seenShowKeys.add(sKey);
+
+        const seenTierNames = new Set();
+        for (const t of (s.ticketTiers || [])) {
+          const tName = (t.name || '').trim().toLowerCase();
+          if (!tName) {
+            const msg = `A ticket tier in show '${s.showTitle || 'Show Slot'}' is missing a name.`;
+            setErrorMsg(msg);
+            showError('Validation Error', msg);
+            setIsSaving(false);
+            return;
+          }
+          if (seenTierNames.has(tName)) {
+            const msg = `Duplicate ticket tier name '${t.name.trim()}' in show slot '${s.showTitle || 'Show Slot'}'.`;
+            setErrorMsg(msg);
+            showError('Duplicate Ticket Tier', msg);
+            setIsSaving(false);
+            return;
+          }
+          seenTierNames.add(tName);
+        }
+      }
+
       const formattedShows = (eventForm.shows || []).map(s => ({
+        id: s.id ? (typeof s.id === 'number' ? s.id : parseInt(s.id, 10)) : null,
         showTitle: s.showTitle || 'Show Slot',
         startTimeUtc: s.startTimeUtc && !s.startTimeUtc.includes('+') && !s.startTimeUtc.includes('Z')
           ? `${s.startTimeUtc}:00+05:00`
@@ -587,12 +661,12 @@ export default function AdminDashboard({ onSelectEvent }) {
         endTimeUtc: s.endTimeUtc && !s.endTimeUtc.includes('+') && !s.endTimeUtc.includes('Z')
           ? `${s.endTimeUtc}:00+05:00`
           : (s.endTimeUtc || new Date().toISOString()),
-        startingPrice: parseFloat(s.startingPrice) || parseFloat(eventForm.startingPrice) || 1500,
+        startingPrice: !isNaN(parseFloat(s.startingPrice)) ? parseFloat(s.startingPrice) : (!isNaN(parseFloat(eventForm.startingPrice)) ? parseFloat(eventForm.startingPrice) : 1500),
         ticketTiers: (s.ticketTiers || []).map(t => ({
           id: t.id ? (typeof t.id === 'number' ? t.id : parseInt(t.id, 10)) : null,
-          name: t.name || 'Standard Pass',
-          price: parseFloat(t.price) || parseFloat(s.startingPrice) || 1500,
-          availableQuantity: parseInt(t.availableQuantity, 10) || 100,
+          name: t.name ? t.name.trim() : 'Standard Pass',
+          price: !isNaN(parseFloat(t.price)) ? parseFloat(t.price) : (!isNaN(parseFloat(s.startingPrice)) ? parseFloat(s.startingPrice) : 1500),
+          availableQuantity: !isNaN(parseInt(t.availableQuantity, 10)) ? parseInt(t.availableQuantity, 10) : 100,
           description: t.description || `${t.name || 'Standard'} pass for ${s.showTitle || 'Show'}`,
           rowRange: t.rowRange || null
         }))
@@ -654,8 +728,17 @@ export default function AdminDashboard({ onSelectEvent }) {
   const handleEditEvent = async (ev) => {
     let fullEv = ev;
     try {
-      if (ev.id && adminApi?.events?.getById) {
-        const fetched = await adminApi.events.getById(ev.id);
+      if (ev.id) {
+        let fetched = null;
+        try {
+          if (adminApi?.events?.getById) fetched = await adminApi.events.getById(ev.id);
+        } catch {
+          fetched = null;
+        }
+        if (!fetched || (!fetched.ticketTiers?.length && !fetched.shows?.some(s => s.ticketTiers?.length))) {
+          const publicDetail = await eventsApi.getEventById(ev.id).catch(() => null);
+          if (publicDetail) fetched = publicDetail;
+        }
         if (fetched) fullEv = fetched;
       }
     } catch (err) {
@@ -675,18 +758,24 @@ export default function AdminDashboard({ onSelectEvent }) {
     }
 
     const formattedShows = showsToUse.map(s => {
-      const tiersToUse = (s.ticketTiers && s.ticketTiers.length > 0) ? s.ticketTiers : (fullEv.ticketTiers || []);
+      let tiersToUse = (s.ticketTiers && s.ticketTiers.length > 0)
+        ? s.ticketTiers
+        : (fullEv.ticketTiers || []).filter(t => !t.eventShowId || t.eventShowId === s.id);
+
+      if ((!tiersToUse || tiersToUse.length === 0) && showsToUse.length === 1 && fullEv.ticketTiers?.length > 0) {
+        tiersToUse = fullEv.ticketTiers;
+      }
       return {
         id: s.id || null,
         showTitle: s.showTitle || 'Show Slot',
         startTimeUtc: s.startTimeUtc ? s.startTimeUtc.slice(0, 16) : '',
         endTimeUtc: s.endTimeUtc ? s.endTimeUtc.slice(0, 16) : '',
-        startingPrice: s.startingPrice || (tiersToUse[0]?.price) || fullEv.startingPrice || 1500,
+        startingPrice: !isNaN(parseFloat(s.startingPrice)) ? parseFloat(s.startingPrice) : (!isNaN(parseFloat(tiersToUse[0]?.price)) ? parseFloat(tiersToUse[0]?.price) : (!isNaN(parseFloat(fullEv.startingPrice)) ? parseFloat(fullEv.startingPrice) : 1500)),
         ticketTiers: tiersToUse.map(t => ({
           id: t.id || null,
           name: t.name || 'Standard Pass',
-          price: t.price || 1500,
-          availableQuantity: t.availableQuantity || 100,
+          price: !isNaN(parseFloat(t.price)) ? parseFloat(t.price) : 1500,
+          availableQuantity: !isNaN(parseInt(t.availableQuantity, 10)) ? parseInt(t.availableQuantity, 10) : 100,
           description: t.description || '',
           rowRange: t.rowRange || ''
         }))
@@ -917,17 +1006,48 @@ export default function AdminDashboard({ onSelectEvent }) {
       return;
     }
 
+    const tierName = (tierForm.name || '').trim();
+    if (!tierName) {
+      const msg = 'Please enter a ticket tier name.';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
+      return;
+    }
+
+    const tierPrice = parseFloat(tierForm.price);
+    if (isNaN(tierPrice) || tierPrice < 0) {
+      const msg = 'Please enter a valid non-negative ticket price.';
+      setErrorMsg(msg);
+      showError('Validation Error', msg);
+      return;
+    }
+
+    const targetEventId = parseInt(tierForm.eventId, 10);
+    const targetShowId = tierForm.eventShowId ? parseInt(tierForm.eventShowId, 10) : null;
+    const isDupTier = ticketTiersList.some(t =>
+      String(t.id) !== String(tierForm.id) &&
+      t.eventId === targetEventId &&
+      (targetShowId == null || t.eventShowId == null || t.eventShowId === targetShowId) &&
+      t.name.trim().toLowerCase() === tierName.toLowerCase()
+    );
+    if (isDupTier) {
+      const msg = `A ticket tier named "${tierName}" already exists for this show slot.`;
+      setErrorMsg(msg);
+      showError('Duplicate Ticket Tier', msg);
+      return;
+    }
+
     try {
       const payload = {
-        eventId: parseInt(tierForm.eventId, 10),
-        eventShowId: tierForm.eventShowId ? parseInt(tierForm.eventShowId, 10) : null,
-        name: tierForm.name,
+        eventId: targetEventId,
+        eventShowId: targetShowId,
+        name: tierName,
         description: tierForm.description || '',
-        price: parseFloat(tierForm.price),
+        price: tierPrice,
         rowRange: tierForm.rowRange || null,
-        availableQuantity: parseInt(tierForm.availableQuantity, 10) || 100,
-        maxPerOrder: parseInt(tierForm.maxPerOrder, 10) || 5,
-        sortOrder: parseInt(tierForm.sortOrder, 10) || 1
+        availableQuantity: !isNaN(parseInt(tierForm.availableQuantity, 10)) ? parseInt(tierForm.availableQuantity, 10) : 100,
+        maxPerOrder: !isNaN(parseInt(tierForm.maxPerOrder, 10)) ? parseInt(tierForm.maxPerOrder, 10) : 5,
+        sortOrder: !isNaN(parseInt(tierForm.sortOrder, 10)) ? parseInt(tierForm.sortOrder, 10) : 1
       };
 
       if (tierForm.id) {
@@ -948,6 +1068,33 @@ export default function AdminDashboard({ onSelectEvent }) {
       const msg = err.message || 'Failed to save ticket tier.';
       setErrorMsg(msg);
       showError('Save Failed', msg);
+    }
+  };
+
+  const handleEditTicketTier = (tier) => {
+    setTierForm({
+      id: tier.id,
+      eventId: String(tier.eventId),
+      eventShowId: tier.eventShowId ? String(tier.eventShowId) : '',
+      name: tier.name || '',
+      description: tier.description || '',
+      price: tier.price !== undefined && tier.price !== null ? tier.price : 1500,
+      rowRange: tier.rowRange || '',
+      availableQuantity: tier.availableQuantity !== undefined ? tier.availableQuantity : 100,
+      maxPerOrder: tier.maxPerOrder || 5,
+      sortOrder: tier.sortOrder || 1
+    });
+    setShowTierModal(true);
+  };
+
+  const handleDeleteTicketTier = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this ticket tier?')) return;
+    try {
+      await adminApi.ticketTiers.delete(id);
+      showSuccess('Deleted', 'Ticket tier deleted successfully.');
+      fetchBackendData();
+    } catch (err) {
+      showError('Delete Failed', err.message || 'Failed to delete ticket tier.');
     }
   };
 
@@ -1940,6 +2087,24 @@ export default function AdminDashboard({ onSelectEvent }) {
         </button>
 
         <button
+          onClick={() => setActiveAdminTab('ticket-tiers')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'ticket-tiers' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Layers size={18} /> Ticket Tiers ({ticketTiersList.length})
+        </button>
+
+        <button
           onClick={() => setActiveAdminTab('organizers')}
           style={{
             padding: '0.75rem 1.25rem',
@@ -2233,6 +2398,16 @@ export default function AdminDashboard({ onSelectEvent }) {
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button
+                          onClick={() => {
+                            setTierEventFilter(String(ev.id));
+                            setActiveAdminTab('ticket-tiers');
+                          }}
+                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(99, 102, 241, 0.2)', border: '1px solid rgba(99, 102, 241, 0.4)', borderRadius: '6px', color: '#c7d2fe', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600 }}
+                          title="View and update ticket tiers for this event"
+                        >
+                          <Layers size={14} /> Tiers
+                        </button>
+                        <button
                           onClick={() => handleEditEvent(ev)}
                           style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                         >
@@ -2253,6 +2428,166 @@ export default function AdminDashboard({ onSelectEvent }) {
           </div>
         </div>
       )}
+
+      {/* --- TAB: TICKET TIERS MANAGEMENT --- */}
+      {activeAdminTab === 'ticket-tiers' && (() => {
+        const filteredTiers = ticketTiersList.filter(t => {
+          if (tierEventFilter !== 'All' && String(t.eventId) !== String(tierEventFilter)) {
+            return false;
+          }
+          if (tierSearch.trim()) {
+            const q = tierSearch.toLowerCase();
+            const matchedEv = eventsList.find(e => e.id === t.eventId);
+            const evTitle = (matchedEv?.title || '').toLowerCase();
+            const tName = (t.name || '').toLowerCase();
+            const tRow = (t.rowRange || '').toLowerCase();
+            if (!tName.includes(q) && !evTitle.includes(q) && !tRow.includes(q)) {
+              return false;
+            }
+          }
+          return true;
+        });
+
+        return (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>Ticket Tiers & Row Pricing</h3>
+                <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                  Manage category passes, VIP packages, and interactive row pricing across all event slots.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ width: '220px' }}>
+                  <SearchableSelect
+                    value={tierEventFilter}
+                    onChange={e => setTierEventFilter(e.target.value)}
+                    options={[
+                      { value: 'All', label: 'All Events' },
+                      ...eventsList.map(ev => ({ value: String(ev.id), label: ev.title }))
+                    ]}
+                    placeholder="Filter by Event..."
+                  />
+                </div>
+                <div style={{ position: 'relative', width: '200px' }}>
+                  <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  <input
+                    type="text"
+                    placeholder="Search tiers..."
+                    value={tierSearch}
+                    onChange={e => setTierSearch(e.target.value)}
+                    style={{ width: '100%', padding: '0.6rem 0.75rem 0.6rem 2.2rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    setTierForm({
+                      ...defaultTierForm,
+                      eventId: tierEventFilter !== 'All' ? tierEventFilter : (eventsList[0]?.id ? String(eventsList[0].id) : '')
+                    });
+                    setShowTierModal(true);
+                  }}
+                  style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }}
+                >
+                  <Plus size={16} /> Add Ticket Tier
+                </button>
+              </div>
+            </div>
+
+            <div className="mature-table-wrapper">
+              <table className="mature-data-table">
+                <thead>
+                  <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <th style={{ padding: '1rem' }}>Tier / Pass Name</th>
+                    <th style={{ padding: '1rem' }}>Event</th>
+                    <th style={{ padding: '1rem' }}>Show Slot</th>
+                    <th style={{ padding: '1rem' }}>Row Range</th>
+                    <th style={{ padding: '1rem' }}>Price</th>
+                    <th style={{ padding: '1rem' }}>Capacity</th>
+                    <th style={{ padding: '1rem' }}>Sold</th>
+                    <th style={{ padding: '1rem' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTiers.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                        No ticket tiers found. Click "+ Add Ticket Tier" to create one.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredTiers.map(tier => {
+                      const matchedEv = eventsList.find(e => e.id === tier.eventId);
+                      const shows = matchedEv?.shows || [];
+                      const matchedShow = shows.find(s => s.id === tier.eventShowId);
+
+                      return (
+                        <tr key={tier.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                          <td style={{ padding: '1rem', fontWeight: 600, color: '#f8fafc' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <Ticket size={16} color="#2dd4bf" />
+                              <div>
+                                <span>{tier.name}</span>
+                                {tier.description && (
+                                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 400, marginTop: '0.15rem' }}>
+                                    {tier.description}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '1rem', color: '#f8fafc' }}>
+                            {matchedEv?.title || `Event #${tier.eventId}`}
+                          </td>
+                          <td style={{ padding: '1rem', color: '#94a3b8' }}>
+                            {matchedShow?.showTitle || (tier.eventShowId ? `Show #${tier.eventShowId}` : 'All Shows')}
+                          </td>
+                          <td style={{ padding: '1rem' }}>
+                            {tier.rowRange ? (
+                              <span style={{ padding: '0.2rem 0.5rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '4px', color: '#2dd4bf', fontSize: '0.75rem', fontWeight: 700 }}>
+                                Rows: {tier.rowRange}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>General / Unmapped</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '1rem', color: '#4ade80', fontWeight: 700 }}>
+                            PKR {tier.price?.toLocaleString()}
+                          </td>
+                          <td style={{ padding: '1rem', color: '#94a3b8' }}>
+                            {tier.availableQuantity}
+                          </td>
+                          <td style={{ padding: '1rem', color: '#fbbf24', fontWeight: 600 }}>
+                            {tier.soldCount || 0}
+                          </td>
+                          <td style={{ padding: '1rem' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <button
+                                onClick={() => handleEditTicketTier(tier)}
+                                style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600 }}
+                                title="Update this ticket tier"
+                              >
+                                <Edit3 size={14} /> Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTicketTier(tier.id)}
+                                style={{ padding: '0.4rem 0.75rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                                title="Delete this ticket tier"
+                              >
+                                <Trash2 size={14} /> Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* --- TAB 2: ORGANIZERS MANAGEMENT --- */}
       {activeAdminTab === 'organizers' && (
@@ -4280,7 +4615,7 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                   <button type="button" onClick={() => setShowTierModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                  <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Tier...' : 'Save Tier & Price'}</button>
+                  <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Tier...' : (tierForm.id ? 'Update Ticket Tier' : 'Save Tier & Price')}</button>
                 </div>
               </form>
             </div>

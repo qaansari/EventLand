@@ -265,6 +265,13 @@ export const adminApi = {
     delete: async (id) => request(`/admin/organizers/${id}`, { method: 'DELETE' })
   },
   ticketTiers: {
+    getAll: async (eventId = null, eventShowId = null) => {
+      const query = new URLSearchParams();
+      if (eventId) query.append('eventId', eventId);
+      if (eventShowId) query.append('eventShowId', eventShowId);
+      const qs = query.toString();
+      return request(`/admin/ticket-tiers${qs ? `?${qs}` : ''}`);
+    },
     create: async (dto) => request('/admin/ticket-tiers', { method: 'POST', body: JSON.stringify(dto) }),
     update: async (id, dto) => request(`/admin/ticket-tiers/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
     delete: async (id) => request(`/admin/ticket-tiers/${id}`, { method: 'DELETE' })

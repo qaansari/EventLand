@@ -50,9 +50,9 @@ public interface IAdminService
     Task<bool> DeleteEventAsync(int id, int? organizerId = null);
 
     // --- EventShows CRUD ---
-    Task<EventShowDto> CreateEventShowAsync(CreateEventShowDto dto);
-    Task<EventShowDto> UpdateEventShowAsync(int id, UpdateEventShowDto dto);
-    Task<bool> DeleteEventShowAsync(int id);
+    Task<EventShowDto> CreateEventShowAsync(CreateEventShowDto dto, int? organizerId = null);
+    Task<EventShowDto> UpdateEventShowAsync(int id, UpdateEventShowDto dto, int? organizerId = null);
+    Task<bool> DeleteEventShowAsync(int id, int? organizerId = null);
 
     // --- Organizers CRUD ---
     Task<List<OrganizerDto>> GetOrganizersAsync();
@@ -69,9 +69,10 @@ public interface IAdminService
     Task<bool> DeleteArtistAsync(int id);
 
     // --- TicketTiers CRUD ---
-    Task<TicketTierDto> CreateTicketTierAsync(CreateTicketTierDto dto);
-    Task<TicketTierDto> UpdateTicketTierAsync(int id, UpdateTicketTierDto dto);
-    Task<bool> DeleteTicketTierAsync(int id);
+    Task<List<TicketTierDto>> GetTicketTiersAsync(int? eventId = null, int? eventShowId = null, int? organizerId = null);
+    Task<TicketTierDto> CreateTicketTierAsync(CreateTicketTierDto dto, int? organizerId = null);
+    Task<TicketTierDto> UpdateTicketTierAsync(int id, UpdateTicketTierDto dto, int? organizerId = null);
+    Task<bool> DeleteTicketTierAsync(int id, int? organizerId = null);
 
     // --- SeatingZones & Seats CRUD ---
     Task<SeatingZoneDto> CreateSeatingZoneAsync(CreateSeatingZoneDto dto);

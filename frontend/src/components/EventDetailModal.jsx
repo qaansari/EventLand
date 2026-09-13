@@ -5,6 +5,28 @@ import { formatEventDateRange, formatEventStartTime } from '../utils/dateUtils';
 import { getEventImageUrl, getOrganizerImageUrl, eventsApi } from '../services/api';
 import InteractiveSeatPicker from './InteractiveSeatPicker';
 
+const formatLocationString = (ev) => {
+  if (!ev) return '';
+  const rawParts = [
+    ev.auditoriumName || ev.auditorium || ev.audiName,
+    ev.venueName || ev.venue,
+    ev.cityName || ev.city,
+    ev.countryName || ev.country
+  ];
+
+  const cleanParts = [];
+  rawParts.forEach(p => {
+    if (typeof p === 'string' && p.trim().length > 0) {
+      const trimmed = p.trim();
+      if (!cleanParts.some(cp => cp.toLowerCase() === trimmed.toLowerCase())) {
+        cleanParts.push(trimmed);
+      }
+    }
+  });
+
+  return cleanParts.length > 0 ? cleanParts.join(', ') : (ev.address || 'Venue Location');
+};
+
 export default function EventDetailModal({ event: initialEvent, onClose, onProceedToBooking }) {
   const { showWarning } = useToast();
   const [eventDetail, setEventDetail] = useState(initialEvent);
@@ -200,9 +222,9 @@ export default function EventDetailModal({ event: initialEvent, onClose, onProce
               <span>{formatEventStartTime(event.startDateUtc || event.startDate, event.time)}</span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#94a3b8' }}>
-              <MapPin size={18} color="#0d9488" />
-              <span>{event.city ? `${event.city} • ${event.venue}` : event.venue}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#94a3b8', flexWrap: 'wrap' }}>
+              <MapPin size={18} color="#0d9488" style={{ flexShrink: 0 }} />
+              <span>{formatLocationString(event)}</span>
             </div>
           </div>
 

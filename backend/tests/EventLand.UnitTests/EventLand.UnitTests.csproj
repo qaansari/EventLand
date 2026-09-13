@@ -19,7 +19,6 @@
     <ProjectReference Include="..\..\src\EventLand.Domain\EventLand.Domain.csproj" />
     <ProjectReference Include="..\..\src\EventLand.Application\EventLand.Application.csproj" />
     <ProjectReference Include="..\..\src\EventLand.Infrastructure\EventLand.Infrastructure.csproj" />
-    <ProjectReference Include="..\..\src\EventLand.Api\EventLand.Api.csproj" />
   </ItemGroup>
 
 </Project>

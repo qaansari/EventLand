@@ -39,6 +39,8 @@ public class EventService : IEventService
 
         var query = _context.Events
             .AsNoTracking()
+            .Include(e => e.Shows.Where(s => !s.IsDeleted))
+                .ThenInclude(s => s.TicketTiers.Where(t => !t.IsDeleted))
             .Where(e => !e.IsDeleted && e.IsPublished);
 
         if (!string.IsNullOrWhiteSpace(city))
@@ -99,7 +101,14 @@ public class EventService : IEventService
                 e.OrganizerId,
                 e.Organizer != null ? e.Organizer.Name : "EventLand Host",
                 e.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList(),
-                e.Shows.Select(s => new EventShowDto(s.Id, s.EventId, s.ShowTitle, s.StartTimeUtc, s.EndTimeUtc, new List<TicketTierDto>())).ToList()
+                e.Shows.Where(s => !s.IsDeleted).Select(s => new EventShowDto(
+                    s.Id,
+                    s.EventId,
+                    s.ShowTitle,
+                    s.StartTimeUtc,
+                    s.EndTimeUtc,
+                    s.TicketTiers.Where(t => !t.IsDeleted).Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange)).ToList()
+                )).ToList()
             ))
             .ToListAsync();
 
