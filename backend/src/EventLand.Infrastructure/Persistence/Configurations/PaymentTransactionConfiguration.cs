@@ -18,6 +18,9 @@ public sealed class PaymentTransactionConfiguration : IEntityTypeConfiguration<P
         builder.Property(t => t.ProviderTransactionId)
                .HasMaxLength(100);
 
+        builder.Property(t => t.ProviderOrderId)
+               .HasMaxLength(100);
+
         builder.Property(t => t.PaymentMethod)
                .IsRequired()
                .HasMaxLength(50);
@@ -44,6 +47,9 @@ public sealed class PaymentTransactionConfiguration : IEntityTypeConfiguration<P
         builder.Property(t => t.FailureReason)
                .HasMaxLength(500);
 
+        builder.Property(t => t.RawProviderResponse)
+               .HasMaxLength(4000);
+
         builder.Property(t => t.MetadataJson)
                .HasMaxLength(4000);
 
@@ -61,5 +67,11 @@ public sealed class PaymentTransactionConfiguration : IEntityTypeConfiguration<P
 
         builder.HasIndex(t => t.ProviderTransactionId)
                .HasDatabaseName("IX_PaymentTransactions_ProviderTransactionId");
+
+        builder.HasIndex(t => t.ProviderOrderId)
+               .HasDatabaseName("IX_PaymentTransactions_ProviderOrderId");
+
+        builder.HasIndex(t => t.Status)
+               .HasDatabaseName("IX_PaymentTransactions_Status");
     }
 }

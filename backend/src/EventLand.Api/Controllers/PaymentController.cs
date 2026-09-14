@@ -72,6 +72,26 @@ public class PaymentController : ControllerBase
             }
         }
 
+        // If pending and using PayPro, attempt server-side reconciliation
+        if (booking.PaymentStatus == PaymentStatus.Pending)
+        {
+            try
+            {
+                var payProStatus = await _payProService.GetPaymentStatusAsync(bookingRef, null, HttpContext.RequestAborted);
+                if (payProStatus.IsPaid)
+                {
+                    // Reload updated entity
+                    booking = await _context.Bookings
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(b => b.BookingRef == bookingRef && !b.IsDeleted) ?? booking;
+                }
+            }
+            catch
+            {
+                // Proceed with local booking state if remote check fails
+            }
+        }
+
         var now = DateTimeOffset.UtcNow;
         var expiresAt = booking.PaymentExpiresAt ?? now.AddMinutes(30);
         var remainingSeconds = Math.Max(0, (int)(expiresAt - now).TotalSeconds);
@@ -90,7 +110,8 @@ public class PaymentController : ControllerBase
             expiresAt = expiresAt,
             remainingSeconds = remainingSeconds,
             isExpired = remainingSeconds <= 0 && booking.PaymentStatus == PaymentStatus.Pending,
-            isPaid = booking.PaymentStatus == PaymentStatus.Paid
+            isPaid = booking.PaymentStatus == PaymentStatus.Paid,
+            ticketReady = booking.PaymentStatus == PaymentStatus.Paid
         });
     }
 
@@ -230,25 +251,25 @@ public class PaymentController : ControllerBase
 
     /// <summary>
     /// Initiates a PayPro online checkout session for an existing pending booking.
-    /// Returns 1Pay connect URL and OTC voucher code.
+    /// Standardized V2 payment creation with idempotency and server-side amount calculation.
     /// </summary>
+    [HttpPost("create")]
     [HttpPost("paypro/checkout")]
     [HttpPost("paypro/initiate")]
     [Authorize]
-    public async Task<IActionResult> InitiatePayProCheckout([FromBody] InitiatePayProCheckoutRequestDto dto)
+    public async Task<IActionResult> CreatePayment([FromBody] CreatePaymentRequestDto dto)
     {
         if (string.IsNullOrWhiteSpace(dto.BookingRef))
             return BadRequest(new { message = "Booking reference is required." });
 
         var booking = await _context.Bookings
-            .Include(b => b.TicketTier)
-            .Include(b => b.PaymentTransactions)
+            .AsNoTracking()
             .FirstOrDefaultAsync(b => b.BookingRef == dto.BookingRef && !b.IsDeleted);
 
         if (booking is null)
             return NotFound(new { message = $"Booking '{dto.BookingRef}' not found." });
 
-        // Authorization check: owner or admin
+        // Authorization check: BOLA / IDOR protection
         if (!User.IsAdmin())
         {
             var callerEmail = User.GetEmail();
@@ -259,54 +280,90 @@ public class PaymentController : ControllerBase
             }
         }
 
-        if (booking.PaymentStatus == PaymentStatus.Paid)
-            return BadRequest(new { message = "Booking is already paid." });
-
-        if (booking.Status == BookingStatus.Cancelled)
-            return BadRequest(new { message = "Booking is cancelled and cannot be paid." });
-
-        // Check if hold window has expired
-        if (booking.PaymentExpiresAt.HasValue && booking.PaymentExpiresAt.Value <= DateTimeOffset.UtcNow)
-        {
-            return BadRequest(new { message = "The payment reservation hold window for this booking has expired. Please place a new booking." });
-        }
-
-        // Determine target payment method
-        var normalizedMethod = dto.PaymentMethod?.Trim().ToLowerInvariant() ?? "easypaisa_jazzcash";
-        var config = await _context.PaymentConfigs
-            .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.PaymentMethod.ToLower() == normalizedMethod && c.IsActive && !c.IsDeleted);
-
-        if (config is null)
-        {
-            return BadRequest(new { message = $"Payment method '{dto.PaymentMethod}' is not active or supported." });
-        }
-
         try
         {
-            var response = await _payProService.CreateInvoiceAsync(booking, config, dto.ReturnUrl);
+            var response = await _payProService.CreatePaymentAsync(
+                bookingRef: dto.BookingRef,
+                paymentMethod: dto.PaymentMethod ?? "paypro",
+                returnUrl: dto.ReturnUrl,
+                cancellationToken: HttpContext.RequestAborted);
+
             return Ok(response);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message });
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                success = false,
+                message = "We could not start the payment session. Please try again."
+            });
         }
     }
 
     /// <summary>
-    /// PayPro Instant Payment Notification (IPN) webhook callback.
+    /// Gets authoritative payment status by Payment ID with IDOR/BOLA verification.
+    /// </summary>
+    [HttpGet("{paymentId:int}/status")]
+    [Authorize]
+    public async Task<IActionResult> GetPaymentStatusById(int paymentId)
+    {
+        var transaction = await _context.PaymentTransactions
+            .Include(pt => pt.Booking)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(pt => pt.Id == paymentId && !pt.IsDeleted);
+
+        if (transaction is null)
+            return NotFound(new { message = $"Payment ID {paymentId} not found." });
+
+        // Authorization check: only owner or admin can view payment status
+        if (!User.IsAdmin())
+        {
+            var callerEmail = User.GetEmail();
+            if (string.IsNullOrWhiteSpace(callerEmail) ||
+                !string.Equals(callerEmail, transaction.Booking.CustomerEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                return Forbid();
+            }
+        }
+
+        try
+        {
+            var status = await _payProService.GetPaymentStatusAsync(
+                bookingRef: transaction.Booking.BookingRef,
+                paymentId: paymentId,
+                cancellationToken: HttpContext.RequestAborted);
+
+            return Ok(status);
+        }
+        catch (Exception)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { message = "Error querying payment status." });
+        }
+    }
+
+    /// <summary>
+    /// PayPro Instant Payment Notification (IPN) / Webhook callback.
     /// Public endpoint called by PayPro servers upon payment completion.
     /// Verifies status server-side, validates amounts, and confirms tickets idempotently.
     /// </summary>
+    [HttpPost("paypro/callback")]
     [HttpPost("paypro-ipn")]
     [HttpPost("paypro/ipn")]
     [AllowAnonymous]
-    public async Task<IActionResult> HandlePayProIpn([FromBody] PayProIpnRequestDto ipnDto)
+    public async Task<IActionResult> HandlePayProCallback([FromBody] PayProIpnRequestDto ipnDto)
     {
         if (ipnDto is null)
             return BadRequest(new { message = "Empty payload received." });
 
-        var result = await _payProService.ProcessIpnCallbackAsync(ipnDto);
+        var result = await _payProService.ProcessIpnCallbackAsync(ipnDto, HttpContext.RequestAborted);
 
         if (!result.Success && result.Status == "REJECTED")
         {

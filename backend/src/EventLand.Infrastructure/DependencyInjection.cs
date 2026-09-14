@@ -135,10 +135,12 @@ public static class DependencyInjection
 
         services.AddScoped<IPaymentFeeService, PaymentFeeService>();
 
-        services.AddHttpClient<IPayProService, PayProService>(client =>
+        services.AddHttpClient<IPayProClient, PayProClient>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(15);
         });
+
+        services.AddScoped<IPayProService, PayProService>();
 
         // Cloudflare Turnstile / CAPTCHA Verification Service
         services.Configure<EventLand.Application.Common.Models.CaptchaOptions>(

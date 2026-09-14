@@ -10,44 +10,54 @@ public class PayProOptions
     public const string SectionName = "PayPro";
 
     /// <summary>
-    /// Environment: "Test" (Sandbox) or "Production" (Live). Defaults to "Test".
+    /// Environment: "Demo" (Sandbox) or "Production" (Live). Defaults to "Demo".
     /// </summary>
-    public string Environment { get; set; } = "Test";
+    public string Environment { get; set; } = "Demo";
 
     /// <summary>
-    /// PayPro 1Pay portal base URL (e.g. "https://sandbox.paypro.com.pk/1pay" or "https://connect.paypro.com.pk/1pay").
+    /// PayPro V2 API Base URL (Default: "http://demoapi.paypro.com.pk/").
     /// </summary>
-    public string BaseUrl { get; set; } = "https://sandbox.paypro.com.pk/1pay";
+    public string BaseUrl { get; set; } = "http://demoapi.paypro.com.pk/";
 
     /// <summary>
-    /// PayPro REST API URL (e.g. "https://sandbox.paypro.com.pk/api" or "https://api.paypro.com.pk").
+    /// Backward-compatibility alias for BaseUrl.
     /// </summary>
-    public string ApiUrl { get; set; } = "https://sandbox.paypro.com.pk/api";
+    public string ApiUrl
+    {
+        get => BaseUrl;
+        set => BaseUrl = value;
+    }
 
     /// <summary>
-    /// PayPro API Username (Secret - supplied via User Secrets or PayPro__Username env var).
+    /// PayPro Merchant Username (Secret - supplied via User Secrets or PayPro__Username env var).
     /// </summary>
     public string Username { get; set; } = string.Empty;
 
     /// <summary>
-    /// PayPro API Password (Secret - supplied via User Secrets or PayPro__Password env var).
+    /// PayPro Merchant Password (Secret - supplied via User Secrets or PayPro__Password env var).
     /// </summary>
     public string Password { get; set; } = string.Empty;
 
     /// <summary>
-    /// PayPro Client ID / Merchant ID (Secret - supplied via User Secrets or PayPro__ClientId env var).
+    /// PayPro Client ID (Secret - supplied via User Secrets or PayPro__ClientId env var).
     /// </summary>
     public string ClientId { get; set; } = string.Empty;
 
     /// <summary>
-    /// PayPro Client Secret / HMAC Key (Secret - supplied via User Secrets or PayPro__ClientSecret env var).
+    /// PayPro Client Secret (Secret - supplied via User Secrets or PayPro__ClientSecret env var).
     /// </summary>
     public string ClientSecret { get; set; } = string.Empty;
 
     /// <summary>
-    /// Indicates whether the gateway is configured in Sandbox/Test mode.
+    /// Indicates whether the gateway is configured in Demo / Sandbox mode.
     /// </summary>
-    public bool IsTest => string.Equals(Environment, "Test", StringComparison.OrdinalIgnoreCase);
+    public bool IsDemo => string.Equals(Environment, "Demo", StringComparison.OrdinalIgnoreCase) ||
+                          string.Equals(Environment, "Test", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Backward compatibility alias for IsDemo.
+    /// </summary>
+    public bool IsTest => IsDemo;
 
     /// <summary>
     /// Validates configuration without revealing any sensitive values in messages.
@@ -58,9 +68,7 @@ public class PayProOptions
         var missing = new List<string>();
 
         if (string.IsNullOrWhiteSpace(BaseUrl)) missing.Add("PayPro:BaseUrl");
-        if (string.IsNullOrWhiteSpace(ApiUrl)) missing.Add("PayPro:ApiUrl");
         if (string.IsNullOrWhiteSpace(Username)) missing.Add("PayPro:Username");
-        if (string.IsNullOrWhiteSpace(Password)) missing.Add("PayPro:Password");
         if (string.IsNullOrWhiteSpace(ClientId)) missing.Add("PayPro:ClientId");
         if (string.IsNullOrWhiteSpace(ClientSecret)) missing.Add("PayPro:ClientSecret");
 

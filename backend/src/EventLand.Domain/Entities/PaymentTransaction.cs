@@ -13,8 +13,9 @@ public class PaymentTransaction : BaseEntity
     public Booking        Booking               { get; set; } = null!;
 
     public string         Provider              { get; set; } = string.Empty; // e.g. "paypro"
-    public string?        ProviderTransactionId { get; set; }                 // Gateway's unique transaction/invoice reference
-    public string         PaymentMethod         { get; set; } = string.Empty; // e.g. "easypaisa_jazzcash", "qr_code"
+    public string?        ProviderTransactionId { get; set; }                 // Gateway's unique transaction/invoice reference (PayPro cPayId / ConnectPayId)
+    public string?        ProviderOrderId       { get; set; }                 // Gateway order reference / OrderNumber
+    public string         PaymentMethod         { get; set; } = string.Empty; // e.g. "paypro", "easypaisa_jazzcash"
     public decimal        Amount                { get; set; }
     public string         Currency              { get; set; } = "PKR";
 
@@ -24,6 +25,8 @@ public class PaymentTransaction : BaseEntity
 
     public DateTimeOffset? PaidAt               { get; set; }
     public DateTimeOffset? FailedAt             { get; set; }
+    public DateTimeOffset? ExpiresAt            { get; set; }
     public string?        FailureReason         { get; set; }
+    public string?        RawProviderResponse   { get; set; }
     public string?        MetadataJson          { get; set; }
 }

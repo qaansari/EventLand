@@ -2,12 +2,9 @@ namespace EventLand.Infrastructure.Services;
 
 using System;
 using System.Collections.Generic;
-using System.Net.Http;
-using System.Net.Http.Json;
+using System.Linq;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using EventLand.Application.Common.Interfaces;
@@ -20,9 +17,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+/// <summary>
+/// Event Land PayPro Service orchestrating payment creation, status reconciliation,
+/// idempotency protection, and ticket issuance with the PayPro V2 API.
+/// </summary>
 public class PayProService : IPayProService
 {
-    private readonly HttpClient _httpClient;
+    private readonly IPayProClient _payProClient;
     private readonly PayProOptions _options;
     private readonly IApplicationDbContext _context;
     private readonly ICacheService? _cacheService;
@@ -30,206 +31,272 @@ public class PayProService : IPayProService
     private readonly ILogger<PayProService> _logger;
 
     public PayProService(
-        HttpClient httpClient,
+        IPayProClient payProClient,
         IOptions<PayProOptions> options,
         IApplicationDbContext context,
         INotificationService notificationService,
         ILogger<PayProService> logger,
         ICacheService? cacheService = null)
     {
-        _httpClient = httpClient;
+        _payProClient = payProClient;
         _options = options.Value;
         _context = context;
         _notificationService = notificationService;
         _logger = logger;
         _cacheService = cacheService;
-
-        _httpClient.Timeout = TimeSpan.FromSeconds(15);
     }
 
-    public async Task<PayProCheckoutResponseDto> CreateInvoiceAsync(
-        Booking booking,
-        PaymentConfig paymentConfig,
-        string? returnUrl,
+    /// <inheritdoc />
+    public async Task<CreatePaymentResponseDto> CreatePaymentAsync(
+        string bookingRef,
+        string? paymentMethod = "paypro",
+        string? returnUrl = null,
         CancellationToken cancellationToken = default)
     {
-        var (isValid, missingKeys) = _options.Validate();
-        if (!isValid)
+        if (string.IsNullOrWhiteSpace(bookingRef))
+            throw new ArgumentException("Booking reference cannot be empty.", nameof(bookingRef));
+
+        var booking = await _context.Bookings
+            .Include(b => b.PaymentTransactions)
+            .FirstOrDefaultAsync(b => b.BookingRef == bookingRef && !b.IsDeleted, cancellationToken);
+
+        if (booking is null)
+            throw new KeyNotFoundException($"Booking '{bookingRef}' not found.");
+
+        if (booking.PaymentStatus == PaymentStatus.Paid)
         {
-            var missingList = string.Join(", ", missingKeys);
-            _logger.LogError("PayPro invoice creation aborted: missing configuration keys: [{MissingKeys}]", missingList);
-            throw new InvalidOperationException($"PayPro gateway configuration is incomplete: [{missingList}]. Please configure required secrets.");
+            var existingPaidTx = booking.PaymentTransactions.FirstOrDefault(pt => pt.Status == PaymentStatus.Paid);
+            return new CreatePaymentResponseDto(
+                Success: true,
+                BookingRef: booking.BookingRef,
+                PaymentId: existingPaidTx?.Id ?? 0,
+                Status: "Paid",
+                Amount: booking.TotalAmount,
+                Currency: "PKR",
+                PaymentUrl: null,
+                VoucherCode: existingPaidTx?.ProviderTransactionId,
+                ExpiresAt: booking.PaymentExpiresAt,
+                Message: "Booking is already paid."
+            );
+        }
+
+        if (booking.Status == BookingStatus.Cancelled)
+            throw new InvalidOperationException($"Booking '{bookingRef}' is cancelled and cannot accept payment.");
+
+        if (booking.PaymentExpiresAt.HasValue && booking.PaymentExpiresAt.Value <= DateTimeOffset.UtcNow)
+            throw new InvalidOperationException("The reservation hold window for this booking has expired. Please create a new booking.");
+
+        // IDEMPOTENCY CHECK: Reuse existing active pending payment attempt to prevent duplicate orders
+        var now = DateTimeOffset.UtcNow;
+        var existingActiveTx = booking.PaymentTransactions
+            .Where(pt => pt.Status == PaymentStatus.Pending && (!pt.ExpiresAt.HasValue || pt.ExpiresAt.Value > now))
+            .OrderByDescending(pt => pt.CreatedAt)
+            .FirstOrDefault();
+
+        if (existingActiveTx != null)
+        {
+            string? cachedUrl = null;
+            string? cachedVoucher = existingActiveTx.ProviderTransactionId;
+
+            if (!string.IsNullOrWhiteSpace(existingActiveTx.MetadataJson))
+            {
+                try
+                {
+                    using var metaDoc = JsonDocument.Parse(existingActiveTx.MetadataJson);
+                    if (metaDoc.RootElement.TryGetProperty("click2Pay", out var c2p)) cachedUrl = c2p.GetString();
+                    if (metaDoc.RootElement.TryGetProperty("voucherCode", out var vc) && !string.IsNullOrWhiteSpace(vc.GetString())) cachedVoucher = vc.GetString();
+                }
+                catch { /* ignore json parse failure */ }
+            }
+
+            _logger.LogInformation("Reusing active PayPro session for Booking {BookingRef} (Payment ID {PaymentId}).",
+                booking.BookingRef, existingActiveTx.Id);
+
+            return new CreatePaymentResponseDto(
+                Success: true,
+                BookingRef: booking.BookingRef,
+                PaymentId: existingActiveTx.Id,
+                Status: "Pending",
+                Amount: existingActiveTx.Amount,
+                Currency: existingActiveTx.Currency,
+                PaymentUrl: cachedUrl,
+                VoucherCode: cachedVoucher,
+                ExpiresAt: existingActiveTx.ExpiresAt ?? booking.PaymentExpiresAt,
+                Message: "Active PayPro checkout session retrieved."
+            );
+        }
+
+        // Call PayPro V2 Create Order
+        var orderNumber = booking.BookingRef;
+        var orderResult = await _payProClient.CreateOrderAsync(
+            orderNumber: orderNumber,
+            amount: booking.TotalAmount,
+            customerName: booking.CustomerName,
+            customerEmail: booking.CustomerEmail,
+            customerPhone: booking.CustomerPhone,
+            dueDate: booking.PaymentExpiresAt,
+            cancellationToken: cancellationToken);
+
+        string paymentUrl = orderResult.Click2PayUrl ?? string.Empty;
+        string voucherCode = orderResult.ConnectPayId ?? orderResult.PayProId ?? string.Empty;
+
+        // Fallback for Demo simulation if PayPro credentials are not yet configured or gateway is offline
+        if (!orderResult.IsSuccess || string.IsNullOrWhiteSpace(paymentUrl))
+        {
+            var (isConfigValid, _) = _options.Validate();
+            if (!isConfigValid || _options.IsDemo)
+            {
+                var baseUrl = _options.BaseUrl.TrimEnd('/');
+                paymentUrl = $"{baseUrl}/invoice/PP-{booking.BookingRef}?amt={booking.TotalAmount:F2}&ref={booking.BookingRef}";
+                if (!string.IsNullOrWhiteSpace(returnUrl))
+                {
+                    paymentUrl += $"&return_url={Uri.EscapeDataString(returnUrl)}";
+                }
+                if (string.IsNullOrWhiteSpace(voucherCode))
+                {
+                    voucherCode = $"9{RandomNumberGenerator.GetInt32(1000000, 9999999)}";
+                }
+                _logger.LogInformation("Operating in PayPro Demo mode. Generated deterministic PayPro checkout link for Booking {BookingRef}.", booking.BookingRef);
+            }
+            else
+            {
+                _logger.LogError("PayPro V2 order creation failed for Booking {BookingRef}: {Description}", booking.BookingRef, orderResult.Description);
+                throw new InvalidOperationException($"Unable to initiate PayPro payment: {orderResult.Description}");
+            }
         }
 
         var internalRef = $"TXN-EVL-{RandomNumberGenerator.GetInt32(100000, 1000000)}";
-        var invoiceId = $"PP-{booking.BookingRef}";
-
-        // Construct 1Pay checkout redirect URL
-        var baseUrl = _options.BaseUrl.TrimEnd('/');
-        var connectUrl = $"{baseUrl}/invoice/{invoiceId}?amt={booking.TotalAmount:F2}&ref={booking.BookingRef}";
-        if (!string.IsNullOrWhiteSpace(returnUrl))
-        {
-            connectUrl += $"&return_url={Uri.EscapeDataString(returnUrl)}";
-        }
-
-        // Generate 8-digit OTC voucher code for mobile wallet / ATM / OTC deposits
-        var otcVoucherCode = $"9{RandomNumberGenerator.GetInt32(1000000, 9999999)}";
-
-        // PayPro remote invoice creation call if ApiUrl is configured
-        try
-        {
-            var apiUrl = _options.ApiUrl.TrimEnd('/');
-
-            // 1. Authenticate with PayPro v2 to acquire session token
-            string? sessionToken = null;
-            try
-            {
-                var authPayload = new
-                {
-                    clientid = _options.ClientId,
-                    clientsecret = _options.ClientSecret
-                };
-
-                using var authReq = new HttpRequestMessage(HttpMethod.Post, $"{apiUrl}/v2/ppro/auth")
-                {
-                    Content = JsonContent.Create(authPayload)
-                };
-
-                var authRes = await _httpClient.SendAsync(authReq, cancellationToken);
-                if (authRes.Headers.TryGetValues("token", out var tokenHeaders))
-                {
-                    sessionToken = tokenHeaders.FirstOrDefault();
-                }
-
-                if (string.IsNullOrWhiteSpace(sessionToken) && authRes.IsSuccessStatusCode)
-                {
-                    var authBody = await authRes.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                    if (authBody.TryGetProperty("token", out var tokenProp))
-                    {
-                        sessionToken = tokenProp.GetString();
-                    }
-                }
-            }
-            catch (Exception authEx)
-            {
-                _logger.LogWarning("PayPro v2 auth handshake failed: {Message}. Attempting fallback.", authEx.Message);
-            }
-
-            // 2. Create Order in PayPro v2
-            var orderList = new[]
-            {
-                new Dictionary<string, object?>
-                {
-                    ["MerchantId"] = _options.ClientId,
-                    ["InvoiceNo"] = invoiceId,
-                    ["Amount"] = booking.TotalAmount.ToString("0.00"),
-                    ["IssueDate"] = DateTime.UtcNow.ToString("dd/MM/yyyy"),
-                    ["DueDate"] = (booking.PaymentExpiresAt?.UtcDateTime ?? DateTime.UtcNow.AddMinutes(30)).ToString("dd/MM/yyyy"),
-                    ["CustomerName"] = booking.CustomerName,
-                    ["CustomerEmail"] = booking.CustomerEmail,
-                    ["CustomerMobile"] = booking.CustomerPhone,
-                    ["CustomerAddress"] = "Pakistan"
-                }
-            };
-
-            using var orderReq = new HttpRequestMessage(HttpMethod.Post, $"{apiUrl}/v2/ppro/co")
-            {
-                Content = JsonContent.Create(orderList)
-            };
-
-            if (!string.IsNullOrWhiteSpace(sessionToken))
-            {
-                orderReq.Headers.Add("token", sessionToken);
-            }
-            else
-            {
-                var authBytes = Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password}");
-                orderReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
-            }
-
-            var orderRes = await _httpClient.SendAsync(orderReq, cancellationToken);
-            if (orderRes.IsSuccessStatusCode)
-            {
-                var orderJson = await orderRes.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                JsonElement firstItem = orderJson.ValueKind == JsonValueKind.Array && orderJson.GetArrayLength() > 0 
-                    ? orderJson[0] 
-                    : orderJson;
-
-                if (firstItem.TryGetProperty("Click2Pay", out var click2Pay) && click2Pay.GetString() is { Length: > 0 } payUrl)
-                {
-                    connectUrl = payUrl;
-                }
-                else if (firstItem.TryGetProperty("connectUrl", out var cUrl) && cUrl.GetString() is { Length: > 0 } customUrl)
-                {
-                    connectUrl = customUrl;
-                }
-
-                if (firstItem.TryGetProperty("ConnectpayId", out var cpId) && cpId.GetString() is { Length: > 0 } cPayId)
-                {
-                    otcVoucherCode = cPayId;
-                }
-                else if (firstItem.TryGetProperty("cPayId", out var cPay) && cPay.GetString() is { Length: > 0 } cpCode)
-                {
-                    otcVoucherCode = cpCode;
-                }
-            }
-            else
-            {
-                _logger.LogWarning("PayPro API create order responded with HTTP {StatusCode}. Proceeding with deterministic 1Pay connect URL.",
-                    (int)orderRes.StatusCode);
-            }
-        }
-        catch (Exception ex) when (ex is not InvalidOperationException)
-        {
-            _logger.LogWarning("Direct PayPro API handshake deferred: {Message}. Utilizing standard 1Pay portal URL.", ex.Message);
-        }
-
-        // Persist PaymentTransaction record for audit trail & idempotency
         var transaction = new PaymentTransaction
         {
             BookingId = booking.Id,
-            Provider = "paypro",
-            ProviderTransactionId = invoiceId,
-            PaymentMethod = paymentConfig.PaymentMethod,
+            Provider = "PayPro",
+            ProviderTransactionId = voucherCode,
+            ProviderOrderId = orderNumber,
+            PaymentMethod = paymentMethod ?? "paypro",
             Amount = booking.TotalAmount,
-            Currency = paymentConfig.Currency,
+            Currency = "PKR",
             Status = PaymentStatus.Pending,
             InternalReference = internalRef,
-            ProviderReference = invoiceId,
+            ProviderReference = voucherCode,
+            ExpiresAt = booking.PaymentExpiresAt ?? DateTimeOffset.UtcNow.AddMinutes(30),
             MetadataJson = JsonSerializer.Serialize(new
             {
                 bookingRef = booking.BookingRef,
-                environment = _options.Environment,
-                voucherCode = otcVoucherCode,
-                feeSnapshot = new
-                {
-                    subtotal = booking.SubtotalAmount,
-                    platformFee = booking.PlatformFee,
-                    processingFee = booking.PaymentProcessingFee,
-                    feePercentage = booking.FeePercentageAtPurchase
-                }
+                click2Pay = paymentUrl,
+                voucherCode = voucherCode,
+                billUrl = orderResult.BillUrl,
+                environment = _options.Environment
             })
         };
 
         _context.PaymentTransactions.Add(transaction);
         await _context.SaveChangesAsync(cancellationToken);
 
-        _logger.LogInformation("Generated PayPro Invoice {InvoiceId} for Booking {BookingRef}. Total: {Amount} {Currency} (Env: {Environment})",
-            invoiceId, booking.BookingRef, booking.TotalAmount, paymentConfig.Currency, _options.Environment);
+        _logger.LogInformation("Created new PayPro PaymentTransaction {PaymentId} for Booking {BookingRef}. Amount: {Amount} PKR.",
+            transaction.Id, booking.BookingRef, booking.TotalAmount);
 
-        return new PayProCheckoutResponseDto(
+        return new CreatePaymentResponseDto(
             Success: true,
             BookingRef: booking.BookingRef,
-            PaymentMethod: paymentConfig.PaymentMethod,
-            TotalAmount: booking.TotalAmount,
-            Currency: paymentConfig.Currency,
-            InvoiceId: invoiceId,
-            ConnectUrl: connectUrl,
-            OtcVoucherCode: otcVoucherCode,
-            ExpiresAt: booking.PaymentExpiresAt
+            PaymentId: transaction.Id,
+            Status: "Pending",
+            Amount: booking.TotalAmount,
+            Currency: "PKR",
+            PaymentUrl: paymentUrl,
+            VoucherCode: voucherCode,
+            ExpiresAt: transaction.ExpiresAt,
+            Message: "PayPro checkout session created successfully."
         );
     }
 
+    /// <inheritdoc />
+    public async Task<PaymentStatusResponseDto> GetPaymentStatusAsync(
+        string bookingRef,
+        int? paymentId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.Bookings
+            .Include(b => b.TicketTier)
+            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+            .Include(b => b.PaymentTransactions)
+            .Where(b => !b.IsDeleted);
+
+        Booking? booking;
+        if (paymentId.HasValue && paymentId.Value > 0)
+        {
+            booking = await query.FirstOrDefaultAsync(b => b.PaymentTransactions.Any(pt => pt.Id == paymentId.Value), cancellationToken);
+        }
+        else
+        {
+            booking = await query.FirstOrDefaultAsync(b => b.BookingRef == bookingRef, cancellationToken);
+        }
+
+        if (booking is null)
+            throw new KeyNotFoundException($"Booking or payment not found.");
+
+        var tx = booking.PaymentTransactions
+            .OrderByDescending(pt => pt.CreatedAt)
+            .FirstOrDefault();
+
+        // If already confirmed, return status immediately
+        if (booking.PaymentStatus == PaymentStatus.Paid)
+        {
+            return BuildStatusResponse(booking, tx, isPaid: true);
+        }
+
+        // Reconcile with PayPro V2
+        var statusResult = await _payProClient.QueryOrderStatusAsync(
+            orderNumber: booking.BookingRef,
+            payProId: tx?.ProviderTransactionId,
+            cancellationToken: cancellationToken);
+
+        if (statusResult.IsSuccess && (statusResult.Status is "PAID" or "SETTLED" or "SUCCESS"))
+        {
+            // Amount integrity validation
+            if (statusResult.AmountPaid > 0 && statusResult.AmountPaid < booking.TotalAmount)
+            {
+                _logger.LogError("PayPro reported payment of PKR {Paid}, but required amount is PKR {Total} for Booking {BookingRef}.",
+                    statusResult.AmountPaid, booking.TotalAmount, booking.BookingRef);
+            }
+            else
+            {
+                await ApplySuccessfulPaymentAsync(booking, tx, statusResult.DatePaid ?? DateTimeOffset.UtcNow, cancellationToken);
+                return BuildStatusResponse(booking, tx, isPaid: true);
+            }
+        }
+
+        return BuildStatusResponse(booking, tx, isPaid: false);
+    }
+
+    /// <inheritdoc />
+    public async Task<PayProCheckoutResponseDto> CreateInvoiceAsync(
+        Booking booking,
+        PaymentConfig paymentConfig,
+        string? returnUrl,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await CreatePaymentAsync(
+            bookingRef: booking.BookingRef,
+            paymentMethod: paymentConfig.PaymentMethod,
+            returnUrl: returnUrl,
+            cancellationToken: cancellationToken);
+
+        return new PayProCheckoutResponseDto(
+            Success: result.Success,
+            BookingRef: result.BookingRef,
+            PaymentMethod: paymentConfig.PaymentMethod,
+            TotalAmount: result.Amount,
+            Currency: result.Currency,
+            InvoiceId: result.VoucherCode,
+            ConnectUrl: result.PaymentUrl,
+            OtcVoucherCode: result.VoucherCode,
+            ExpiresAt: result.ExpiresAt,
+            Message: result.Message,
+            PaymentId: result.PaymentId
+        );
+    }
+
+    /// <inheritdoc />
     public async Task<PayProIpnResponseDto> ProcessIpnCallbackAsync(
         PayProIpnRequestDto ipnDto,
         CancellationToken cancellationToken = default)
@@ -240,13 +307,13 @@ public class PayProService : IPayProService
             return new PayProIpnResponseDto(false, "REJECTED", "Missing booking reference or invoice identifier.");
         }
 
-        // Look up target booking
         var booking = await _context.Bookings
             .Include(b => b.TicketTier)
             .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
             .Include(b => b.PaymentTransactions)
             .FirstOrDefaultAsync(b =>
-                (b.BookingRef == ipnDto.BookingRef || b.PaymentTransactions.Any(pt => pt.ProviderTransactionId == ipnDto.InvoiceId))
+                (b.BookingRef == ipnDto.BookingRef ||
+                 b.PaymentTransactions.Any(pt => pt.ProviderTransactionId == ipnDto.InvoiceId || pt.ProviderOrderId == ipnDto.BookingRef))
                 && !b.IsDeleted,
                 cancellationToken);
 
@@ -257,63 +324,80 @@ public class PayProService : IPayProService
             return new PayProIpnResponseDto(false, "NOT_FOUND", "Booking not found.");
         }
 
-        // IDEMPOTENCY CHECK: If already marked paid, return OK immediately without duplicate actions
+        // IDEMPOTENCY CHECK: If already paid, return 200 OK immediately
         if (booking.PaymentStatus == PaymentStatus.Paid)
         {
-            _logger.LogInformation("PayPro IPN duplicate callback received for already-paid Booking {BookingRef}. Idempotent 200 OK returned.",
-                booking.BookingRef);
+            _logger.LogInformation("PayPro IPN duplicate callback received for already-paid Booking {BookingRef}.", booking.BookingRef);
             return new PayProIpnResponseDto(true, "ALREADY_PROCESSED", "Booking is already paid and confirmed.");
         }
 
-        // Match payment status from IPN payload
         var statusStr = ipnDto.Status?.Trim().ToUpperInvariant() ?? "UNKNOWN";
         var isPaidStatus = statusStr is "PAID" or "SUCCESS" or "SETTLED";
 
         if (!isPaidStatus)
         {
-            _logger.LogWarning("PayPro IPN reported non-success status '{Status}' for Booking {BookingRef}.",
-                statusStr, booking.BookingRef);
-
-            var existingTx = booking.PaymentTransactions.FirstOrDefault(pt => pt.ProviderTransactionId == ipnDto.InvoiceId);
-            if (existingTx != null)
-            {
-                existingTx.Status = statusStr is "FAILED" or "EXPIRED" or "CANCELLED" ? PaymentStatus.Failed : PaymentStatus.Processing;
-                existingTx.FailedAt = DateTimeOffset.UtcNow;
-                existingTx.FailureReason = $"PayPro IPN reported status: {statusStr}";
-                await _context.SaveChangesAsync(cancellationToken);
-            }
-
+            _logger.LogWarning("PayPro IPN reported non-success status '{Status}' for Booking {BookingRef}.", statusStr, booking.BookingRef);
             return new PayProIpnResponseDto(false, statusStr, $"Payment was not successful (Status: {statusStr}).");
         }
 
-        // AMOUNT INTEGRITY CHECK: Reject underpaid or tampered transactions
-        if (ipnDto.AmountPaid < booking.TotalAmount)
+        // AMOUNT INTEGRITY CHECK
+        if (ipnDto.AmountPaid > 0 && ipnDto.AmountPaid < booking.TotalAmount)
         {
             _logger.LogError("PayPro IPN amount mismatch for Booking {BookingRef}: expected PKR {ExpectedAmount}, received PKR {AmountPaid}.",
                 booking.BookingRef, booking.TotalAmount, ipnDto.AmountPaid);
 
             return new PayProIpnResponseDto(false, "AMOUNT_MISMATCH",
-                $"Amount paid ({ipnDto.AmountPaid}) is less than authoritative required amount ({booking.TotalAmount}).");
+                $"Amount paid ({ipnDto.AmountPaid}) is less than required amount ({booking.TotalAmount}).");
         }
 
-        // Verify with PayPro server-side if signature or API query is available
-        var verified = await VerifyInvoiceStatusAsync(ipnDto.InvoiceId ?? $"PP-{booking.BookingRef}", booking.TotalAmount, cancellationToken);
-        if (!verified)
+        // Verify status server-side
+        var statusResult = await _payProClient.QueryOrderStatusAsync(
+            orderNumber: booking.BookingRef,
+            payProId: ipnDto.InvoiceId,
+            cancellationToken: cancellationToken);
+
+        if (!statusResult.IsSuccess && !_options.IsDemo)
         {
-            var (isConfigValid, _) = _options.Validate();
-            if (isConfigValid)
-            {
-                _logger.LogError("PayPro IPN callback rejected: Server-side invoice verification failed for Invoice {InvoiceId}.", ipnDto.InvoiceId);
-                return new PayProIpnResponseDto(false, "VERIFICATION_FAILED", "Upstream payment provider verification failed.");
-            }
-            _logger.LogWarning("Server-side verification with PayPro failed for Invoice {InvoiceId}. In test mode without credentials; allowing simulation.", ipnDto.InvoiceId);
+            _logger.LogError("PayPro IPN callback rejected: Remote status query failed for Order {OrderNumber}.", booking.BookingRef);
+            return new PayProIpnResponseDto(false, "VERIFICATION_FAILED", "Upstream payment provider verification failed.");
         }
 
-        // Transition Booking to Paid & Confirmed
-        var now = DateTimeOffset.UtcNow;
+        var tx = booking.PaymentTransactions.FirstOrDefault(pt => pt.ProviderTransactionId == ipnDto.InvoiceId || pt.ProviderOrderId == booking.BookingRef);
+        await ApplySuccessfulPaymentAsync(booking, tx, ipnDto.PaymentDate ?? DateTimeOffset.UtcNow, cancellationToken);
+
+        return new PayProIpnResponseDto(true, "PAID", "Payment confirmed and tickets issued successfully.");
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> VerifyInvoiceStatusAsync(
+        string invoiceId,
+        decimal expectedAmount,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(invoiceId)) return false;
+
+        var result = await _payProClient.QueryOrderStatusAsync(
+            orderNumber: invoiceId,
+            payProId: invoiceId,
+            cancellationToken: cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return _options.IsDemo; // In demo test mode, allow verification to proceed
+        }
+
+        return result.Status is "PAID" or "SETTLED" or "SUCCESS";
+    }
+
+    private async Task ApplySuccessfulPaymentAsync(
+        Booking booking,
+        PaymentTransaction? tx,
+        DateTimeOffset paidAt,
+        CancellationToken cancellationToken)
+    {
         booking.PaymentStatus = PaymentStatus.Paid;
         booking.Status = BookingStatus.Confirmed;
-        booking.PaidAt = ipnDto.PaymentDate ?? now;
+        booking.PaidAt = paidAt;
 
         // Permanently lock seats to Booked
         foreach (var bs in booking.BookingSeats)
@@ -324,28 +408,25 @@ public class PayProService : IPayProService
             }
         }
 
-        // Update / Add PaymentTransaction
-        var matchedTx = booking.PaymentTransactions.FirstOrDefault(pt => pt.ProviderTransactionId == ipnDto.InvoiceId);
-        if (matchedTx != null)
+        if (tx != null)
         {
-            matchedTx.Status = PaymentStatus.Paid;
-            matchedTx.PaidAt = now;
-            matchedTx.ProviderTransactionId = ipnDto.TransactionId ?? matchedTx.ProviderTransactionId;
+            tx.Status = PaymentStatus.Paid;
+            tx.PaidAt = paidAt;
         }
         else
         {
             booking.PaymentTransactions.Add(new PaymentTransaction
             {
                 BookingId = booking.Id,
-                Provider = "paypro",
-                ProviderTransactionId = ipnDto.TransactionId ?? ipnDto.InvoiceId ?? $"PP-{booking.BookingRef}",
+                Provider = "PayPro",
+                ProviderTransactionId = $"PP-{booking.BookingRef}",
+                ProviderOrderId = booking.BookingRef,
                 PaymentMethod = booking.PaymentMethod.ToString().ToLowerInvariant(),
-                Amount = ipnDto.AmountPaid > 0 ? ipnDto.AmountPaid : booking.TotalAmount,
+                Amount = booking.TotalAmount,
                 Currency = "PKR",
                 Status = PaymentStatus.Paid,
                 InternalReference = $"TXN-EVL-{RandomNumberGenerator.GetInt32(100000, 1000000)}",
-                ProviderReference = ipnDto.InvoiceId,
-                PaidAt = now
+                PaidAt = paidAt
             });
         }
 
@@ -353,19 +434,14 @@ public class PayProService : IPayProService
         if (seatIds.Any() && _cacheService != null)
         {
             await _cacheService.ReleaseSeatsAsync(booking.EventId, seatIds, null);
+            await _cacheService.ClearEventCacheAsync(booking.EventId);
         }
 
         await _context.SaveChangesAsync(cancellationToken);
 
-        if (_cacheService != null)
-        {
-            await _cacheService.ClearEventCacheAsync(booking.EventId);
-        }
+        _logger.LogInformation("Payment confirmed and applied for Booking {BookingRef}. PaymentStatus=Paid, BookingStatus=Confirmed.", booking.BookingRef);
 
-        _logger.LogInformation("PayPro IPN successfully verified and applied for Booking {BookingRef}. PaymentStatus -> Paid, BookingStatus -> Confirmed.",
-            booking.BookingRef);
-
-        // Dispatch E-Ticket pass to customer asynchronously
+        // Idempotent ticket notification dispatch
         _ = Task.Run(async () =>
         {
             try
@@ -390,14 +466,10 @@ public class PayProService : IPayProService
                     booking.CreatedAt,
                     new List<BookingSeatDto>(),
                     booking.BankTransactionRef,
-                    null,
-                    null,
-                    null,
-                    null,
+                    null, null, null, null,
                     booking.VerifiedAt,
                     booking.PaymentExpiresAt,
-                    null,
-                    null
+                    null, null
                 );
 
                 await _notificationService.SendTicketConfirmationEmailAsync(dto);
@@ -407,48 +479,38 @@ public class PayProService : IPayProService
                 _logger.LogError(ex, "Failed to dispatch ticket confirmation email for Booking {BookingRef}", booking.BookingRef);
             }
         });
-
-        return new PayProIpnResponseDto(true, "PAID", "Payment confirmed and tickets issued successfully.");
     }
 
-    public async Task<bool> VerifyInvoiceStatusAsync(
-        string invoiceId,
-        decimal expectedAmount,
-        CancellationToken cancellationToken = default)
+    private static PaymentStatusResponseDto BuildStatusResponse(Booking booking, PaymentTransaction? tx, bool isPaid)
     {
-        if (string.IsNullOrWhiteSpace(invoiceId)) return false;
+        string? voucherCode = tx?.ProviderTransactionId;
+        string? paymentUrl = null;
 
-        var (isValid, _) = _options.Validate();
-        if (!isValid) return true; // In test mode without credentials, allow simulated confirmation
-
-        try
+        if (!string.IsNullOrWhiteSpace(tx?.MetadataJson))
         {
-            var apiUrl = _options.ApiUrl.TrimEnd('/');
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{apiUrl}/v2/ppro/invoices/{Uri.EscapeDataString(invoiceId)}");
-
-            var authBytes = Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password}");
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
-
-            var response = await _httpClient.SendAsync(request, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                _logger.LogWarning("PayPro invoice status query for '{InvoiceId}' returned HTTP {StatusCode}", invoiceId, (int)response.StatusCode);
-                return true; // Don't block if remote check is unreachable in test mode
+                using var doc = JsonDocument.Parse(tx.MetadataJson);
+                if (doc.RootElement.TryGetProperty("voucherCode", out var vc)) voucherCode = vc.GetString() ?? voucherCode;
+                if (doc.RootElement.TryGetProperty("click2Pay", out var c2p)) paymentUrl = c2p.GetString();
             }
-
-            var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-            if (body.TryGetProperty("status", out var statusProp))
-            {
-                var status = statusProp.GetString()?.ToUpperInvariant();
-                return status is "PAID" or "SETTLED" or "SUCCESS";
-            }
-
-            return true;
+            catch { /* ignore */ }
         }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("Could not query PayPro remote status for Invoice '{InvoiceId}': {Message}", invoiceId, ex.Message);
-            return true;
-        }
+
+        return new PaymentStatusResponseDto(
+            PaymentId: tx?.Id ?? 0,
+            BookingRef: booking.BookingRef,
+            Status: booking.Status.ToString(),
+            PaymentStatus: booking.PaymentStatus.ToString(),
+            IsPaid: isPaid,
+            TicketReady: isPaid,
+            TotalAmount: booking.TotalAmount,
+            Currency: "PKR",
+            PaymentMethod: tx?.PaymentMethod ?? booking.PaymentMethod.ToString(),
+            VoucherCode: voucherCode,
+            PaymentUrl: paymentUrl,
+            PaidAt: booking.PaidAt,
+            ExpiresAt: tx?.ExpiresAt ?? booking.PaymentExpiresAt
+        );
     }
 }

@@ -30,6 +30,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
   const [selectedPayProMethod, setSelectedPayProMethod] = useState('easypaisa_jazzcash');
   const [payproResponse, setPayproResponse] = useState(null);
   const [isInitiatingPayPro, setIsInitiatingPayPro] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   // Authorization / Verified User check
   const loggedUserRaw = localStorage.getItem('eventland_logged_user');
@@ -335,7 +336,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         throw new Error('Could not generate booking reference for PayPro session.');
       }
 
-      const response = await paymentsApi.initiatePayProCheckout(
+      const response = await paymentsApi.createPayment(
         bookingRefToUse,
         selectedPayProMethod,
         window.location.href
@@ -343,7 +344,8 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
 
       setPayproResponse(response);
       setStep(3); // Go to Step 3: PayPro Invoice & Direct Connect Portal
-      showSuccess('PayPro Invoice Ready 💳', `PayPro Voucher #: ${response.otcVoucherCode || response.invoiceId || bookingRefToUse}`);
+      const voucher = response.voucherCode || response.otcVoucherCode || response.invoiceId || bookingRefToUse;
+      showSuccess('PayPro Invoice Ready 💳', `PayPro Voucher #: ${voucher}`);
 
       if (onBookingSuccess) {
         onBookingSuccess(booking);
@@ -353,6 +355,30 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
       showError('PayPro Gateway Error', err.message || 'Failed to initiate PayPro Online Gateway session.');
     } finally {
       setIsInitiatingPayPro(false);
+    }
+  };
+
+  const handleCheckPaymentStatus = async () => {
+    const bookingRef = createdBooking?.bookingRef || payproResponse?.bookingRef;
+    if (!bookingRef) return;
+
+    setIsCheckingStatus(true);
+    try {
+      const statusRes = await paymentsApi.getPaymentStatus(bookingRef);
+      if (statusRes && (statusRes.isPaid || statusRes.ticketReady || statusRes.paymentStatus === 'Paid')) {
+        showSuccess('Payment Confirmed! 🎉', 'Your payment was verified and tickets are confirmed!');
+        if (onBookingSuccess) {
+          onBookingSuccess({ ...createdBooking, status: 'Confirmed', paymentStatus: 'Paid' });
+        }
+        setStep(4);
+      } else {
+        showWarning('Payment Pending ⏳', 'Payment has not been confirmed yet. If you have completed payment, please allow a moment and try again.');
+      }
+    } catch (err) {
+      console.error('Status check error:', err);
+      showError('Status Check Failed', err.message || 'Could not verify payment status.');
+    } finally {
+      setIsCheckingStatus(false);
     }
   };
 
@@ -1139,11 +1165,11 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                 PayPro Consumer Voucher / OTC Number
               </div>
               <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#2dd4bf', letterSpacing: '0.08em', marginBottom: '0.75rem' }}>
-                {payproResponse.otcVoucherCode || payproResponse.invoiceId || createdBooking?.bookingRef || '1PAY-PAYPRO-01'}
+                {payproResponse.voucherCode || payproResponse.otcVoucherCode || payproResponse.invoiceId || createdBooking?.bookingRef || '1PAY-PAYPRO-01'}
               </div>
               <button
                 type="button"
-                onClick={() => copyToClipboard(payproResponse.otcVoucherCode || payproResponse.invoiceId || createdBooking?.bookingRef, 'PayPro Consumer Voucher')}
+                onClick={() => copyToClipboard(payproResponse.voucherCode || payproResponse.otcVoucherCode || payproResponse.invoiceId || createdBooking?.bookingRef, 'PayPro Consumer Voucher')}
                 style={{
                   background: 'rgba(13, 148, 136, 0.25)',
                   border: '1px solid rgba(45, 212, 191, 0.5)',
@@ -1162,11 +1188,11 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               </button>
             </div>
 
-            {/* Direct PayPro 1Pay Link */}
-            {payproResponse.connectUrl && (
+            {/* Direct PayPro 1Pay / Click2Pay Link */}
+            {(payproResponse.paymentUrl || payproResponse.connectUrl) && (
               <div style={{ marginBottom: '1.5rem' }}>
                 <a
-                  href={payproResponse.connectUrl}
+                  href={payproResponse.paymentUrl || payproResponse.connectUrl}
                   target="_blank"
                   rel="noreferrer"
                   style={{
@@ -1200,7 +1226,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.85rem' }}>
                 <span style={{ color: '#64748b' }}>Booking Reference:</span>
-                <strong style={{ color: '#2dd4bf' }}>{createdBooking?.bookingRef || 'EVL-100001'}</strong>
+                <strong style={{ color: '#2dd4bf' }}>{createdBooking?.bookingRef || payproResponse?.bookingRef || 'EVL-100001'}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.85rem' }}>
                 <span style={{ color: '#64748b' }}>Event:</span>
@@ -1212,11 +1238,28 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: 800, borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '0.6rem' }}>
                 <span style={{ color: '#fff' }}>Amount Payable:</span>
-                <span style={{ color: '#2dd4bf' }}>PKR {totalPayable.toLocaleString()}</span>
+                <span style={{ color: '#2dd4bf' }}>PKR {(payproResponse.amount || totalPayable).toLocaleString()}</span>
               </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <button
+                onClick={handleCheckPaymentStatus}
+                disabled={isCheckingStatus}
+                className="btn btn-primary"
+                style={{
+                  padding: '0.85rem',
+                  borderRadius: '12px',
+                  fontWeight: 800,
+                  fontSize: '0.95rem',
+                  background: 'linear-gradient(135deg, #0d9488, #0284c7)',
+                  border: 'none',
+                  color: '#fff',
+                  cursor: isCheckingStatus ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isCheckingStatus ? 'Verifying with PayPro...' : 'I Have Paid — Verify Payment & Issue Tickets 🎟️'}
+              </button>
               <button
                 onClick={onClose}
                 className="btn btn-outline-secondary"
