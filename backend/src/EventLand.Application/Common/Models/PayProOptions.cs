@@ -52,7 +52,8 @@ public class PayProOptions
     /// Indicates whether the gateway is configured in Demo / Sandbox mode.
     /// </summary>
     public bool IsDemo => string.Equals(Environment, "Demo", StringComparison.OrdinalIgnoreCase) ||
-                          string.Equals(Environment, "Test", StringComparison.OrdinalIgnoreCase);
+                          string.Equals(Environment, "Test", StringComparison.OrdinalIgnoreCase) ||
+                          string.Equals(Environment, "Development", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Backward compatibility alias for IsDemo.

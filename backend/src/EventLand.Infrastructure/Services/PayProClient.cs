@@ -22,6 +22,10 @@ using Microsoft.Extensions.Options;
 public class PayProClient : IPayProClient
 {
     private const string TokenCacheKey = "PayPro_V2_Auth_Token";
+    private static readonly JsonSerializerOptions ExactCaseJsonOptions = new()
+    {
+        PropertyNamingPolicy = null
+    };
     private readonly HttpClient _httpClient;
     private readonly PayProOptions _options;
     private readonly IMemoryCache _memoryCache;
@@ -69,7 +73,7 @@ public class PayProClient : IPayProClient
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, authUrl)
             {
-                Content = JsonContent.Create(payload)
+                Content = JsonContent.Create(payload, options: ExactCaseJsonOptions)
             };
 
             var response = await _httpClient.SendAsync(request, cancellationToken);
@@ -167,7 +171,7 @@ public class PayProClient : IPayProClient
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, orderUrl)
             {
-                Content = JsonContent.Create(payload)
+                Content = JsonContent.Create(payload, options: ExactCaseJsonOptions)
             };
 
             if (!string.IsNullOrWhiteSpace(token))
@@ -177,6 +181,7 @@ public class PayProClient : IPayProClient
 
             var response = await _httpClient.SendAsync(request, cancellationToken);
             var contentString = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogInformation("PayPro V2 create order HTTP {StatusCode} for {OrderNumber}: {Response}", (int)response.StatusCode, orderNumber, contentString);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -290,7 +295,7 @@ public class PayProClient : IPayProClient
 
             using var request = new HttpRequestMessage(HttpMethod.Post, ggosboiUrl)
             {
-                Content = JsonContent.Create(payload)
+                Content = JsonContent.Create(payload, options: ExactCaseJsonOptions)
             };
 
             if (!string.IsNullOrWhiteSpace(token))
@@ -351,7 +356,7 @@ public class PayProClient : IPayProClient
 
                 using var request = new HttpRequestMessage(HttpMethod.Post, ggosUrl)
                 {
-                    Content = JsonContent.Create(ggosPayload)
+                    Content = JsonContent.Create(ggosPayload, options: ExactCaseJsonOptions)
                 };
 
                 if (!string.IsNullOrWhiteSpace(token))
