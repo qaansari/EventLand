@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EventLand.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260911121048_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260917071121_InitialBaseline")]
+    partial class InitialBaseline
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -378,6 +378,9 @@ namespace EventLand.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_Bookings_BookingRef");
 
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("IX_Bookings_CreatedAt");
+
                     b.HasIndex("CustomerEmail")
                         .HasDatabaseName("IX_Bookings_CustomerEmail");
 
@@ -693,7 +696,8 @@ namespace EventLand.Infrastructure.Migrations
                     b.HasIndex("IsFeatured")
                         .HasDatabaseName("IX_Events_IsFeatured");
 
-                    b.HasIndex("OrganizerId");
+                    b.HasIndex("OrganizerId")
+                        .HasDatabaseName("IX_Events_OrganizerId");
 
                     b.HasIndex("StartDateUtc")
                         .HasDatabaseName("IX_Events_StartDateUtc");
@@ -706,6 +710,9 @@ namespace EventLand.Infrastructure.Migrations
 
                     b.HasIndex("IsDeleted", "IsPublished", "StartDateUtc")
                         .HasDatabaseName("IX_Events_Published_Date");
+
+                    b.HasIndex("IsPublished", "CityId", "StartDateUtc")
+                        .HasDatabaseName("IX_Events_Published_City_Date");
 
                     b.ToTable("Events");
                 });
@@ -1137,6 +1144,9 @@ namespace EventLand.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<DateTimeOffset?>("FailedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -1169,6 +1179,10 @@ namespace EventLand.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("ProviderOrderId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<string>("ProviderReference")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -1176,6 +1190,10 @@ namespace EventLand.Infrastructure.Migrations
                     b.Property<string>("ProviderTransactionId")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RawProviderResponse")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
@@ -1195,8 +1213,14 @@ namespace EventLand.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("IX_PaymentTransactions_InternalReference");
 
+                    b.HasIndex("ProviderOrderId")
+                        .HasDatabaseName("IX_PaymentTransactions_ProviderOrderId");
+
                     b.HasIndex("ProviderTransactionId")
                         .HasDatabaseName("IX_PaymentTransactions_ProviderTransactionId");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("IX_PaymentTransactions_Status");
 
                     b.ToTable("PaymentTransactions");
                 });
@@ -1732,7 +1756,7 @@ namespace EventLand.Infrastructure.Migrations
                             FullName = "Super Admin",
                             IsActive = true,
                             IsDeleted = false,
-                            PasswordHash = "AQAAAAIAAYagAAAAECgRlR/0KDmv61u80Wt24hRgSE3iMdEt9dsDbEk5BQ5fmpGtMevDyzKGHPVji6tEvQ==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEHsRMsgj83jxgHuFr3TTpQzr3/l4xvFEMPgpBV3Iy/3x0kiopGzfJMVKxXCfkng16A==",
                             PhoneNumber = "+92 331 2541767",
                             RoleId = 1,
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
@@ -1788,6 +1812,172 @@ namespace EventLand.Infrastructure.Migrations
                     b.HasIndex("CityId");
 
                     b.ToTable("Venues");
+                });
+
+            modelBuilder.Entity("EventLand.Modules.PayPro.Entities.Consumer", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("ConsumerId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<string>("Mobile")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConsumerId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Consumers_ConsumerId");
+
+                    b.ToTable("Consumers", (string)null);
+                });
+
+            modelBuilder.Entity("EventLand.Modules.PayPro.Entities.Order", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("AmountPaid")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("BillUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Click2PayUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("ConsumerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<DateTime?>("DatePaid")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("IssueDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PayProId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("PaymentMode")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("RawCreateResponse")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConsumerId");
+
+                    b.HasIndex("OrderNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Orders_OrderNumber");
+
+                    b.HasIndex("PayProId")
+                        .HasDatabaseName("IX_Orders_PayProId");
+
+                    b.HasIndex("Status", "UpdatedAtUtc")
+                        .HasDatabaseName("IX_Orders_Status_UpdatedAtUtc");
+
+                    b.ToTable("Orders", (string)null);
+                });
+
+            modelBuilder.Entity("EventLand.Modules.PayPro.Entities.PayProCallbackLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
+
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<string>("RequestBody")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ResponseBody")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("Success")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReceivedAtUtc")
+                        .HasDatabaseName("IX_PayProCallbackLogs_ReceivedAtUtc");
+
+                    b.ToTable("PayProCallbackLogs", (string)null);
                 });
 
             modelBuilder.Entity("EventLand.Domain.Entities.Auditorium", b =>
@@ -2027,6 +2217,16 @@ namespace EventLand.Infrastructure.Migrations
                     b.Navigation("City");
                 });
 
+            modelBuilder.Entity("EventLand.Modules.PayPro.Entities.Order", b =>
+                {
+                    b.HasOne("EventLand.Modules.PayPro.Entities.Consumer", "Consumer")
+                        .WithMany("Orders")
+                        .HasForeignKey("ConsumerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Consumer");
+                });
+
             modelBuilder.Entity("EventLand.Domain.Entities.Auditorium", b =>
                 {
                     b.Navigation("Events");
@@ -2106,6 +2306,11 @@ namespace EventLand.Infrastructure.Migrations
                     b.Navigation("Auditoriums");
 
                     b.Navigation("Events");
+                });
+
+            modelBuilder.Entity("EventLand.Modules.PayPro.Entities.Consumer", b =>
+                {
+                    b.Navigation("Orders");
                 });
 #pragma warning restore 612, 618
         }

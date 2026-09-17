@@ -50,7 +50,8 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
 });
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddApplicationPart(typeof(EventLand.Modules.PayPro.Webhooks.PayProCallbackController).Assembly);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSignalR();
 
@@ -133,6 +134,17 @@ builder.Services.AddRateLimiter(options =>
                 PermitLimit = 20,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
+            }));
+
+    // Per-IP rate limiting for PayPro inbound webhook callback
+    options.AddPolicy("paypro-callback", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"paypro_cb_{ResolveClientIp(httpContext)}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 10
             }));
 
     // Global fallback limiter: 300 requests/minute per client IP

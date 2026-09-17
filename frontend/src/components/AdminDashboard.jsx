@@ -47,6 +47,7 @@ import MultiSearchableSelect from './MultiSearchableSelect';
 import EventCard from './EventCard';
 import InteractiveSeatPicker from './InteractiveSeatPicker';
 import DigitalTicketModal from './DigitalTicketModal';
+import PayProAdminPanel from './PayProAdminPanel';
 import { parseAuditoriumLayout, createBlankLayoutJson } from '../data/auditoriumLayouts';
 import { exportAuditoriumChartPdf } from '../utils/pdfChartExporter';
 import { exportTicketPdf } from '../utils/ticketPdfExporter';
@@ -2340,6 +2341,26 @@ export default function AdminDashboard({ onSelectEvent }) {
             }}
           >
             <Building2 size={18} /> Bank Accounts ({bankAccountsList.length})
+          </button>
+        )}
+
+        {isSuperAdmin && (
+          <button
+            onClick={() => setActiveAdminTab('paypro')}
+            style={{
+              padding: '0.75rem 1.25rem',
+              borderRadius: '10px',
+              border: 'none',
+              background: activeAdminTab === 'paypro' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
+              color: '#ffffff',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <ShieldCheck size={18} /> PayPro Gateway
           </button>
         )}
       </div>
@@ -5608,6 +5629,11 @@ export default function AdminDashboard({ onSelectEvent }) {
             ))}
           </div>
         </div>
+      )}
+
+      {/* --- TAB: PAYPRO GATEWAY SWITCH (SUPER ADMIN) --- */}
+      {activeAdminTab === 'paypro' && isSuperAdmin && (
+        <PayProAdminPanel />
       )}
 
       {/* --- MODAL: ADD / EDIT BANK ACCOUNT --- */}

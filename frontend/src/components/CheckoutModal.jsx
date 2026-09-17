@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { bookingsApi, bankAccountsApi, uploadApi, paymentsApi, getEventImageUrl, getQrCodeImageUrl, getPaymentSlipUrl } from '../services/api';
+import PayProStatusTracker from './PayProStatusTracker';
 import { useToast } from '../context/ToastContext';
 
 export default function CheckoutModal({ event, selectedSeats, onClose, onBookingSuccess, onInvoiceCreated }) {
@@ -1189,10 +1190,10 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
             </div>
 
             {/* Direct PayPro 1Pay / Click2Pay Link */}
-            {(payproResponse.paymentUrl || payproResponse.connectUrl) && (
+            {(payproResponse.paymentUrl || payproResponse.connectUrl || payproResponse.click2PayUrl) && (
               <div style={{ marginBottom: '1.5rem' }}>
                 <a
-                  href={payproResponse.paymentUrl || payproResponse.connectUrl}
+                  href={payproResponse.click2PayUrl || payproResponse.paymentUrl || payproResponse.connectUrl}
                   target="_blank"
                   rel="noreferrer"
                   style={{
@@ -1240,6 +1241,23 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                 <span style={{ color: '#fff' }}>Amount Payable:</span>
                 <span style={{ color: '#2dd4bf' }}>PKR {(payproResponse.amount || totalPayable).toLocaleString()}</span>
               </div>
+            </div>
+
+            {/* Live PayPro Status Tracker Widget */}
+            <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
+              <PayProStatusTracker
+                orderNumber={payproResponse.voucherCode || payproResponse.invoiceId || createdBooking?.bookingRef || payproResponse.bookingRef}
+                click2PayUrl={payproResponse.click2PayUrl || payproResponse.paymentUrl || payproResponse.connectUrl}
+                onStatusChange={(statusRes) => {
+                  if (statusRes && (statusRes.isPaid || statusRes.orderStatus === 'Paid' || statusRes.orderStatus === 'PAID')) {
+                    showSuccess('Payment Confirmed! 🎉', 'Your payment was verified and tickets are confirmed!');
+                    if (onBookingSuccess) {
+                      onBookingSuccess({ ...createdBooking, status: 'Confirmed', paymentStatus: 'Paid' });
+                    }
+                    setStep(4);
+                  }
+                }}
+              />
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

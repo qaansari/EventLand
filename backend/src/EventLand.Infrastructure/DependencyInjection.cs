@@ -129,7 +129,11 @@ public static class DependencyInjection
         services.AddScoped<IBankAccountService, BankAccountService>();
         services.AddScoped<INotificationService, NotificationService>();
 
-        // Payment Gateway & Fee Services (PayPro Pakistan)
+        // Payment Gateway & Fee Services (PayPro Pakistan V2 Module)
+        services.AddScoped<EventLand.Modules.PayPro.Persistence.IPayProDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+        services.AddScoped<EventLand.Modules.PayPro.Services.IPayProOrderPaidHandler, PayProBookingPaidHandler>();
+        EventLand.Modules.PayPro.Extensions.PayProServiceCollectionExtensions.AddPayProModule(services, configuration);
+
         services.Configure<EventLand.Application.Common.Models.PayProOptions>(
             configuration.GetSection(EventLand.Application.Common.Models.PayProOptions.SectionName));
 

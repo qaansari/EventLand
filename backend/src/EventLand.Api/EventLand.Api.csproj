@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\EventLand.Infrastructure\EventLand.Infrastructure.csproj" />
     <ProjectReference Include="..\EventLand.Application\EventLand.Application.csproj" />
+    <ProjectReference Include="..\Modules\PayPro\EventLand.Modules.PayPro.csproj" />
   </ItemGroup>
 
   <ItemGroup>

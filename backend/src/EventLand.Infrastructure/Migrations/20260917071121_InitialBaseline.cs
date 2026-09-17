@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace EventLand.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class InitialBaseline : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -72,6 +72,25 @@ namespace EventLand.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_BankAccounts", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Consumers",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1000, 1"),
+                    ConsumerId = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
+                    Mobile = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
+                    Email = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: true),
+                    Address = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: true),
+                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "SYSUTCDATETIME()"),
+                    UpdatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "SYSUTCDATETIME()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Consumers", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -189,6 +208,22 @@ namespace EventLand.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PayProCallbackLogs",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1000, 1"),
+                    ReceivedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "SYSUTCDATETIME()"),
+                    RequestBody = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ResponseBody = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Success = table.Column<bool>(type: "bit", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PayProCallbackLogs", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Roles",
                 columns: table => new
                 {
@@ -226,6 +261,40 @@ namespace EventLand.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Tags", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Orders",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1000, 1"),
+                    OrderNumber = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    PayProId = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    ConsumerId = table.Column<int>(type: "int", nullable: true),
+                    BookingId = table.Column<int>(type: "int", nullable: true),
+                    Amount = table.Column<decimal>(type: "decimal(18,4)", precision: 18, scale: 4, nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
+                    IssueDate = table.Column<DateTime>(type: "date", nullable: false),
+                    DueDate = table.Column<DateTime>(type: "date", nullable: false),
+                    Click2PayUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    BillUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PaymentMode = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    AmountPaid = table.Column<decimal>(type: "decimal(18,4)", precision: 18, scale: 4, nullable: true),
+                    DatePaid = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    RawCreateResponse = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "SYSUTCDATETIME()"),
+                    UpdatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "SYSUTCDATETIME()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Orders", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Orders_Consumers_ConsumerId",
+                        column: x => x.ConsumerId,
+                        principalTable: "Consumers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -680,6 +749,7 @@ namespace EventLand.Infrastructure.Migrations
                     BookingId = table.Column<int>(type: "int", nullable: false),
                     Provider = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     ProviderTransactionId = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    ProviderOrderId = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
                     PaymentMethod = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     Amount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
                     Currency = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
@@ -688,7 +758,9 @@ namespace EventLand.Infrastructure.Migrations
                     ProviderReference = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
                     PaidAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     FailedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    ExpiresAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     FailureReason = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    RawProviderResponse = table.Column<string>(type: "nvarchar(4000)", maxLength: 4000, nullable: true),
                     MetadataJson = table.Column<string>(type: "nvarchar(4000)", maxLength: 4000, nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
@@ -817,7 +889,7 @@ namespace EventLand.Infrastructure.Migrations
             migrationBuilder.InsertData(
                 table: "Users",
                 columns: new[] { "Id", "AccessFailedCount", "CountryId", "CreatedAt", "CreatedBy", "DeletedAt", "Email", "FullName", "ImageUrl", "IsActive", "IsDeleted", "LastLoginAt", "LockoutEndUtc", "PasswordHash", "PhoneNumber", "RoleId", "UpdatedAt", "UpdatedBy" },
-                values: new object[] { 1, 0, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "admin@eventland.pk", "Super Admin", null, true, false, null, null, "AQAAAAIAAYagAAAAECgRlR/0KDmv61u80Wt24hRgSE3iMdEt9dsDbEk5BQ5fmpGtMevDyzKGHPVji6tEvQ==", "+92 331 2541767", 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null });
+                values: new object[] { 1, 0, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "admin@eventland.pk", "Super Admin", null, true, false, null, null, "AQAAAAIAAYagAAAAEHsRMsgj83jxgHuFr3TTpQzr3/l4xvFEMPgpBV3Iy/3x0kiopGzfJMVKxXCfkng16A==", "+92 331 2541767", 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Artists_IsFeatured",
@@ -834,6 +906,11 @@ namespace EventLand.Infrastructure.Migrations
                 table: "Bookings",
                 column: "BookingRef",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Bookings_CreatedAt",
+                table: "Bookings",
+                column: "CreatedAt");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Bookings_CustomerEmail",
@@ -881,6 +958,12 @@ namespace EventLand.Infrastructure.Migrations
                 column: "CountryId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Consumers_ConsumerId",
+                table: "Consumers",
+                column: "ConsumerId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Events_AuditoriumId",
                 table: "Events",
                 column: "AuditoriumId");
@@ -904,6 +987,11 @@ namespace EventLand.Infrastructure.Migrations
                 name: "IX_Events_OrganizerId",
                 table: "Events",
                 column: "OrganizerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Events_Published_City_Date",
+                table: "Events",
+                columns: new[] { "IsPublished", "CityId", "StartDateUtc" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Events_Published_Date",
@@ -936,6 +1024,27 @@ namespace EventLand.Infrastructure.Migrations
                 column: "TagId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Orders_ConsumerId",
+                table: "Orders",
+                column: "ConsumerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Orders_OrderNumber",
+                table: "Orders",
+                column: "OrderNumber",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Orders_PayProId",
+                table: "Orders",
+                column: "PayProId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Orders_Status_UpdatedAtUtc",
+                table: "Orders",
+                columns: new[] { "Status", "UpdatedAtUtc" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Organizers_Email",
                 table: "Organizers",
                 column: "Email",
@@ -965,9 +1074,24 @@ namespace EventLand.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_PaymentTransactions_ProviderOrderId",
+                table: "PaymentTransactions",
+                column: "ProviderOrderId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_PaymentTransactions_ProviderTransactionId",
                 table: "PaymentTransactions",
                 column: "ProviderTransactionId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PaymentTransactions_Status",
+                table: "PaymentTransactions",
+                column: "Status");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PayProCallbackLogs_ReceivedAtUtc",
+                table: "PayProCallbackLogs",
+                column: "ReceivedAtUtc");
 
             migrationBuilder.CreateIndex(
                 name: "IX_RefundRecords_BookingId",
@@ -1071,10 +1195,16 @@ namespace EventLand.Infrastructure.Migrations
                 name: "FooterInfo");
 
             migrationBuilder.DropTable(
+                name: "Orders");
+
+            migrationBuilder.DropTable(
                 name: "PaymentConfigs");
 
             migrationBuilder.DropTable(
                 name: "PaymentTransactions");
+
+            migrationBuilder.DropTable(
+                name: "PayProCallbackLogs");
 
             migrationBuilder.DropTable(
                 name: "RefundRecords");
@@ -1084,6 +1214,9 @@ namespace EventLand.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "Tags");
+
+            migrationBuilder.DropTable(
+                name: "Consumers");
 
             migrationBuilder.DropTable(
                 name: "Bookings");

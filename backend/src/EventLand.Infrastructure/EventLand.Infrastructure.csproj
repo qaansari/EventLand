@@ -1,8 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\EventLand.Application\EventLand.Application.csproj" />
     <ProjectReference Include="..\EventLand.Domain\EventLand.Domain.csproj" />
+    <ProjectReference Include="..\Modules\PayPro\EventLand.Modules.PayPro.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -24,6 +24,7 @@ const CheckoutModal = lazy(() => import('./components/CheckoutModal'));
 const DigitalTicketModal = lazy(() => import('./components/DigitalTicketModal'));
 const UnpaidInvoicesModal = lazy(() => import('./components/UnpaidInvoicesModal'));
 const AttendeeDashboard = lazy(() => import('./components/AttendeeDashboard'));
+const PayProReturnPage = lazy(() => import('./components/PayProReturnPage'));
 
 const LazyFallback = (
   <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#94a3b8' }}>
@@ -46,6 +47,14 @@ const getEventIdFromUrl = () => {
     return searchParams.get('event');
   }
   return null;
+};
+
+const isPaymentReturnUrl = () => {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname;
+  if (path.includes('/payments/return') || path.includes('/payment/return')) return true;
+  const searchParams = new URLSearchParams(window.location.search);
+  return searchParams.has('ordId') || (searchParams.has('orderNumber') && searchParams.has('status'));
 };
 
 function mapBookingToTicket(b, fallbackEmail = '') {
@@ -179,7 +188,11 @@ export default function App() {
   };
 
   const [urlEventId, setUrlEventId] = useState(getEventIdFromUrl);
-  const [activeView, setActiveView] = useState(() => getEventIdFromUrl() ? 'event-detail' : 'explore'); // explore, event-detail, artists, organizer-wizard, my-tickets, organizer, admin
+  const [activeView, setActiveView] = useState(() => {
+    if (isPaymentReturnUrl()) return 'payment-return';
+    if (getEventIdFromUrl()) return 'event-detail';
+    return 'explore';
+  }); // explore, event-detail, artists, organizer-wizard, my-tickets, organizer, admin, payment-return
   const [userRole, setUserRole] = useState('customer'); // customer, organizer, admin
   const [sortBy, setSortBy] = useState('featured');
 
@@ -1239,6 +1252,26 @@ export default function App() {
             onBack={handleBackFromEventDetail}
             onProceedToBooking={handleProceedFromDetail}
           />
+        )}
+
+        {/* View: PayPro Gateway Return / Receipt */}
+        {activeView === 'payment-return' && (
+          <Suspense fallback={LazyFallback}>
+            <PayProReturnPage
+              onNavigateHome={() => {
+                if (typeof window !== 'undefined' && window.history.pushState) {
+                  window.history.pushState({}, '', '/');
+                }
+                setActiveView('explore');
+              }}
+              onNavigateTickets={() => {
+                if (typeof window !== 'undefined' && window.history.pushState) {
+                  window.history.pushState({}, '', '/');
+                }
+                setActiveView('my-tickets');
+              }}
+            />
+          </Suspense>
         )}
       </main>
 

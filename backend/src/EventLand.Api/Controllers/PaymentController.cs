@@ -298,7 +298,7 @@ public class PaymentController : ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             return StatusCode(StatusCodes.Status500InternalServerError, new
             {

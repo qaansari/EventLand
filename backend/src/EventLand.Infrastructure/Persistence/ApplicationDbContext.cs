@@ -6,7 +6,7 @@ using EventLand.Domain.Common;
 using EventLand.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
-public class ApplicationDbContext : DbContext, IApplicationDbContext
+public class ApplicationDbContext : DbContext, IApplicationDbContext, EventLand.Modules.PayPro.Persistence.IPayProDbContext
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
     {
@@ -37,13 +37,19 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<PaymentConfig> PaymentConfigs => Set<PaymentConfig>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
 
+    // ── PayPro Module DbSets ─────────────────────────────────────────────────
+    public DbSet<EventLand.Modules.PayPro.Entities.Order> Orders => Set<EventLand.Modules.PayPro.Entities.Order>();
+    public DbSet<EventLand.Modules.PayPro.Entities.Consumer> Consumers => Set<EventLand.Modules.PayPro.Entities.Consumer>();
+    public DbSet<EventLand.Modules.PayPro.Entities.PayProCallbackLog> PayProCallbackLogs => Set<EventLand.Modules.PayPro.Entities.PayProCallbackLog>();
+
     // ── Model Configuration ──────────────────────────────────────────────────
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Automatically picks up all IEntityTypeConfiguration<T> classes in this assembly
+        // Automatically picks up all IEntityTypeConfiguration<T> classes in this assembly and PayPro module
         modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(EventLand.Modules.PayPro.Entities.Order).Assembly);
 
         // Apply global soft-delete query filter for all BaseEntity models
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
