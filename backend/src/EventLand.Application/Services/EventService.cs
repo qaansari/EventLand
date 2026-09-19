@@ -39,8 +39,6 @@ public class EventService : IEventService
 
         var query = _context.Events
             .AsNoTracking()
-            .Include(e => e.Shows.Where(s => !s.IsDeleted))
-                .ThenInclude(s => s.TicketTiers.Where(t => !t.IsDeleted))
             .Where(e => !e.IsDeleted && e.IsPublished);
 
         if (!string.IsNullOrWhiteSpace(city))
@@ -127,6 +125,7 @@ public class EventService : IEventService
 
         var ev = await _context.Events
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(e => e.Organizer)
             .Include(e => e.Country)
             .Include(e => e.City)

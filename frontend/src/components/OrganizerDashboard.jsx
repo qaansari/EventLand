@@ -93,10 +93,30 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
     { id: 'EVL-100005', name: 'Bilal Ahmed', email: 'bilal@example.com', phone: '0301 5566778', cnic: '42201-5566778-5', event: 'First Light - Axwell', tier: 'VIP Pass', seat: 'Zone A - Seat 22', status: 'Checked-in', checkedInAt: '08:30 PM' }
   ]);
 
-  const filteredRoster = sampleRoster.filter(item => {
+  const rosterData = useMemo(() => {
+    if (bookings && bookings.length > 0) {
+      return bookings.map(b => ({
+        id: b.bookingRef || `EVL-${b.id}`,
+        name: b.customerName || 'Anonymous Attendee',
+        email: b.customerEmail || '—',
+        phone: b.customerPhone || '—',
+        cnic: b.customerCnic || '—',
+        event: b.eventTitle || '—',
+        tier: b.ticketTierName || `${b.quantity}x Tickets`,
+        seat: b.selectedSeats && b.selectedSeats.length > 0
+          ? b.selectedSeats.map(s => s.seatLabel || `R${s.seatRow}C${s.seatCol}`).join(', ')
+          : 'General Admission',
+        status: b.status === 'Confirmed' || b.paymentStatus === 'Paid' ? 'Checked-in' : (b.status || 'Pending Entry'),
+        checkedInAt: b.paidAt ? new Date(b.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (b.createdAt ? new Date(b.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—')
+      }));
+    }
+    return sampleRoster;
+  }, [bookings, sampleRoster]);
+
+  const filteredRoster = rosterData.filter(item => {
     const matchesEvent = rosterEventFilter === 'All Events' || item.event === rosterEventFilter;
     const q = rosterSearch.toLowerCase();
-    const matchesQuery = !q || item.name.toLowerCase().includes(q) || item.email.toLowerCase().includes(q) || item.id.toLowerCase().includes(q) || item.cnic.includes(q);
+    const matchesQuery = !q || item.name.toLowerCase().includes(q) || item.email.toLowerCase().includes(q) || item.id.toLowerCase().includes(q) || (item.cnic && item.cnic.includes(q));
     return matchesEvent && matchesQuery;
   });
 

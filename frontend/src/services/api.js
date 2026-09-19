@@ -353,11 +353,11 @@ export const locationsApi = {
   updateVenue: async (id, dto) => request(`/venues/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   deleteVenue: async (id) => request(`/venues/${id}`, { method: 'DELETE' }),
 
-  getAuditoriums: async (venueId = null) => request(`/auditoriums${venueId ? `?venueId=${venueId}` : ''}`),
-  getAuditoriumById: async (id) => request(`/auditoriums/${id}`),
-  createAuditorium: async (dto) => request('/auditoriums', { method: 'POST', body: JSON.stringify(dto) }),
-  updateAuditorium: async (id, dto) => request(`/auditoriums/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
-  deleteAuditorium: async (id) => request(`/auditoriums/${id}`, { method: 'DELETE' })
+  getAuditoriums: async () => request('/auditorium-layouts'),
+  getAuditoriumById: async (id) => request(`/auditorium-layouts/${id}`),
+  createAuditorium: async (dto) => request('/admin/auditorium-layouts', { method: 'POST', body: JSON.stringify(dto) }),
+  updateAuditorium: async (id, dto) => request(`/admin/auditorium-layouts/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  deleteAuditorium: async (id) => request(`/admin/auditorium-layouts/${id}`, { method: 'DELETE' })
 };
 
 // --- Public Tags API ---

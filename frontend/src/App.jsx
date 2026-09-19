@@ -215,7 +215,7 @@ export default function App() {
   useEffect(() => {
     const token = getStoredToken();
     if (!token) {
-      if (currentUser) setCurrentUser(null);
+      setCurrentUser(prev => prev ? null : prev);
       return;
     }
 

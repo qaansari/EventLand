@@ -288,7 +288,7 @@ public class PayProServiceTests : IDisposable
         var notifService = new FakeNotificationService();
         var logger = NullLogger<PayProService>.Instance;
 
-        var service = new PayProService(payProClient, options, context, notifService, logger);
+        var service = new PayProService(payProClient, options, context, context, notifService, logger);
 
         var result = await service.CreatePaymentAsync(booking.BookingRef, "paypro", "https://eventland.pk/order/success");
 
@@ -347,7 +347,7 @@ public class PayProServiceTests : IDisposable
 
         var httpClient = new HttpClient(fakeHandler);
         var payProClient = new PayProClient(httpClient, options, new MemoryCache(new MemoryCacheOptions()), NullLogger<PayProClient>.Instance);
-        var service = new PayProService(payProClient, options, context, new FakeNotificationService(), NullLogger<PayProService>.Instance);
+        var service = new PayProService(payProClient, options, context, context, new FakeNotificationService(), NullLogger<PayProService>.Instance);
 
         // First payment attempt
         var first = await service.CreatePaymentAsync(booking.BookingRef);
@@ -404,7 +404,7 @@ public class PayProServiceTests : IDisposable
 
         var httpClient = new HttpClient(fakeHandler);
         var payProClient = new PayProClient(httpClient, options, new MemoryCache(new MemoryCacheOptions()), NullLogger<PayProClient>.Instance);
-        var service = new PayProService(payProClient, options, context, new FakeNotificationService(), NullLogger<PayProService>.Instance);
+        var service = new PayProService(payProClient, options, context, context, new FakeNotificationService(), NullLogger<PayProService>.Instance);
 
         var ipnDto = new PayProIpnRequestDto(
             InvoiceId: "01102205600001",
@@ -457,7 +457,7 @@ public class PayProServiceTests : IDisposable
         var options = Options.Create(new PayProOptions());
         var httpClient = new HttpClient(new FakeHttpMessageHandler(r => new HttpResponseMessage(HttpStatusCode.OK)));
         var payProClient = new PayProClient(httpClient, options, new MemoryCache(new MemoryCacheOptions()), NullLogger<PayProClient>.Instance);
-        var service = new PayProService(payProClient, options, context, new FakeNotificationService(), NullLogger<PayProService>.Instance);
+        var service = new PayProService(payProClient, options, context, context, new FakeNotificationService(), NullLogger<PayProService>.Instance);
 
         var ipnDto = new PayProIpnRequestDto(
             InvoiceId: "01102205600001",
@@ -505,7 +505,7 @@ public class PayProServiceTests : IDisposable
         var options = Options.Create(new PayProOptions());
         var httpClient = new HttpClient(new FakeHttpMessageHandler(r => new HttpResponseMessage(HttpStatusCode.OK)));
         var payProClient = new PayProClient(httpClient, options, new MemoryCache(new MemoryCacheOptions()), NullLogger<PayProClient>.Instance);
-        var service = new PayProService(payProClient, options, context, new FakeNotificationService(), NullLogger<PayProService>.Instance);
+        var service = new PayProService(payProClient, options, context, context, new FakeNotificationService(), NullLogger<PayProService>.Instance);
 
         // Underpaid by attacker attempting price manipulation
         var ipnDto = new PayProIpnRequestDto(

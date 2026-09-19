@@ -177,6 +177,11 @@ builder.Services.AddSwaggerGen(c =>
 // Register Infrastructure & Application Services (Includes DbContext, Auth, Redis/MemoryCache)
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
+// Register Api-layer notification service so Infrastructure background services can
+// push SignalR seat-release events without referencing the Api project directly.
+builder.Services.AddSingleton<EventLand.Application.Interfaces.ISeatingNotificationService,
+    EventLand.Api.Services.SeatingNotificationService>();
+
 // Configure CORS for Frontend & WebSockets.
 // Allowed origins are read from configuration ("Cors:AllowedOrigins") and augmented with local dev origins.
 // Credentials are enabled (required for SignalR), so wildcard origins are strictly forbidden.

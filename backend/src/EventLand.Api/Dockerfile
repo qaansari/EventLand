@@ -6,6 +6,7 @@ COPY ["EventLand.Api/EventLand.Api.csproj", "EventLand.Api/"]
 COPY ["EventLand.Application/EventLand.Application.csproj", "EventLand.Application/"]
 COPY ["EventLand.Domain/EventLand.Domain.csproj", "EventLand.Domain/"]
 COPY ["EventLand.Infrastructure/EventLand.Infrastructure.csproj", "EventLand.Infrastructure/"]
+COPY ["Modules/PayPro/EventLand.Modules.PayPro.csproj", "Modules/PayPro/"]
 RUN dotnet restore EventLand.Api/EventLand.Api.csproj
 
 # Copy the full source and publish

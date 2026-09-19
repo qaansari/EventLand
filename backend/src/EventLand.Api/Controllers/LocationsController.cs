@@ -29,9 +29,6 @@ public class LocationsController : ControllerBase
         {
             return StatusCode(500, new { message = ex.Message });
         }
-        finally
-        {
-        }
     }
 
     [HttpPost("api/countries")]
@@ -50,9 +47,6 @@ public class LocationsController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { message = ex.Message });
-        }
-        finally
-        {
         }
     }
 
@@ -77,9 +71,6 @@ public class LocationsController : ControllerBase
         {
             return StatusCode(500, new { message = ex.Message });
         }
-        finally
-        {
-        }
     }
 
     [HttpDelete("api/countries/{id:int}")]
@@ -100,9 +91,6 @@ public class LocationsController : ControllerBase
         {
             return StatusCode(500, new { message = ex.Message });
         }
-        finally
-        {
-        }
     }
 
     // --- Cities ---
@@ -117,9 +105,6 @@ public class LocationsController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { message = ex.Message });
-        }
-        finally
-        {
         }
     }
 
@@ -139,9 +124,6 @@ public class LocationsController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { message = ex.Message });
-        }
-        finally
-        {
         }
     }
 
@@ -166,9 +148,6 @@ public class LocationsController : ControllerBase
         {
             return StatusCode(500, new { message = ex.Message });
         }
-        finally
-        {
-        }
     }
 
     [HttpDelete("api/cities/{id:int}")]
@@ -189,9 +168,6 @@ public class LocationsController : ControllerBase
         {
             return StatusCode(500, new { message = ex.Message });
         }
-        finally
-        {
-        }
     }
 
     // --- Venues ---
@@ -206,9 +182,6 @@ public class LocationsController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { message = ex.Message });
-        }
-        finally
-        {
         }
     }
 
@@ -228,9 +201,6 @@ public class LocationsController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, new { message = ex.Message });
-        }
-        finally
-        {
         }
     }
 
@@ -255,9 +225,6 @@ public class LocationsController : ControllerBase
         {
             return StatusCode(500, new { message = ex.Message });
         }
-        finally
-        {
-        }
     }
 
     [HttpDelete("api/venues/{id:int}")]
@@ -278,115 +245,6 @@ public class LocationsController : ControllerBase
         {
             return StatusCode(500, new { message = ex.Message });
         }
-        finally
-        {
-        }
-    }
-
-    // --- Auditoriums ---
-    [HttpGet("api/auditoriums")]
-    public async Task<ActionResult<List<AuditoriumDto>>> GetAuditoriums([FromQuery] int? venueId)
-    {
-        try
-        {
-            var result = await _adminService.GetAuditoriumsAsync(venueId);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { message = ex.Message });
-        }
-        finally
-        {
-        }
-    }
-
-    [HttpGet("api/auditoriums/{id:int}")]
-    public async Task<ActionResult<AuditoriumDto>> GetAuditoriumById(int id)
-    {
-        try
-        {
-            var result = await _adminService.GetAuditoriumByIdAsync(id);
-            if (result == null) return NotFound(new { message = $"Auditorium '{id}' not found." });
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { message = ex.Message });
-        }
-        finally
-        {
-        }
-    }
-
-    [HttpPost("api/auditoriums")]
-    [Authorize(Roles = "SuperAdmin,Admin,Organizer")]
-    public async Task<ActionResult<AuditoriumDto>> CreateAuditorium([FromBody] CreateAuditoriumDto dto)
-    {
-        try
-        {
-            var created = await _adminService.CreateAuditoriumAsync(dto);
-            return Ok(created);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { message = ex.Message });
-        }
-        finally
-        {
-        }
-    }
-
-    [HttpPut("api/auditoriums/{id:int}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
-    public async Task<ActionResult<AuditoriumDto>> UpdateAuditorium(int id, [FromBody] UpdateAuditoriumDto dto)
-    {
-        try
-        {
-            var updated = await _adminService.UpdateAuditoriumAsync(id, dto);
-            return Ok(updated);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { message = ex.Message });
-        }
-        finally
-        {
-        }
-    }
-
-    [HttpDelete("api/auditoriums/{id:int}")]
-    [Authorize(Roles = "SuperAdmin,Admin")]
-    public async Task<ActionResult> DeleteAuditorium(int id)
-    {
-        try
-        {
-            var success = await _adminService.DeleteAuditoriumAsync(id);
-            if (!success) return NotFound(new { message = $"Auditorium '{id}' not found." });
-            return NoContent();
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { message = ex.Message });
-        }
-        finally
-        {
-        }
     }
 }
+

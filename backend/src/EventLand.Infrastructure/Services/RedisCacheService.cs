@@ -13,7 +13,7 @@ public class RedisCacheService : ICacheService
     private readonly IDistributedCache _distributedCache;
     private readonly IMemoryCache _memoryCache;
     private readonly ILogger<RedisCacheService> _logger;
-    private static readonly ConcurrentDictionary<string, byte> _knownKeys = new();
+    private static readonly ConcurrentDictionary<string, DateTimeOffset> _knownKeys = new();
     private static DateTimeOffset _redisDisabledUntil = DateTimeOffset.MinValue;
 
     public RedisCacheService(
@@ -65,8 +65,22 @@ public class RedisCacheService : ICacheService
 
     public async Task SetAsync<T>(string key, T value, TimeSpan? absoluteExpiration = null)
     {
-        _knownKeys.TryAdd(key, 0);
         var duration = absoluteExpiration ?? TimeSpan.FromMinutes(10);
+        var expiry = DateTimeOffset.UtcNow.Add(duration);
+        _knownKeys[key] = expiry;
+
+        // Prune expired entries periodically to prevent memory leaks
+        if (_knownKeys.Count > 1000)
+        {
+            var now = DateTimeOffset.UtcNow;
+            foreach (var entry in _knownKeys)
+            {
+                if (entry.Value < now)
+                {
+                    _knownKeys.TryRemove(entry.Key, out _);
+                }
+            }
+        }
 
         if (IsRedisAvailable())
         {
@@ -115,8 +129,10 @@ public class RedisCacheService : ICacheService
     {
         _logger.LogInformation("Evicting cache prefix '{PrefixKey}'", prefixKey);
 
-        var matchingKeys = _knownKeys.Keys
-            .Where(k => k.StartsWith(prefixKey, StringComparison.OrdinalIgnoreCase))
+        var now = DateTimeOffset.UtcNow;
+        var matchingKeys = _knownKeys
+            .Where(k => k.Value >= now && k.Key.StartsWith(prefixKey, StringComparison.OrdinalIgnoreCase))
+            .Select(k => k.Key)
             .ToList();
 
         // Remove all matching keys in parallel to reduce Redis round-trip latency

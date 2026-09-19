@@ -6,11 +6,11 @@ export default defineConfig(({ mode }) => {
   // Load .env.local so VITE_BACKEND_URL is available at config time
   const env = loadEnv(mode, process.cwd(), '');
 
-  // Prefer the env-configured backend; fall back to the current ngrok tunnel for local dev.
-  // To switch tunnels, update VITE_BACKEND_URL in .env.local — no code change required.
-  const backendTarget = (env.VITE_BACKEND_URL && !env.VITE_BACKEND_URL.includes('localhost'))
-    ? env.VITE_BACKEND_URL
-    : 'https://celiac-briley-commandingly.ngrok-free.dev';
+  // Prefer env-configured backend; fall back to localhost for local development.
+  // To use ngrok or another tunnel, set VITE_BACKEND_URL in .env.local — no code change required.
+  const backendTarget = (env.VITE_BACKEND_URL && env.VITE_BACKEND_URL.trim())
+    ? env.VITE_BACKEND_URL.trim()
+    : 'http://localhost:4257';
 
   return {
     plugins: [react()],
@@ -61,7 +61,7 @@ export default defineConfig(({ mode }) => {
               if (id.includes('html2pdf')) {
                 return 'vendor-pdf';
               }
-              if (id.includes('dompurify') || id.includes('qrcode')) {
+              if (id.includes('qrcode')) {
                 return 'vendor-utils';
               }
               return 'vendor';

@@ -51,13 +51,17 @@ export default function AttendeeDashboard({
   });
   const [profileSaved, setProfileSaved] = useState(false);
 
-  // Filtered tickets logic
+  // Filtered tickets logic — uses real timestamp comparison instead of hardcoded year strings
   const filteredTickets = purchasedTickets.filter((t) => {
     if (ticketFilter === 'upcoming') {
-      return !t.date || t.date.includes('2027') || t.date.includes('2026') || t.date.toLowerCase().includes('upcoming');
+      if (!t.date) return true; // No date means unscheduled/upcoming
+      const eventDate = new Date(t.date);
+      return isNaN(eventDate.getTime()) || eventDate.getTime() >= Date.now();
     }
     if (ticketFilter === 'past') {
-      return t.date && (t.date.includes('2025') || t.date.includes('2024'));
+      if (!t.date) return false;
+      const eventDate = new Date(t.date);
+      return !isNaN(eventDate.getTime()) && eventDate.getTime() < Date.now();
     }
     return true;
   });

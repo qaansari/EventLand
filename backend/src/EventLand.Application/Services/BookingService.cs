@@ -175,13 +175,16 @@ public class BookingService : IBookingService
             if (reserved == 0)
                 throw new InvalidOperationException($"Not enough tickets available in tier '{tier.Name}'.");
 
-            foreach (var seatId in seatIds)
+            if (seatIds.Count > 0)
             {
-                // Flip only if still Available AND still belongs to this event.
-                var flipped = await _context.Database.ExecuteSqlInterpolatedAsync(
-                    $"UPDATE Seats SET Status = {(int)SeatStatus.Reserved} WHERE Id = {seatId} AND Status = {(int)SeatStatus.Available} AND IsDeleted = 0 AND ZoneId IN (SELECT Id FROM SeatingZones WHERE EventId = {dto.EventId} AND IsDeleted = 0)");
+                var flipped = await _context.Seats
+                    .Where(s => seatIds.Contains(s.Id)
+                             && s.Status == SeatStatus.Available
+                             && !s.IsDeleted
+                             && _context.SeatingZones.Any(z => z.Id == s.ZoneId && z.EventId == dto.EventId && !z.IsDeleted))
+                    .ExecuteUpdateAsync(s => s.SetProperty(seat => seat.Status, SeatStatus.Reserved));
 
-                if (flipped == 0)
+                if (flipped != seatIds.Count)
                     throw new InvalidOperationException("One or more selected seats are no longer available. Please choose different seats.");
             }
 

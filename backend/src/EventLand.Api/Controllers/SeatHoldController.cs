@@ -27,7 +27,7 @@ public class SeatHoldController : ControllerBase
     /// <summary>Hold seats for 10 minutes in Redis for checkout. Requires authentication.</summary>
     [HttpPost("hold")]
     [Authorize]
-    [EnableRateLimiting("general")]
+    [EnableRateLimiting("booking")]
     public async Task<ActionResult<HoldSeatsResponseDto>> HoldSeats([FromBody] HoldSeatsRequestDto dto)
     {
         if (dto.SeatIds == null || !dto.SeatIds.Any())

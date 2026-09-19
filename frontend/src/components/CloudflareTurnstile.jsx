@@ -16,6 +16,14 @@ export default function CloudflareTurnstile({
 }) {
   const containerRef = useRef(null);
   const widgetIdRef = useRef(null);
+  // Stable refs for callbacks — avoids re-triggering effects when parent creates new inline functions
+  const onVerifyRef = useRef(onVerify);
+  const onExpireRef = useRef(onExpire);
+  const onErrorRef = useRef(onError);
+  useEffect(() => { onVerifyRef.current = onVerify; }, [onVerify]);
+  useEffect(() => { onExpireRef.current = onExpire; }, [onExpire]);
+  useEffect(() => { onErrorRef.current = onError; }, [onError]);
+
   const [siteKey, setSiteKey] = useState(TEST_SITEKEY);
   const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -26,8 +34,8 @@ export default function CloudflareTurnstile({
   useEffect(() => {
     const handleGlobalVerified = (e) => {
       setVerified(true);
-      if (onVerify && e.detail?.token) {
-        onVerify(e.detail.token);
+      if (onVerifyRef.current && e.detail?.token) {
+        onVerifyRef.current(e.detail.token);
       }
     };
     const handleGlobalReset = () => {
@@ -37,8 +45,8 @@ export default function CloudflareTurnstile({
     window.addEventListener('eventland:captcha-verified', handleGlobalVerified);
     window.addEventListener('eventland:captcha-reset', handleGlobalReset);
 
-    if (isCaptchaVerified() && onVerify) {
-      onVerify(getStoredCaptchaToken());
+    if (isCaptchaVerified() && onVerifyRef.current) {
+      onVerifyRef.current(getStoredCaptchaToken());
     }
 
     return () => {
@@ -76,7 +84,7 @@ export default function CloudflareTurnstile({
     if (!enabled) {
       setLoading(false);
       // If captcha is disabled in configuration, notify parent as auto-verified
-      if (onVerify) onVerify('CAPTCHA_DISABLED_PASSTHROUGH');
+      if (onVerifyRef.current) onVerifyRef.current('CAPTCHA_DISABLED_PASSTHROUGH');
       return;
     }
 
@@ -100,13 +108,13 @@ export default function CloudflareTurnstile({
             setCaptchaVerified(token);
             setVerified(true);
             setErrorMsg(null);
-            if (onVerify) onVerify(token);
+            if (onVerifyRef.current) onVerifyRef.current(token);
           },
           'expired-callback': () => {
             if (!isMounted) return;
             clearCaptchaVerified();
             setVerified(false);
-            if (onExpire) onExpire();
+            if (onExpireRef.current) onExpireRef.current();
           },
           'error-callback': (err) => {
             if (!isMounted) return;
@@ -115,8 +123,8 @@ export default function CloudflareTurnstile({
             const fallbackToken = `test-pass-${Date.now()}`;
             setCaptchaVerified(fallbackToken);
             setVerified(true);
-            if (onVerify) onVerify(fallbackToken);
-            if (onError) onError(err);
+            if (onVerifyRef.current) onVerifyRef.current(fallbackToken);
+            if (onErrorRef.current) onErrorRef.current(err);
           }
         });
 
@@ -130,7 +138,7 @@ export default function CloudflareTurnstile({
         const fallbackToken = `test-pass-${Date.now()}`;
         setCaptchaVerified(fallbackToken);
         setVerified(true);
-        if (onVerify) onVerify(fallbackToken);
+        if (onVerifyRef.current) onVerifyRef.current(fallbackToken);
       }
     };
 
@@ -155,7 +163,7 @@ export default function CloudflareTurnstile({
               const fallbackToken = `test-pass-offline-${Date.now()}`;
               setCaptchaVerified(fallbackToken);
               setVerified(true);
-              if (onVerify) onVerify(fallbackToken);
+              if (onVerifyRef.current) onVerifyRef.current(fallbackToken);
             }
           };
           document.head.appendChild(script);

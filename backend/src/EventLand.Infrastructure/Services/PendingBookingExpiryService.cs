@@ -19,13 +19,16 @@ public sealed class PendingBookingExpiryService : BackgroundService
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<PendingBookingExpiryService> _logger;
+    private readonly ISeatingNotificationService _seatingNotifications;
 
     public PendingBookingExpiryService(
         IServiceScopeFactory scopeFactory,
-        ILogger<PendingBookingExpiryService> logger)
+        ILogger<PendingBookingExpiryService> logger,
+        ISeatingNotificationService seatingNotifications)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
+        _seatingNotifications = seatingNotifications;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -128,7 +131,7 @@ public sealed class PendingBookingExpiryService : BackgroundService
         // Flush all DB changes in a single round-trip
         await context.SaveChangesAsync(cancellationToken);
 
-        // Batch release: one ReleaseSeatsAsync + one ClearEventCacheAsync per unique event
+        // Batch release: one ReleaseSeatsAsync + one ClearEventCacheAsync + one SignalR broadcast per unique event
         if (cacheService != null)
         {
             var cacheTasks = seatsByEvent.Select(async kvp =>
@@ -137,6 +140,9 @@ public sealed class PendingBookingExpiryService : BackgroundService
                 {
                     await cacheService.ReleaseSeatsAsync(kvp.Key, kvp.Value, null);
                     await cacheService.ClearEventCacheAsync(kvp.Key);
+
+                    // Notify all open browser clients so expired seats turn green immediately
+                    await _seatingNotifications.BroadcastSeatsReleasedAsync(kvp.Key, kvp.Value, cancellationToken);
                 }
                 catch (Exception ex)
                 {

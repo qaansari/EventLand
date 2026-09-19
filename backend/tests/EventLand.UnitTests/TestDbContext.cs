@@ -4,10 +4,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using EventLand.Application.Common.Interfaces;
 using EventLand.Domain.Entities;
+using EventLand.Modules.PayPro.Entities;
+using EventLand.Modules.PayPro.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
-public class TestDbContext : DbContext, IApplicationDbContext
+public class TestDbContext : DbContext, IApplicationDbContext, IPayProDbContext
 {
     public TestDbContext(DbContextOptions<TestDbContext> options) : base(options)
     {
@@ -36,6 +38,11 @@ public class TestDbContext : DbContext, IApplicationDbContext
     public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
     public DbSet<PaymentConfig> PaymentConfigs => Set<PaymentConfig>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
+
+    // IPayProDbContext implementation
+    public DbSet<Order> Orders => Set<Order>();
+    public DbSet<Consumer> Consumers => Set<Consumer>();
+    public DbSet<PayProCallbackLog> PayProCallbackLogs => Set<PayProCallbackLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

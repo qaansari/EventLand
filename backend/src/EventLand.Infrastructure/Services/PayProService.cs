@@ -16,6 +16,8 @@ using EventLand.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using EventLand.Modules.PayPro.Entities;
+using EventLand.Modules.PayPro.Persistence;
 
 /// <summary>
 /// Event Land PayPro Service orchestrating payment creation, status reconciliation,
@@ -26,6 +28,7 @@ public class PayProService : IPayProService
     private readonly IPayProClient _payProClient;
     private readonly PayProOptions _options;
     private readonly IApplicationDbContext _context;
+    private readonly IPayProDbContext _payProDbContext;
     private readonly ICacheService? _cacheService;
     private readonly INotificationService _notificationService;
     private readonly ILogger<PayProService> _logger;
@@ -34,6 +37,7 @@ public class PayProService : IPayProService
         IPayProClient payProClient,
         IOptions<PayProOptions> options,
         IApplicationDbContext context,
+        IPayProDbContext payProDbContext,
         INotificationService notificationService,
         ILogger<PayProService> logger,
         ICacheService? cacheService = null)
@@ -41,6 +45,7 @@ public class PayProService : IPayProService
         _payProClient = payProClient;
         _options = options.Value;
         _context = context;
+        _payProDbContext = payProDbContext;
         _notificationService = notificationService;
         _logger = logger;
         _cacheService = cacheService;
@@ -191,6 +196,37 @@ public class PayProService : IPayProService
 
         _context.PaymentTransactions.Add(transaction);
         await _context.SaveChangesAsync(cancellationToken);
+
+        // Ensure an Order record exists in the PayPro module's Orders table so that
+        // the IPN webhook (PayProCallbackController) and ReconciliationService can
+        // resolve it by BookingRef/OrderNumber without returning "03: No records found".
+        var existingOrder = await _payProDbContext.Orders
+            .FirstOrDefaultAsync(o => o.OrderNumber == orderNumber, cancellationToken);
+
+        if (existingOrder == null)
+        {
+            var order = new Modules.PayPro.Entities.Order
+            {
+                OrderNumber = orderNumber,
+                BookingId = booking.Id,
+                Amount = booking.TotalAmount,
+                PayProId = string.IsNullOrWhiteSpace(voucherCode) ? null : voucherCode,
+                Click2PayUrl = string.IsNullOrWhiteSpace(paymentUrl) ? null : paymentUrl,
+                Status = Modules.PayPro.Entities.OrderStatus.Pending,
+                IssueDate = DateTime.UtcNow.Date,
+                DueDate = (booking.PaymentExpiresAt?.DateTime ?? DateTime.UtcNow.AddMinutes(30)).ToUniversalTime().Date
+            };
+            _payProDbContext.Orders.Add(order);
+            await _payProDbContext.SaveChangesAsync(cancellationToken);
+        }
+        else if (existingOrder.Status != Modules.PayPro.Entities.OrderStatus.Paid)
+        {
+            // Refresh payment URL / PayProId if they were empty on an existing pending order
+            existingOrder.PayProId ??= string.IsNullOrWhiteSpace(voucherCode) ? null : voucherCode;
+            existingOrder.Click2PayUrl ??= string.IsNullOrWhiteSpace(paymentUrl) ? null : paymentUrl;
+            existingOrder.UpdatedAtUtc = DateTime.UtcNow;
+            await _payProDbContext.SaveChangesAsync(cancellationToken);
+        }
 
         _logger.LogInformation("Created new PayPro PaymentTransaction {PaymentId} for Booking {BookingRef}. Amount: {Amount} PKR.",
             transaction.Id, booking.BookingRef, booking.TotalAmount);

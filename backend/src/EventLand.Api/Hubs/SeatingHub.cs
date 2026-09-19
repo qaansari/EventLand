@@ -1,10 +1,14 @@
 namespace EventLand.Api.Hubs;
 
 using EventLand.Application.Interfaces;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
-[Authorize]
+/// <summary>
+/// Real-time SignalR hub for seat availability updates.
+/// Intentionally open to anonymous connections so guests browsing the seating map
+/// can receive live seat-lock/release broadcasts without requiring a JWT.
+/// Write operations (hold/release) are protected on SeatHoldController with [Authorize].
+/// </summary>
 public class SeatingHub : Hub<ISeatingHubClient>
 {
     public async Task JoinEventGroup(int eventId)
