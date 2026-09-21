@@ -5086,10 +5086,10 @@ export default function AdminDashboard({ onSelectEvent }) {
         <PayProAdminPanel />
       )}
 
-      {/* --- MODAL: ADD / EDIT BANK ACCOUNT --- */}
+      {/* --- MODAL: ADD / EDIT BANK ACCOUNT (STATIC MODAL) --- */}
       {showBankAccountModal && (
-        <div className="modal-overlay" onClick={() => setShowBankAccountModal(false)}>
-          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '650px', padding: '2rem', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div className="modal-overlay">
+          <div className="modal-content glass-card" style={{ maxWidth: '650px', padding: '2rem', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
             <button
               onClick={() => setShowBankAccountModal(false)}
               style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255, 255, 255, 0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
