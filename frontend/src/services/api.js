@@ -52,7 +52,8 @@ export function getEventImageUrl(bannerUrl) {
 
 export function getUserImageUrl(imageUrl) {
   if (!imageUrl) return '';
-  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl;
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) return imageUrl;
+  if (imageUrl.startsWith('/assets/')) return `${SERVER_BASE}${imageUrl}`;
   const fileName = imageUrl.split('/').pop().split('\\').pop();
   return `${SERVER_BASE}/assets/images/users/${fileName}`;
 }

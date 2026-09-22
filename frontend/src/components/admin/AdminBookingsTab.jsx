@@ -38,6 +38,7 @@ export default function AdminBookingsTab({
   const [bookingStatusFilter, setBookingStatusFilter] = useState('All');
   const [bookingSearch, setBookingSearch] = useState('');
   const [previewProofModal, setPreviewProofModal] = useState(null);
+  const [exportingTicketId, setExportingTicketId] = useState(null);
 
   // Memoized Filtered Bookings
   const filteredBookings = useMemo(() => {
@@ -545,14 +546,46 @@ export default function AdminBookingsTab({
                         {isPaid ? (
                           <button
                             type="button"
-                            onClick={() => {
-                              exportTicketPdf(ticketObj);
-                              showSuccess('PDF Ticket Exported', `E-Ticket #${ticketObj.ticketId} downloaded successfully!`);
+                            onClick={async () => {
+                              const tId = ticketObj.ticketId || ticketObj.id;
+                              if (exportingTicketId) return;
+                              setExportingTicketId(tId);
+                              try {
+                                const res = await exportTicketPdf(ticketObj);
+                                showSuccess('PDF Ticket Exported', `${res?.fileName || 'E-Ticket'} downloaded successfully!`);
+                              } catch (err) {
+                                console.error('Failed to export PDF:', err);
+                                showError('Export Failed', 'Unable to export E-Ticket PDF.');
+                              } finally {
+                                setExportingTicketId(null);
+                              }
                             }}
-                            style={{ padding: '0.4rem 0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '6px', color: '#fff', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                            disabled={exportingTicketId === (ticketObj.ticketId || ticketObj.id)}
+                            style={{
+                              padding: '0.4rem 0.75rem',
+                              background: 'linear-gradient(135deg, #0d9488, #0f766e)',
+                              border: 'none',
+                              borderRadius: '6px',
+                              color: '#fff',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: exportingTicketId === (ticketObj.ticketId || ticketObj.id) ? 'not-allowed' : 'pointer',
+                              opacity: exportingTicketId === (ticketObj.ticketId || ticketObj.id) ? 0.7 : 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.3rem'
+                            }}
                             title="Export Official PDF E-Ticket"
                           >
-                            <Download size={13} /> PDF
+                            {exportingTicketId === (ticketObj.ticketId || ticketObj.id) ? (
+                              <>
+                                <RefreshCw size={13} className="animate-spin" /> Exporting...
+                              </>
+                            ) : (
+                              <>
+                                <Download size={13} /> Export to PDF
+                              </>
+                            )}
                           </button>
                         ) : (
                           <span style={{ fontSize: '0.72rem', color: '#64748b', background: 'rgba(255, 255, 255, 0.04)', padding: '0.35rem 0.6rem', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>

@@ -9,6 +9,7 @@ import { useToast } from '../context/ToastContext';
 import { formatEventDateRange, formatEventStartTime } from '../utils/dateUtils';
 import { getEventImageUrl, getOrganizerImageUrl, eventsApi } from '../services/api';
 import InteractiveSeatPicker from './InteractiveSeatPicker';
+import EventLandPreloader from './EventLandPreloader';
 
 const formatLocationString = (ev) => {
   if (!ev) return '';
@@ -163,9 +164,8 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
 
   if (loading) {
     return (
-      <div className="container" style={{ padding: '6rem 1.5rem', textAlign: 'center', color: '#94a3b8' }}>
-        <div className="loading-spinner" style={{ margin: '0 auto 1.5rem' }}></div>
-        <h3 style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 600 }}>Loading Event Details...</h3>
+      <div className="container" style={{ padding: '4rem 1.5rem' }}>
+        <EventLandPreloader text="Loading Event Details & Seating..." minHeight="60vh" />
       </div>
     );
   }

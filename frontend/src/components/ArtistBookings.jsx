@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Star, X } from 'lucide-react';
+import { Star, X, RefreshCw } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
+import EventLandPreloader from './EventLandPreloader';
 import { artistsApi, locationsApi } from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -87,10 +88,7 @@ export default function ArtistBookings({ cities: citiesProp = [] }) {
 
       {/* Artist Cards Grid */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#94a3b8' }}>
-          <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
-          <p>Loading talent roster from database...</p>
-        </div>
+        <EventLandPreloader text="Loading talent roster from database..." minHeight="360px" />
       ) : artists.length === 0 ? (
         <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
           <p>No artists listed in the database currently.</p>
@@ -321,9 +319,25 @@ export default function ArtistBookings({ cities: citiesProp = [] }) {
                 type="submit"
                 disabled={inquirySubmitted}
                 className="btn btn-primary"
-                style={{ width: '100%', padding: '0.85rem' }}
+                style={{
+                  width: '100%',
+                  padding: '0.85rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  cursor: inquirySubmitted ? 'not-allowed' : 'pointer',
+                  opacity: inquirySubmitted ? 0.75 : 1
+                }}
               >
-                {inquirySubmitted ? 'Sending Inquiry...' : 'Submit Booking Inquiry'}
+                {inquirySubmitted ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    <span>Sending Inquiry...</span>
+                  </>
+                ) : (
+                  'Submit Booking Inquiry'
+                )}
               </button>
             </form>
           </div>

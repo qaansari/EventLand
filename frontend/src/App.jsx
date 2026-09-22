@@ -13,6 +13,7 @@ import { eventsApi, bookingsApi, tagsApi, locationsApi, adminApi, authApi, toEve
 import { getStoredUser, getStoredToken, setStoredSession, clearStoredSession, normalizeRole, isAdmin, isOrganizer } from './utils/auth';
 import { useToast } from './context/ToastContext';
 import { isCaptchaVerified, getStoredCaptchaToken } from './utils/captcha';
+import EventLandPreloader from './components/EventLandPreloader';
 import './App.css';
 
 // Code-split heavy / role-gated views and on-demand modals into separate chunks
@@ -27,10 +28,7 @@ const AttendeeDashboard = lazy(() => import('./components/AttendeeDashboard'));
 const PayProReturnPage = lazy(() => import('./components/PayProReturnPage'));
 
 const LazyFallback = (
-  <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#94a3b8' }}>
-    <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
-    <p>Loading view...</p>
-  </div>
+  <EventLandPreloader text="Loading view..." minHeight="50vh" />
 );
 
 const PAGE_SIZE = 12;
@@ -222,7 +220,8 @@ export default function App() {
     authApi.getMe()
       .then(verifiedUser => {
         if (verifiedUser) {
-          const userRole = normalizeRole(verifiedUser.role);
+          const rawRole = verifiedUser.role || '';
+          const userRole = normalizeRole(rawRole);
           setCurrentUser(prev => ({
             ...(prev || {}),
             id: verifiedUser.id,
@@ -231,6 +230,9 @@ export default function App() {
             phone: verifiedUser.phoneNumber || '',
             countryId: verifiedUser.countryId || 1,
             role: userRole,
+            rawRole: rawRole,
+            roleName: rawRole,
+            imageUrl: verifiedUser.imageUrl || prev?.imageUrl || null,
             token: token
           }));
         }
@@ -240,6 +242,17 @@ export default function App() {
         clearStoredSession();
         setCurrentUser(null);
       });
+  }, []);
+
+  // Listen for user profile updates from dashboard components
+  useEffect(() => {
+    const handleUserUpdated = (e) => {
+      if (e.detail) {
+        setCurrentUser(prev => ({ ...(prev || {}), ...e.detail }));
+      }
+    };
+    window.addEventListener('eventland:user-updated', handleUserUpdated);
+    return () => window.removeEventListener('eventland:user-updated', handleUserUpdated);
   }, []);
 
   // Listen for automatic session expiry from api.js
@@ -1098,10 +1111,7 @@ export default function App() {
 
             {/* Event Cards Grid */}
             {loadingEvents ? (
-              <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#94a3b8' }}>
-                <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
-                <p>Loading events...</p>
-              </div>
+              <EventLandPreloader text="Discovering Pakistan's Top Live Events..." minHeight="360px" />
             ) : sortedEvents.length === 0 ? (
               <div className="glass-card" style={{ padding: '4rem 2rem', textAlign: 'center' }}>
                 <Ticket size={48} color="#94a3b8" style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
@@ -1224,6 +1234,8 @@ export default function App() {
         {activeView === 'admin' && (
           <Suspense fallback={LazyFallback}>
             <AdminDashboard
+              currentUser={currentUser}
+              onUpdateCurrentUser={(updated) => setCurrentUser(prev => ({ ...prev, ...updated }))}
               events={events}
               onToggleFeature={handleToggleFeature}
               onDeleteEvent={handleDeleteEvent}

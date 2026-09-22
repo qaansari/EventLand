@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, Send, Phone, Mail } from 'lucide-react';
+import { ChevronDown, Send, Phone, Mail, RefreshCw } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { footerApi } from '../services/api';
 import { getStoredCaptchaToken } from '../utils/captcha';
@@ -11,6 +11,7 @@ export default function Footer({ onSelectCity }) {
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterCaptcha, setNewsletterCaptcha] = useState(() => getStoredCaptchaToken());
   const [subscribedToast, setSubscribedToast] = useState(false);
+  const [isSubscribing, setIsSubscribing] = useState(false);
 
   // Dynamic state loaded from Database/API
   const [footerData, setFooterData] = useState({
@@ -110,13 +111,19 @@ export default function Footer({ onSelectCity }) {
     };
   }, []);
 
-  const handleSubscribe = (e) => {
+  const handleSubscribe = async (e) => {
     e.preventDefault();
     if (!newsletterEmail) return;
-    setSubscribedToast(true);
-    showSuccess('Subscribed 📧', `Subscribed ${newsletterEmail} to ${footerData.brandName} newsletter updates!`);
-    setNewsletterEmail('');
-    setTimeout(() => setSubscribedToast(false), 3000);
+    setIsSubscribing(true);
+    try {
+      await new Promise((res) => setTimeout(res, 600));
+      setSubscribedToast(true);
+      showSuccess('Subscribed 📧', `Subscribed ${newsletterEmail} to ${footerData.brandName} newsletter updates!`);
+      setNewsletterEmail('');
+      setTimeout(() => setSubscribedToast(false), 3000);
+    } finally {
+      setIsSubscribing(false);
+    }
   };
 
   return (
@@ -267,8 +274,20 @@ export default function Footer({ onSelectCity }) {
                     flexGrow: 1
                   }}
                 />
-                <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 0.85rem' }}>
-                  <Send size={15} />
+                <button
+                  type="submit"
+                  disabled={isSubscribing}
+                  className="btn btn-primary"
+                  style={{
+                    padding: '0.5rem 0.85rem',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: isSubscribing ? 'not-allowed' : 'pointer',
+                    opacity: isSubscribing ? 0.75 : 1
+                  }}
+                >
+                  {isSubscribing ? <RefreshCw size={15} className="animate-spin" /> : <Send size={15} />}
                 </button>
               </div>
               <CloudflareTurnstile

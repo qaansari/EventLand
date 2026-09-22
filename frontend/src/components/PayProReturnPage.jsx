@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Clock, XCircle, ArrowRight, Download, Ticket, RefreshCw, ShieldCheck, Home } from 'lucide-react';
 import { payProApi } from '../services/paypro.api';
 import { paymentsApi } from '../services/api';
+import EventLandPreloader from './EventLandPreloader';
 
 /**
  * PayProReturnPage
@@ -90,14 +91,8 @@ export default function PayProReturnPage({
 
   if (loading) {
     return (
-      <div className="container" style={{ padding: '6rem 1rem', textAlign: 'center', maxWidth: '600px', margin: '0 auto' }}>
-        <div className="loading-spinner" style={{ margin: '0 auto 1.5rem', width: '48px', height: '48px' }} />
-        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', marginBottom: '0.5rem' }}>
-          Verifying PayPro Transaction...
-        </h2>
-        <p style={{ color: '#94a3b8', fontSize: '0.95rem' }}>
-          Connecting with 1Link / PayPro network to confirm your invoice payment.
-        </p>
+      <div className="container" style={{ padding: '4rem 1rem', textAlign: 'center', maxWidth: '600px', margin: '0 auto' }}>
+        <EventLandPreloader text="Verifying PayPro 1Link Payment..." minHeight="50vh" />
       </div>
     );
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Grid, Layers, MapPin, CheckCircle, Download } from 'lucide-react';
+import { Sparkles, Grid, Layers, MapPin, CheckCircle, Download, RefreshCw } from 'lucide-react';
 import EventCard from './EventCard';
 import { uploadApi, adminApi, auditoriumLayoutsApi, locationsApi } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -17,6 +17,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
   const [countriesList, setCountriesList] = useState([]);
   const [citiesList, setCitiesList] = useState([]);
   const [venuesList, setVenuesList] = useState([]);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const [eventForm, setEventForm] = useState({
     title: '',
@@ -122,7 +123,8 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
     ] : []
   };
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
     const selAudi = auditoriumsList.find(a => a.layoutCode === eventForm.auditoriumLayout || a.name === eventForm.auditoriumLayout);
     const resolvedVenue = eventForm.venue?.trim() || selAudi?.venue || selAudi?.name || 'Arts Council of Pakistan';
 
@@ -132,9 +134,11 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
     }
 
     setPublishedSuccess(true);
-    setTimeout(() => {
-      onPublishEvent(previewEventObject);
-    }, 1200);
+    try {
+      await onPublishEvent(previewEventObject);
+    } catch (err) {
+      setPublishedSuccess(false);
+    }
   };
 
   return (
@@ -288,35 +292,57 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
 
                           <button
                             type="button"
-                            onClick={() => {
-                              const parsedBlueprint = parseAuditoriumLayout(selectedAuditorium.layoutJson);
-                              exportAuditoriumChartPdf({
-                                auditoriumName: selectedAuditorium.name || 'Main Auditorium',
-                                venueName: selectedAuditorium.venue || (eventForm.venue ? eventForm.venue.split(',')[0].trim() : '') || 'Alhamra Cultural Complex',
-                                cityName: selectedAuditorium.city || eventForm.city || 'Lahore',
-                                countryName: 'Pakistan',
-                                showName: '',
-                                showDate: eventForm.startDate ? new Date(eventForm.startDate).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '',
-                                resolvedBlueprint: parsedBlueprint,
-                                currentZone: { zone: selectedAuditorium.name, totalCapacity: selectedAuditorium.totalCapacity },
-                                eventTitle: ''
-                              });
+                            onClick={async () => {
+                              if (!selectedAuditorium || isExportingPdf) return;
+                              setIsExportingPdf(true);
+                              try {
+                                const parsedBlueprint = parseAuditoriumLayout(selectedAuditorium.layoutJson);
+                                const exported = await exportAuditoriumChartPdf({
+                                  auditoriumName: selectedAuditorium.name || 'Main Auditorium',
+                                  venueName: selectedAuditorium.venue || (eventForm.venue ? eventForm.venue.split(',')[0].trim() : '') || 'Alhamra Cultural Complex',
+                                  cityName: selectedAuditorium.city || eventForm.city || 'Lahore',
+                                  countryName: 'Pakistan',
+                                  showName: '',
+                                  showDate: eventForm.startDate ? new Date(eventForm.startDate).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '',
+                                  resolvedBlueprint: parsedBlueprint,
+                                  currentZone: { zone: selectedAuditorium.name, totalCapacity: selectedAuditorium.totalCapacity },
+                                  eventTitle: ''
+                                });
+                                if (exported && showSuccess) {
+                                  showSuccess('Chart Exported 📥', `${selectedAuditorium.name} seating chart downloaded as PDF.`);
+                                }
+                              } catch (err) {
+                                console.error('Error exporting chart PDF:', err);
+                                if (showError) showError('Export Failed', 'Failed to export auditorium chart to PDF.');
+                              } finally {
+                                setIsExportingPdf(false);
+                              }
                             }}
+                            disabled={isExportingPdf}
+                            title="Download Seating Chart in PDF format with White Background"
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '0.35rem',
                               padding: '0.35rem 0.75rem',
                               borderRadius: '6px',
-                              background: 'linear-gradient(135deg, #059669, #0f766e)',
+                              background: isExportingPdf ? 'rgba(5, 150, 105, 0.6)' : 'linear-gradient(135deg, #059669, #0f766e)',
                               border: '1px solid rgba(45, 212, 191, 0.4)',
                               color: '#fff',
                               fontSize: '0.75rem',
                               fontWeight: 700,
-                              cursor: 'pointer'
+                              cursor: isExportingPdf ? 'wait' : 'pointer'
                             }}
                           >
-                            <Download size={14} /> Download Chart (PDF)
+                            {isExportingPdf ? (
+                              <>
+                                <RefreshCw size={14} className="animate-spin" /> Exporting PDF...
+                              </>
+                            ) : (
+                              <>
+                                <Download size={14} /> Download Chart (PDF)
+                              </>
+                            )}
                           </button>
                         </div>
                       )}
@@ -509,9 +535,25 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
                 type="submit"
                 disabled={publishedSuccess}
                 className="btn btn-primary"
-                style={{ width: '70%', padding: '0.85rem', opacity: publishedSuccess ? 0.6 : 1, cursor: publishedSuccess ? 'not-allowed' : 'pointer' }}
+                style={{
+                  width: '70%',
+                  padding: '0.85rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  opacity: publishedSuccess ? 0.7 : 1,
+                  cursor: publishedSuccess ? 'not-allowed' : 'pointer'
+                }}
               >
-                {publishedSuccess ? 'Publishing Event...' : '🚀 Publish Event Live'}
+                {publishedSuccess ? (
+                  <>
+                    <RefreshCw size={18} className="animate-spin" />
+                    <span>Publishing Event...</span>
+                  </>
+                ) : (
+                  '🚀 Publish Event Live'
+                )}
               </button>
             </div>
           </form>

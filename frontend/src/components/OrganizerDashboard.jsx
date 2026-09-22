@@ -20,7 +20,8 @@ import {
   Filter,
   Check,
   X,
-  Clock
+  Clock,
+  RefreshCw
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import SearchableSelect from './SearchableSelect';
@@ -50,6 +51,7 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
     { id: 3, code: 'VIPCONCERT', type: 'percentage', value: 20, maxUses: 50, currentUses: 50, expiry: '2026-09-30', active: false }
   ]);
   const [showCreatePromoModal, setShowCreatePromoModal] = useState(false);
+  const [isCreatingPromo, setIsCreatingPromo] = useState(false);
   const [newPromoForm, setNewPromoForm] = useState({
     code: '',
     type: 'percentage',
@@ -58,23 +60,29 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
     expiry: '2027-01-31'
   });
 
-  const handleCreatePromoCode = (e) => {
+  const handleCreatePromoCode = async (e) => {
     e.preventDefault();
     if (!newPromoForm.code.trim()) return;
-    const newPromo = {
-      id: Date.now(),
-      code: newPromoForm.code.toUpperCase().trim(),
-      type: newPromoForm.type,
-      value: Number(newPromoForm.value),
-      maxUses: Number(newPromoForm.maxUses),
-      currentUses: 0,
-      expiry: newPromoForm.expiry,
-      active: true
-    };
-    setPromoCodes([newPromo, ...promoCodes]);
-    setShowCreatePromoModal(false);
-    setNewPromoForm({ code: '', type: 'percentage', value: 10, maxUses: 100, expiry: '2027-01-31' });
-    showSuccess('Promo Code Created 🎟️', `Discount code "${newPromo.code}" is now active!`);
+    setIsCreatingPromo(true);
+    try {
+      await new Promise((res) => setTimeout(res, 600));
+      const newPromo = {
+        id: Date.now(),
+        code: newPromoForm.code.toUpperCase().trim(),
+        type: newPromoForm.type,
+        value: Number(newPromoForm.value),
+        maxUses: Number(newPromoForm.maxUses),
+        currentUses: 0,
+        expiry: newPromoForm.expiry,
+        active: true
+      };
+      setPromoCodes([newPromo, ...promoCodes]);
+      setShowCreatePromoModal(false);
+      setNewPromoForm({ code: '', type: 'percentage', value: 10, maxUses: 100, expiry: '2027-01-31' });
+      showSuccess('Promo Code Created 🎟️', `Discount code "${newPromo.code}" is now active!`);
+    } finally {
+      setIsCreatingPromo(false);
+    }
   };
 
   const handleTogglePromoStatus = (id) => {
@@ -1077,9 +1085,26 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
                 disabled={payoutSubmitted}
                 type="submit"
                 className="btn btn-primary"
-                style={{ padding: '0.85rem', marginTop: '0.5rem', fontSize: '0.95rem' }}
+                style={{
+                  padding: '0.85rem',
+                  marginTop: '0.5rem',
+                  fontSize: '0.95rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  cursor: payoutSubmitted ? 'not-allowed' : 'pointer',
+                  opacity: payoutSubmitted ? 0.75 : 1
+                }}
               >
-                {payoutSubmitted ? 'Processing...' : 'Submit Settlement Request'}
+                {payoutSubmitted ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    <span>Processing Settlement...</span>
+                  </>
+                ) : (
+                  'Submit Settlement Request'
+                )}
               </button>
             </form>
           </div>
@@ -1189,8 +1214,28 @@ export default function OrganizerDashboard({ events, onNavigateToCreate, onSelec
 
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" onClick={() => setShowCreatePromoModal(false)} className="btn btn-secondary" style={{ width: '40%' }}>Cancel</button>
-                <button type="submit" className="btn btn-primary" style={{ width: '60%' }}>
-                  Create Code
+                <button
+                  type="submit"
+                  disabled={isCreatingPromo}
+                  className="btn btn-primary"
+                  style={{
+                    width: '60%',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    cursor: isCreatingPromo ? 'not-allowed' : 'pointer',
+                    opacity: isCreatingPromo ? 0.75 : 1
+                  }}
+                >
+                  {isCreatingPromo ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      <span>Creating Code...</span>
+                    </>
+                  ) : (
+                    'Create Code'
+                  )}
                 </button>
               </div>
             </form>

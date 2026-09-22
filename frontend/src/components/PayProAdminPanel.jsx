@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { payProApi } from '../services/paypro.api';
 import { useToast } from '../context/ToastContext';
+import EventLandPreloader from './EventLandPreloader';
 
 export default function PayProAdminPanel() {
   const { showSuccess, showError, showWarning, showInfo } = useToast();
@@ -360,10 +361,7 @@ export default function PayProAdminPanel() {
           {/* Report Table */}
           <div className="glass-card" style={{ borderRadius: '14px', overflow: 'hidden' }}>
             {reportLoading ? (
-              <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#94a3b8' }}>
-                <div className="loading-spinner" style={{ margin: '0 auto 1rem' }} />
-                <p>Querying PayPro GPO Report...</p>
-              </div>
+              <EventLandPreloader compact={true} text="Querying PayPro GPO Report..." minHeight="240px" />
             ) : !reportData || reportData.items.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#94a3b8' }}>
                 <FileText size={48} style={{ opacity: 0.3, margin: '0 auto 1rem' }} />
@@ -529,10 +527,7 @@ export default function PayProAdminPanel() {
           {/* Consumers Table */}
           <div className="glass-card" style={{ borderRadius: '14px', overflow: 'hidden' }}>
             {consumersLoading ? (
-              <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#94a3b8' }}>
-                <div className="loading-spinner" style={{ margin: '0 auto 1rem' }} />
-                <p>Loading PayPro Consumers...</p>
-              </div>
+              <EventLandPreloader compact={true} text="Loading PayPro Consumers..." minHeight="240px" />
             ) : consumers.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#94a3b8' }}>
                 <Users size={48} style={{ opacity: 0.3, margin: '0 auto 1rem' }} />
@@ -736,9 +731,24 @@ export default function PayProAdminPanel() {
                     type="submit"
                     disabled={inspectLoading}
                     className="btn btn-secondary"
-                    style={{ padding: '0.65rem 1rem', fontSize: '0.85rem' }}
+                    style={{
+                      padding: '0.65rem 1rem',
+                      fontSize: '0.85rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      cursor: inspectLoading ? 'not-allowed' : 'pointer',
+                      opacity: inspectLoading ? 0.75 : 1
+                    }}
                   >
-                    Query
+                    {inspectLoading ? (
+                      <>
+                        <RefreshCw size={14} className="animate-spin" />
+                        <span>Querying...</span>
+                      </>
+                    ) : (
+                      'Query'
+                    )}
                   </button>
                 </div>
               </form>
@@ -1018,8 +1028,23 @@ export default function PayProAdminPanel() {
                   type="submit"
                   disabled={isSubmittingConsumer}
                   className="btn btn-primary"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    cursor: isSubmittingConsumer ? 'not-allowed' : 'pointer',
+                    opacity: isSubmittingConsumer ? 0.75 : 1
+                  }}
                 >
-                  {isSubmittingConsumer ? 'Registering...' : 'Register'}
+                  {isSubmittingConsumer ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      <span>Registering...</span>
+                    </>
+                  ) : (
+                    'Register'
+                  )}
                 </button>
               </div>
             </form>
@@ -1099,8 +1124,23 @@ export default function PayProAdminPanel() {
                   type="submit"
                   disabled={isSubmittingConsumer}
                   className="btn btn-primary"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    cursor: isSubmittingConsumer ? 'not-allowed' : 'pointer',
+                    opacity: isSubmittingConsumer ? 0.75 : 1
+                  }}
                 >
-                  {isSubmittingConsumer ? 'Processing...' : 'Import Batch'}
+                  {isSubmittingConsumer ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    'Import Batch'
+                  )}
                 </button>
               </div>
             </form>

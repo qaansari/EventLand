@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { X, Download, CheckCircle2, ShieldCheck, ScanLine } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Download, CheckCircle2, ShieldCheck, ScanLine, RefreshCw } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { exportTicketPdf } from '../utils/ticketPdfExporter';
 import { generateTicketQrDataUrl } from '../utils/qrGenerator';
 
 export default function DigitalTicketModal({ ticket, onClose }) {
-  const { showSuccess } = useToast();
+  const { showSuccess, showError } = useToast();
+  const ticketCardRef = useRef(null);
+  const [isExporting, setIsExporting] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scannerStatus, setScannerStatus] = useState('idle'); // idle, scanning, verified
   const [qrDataUrl, setQrDataUrl] = useState('');
@@ -25,6 +27,23 @@ export default function DigitalTicketModal({ ticket, onClose }) {
   const seatCount = ticket?.seatCount || (ticket?.seats || []).length || ticket?.quantity || 1;
   const categoryName = ticket?.ticketTierName || ticket?.tierName || ticket?.category || ticket?.ticketTier || 'Standard Pass';
   const rawSeats = (ticket.seats || []).map((s) => s.label || (typeof s.id === 'string' ? s.id.split('-').pop() : s.id)).join(', ');
+
+  const handleExportPdf = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const res = await exportTicketPdf(
+        { ...ticket, banner: bannerUrl, seatCount },
+        ticketCardRef.current
+      );
+      showSuccess('E-Ticket Exported 📥', `${res?.fileName || 'E-Ticket'} downloaded successfully!`);
+    } catch (err) {
+      console.error('Failed to export PDF:', err);
+      showError('Export Failed', 'Unable to export E-Ticket PDF. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleSimulateScan = () => {
     setIsScannerOpen(true);
@@ -75,7 +94,7 @@ export default function DigitalTicketModal({ ticket, onClose }) {
 
         {/* Ticket Graphic Body */}
         <div style={{ padding: '1.5rem' }}>
-          <div style={{
+          <div ref={ticketCardRef} style={{
             background: 'linear-gradient(135deg, #10192d 0%, #1a294a 100%)',
             border: '2px dashed rgba(13, 148, 136, 0.45)',
             borderRadius: '20px',
@@ -94,7 +113,7 @@ export default function DigitalTicketModal({ ticket, onClose }) {
               borderBottom: '1px solid rgba(255,255,255,0.1)'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <img src="/logo-icon.png" alt="EventLand Logo" style={{ width: '32px', height: '32px', objectFit: 'contain', filter: 'drop-shadow(0 0 6px rgba(13, 148, 136, 0.5))' }} />
+                <img src="/logo-icon.png" crossOrigin="anonymous" alt="EventLand Logo" style={{ width: '32px', height: '32px', objectFit: 'contain', filter: 'drop-shadow(0 0 6px rgba(13, 148, 136, 0.5))' }} />
                 <div>
                   <span style={{ fontWeight: 900, letterSpacing: '-0.02em', fontSize: '1rem', color: '#fff', display: 'block', lineHeight: 1 }}>EVENTLAND PAKISTAN</span>
                   <span style={{ fontSize: '0.65rem', color: '#2dd4bf' }}>Official E-Ticket Pass</span>
@@ -115,6 +134,7 @@ export default function DigitalTicketModal({ ticket, onClose }) {
               <div style={{ width: '100%', position: 'relative', background: '#070c18', borderBottom: '1px solid rgba(13, 148, 136, 0.2)' }}>
                 <img
                   src={bannerUrl}
+                  crossOrigin="anonymous"
                   alt={ticket.eventTitle}
                   style={{ width: '100%', height: 'auto', maxHeight: '240px', objectFit: 'cover', display: 'block' }}
                   onError={(e) => e.target.style.display = 'none'}
@@ -179,7 +199,7 @@ export default function DigitalTicketModal({ ticket, onClose }) {
 
               {/* Real QR Code Display ONLY when Verified by Admin */}
               {isVerified ? (
-                <div className="digital-ticket-qr" style={{ textAlign: 'center', margin: '1rem 0' }}>
+                <div className="digital-ticket-qr" style={{ textAlign: 'center', margin: '0.85rem 0' }}>
                   <div style={{
                     display: 'inline-block',
                     backgroundColor: '#ffffff',
@@ -214,6 +234,46 @@ export default function DigitalTicketModal({ ticket, onClose }) {
                   </p>
                 </div>
               )}
+
+              {/* Security Barcode & Ticket Number Strip */}
+              {isVerified && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed rgba(13, 148, 136, 0.3)', paddingTop: '0.85rem', marginTop: '0.25rem' }}>
+                  <div>
+                    <div style={{ fontSize: '0.62rem', color: '#64748b', fontWeight: 800, textTransform: 'uppercase' }}>SECURITY VERIFICATION REF</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 900, color: '#2dd4bf', letterSpacing: '0.05em' }}>
+                      {ticket.ticketId || ticket.bookingRef || ticket.id || 'EVL-TICKET'}
+                    </div>
+                  </div>
+                  <svg viewBox="0 0 120 36" width="110" height="32">
+                    <rect x="0" y="0" width="3" height="36" fill="#2dd4bf"/>
+                    <rect x="5" y="0" width="2" height="36" fill="#2dd4bf"/>
+                    <rect x="9" y="0" width="5" height="36" fill="#2dd4bf"/>
+                    <rect x="16" y="0" width="2" height="36" fill="#2dd4bf"/>
+                    <rect x="20" y="0" width="3" height="36" fill="#2dd4bf"/>
+                    <rect x="25" y="0" width="6" height="36" fill="#2dd4bf"/>
+                    <rect x="33" y="0" width="2" height="36" fill="#2dd4bf"/>
+                    <rect x="37" y="0" width="4" height="36" fill="#2dd4bf"/>
+                    <rect x="43" y="0" width="5" height="36" fill="#2dd4bf"/>
+                    <rect x="50" y="0" width="2" height="36" fill="#2dd4bf"/>
+                    <rect x="54" y="0" width="6" height="36" fill="#2dd4bf"/>
+                    <rect x="62" y="0" width="3" height="36" fill="#2dd4bf"/>
+                    <rect x="67" y="0" width="2" height="36" fill="#2dd4bf"/>
+                    <rect x="71" y="0" width="5" height="36" fill="#2dd4bf"/>
+                    <rect x="78" y="0" width="3" height="36" fill="#2dd4bf"/>
+                    <rect x="83" y="0" width="6" height="36" fill="#2dd4bf"/>
+                    <rect x="91" y="0" width="2" height="36" fill="#2dd4bf"/>
+                    <rect x="95" y="0" width="4" height="36" fill="#2dd4bf"/>
+                    <rect x="101" y="0" width="2" height="36" fill="#2dd4bf"/>
+                    <rect x="105" y="0" width="5" height="36" fill="#2dd4bf"/>
+                    <rect x="112" y="0" width="3" height="36" fill="#2dd4bf"/>
+                    <rect x="117" y="0" width="3" height="36" fill="#2dd4bf"/>
+                  </svg>
+                </div>
+              )}
+
+              <div style={{ fontSize: '0.65rem', color: '#64748b', textAlign: 'center', marginTop: '0.6rem', fontWeight: 600 }}>
+                EventLand Pakistan • Official Ticketing & Auditorium Platform
+              </div>
             </div>
           </div>
 
@@ -221,14 +281,28 @@ export default function DigitalTicketModal({ ticket, onClose }) {
           {isVerified ? (
             <div className="digital-ticket-actions" style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
               <button
-                onClick={() => {
-                  exportTicketPdf({ ...ticket, banner: bannerUrl, seatCount });
-                  showSuccess('E-Ticket Exported 📥', `E-Ticket #${ticket.ticketId || ticket.id || 'PASS'} generated successfully!`);
-                }}
+                onClick={handleExportPdf}
+                disabled={isExporting}
                 className="btn btn-primary"
-                style={{ flexGrow: 1 }}
+                style={{
+                  flexGrow: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  opacity: isExporting ? 0.7 : 1,
+                  cursor: isExporting ? 'not-allowed' : 'pointer'
+                }}
               >
-                <Download size={18} /> Download PDF Ticket
+                {isExporting ? (
+                  <>
+                    <RefreshCw size={18} className="animate-spin" /> Exporting PDF...
+                  </>
+                ) : (
+                  <>
+                    <Download size={18} /> Export to PDF
+                  </>
+                )}
               </button>
 
               <button

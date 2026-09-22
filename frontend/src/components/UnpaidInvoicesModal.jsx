@@ -558,9 +558,28 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
                             onClick={() => handleSubmitProofForInvoice(inv)}
                             disabled={isProcessing || isExpired}
                             className="btn btn-primary"
-                            style={{ padding: '0.5rem 1rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                            style={{
+                              padding: '0.5rem 1rem',
+                              fontSize: '0.82rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.35rem',
+                              cursor: (isProcessing || isExpired) ? 'not-allowed' : 'pointer',
+                              opacity: isProcessing ? 0.75 : 1
+                            }}
                           >
-                            <Send size={13} /> {inv.bankTransactionRef ? 'Update Proof' : 'Submit Proof'}
+                            {isProcessing ? (
+                              <>
+                                <RefreshCw size={13} className="animate-spin" />
+                                <span>Saving Proof...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Send size={13} />
+                                <span>{inv.bankTransactionRef ? 'Update Proof' : 'Submit Proof'}</span>
+                              </>
+                            )}
                           </button>
                         </div>
                       </div>

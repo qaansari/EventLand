@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import { exportTicketPdf } from '../utils/ticketPdfExporter';
+import { getUserImageUrl } from '../services/api';
 
 export default function AttendeeDashboard({
   currentUser,
@@ -27,13 +28,35 @@ export default function AttendeeDashboard({
   onBrowseEvents,
   onSelectEvent
 }) {
-  const { showSuccess } = useToast();
+  const { showSuccess, showError } = useToast();
   const [activeTab, setActiveTab] = useState('passes');
   const [ticketFilter, setTicketFilter] = useState('all');
+  const [imgError, setImgError] = useState(false);
+  const [exportingTicketId, setExportingTicketId] = useState(null);
+
+  const userImgUrl = (currentUser?.imageUrl || currentUser?.avatar)
+    ? getUserImageUrl(currentUser.imageUrl || currentUser.avatar)
+    : '';
 
   // Lookup state
   const [lookupQuery, setLookupQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+
+  // Export PDF helper
+  const handleExportPdf = async (ticket) => {
+    const tId = ticket.ticketId || ticket.bookingRef || ticket.id;
+    if (exportingTicketId) return;
+    setExportingTicketId(tId);
+    try {
+      const res = await exportTicketPdf(ticket);
+      showSuccess('PDF Exported 📥', `${res?.fileName || 'E-Ticket'} downloaded successfully!`);
+    } catch (err) {
+      console.error('Failed to export PDF:', err);
+      showError('Export Failed', 'Unable to export E-Ticket PDF. Please try again.');
+    } finally {
+      setExportingTicketId(null);
+    }
+  };
 
   // Refund Modal state
   const [refundModalTicket, setRefundModalTicket] = useState(null);
@@ -50,6 +73,7 @@ export default function AttendeeDashboard({
     notifications: true
   });
   const [profileSaved, setProfileSaved] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   // Filtered tickets logic — uses real timestamp comparison instead of hardcoded year strings
   const filteredTickets = purchasedTickets.filter((t) => {
@@ -123,11 +147,17 @@ export default function AttendeeDashboard({
     }, 1200);
   };
 
-  const handleSaveProfile = (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    setProfileSaved(true);
-    setTimeout(() => setProfileSaved(false), 2500);
-    showSuccess('Profile Updated 👤', 'Your Govt CNIC and attendee contact preferences have been updated.');
+    setIsSavingProfile(true);
+    try {
+      await new Promise((res) => setTimeout(res, 600));
+      setProfileSaved(true);
+      setTimeout(() => setProfileSaved(false), 2500);
+      showSuccess('Profile Updated 👤', 'Your Govt CNIC and attendee contact preferences have been updated.');
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   const handleSearchClick = async (e) => {
@@ -156,16 +186,55 @@ export default function AttendeeDashboard({
         flexWrap: 'wrap',
         gap: '1.5rem'
       }}>
-        <div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'rgba(13, 148, 136, 0.15)', color: '#2dd4bf', border: '1px solid rgba(13, 148, 136, 0.3)', padding: '0.3rem 0.8rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 800, marginBottom: '0.75rem' }}>
-            <ShieldCheck size={14} /> VERIFIED ATTENDEE PORTAL
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+          {/* User Image / Avatar */}
+          {userImgUrl && !imgError ? (
+            <img
+              src={userImgUrl}
+              alt={profileForm.fullName}
+              onError={() => setImgError(true)}
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                objectFit: 'cover',
+                border: '2.5px solid #2dd4bf',
+                boxShadow: '0 4px 14px rgba(13, 148, 136, 0.4)',
+                flexShrink: 0
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #0d9488, #059669)',
+                border: '2.5px solid #2dd4bf',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                fontSize: '1.5rem',
+                fontWeight: 900,
+                boxShadow: '0 4px 14px rgba(13, 148, 136, 0.4)',
+                flexShrink: 0
+              }}
+            >
+              {(profileForm.fullName || currentUser?.name || 'U').charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'rgba(13, 148, 136, 0.15)', color: '#2dd4bf', border: '1px solid rgba(13, 148, 136, 0.3)', padding: '0.3rem 0.8rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 800, marginBottom: '0.75rem' }}>
+              <ShieldCheck size={14} /> VERIFIED ATTENDEE PORTAL
+            </div>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 4vw, 2.4rem)', fontWeight: 900, color: '#fff', marginBottom: '0.4rem' }}>
+              Welcome, {profileForm.fullName}! 👋
+            </h1>
+            <p style={{ color: '#94a3b8', fontSize: '0.92rem', maxWidth: '600px' }}>
+              Access your active digital E-tickets, export passes to calendar, manage security credentials, or recover past bookings.
+            </p>
           </div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 4vw, 2.4rem)', fontWeight: 900, color: '#fff', marginBottom: '0.4rem' }}>
-            Welcome, {profileForm.fullName}! 👋
-          </h1>
-          <p style={{ color: '#94a3b8', fontSize: '0.92rem', maxWidth: '600px' }}>
-            Access your active digital E-tickets, export passes to calendar, manage security credentials, or recover past bookings.
-          </p>
         </div>
 
         {/* Stats Badges */}
@@ -433,11 +502,30 @@ export default function AttendeeDashboard({
 
                     <div style={{ display: 'flex', gap: '0.4rem', marginTop: '1rem' }}>
                       <button
-                        onClick={() => exportTicketPdf(t)}
+                        onClick={() => handleExportPdf(t)}
+                        disabled={exportingTicketId === (t.ticketId || t.bookingRef || t.id)}
                         className="btn btn-secondary"
-                        style={{ flex: 1, fontSize: '0.78rem', padding: '0.5rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                        style={{
+                          flex: 1,
+                          fontSize: '0.78rem',
+                          padding: '0.5rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          opacity: exportingTicketId === (t.ticketId || t.bookingRef || t.id) ? 0.6 : 1,
+                          cursor: exportingTicketId === (t.ticketId || t.bookingRef || t.id) ? 'not-allowed' : 'pointer'
+                        }}
                       >
-                        <Download size={13} /> PDF Ticket
+                        {exportingTicketId === (t.ticketId || t.bookingRef || t.id) ? (
+                          <>
+                            <RefreshCw size={13} className="animate-spin" /> Exporting...
+                          </>
+                        ) : (
+                          <>
+                            <Download size={13} /> Export to PDF
+                          </>
+                        )}
                       </button>
 
                       <button
@@ -509,8 +597,27 @@ export default function AttendeeDashboard({
                 outline: 'none'
               }}
             />
-            <button type="submit" disabled={isSearching} className="btn btn-primary" style={{ padding: '0.75rem 1.4rem' }}>
-              {isSearching ? <RefreshCw size={16} className="spinning" /> : 'Find Booking'}
+            <button
+              type="submit"
+              disabled={isSearching}
+              className="btn btn-primary"
+              style={{
+                padding: '0.75rem 1.4rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                cursor: isSearching ? 'not-allowed' : 'pointer',
+                opacity: isSearching ? 0.75 : 1
+              }}
+            >
+              {isSearching ? (
+                <>
+                  <RefreshCw size={16} className="animate-spin" />
+                  <span>Searching...</span>
+                </>
+              ) : (
+                'Find Booking'
+              )}
             </button>
           </form>
 
@@ -564,6 +671,25 @@ export default function AttendeeDashboard({
           <p style={{ color: '#94a3b8', fontSize: '0.88rem', marginBottom: '1.75rem' }}>
             Pakistani high-security venues require verified Govt CNIC numbers for VIP seat entry and venue security checks.
           </p>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem', paddingBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            {userImgUrl && !imgError ? (
+              <img
+                src={userImgUrl}
+                alt={profileForm.fullName}
+                onError={() => setImgError(true)}
+                style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #2dd4bf' }}
+              />
+            ) : (
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'linear-gradient(135deg, #0d9488, #059669)', border: '2px solid #2dd4bf', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '1.3rem', fontWeight: 900 }}>
+                {(profileForm.fullName || 'U').charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <div style={{ color: '#fff', fontWeight: 800, fontSize: '1.05rem' }}>{profileForm.fullName}</div>
+              <div style={{ color: '#2dd4bf', fontSize: '0.8rem' }}>{currentUser?.email || profileForm.email}</div>
+            </div>
+          </div>
 
           <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div className="attendee-profile-form" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -628,8 +754,29 @@ export default function AttendeeDashboard({
               </select>
             </div>
 
-            <button type="submit" className="btn btn-primary" style={{ padding: '0.8rem', marginTop: '0.5rem' }}>
-              Save Profile Preferences
+            <button
+              type="submit"
+              disabled={isSavingProfile}
+              className="btn btn-primary"
+              style={{
+                padding: '0.8rem',
+                marginTop: '0.5rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                cursor: isSavingProfile ? 'not-allowed' : 'pointer',
+                opacity: isSavingProfile ? 0.75 : 1
+              }}
+            >
+              {isSavingProfile ? (
+                <>
+                  <RefreshCw size={16} className="animate-spin" />
+                  <span>Saving Preferences...</span>
+                </>
+              ) : (
+                'Save Profile Preferences'
+              )}
             </button>
           </form>
         </div>
@@ -681,8 +828,28 @@ export default function AttendeeDashboard({
 
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
                 <button type="button" onClick={() => setRefundModalTicket(null)} className="btn btn-secondary" style={{ width: '40%' }}>Cancel</button>
-                <button type="submit" disabled={isSubmittingRefund} className="btn btn-primary" style={{ width: '60%' }}>
-                  {isSubmittingRefund ? 'Submitting...' : 'Submit Refund Claim'}
+                <button
+                  type="submit"
+                  disabled={isSubmittingRefund}
+                  className="btn btn-primary"
+                  style={{
+                    width: '60%',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    cursor: isSubmittingRefund ? 'not-allowed' : 'pointer',
+                    opacity: isSubmittingRefund ? 0.75 : 1
+                  }}
+                >
+                  {isSubmittingRefund ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      <span>Submitting Claim...</span>
+                    </>
+                  ) : (
+                    'Submit Refund Claim'
+                  )}
                 </button>
               </div>
             </form>

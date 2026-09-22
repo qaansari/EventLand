@@ -77,3 +77,14 @@ export function isOrganizer(user) {
   const role = normalizeRole(user.role);
   return role === 'organizer' || role === 'admin';
 }
+
+/**
+ * Checks if user is SuperAdmin.
+ * @param {object|null} user 
+ * @returns {boolean}
+ */
+export function isSuperAdmin(user) {
+  if (!user) return false;
+  const raw = (user.rawRole || user.roleName || user.role || '').trim().toLowerCase();
+  return raw === 'superadmin' || user.roleId === 1;
+}

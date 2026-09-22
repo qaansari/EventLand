@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Lock, Mail, X, LogIn, UserPlus, Eye, EyeOff, Phone, Globe } from 'lucide-react';
+import { User, Lock, Mail, X, LogIn, UserPlus, Eye, EyeOff, Phone, Globe, RefreshCw } from 'lucide-react';
 import { authApi, locationsApi, formatPhoneNumberOnSubmit } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { isCaptchaVerified, getStoredCaptchaToken } from '../utils/captcha';
@@ -146,13 +146,15 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
           phone: authData.user?.phoneNumber || formattedPhone,
           countryId: authData.user?.countryId || Number(selectedCountryId),
           role: 'customer',
+          imageUrl: authData.user?.imageUrl || null,
           token: authData.token
         });
       } else {
         // Authenticate with live .NET Backend API
         const authData = await authApi.login(email.trim(), password);
 
-        const backendRole = (authData.user?.role || '').toLowerCase();
+        const rawRole = authData.user?.role || '';
+        const backendRole = rawRole.toLowerCase();
         let userRole = 'customer';
         if (backendRole.includes('admin')) userRole = 'admin';
         else if (backendRole.includes('organizer')) userRole = 'organizer';
@@ -164,6 +166,9 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
           phone: authData.user?.phoneNumber || '',
           countryId: authData.user?.countryId || 1,
           role: userRole,
+          rawRole: rawRole,
+          roleName: rawRole,
+          imageUrl: authData.user?.imageUrl || null,
           token: authData.token
         });
       }
@@ -467,12 +472,23 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
               color: '#ffffff',
               fontWeight: 600,
               fontSize: '0.9375rem',
-              cursor: loading ? 'wait' : 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               opacity: loading ? 0.7 : 1,
-              boxShadow: '0 4px 16px rgba(13, 148, 136, 0.4)'
+              boxShadow: '0 4px 16px rgba(13, 148, 136, 0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem'
             }}
           >
-            {loading ? 'Authenticating...' : (isSignUp ? 'Create Account' : 'Sign In')}
+            {loading ? (
+              <>
+                <RefreshCw size={16} className="animate-spin" />
+                <span>Authenticating...</span>
+              </>
+            ) : (
+              isSignUp ? 'Create Account' : 'Sign In'
+            )}
           </button>
         </form>
 

@@ -428,12 +428,16 @@ public class AdminService : IAdminService
     }
 
     // --- Users CRUD ---
-    public async Task<PagedResult<UserDto>> GetUsersAsync(int pageNumber = 1, int pageSize = 10)
+    public async Task<PagedResult<UserDto>> GetUsersAsync(int pageNumber = 1, int pageSize = 10, bool isSuperAdmin = true)
     {
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
         var query = _context.Users.AsNoTracking().Include(u => u.Role).Include(u => u.Country).Where(u => !u.IsDeleted);
+        if (!isSuperAdmin)
+        {
+            query = query.Where(u => u.Role.Name != "Admin" && u.Role.Name != "SuperAdmin");
+        }
         var totalCount = await query.CountAsync();
 
         var items = await query
@@ -446,13 +450,18 @@ public class AdminService : IAdminService
         return new PagedResult<UserDto>(items, totalCount, pageNumber, pageSize);
     }
 
-    public async Task<UserDto?> GetUserByIdAsync(int id)
+    public async Task<UserDto?> GetUserByIdAsync(int id, bool isSuperAdmin = true)
     {
-        var u = await _context.Users.AsNoTracking().Include(x => x.Role).Include(x => x.Country).FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+        var query = _context.Users.AsNoTracking().Include(x => x.Role).Include(x => x.Country).Where(x => x.Id == id && !x.IsDeleted);
+        if (!isSuperAdmin)
+        {
+            query = query.Where(x => x.Role.Name != "Admin" && x.Role.Name != "SuperAdmin");
+        }
+        var u = await query.FirstOrDefaultAsync();
         return u is null ? null : new UserDto(u.Id, u.Email, u.FullName, u.Role.Name, u.LastLoginAt, FileUrlHelper.FormatUserImageUrl(u.ImageUrl), u.PhoneNumber, u.CountryId, u.Country?.Name, u.Country?.DialingCode);
     }
 
-    public async Task<UserDto> CreateUserAsync(CreateUserDto dto)
+    public async Task<UserDto> CreateUserAsync(CreateUserDto dto, bool isSuperAdmin = true)
     {
         var exists = await _context.Users.AnyAsync(u => u.Email.ToLower() == dto.Email.Trim().ToLower() && !u.IsDeleted);
         if (exists)
@@ -469,6 +478,11 @@ public class AdminService : IAdminService
         var role = await _context.Roles.FirstOrDefaultAsync(r => r.Id == dto.RoleId && !r.IsDeleted);
         if (role is null)
             throw new KeyNotFoundException($"Role '{dto.RoleId}' not found.");
+
+        if (!isSuperAdmin && (role.Name.Equals("Admin", StringComparison.OrdinalIgnoreCase) || role.Name.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new UnauthorizedAccessException("Admins are only permitted to create users with Organizer or Attendee roles.");
+        }
 
         var user = new User
         {
@@ -491,11 +505,16 @@ public class AdminService : IAdminService
         return new UserDto(user.Id, user.Email, user.FullName, role.Name, null, FileUrlHelper.FormatUserImageUrl(user.ImageUrl), user.PhoneNumber, user.CountryId, country?.Name, country?.DialingCode);
     }
 
-    public async Task<UserDto> UpdateUserAsync(int id, UpdateUserDto dto)
+    public async Task<UserDto> UpdateUserAsync(int id, UpdateUserDto dto, bool isSuperAdmin = true)
     {
         var user = await _context.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
         if (user is null)
             throw new KeyNotFoundException($"User '{id}' not found.");
+
+        if (!isSuperAdmin && user.Role != null && (user.Role.Name.Equals("Admin", StringComparison.OrdinalIgnoreCase) || user.Role.Name.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new UnauthorizedAccessException("Admins cannot modify Administrator or Super Administrator accounts.");
+        }
 
         if (!string.IsNullOrWhiteSpace(dto.PhoneNumber))
         {
@@ -508,6 +527,11 @@ public class AdminService : IAdminService
         var role = await _context.Roles.FirstOrDefaultAsync(r => r.Id == dto.RoleId && !r.IsDeleted);
         if (role is null)
             throw new KeyNotFoundException($"Role '{dto.RoleId}' not found.");
+
+        if (!isSuperAdmin && (role.Name.Equals("Admin", StringComparison.OrdinalIgnoreCase) || role.Name.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new UnauthorizedAccessException("Admins cannot assign Administrator or Super Administrator roles.");
+        }
 
         user.FullName = dto.FullName.Trim();
         user.RoleId = dto.RoleId;
@@ -532,10 +556,15 @@ public class AdminService : IAdminService
         return new UserDto(user.Id, user.Email, user.FullName, role.Name, user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl), user.PhoneNumber, user.CountryId, country?.Name, country?.DialingCode);
     }
 
-    public async Task<bool> DeleteUserAsync(int id)
+    public async Task<bool> DeleteUserAsync(int id, bool isSuperAdmin = true)
     {
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
+        var user = await _context.Users.Include(u => u.Role).FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
         if (user is null) return false;
+
+        if (!isSuperAdmin && user.Role != null && (user.Role.Name.Equals("Admin", StringComparison.OrdinalIgnoreCase) || user.Role.Name.Equals("SuperAdmin", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new UnauthorizedAccessException("Admins cannot delete Administrator or Super Administrator accounts.");
+        }
 
         user.IsDeleted = true;
         user.DeletedAt = DateTimeOffset.UtcNow;

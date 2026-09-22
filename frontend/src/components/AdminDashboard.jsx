@@ -118,7 +118,7 @@ function FileUploadField({ label, value, onChange, placeholder = "Image URL or u
   );
 }
 
-export default function AdminDashboard({ onSelectEvent }) {
+export default function AdminDashboard({ onSelectEvent, currentUser = null, onUpdateCurrentUser = null }) {
   const { showSuccess, showError, showWarning } = useToast();
   const [activeAdminTab, setActiveAdminTab] = useState('events'); // 'events', 'organizers', 'artists', 'bookings', 'users', 'roles', 'ticket-tiers', 'tags'
   const [loading, setLoading] = useState(true);
@@ -147,7 +147,41 @@ export default function AdminDashboard({ onSelectEvent }) {
 
   const loggedUserRaw = localStorage.getItem('eventland_logged_user');
   const loggedUser = loggedUserRaw ? JSON.parse(loggedUserRaw) : null;
-  const isSuperAdmin = !loggedUser || loggedUser?.role?.toLowerCase() === 'superadmin' || loggedUser?.role?.toLowerCase() === 'admin' || loggedUser?.roleId === 1;
+  const effectiveUser = currentUser || loggedUser;
+  const rawRoleName = (effectiveUser?.rawRole || effectiveUser?.roleName || effectiveUser?.role || '').trim().toLowerCase();
+  const isSuperAdmin = rawRoleName === 'superadmin' || effectiveUser?.roleId === 1;
+
+  // Auto-redirect if non-superadmin attempts to stay on roles tab
+  useEffect(() => {
+    if (!isSuperAdmin && activeAdminTab === 'roles') {
+      setActiveAdminTab('events');
+    }
+  }, [isSuperAdmin, activeAdminTab]);
+
+  // Filtered users list: Admin can only see Organizer and Attendee (Customer) accounts
+  const visibleUsersList = useMemo(() => {
+    if (isSuperAdmin) return usersList;
+    return usersList.filter(u => {
+      const r = (u.role || '').trim().toLowerCase();
+      return r !== 'admin' && r !== 'superadmin';
+    });
+  }, [isSuperAdmin, usersList]);
+
+  // Role options for Create / Update user modal: Admin ONLY gets Organizer and Attendee
+  const userRoleOptions = useMemo(() => {
+    if (isSuperAdmin) {
+      return rolesList.map(r => ({
+        value: r.id,
+        label: r.name?.toLowerCase() === 'customer' ? 'Attendee' : r.name
+      }));
+    }
+    const orgRole = rolesList.find(r => r.name?.toLowerCase() === 'organizer');
+    const attRole = rolesList.find(r => r.name?.toLowerCase() === 'customer' || r.name?.toLowerCase() === 'attendee');
+    return [
+      { value: orgRole ? orgRole.id : 3, label: 'Organizer' },
+      { value: attRole ? attRole.id : 4, label: 'Attendee' }
+    ];
+  }, [isSuperAdmin, rolesList]);
 
   // Form Modal States
   const [showEventModal, setShowEventModal] = useState(false);
@@ -165,6 +199,7 @@ export default function AdminDashboard({ onSelectEvent }) {
   const [editingFeeConfig, setEditingFeeConfig] = useState(null);
   const [previewAuditorium, setPreviewAuditorium] = useState(null);
   const [adminPreviewTicket, setAdminPreviewTicket] = useState(null);
+  const [exportingAudId, setExportingAudId] = useState(null);
 
   const defaultFooterForm = {
     brandName: 'Event Land',
@@ -737,6 +772,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       return;
     }
 
+    setIsSaving(true);
     try {
       const payload = {
         name: orgForm.name,
@@ -765,6 +801,8 @@ export default function AdminDashboard({ onSelectEvent }) {
       const msg = err.message || 'Failed to save organizer.';
       setErrorMsg(msg);
       showError('Save Failed', msg);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -814,6 +852,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       return;
     }
 
+    setIsSaving(true);
     try {
       const payload = {
         name: artistForm.name,
@@ -847,6 +886,8 @@ export default function AdminDashboard({ onSelectEvent }) {
       const msg = err.message || 'Failed to save artist.';
       setErrorMsg(msg);
       showError('Save Failed', msg);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -927,6 +968,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       return;
     }
 
+    setIsSaving(true);
     try {
       const payload = {
         eventId: targetEventId,
@@ -958,6 +1000,8 @@ export default function AdminDashboard({ onSelectEvent }) {
       const msg = err.message || 'Failed to save ticket tier.';
       setErrorMsg(msg);
       showError('Save Failed', msg);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1001,6 +1045,15 @@ export default function AdminDashboard({ onSelectEvent }) {
       return;
     }
 
+    if (!isSuperAdmin) {
+      const chosenRole = rolesList.find(r => String(r.id) === String(userForm.roleId));
+      const roleName = (chosenRole?.name || '').trim().toLowerCase();
+      if (roleName === 'admin' || roleName === 'superadmin' || Number(userForm.roleId) === 1 || Number(userForm.roleId) === 2) {
+        showError('Unauthorized', 'Admins can only assign Organizer or Attendee roles.');
+        return;
+      }
+    }
+
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const targetEmail = (userForm.email || '').trim().toLowerCase();
     if (!targetEmail || !emailPattern.test(targetEmail)) {
@@ -1041,6 +1094,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       }
     }
 
+    setIsSaving(true);
     try {
       const activeCountry = countriesList.find(c => c.id === parseInt(userForm.countryId, 10)) || countriesList[0];
       const dialingCode = activeCountry?.dialingCode || '+92';
@@ -1057,6 +1111,18 @@ export default function AdminDashboard({ onSelectEvent }) {
           isActive: true
         };
         await adminApi.users.update(userForm.id, payload);
+
+        if (currentUser && currentUser.id === userForm.id) {
+          const updated = {
+            ...currentUser,
+            name: userForm.fullName,
+            fullName: userForm.fullName,
+            imageUrl: userForm.imageUrl || null
+          };
+          if (onUpdateCurrentUser) onUpdateCurrentUser(updated);
+          window.dispatchEvent(new CustomEvent('eventland:user-updated', { detail: updated }));
+        }
+
         const msg = 'User account updated successfully!';
         setSuccessMsg(msg);
         showSuccess('User Updated', msg);
@@ -1082,10 +1148,32 @@ export default function AdminDashboard({ onSelectEvent }) {
       const msg = err.message || 'Failed to save user.';
       setErrorMsg(msg);
       showError('Save Failed', msg);
+    } finally {
+      setIsSaving(false);
     }
   };
 
+  const handleOpenCreateUser = () => {
+    const defaultRole = isSuperAdmin
+      ? (rolesList.find(r => r.name?.toLowerCase() === 'admin')?.id || rolesList[0]?.id || 2)
+      : (rolesList.find(r => r.name?.toLowerCase() === 'organizer')?.id || 3);
+
+    setUserForm({
+      ...defaultUserForm,
+      roleId: defaultRole
+    });
+    setShowUserModal(true);
+  };
+
   const handleEditUser = (u) => {
+    if (!isSuperAdmin) {
+      const userRole = (u.role || '').trim().toLowerCase();
+      if (userRole === 'admin' || userRole === 'superadmin') {
+        showError('Unauthorized', 'Admins cannot edit Administrator or Super Administrator accounts.');
+        return;
+      }
+    }
+
     const matchedRole = rolesList.find(r => (r.name || '').toLowerCase() === (u.role || '').toLowerCase());
     const splitPhone = splitPhoneNumberForEdit(u.phoneNumber, countriesList, u.countryId);
 
@@ -1094,7 +1182,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       email: u.email || '',
       password: '',
       fullName: u.fullName || '',
-      roleId: matchedRole ? matchedRole.id : (u.roleId || rolesList[0]?.id || 2),
+      roleId: matchedRole ? matchedRole.id : (u.roleId || (isSuperAdmin ? 2 : 3)),
       countryId: splitPhone.countryId || u.countryId || 1,
       phoneNumber: splitPhone.nationalNumber || '',
       imageUrl: u.imageUrl || ''
@@ -1103,6 +1191,15 @@ export default function AdminDashboard({ onSelectEvent }) {
   };
 
   const handleDeleteUser = async (id) => {
+    const target = usersList.find(u => u.id === id);
+    if (!isSuperAdmin && target) {
+      const userRole = (target.role || '').trim().toLowerCase();
+      if (userRole === 'admin' || userRole === 'superadmin') {
+        showError('Unauthorized', 'Admins cannot delete Administrator or Super Administrator accounts.');
+        return;
+      }
+    }
+
     if (!window.confirm('Are you sure you want to delete this user?')) return;
     try {
       await adminApi.users.delete(id);
@@ -1134,6 +1231,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       return;
     }
 
+    setIsSaving(true);
     try {
       if (roleForm.id) {
         await adminApi.roles.update(roleForm.id, { name: roleForm.name, description: roleForm.description });
@@ -1153,6 +1251,8 @@ export default function AdminDashboard({ onSelectEvent }) {
       const msg = err.message || 'Failed to save role.';
       setErrorMsg(msg);
       showError('Save Failed', msg);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1181,6 +1281,7 @@ export default function AdminDashboard({ onSelectEvent }) {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
+    setIsSaving(true);
     try {
       const name = tagForm.name ? tagForm.name.trim() : '';
       const slug = (tagForm.slug ? tagForm.slug.trim() : name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')).toLowerCase();
@@ -1189,6 +1290,7 @@ export default function AdminDashboard({ onSelectEvent }) {
         const msg = 'Please enter a tag name.';
         setErrorMsg(msg);
         showError('Validation Error', msg);
+        setIsSaving(false);
         return;
       }
 
@@ -1201,6 +1303,7 @@ export default function AdminDashboard({ onSelectEvent }) {
         const msg = `A tag with the name '${name}' or slug '${slug}' already exists.`;
         setErrorMsg(msg);
         showError('Duplicate Tag', msg);
+        setIsSaving(false);
         return;
       }
 
@@ -1222,6 +1325,8 @@ export default function AdminDashboard({ onSelectEvent }) {
       const msg = err.message || 'Failed to save tag.';
       setErrorMsg(msg);
       showError('Save Failed', msg);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1327,6 +1432,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       return;
     }
 
+    setIsSaving(true);
     try {
       const selVenue = venuesList.find(v => v.id === venueId);
       const payload = {
@@ -1360,6 +1466,8 @@ export default function AdminDashboard({ onSelectEvent }) {
       console.error('Save Auditorium Error:', err);
       setErrorMsg(err.message || 'Failed to save auditorium layout.');
       showError('Save Failed', err.message || 'Failed to save auditorium layout.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1427,6 +1535,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       return;
     }
 
+    setIsSaving(true);
     try {
       if (countryForm.id) {
         await locationsApi.updateCountry(countryForm.id, { name, code, isActive: countryForm.isActive });
@@ -1446,6 +1555,8 @@ export default function AdminDashboard({ onSelectEvent }) {
       const msg = err.message || 'Failed to save country.';
       setErrorMsg(msg);
       showError('Save Failed', msg);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1502,6 +1613,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       return;
     }
 
+    setIsSaving(true);
     try {
       if (cityForm.id) {
         await locationsApi.updateCity(cityForm.id, { name, isActive: cityForm.isActive });
@@ -1521,6 +1633,8 @@ export default function AdminDashboard({ onSelectEvent }) {
       const msg = err.message || 'Failed to save city.';
       setErrorMsg(msg);
       showError('Save Failed', msg);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1577,6 +1691,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       return;
     }
 
+    setIsSaving(true);
     try {
       const payload = {
         cityId,
@@ -1604,6 +1719,8 @@ export default function AdminDashboard({ onSelectEvent }) {
       const msg = err.message || 'Failed to save venue.';
       setErrorMsg(msg);
       showError('Save Failed', msg);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1664,6 +1781,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       return;
     }
 
+    setIsSaving(true);
     try {
       if (faqForm.id) {
         await faqsApi.update(faqForm.id, {
@@ -1693,6 +1811,8 @@ export default function AdminDashboard({ onSelectEvent }) {
       const msg = err.message || 'Failed to save FAQ.';
       setErrorMsg(msg);
       showError('Save Failed', msg);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1816,6 +1936,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       return;
     }
 
+    setIsSaving(true);
     try {
       const payload = {
         ...bankAccountForm,
@@ -1837,6 +1958,8 @@ export default function AdminDashboard({ onSelectEvent }) {
       fetchBackendData();
     } catch (err) {
       showError('Save Failed', err.message || 'Failed to save bank account.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -2063,26 +2186,28 @@ export default function AdminDashboard({ onSelectEvent }) {
             gap: '0.5rem'
           }}
         >
-          <Users size={18} /> Users ({usersList.length})
+          <Users size={18} /> Users ({visibleUsersList.length})
         </button>
 
-        <button
-          onClick={() => setActiveAdminTab('roles')}
-          style={{
-            padding: '0.75rem 1.25rem',
-            borderRadius: '10px',
-            border: 'none',
-            background: activeAdminTab === 'roles' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
-            color: '#ffffff',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <ShieldCheck size={18} /> Roles ({rolesList.length})
-        </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => setActiveAdminTab('roles')}
+            style={{
+              padding: '0.75rem 1.25rem',
+              borderRadius: '10px',
+              border: 'none',
+              background: activeAdminTab === 'roles' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
+              color: '#ffffff',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <ShieldCheck size={18} /> Roles ({rolesList.length})
+          </button>
+        )}
 
         <button
           onClick={() => setActiveAdminTab('auditoriums')}
@@ -2658,7 +2783,7 @@ export default function AdminDashboard({ onSelectEvent }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>User Accounts</h3>
             <button
-              onClick={() => { setUserForm(defaultUserForm); setShowUserModal(true); }}
+              onClick={handleOpenCreateUser}
               style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', border: 'none', color: '#ffffff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               <Plus size={16} /> Create User Account
@@ -2677,7 +2802,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                 </tr>
               </thead>
               <tbody>
-                {usersList.map(u => (
+                {visibleUsersList.map(u => (
                   <tr key={u.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
                     <td style={{ padding: '1rem', fontWeight: 600, color: '#f8fafc' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -2727,7 +2852,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       )}
 
       {/* --- TAB 6: ROLES TABLE --- */}
-      {activeAdminTab === 'roles' && (
+      {isSuperAdmin && activeAdminTab === 'roles' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>Database System Roles</h3>
@@ -2890,7 +3015,7 @@ export default function AdminDashboard({ onSelectEvent }) {
                       {aud.description || 'Custom interactive venue blueprint.'}
                     </p>
 
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)', flexWrap: 'wrap' }}>
                       <button
                         onClick={() => setPreviewAuditorium(aud)}
                         style={{ padding: '0.5rem 0.85rem', background: 'rgba(13, 148, 136, 0.18)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600 }}
@@ -2898,8 +3023,62 @@ export default function AdminDashboard({ onSelectEvent }) {
                         <Eye size={14} /> Preview Chart
                       </button>
                       <button
+                        onClick={async () => {
+                          if (exportingAudId === aud.id) return;
+                          try {
+                            setExportingAudId(aud.id);
+                            const parsedBlueprint = parseAuditoriumLayout(aud.layoutJson);
+                            const exported = await exportAuditoriumChartPdf({
+                              auditoriumName: aud.name,
+                              venueName: venueName || 'Arts Council of Pakistan',
+                              cityName: cityName || 'Karachi',
+                              countryName: countryName || 'Pakistan',
+                              showName: '',
+                              showDate: '',
+                              resolvedBlueprint: parsedBlueprint,
+                              currentZone: { zone: aud.name, totalCapacity: aud.totalCapacity },
+                              eventTitle: ''
+                            });
+                            if (exported && showSuccess) {
+                              showSuccess('Chart Exported 📥', `${aud.name} seating chart downloaded as PDF.`);
+                            }
+                          } catch (err) {
+                            console.error('Error exporting chart PDF:', err);
+                            if (showError) showError('Export Failed', 'Failed to export auditorium chart to PDF.');
+                          } finally {
+                            setExportingAudId(null);
+                          }
+                        }}
+                        disabled={exportingAudId === aud.id}
+                        title="Download Seating Chart in PDF format with White Background"
+                        style={{
+                          padding: '0.5rem 0.85rem',
+                          background: exportingAudId === aud.id ? 'rgba(5, 150, 105, 0.6)' : 'linear-gradient(135deg, #059669, #0f766e)',
+                          border: '1px solid rgba(45, 212, 191, 0.4)',
+                          borderRadius: '6px',
+                          color: '#ffffff',
+                          cursor: exportingAudId === aud.id ? 'wait' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.35rem',
+                          fontSize: '0.82rem',
+                          fontWeight: 700
+                        }}
+                      >
+                        {exportingAudId === aud.id ? (
+                          <>
+                            <RefreshCw size={14} className="animate-spin" /> Exporting...
+                          </>
+                        ) : (
+                          <>
+                            <Download size={14} /> Download PDF
+                          </>
+                        )}
+                      </button>
+                      <button
                         onClick={() => handleEditAuditorium(aud)}
-                        style={{ flex: 1, padding: '0.5rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600 }}
+                        style={{ flex: 1, minWidth: '70px', padding: '0.5rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', fontSize: '0.82rem', fontWeight: 600 }}
                       >
                         <Edit3 size={14} /> Edit
                       </button>
@@ -3889,9 +4068,17 @@ export default function AdminDashboard({ onSelectEvent }) {
                       <button
                         type="submit"
                         disabled={isSaving}
-                        style={{ flex: 2, padding: '0.85rem 1.5rem', background: 'linear-gradient(135deg, #059669 0%, #0f766e 100%)', border: '1px solid rgba(13, 148, 136, 0.5)', borderRadius: '10px', color: '#fff', fontWeight: 700, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1, boxShadow: '0 4px 15px rgba(13, 148, 136, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.95rem' }}
+                        style={{ flex: 2, padding: '0.85rem 1.5rem', background: 'linear-gradient(135deg, #059669 0%, #0f766e 100%)', border: '1px solid rgba(13, 148, 136, 0.5)', borderRadius: '10px', color: '#fff', fontWeight: 700, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, boxShadow: '0 4px 15px rgba(13, 148, 136, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '0.95rem' }}
                       >
-                        <Save size={18} /> {isSaving ? 'Saving Event...' : (eventForm.id ? 'Update & Save Event' : 'Create & Publish Event')}
+                        {isSaving ? (
+                          <>
+                            <RefreshCw size={18} className="animate-spin" /> Saving Event...
+                          </>
+                        ) : (
+                          <>
+                            <Save size={18} /> {eventForm.id ? 'Update & Save Event' : 'Create & Publish Event'}
+                          </>
+                        )}
                       </button>
                     </div>
 
@@ -3955,7 +4142,9 @@ export default function AdminDashboard({ onSelectEvent }) {
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowOrgModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Organizer...' : 'Save Organizer'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  {isSaving ? <><RefreshCw size={16} className="animate-spin" /> Saving Organizer...</> : (orgForm.id ? 'Update Organizer' : 'Save Organizer')}
+                </button>
               </div>
             </form>
           </div>
@@ -4010,7 +4199,9 @@ export default function AdminDashboard({ onSelectEvent }) {
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowArtistModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #a855f7, #6b21a8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Artist...' : 'Save Artist'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #a855f7, #6b21a8)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  {isSaving ? <><RefreshCw size={16} className="animate-spin" /> Saving Artist...</> : (artistForm.id ? 'Update Artist' : 'Save Artist')}
+                </button>
               </div>
             </form>
           </div>
@@ -4086,7 +4277,9 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                   <button type="button" onClick={() => setShowTierModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                  <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Tier...' : (tierForm.id ? 'Update Ticket Tier' : 'Save Tier & Price')}</button>
+                  <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                    {isSaving ? <><RefreshCw size={16} className="animate-spin" /> Saving Tier...</> : (tierForm.id ? 'Update Ticket Tier' : 'Save Tier & Price')}
+                  </button>
                 </div>
               </form>
             </div>
@@ -4175,18 +4368,22 @@ export default function AdminDashboard({ onSelectEvent }) {
                 entityId={userForm.id}
               />
               <div>
-                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Assign Role *</label>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                  Assign Role * {!isSuperAdmin && <span style={{ color: '#2dd4bf', fontSize: '0.75rem' }}>(Organizer & Attendee only)</span>}
+                </label>
                 <SearchableSelect
                   required
                   value={userForm.roleId}
-                  onChange={e => setUserForm({ ...userForm, roleId: e.target.value })}
-                  options={rolesList.map(r => ({ value: r.id, label: r.name }))}
+                  onChange={val => setUserForm({ ...userForm, roleId: typeof val === 'object' && val !== null ? (val.value || val.target?.value) : val })}
+                  options={userRoleOptions}
                   placeholder="Select Role..."
                 />
               </div>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowUserModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving User...' : 'Save User'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  {isSaving ? <><RefreshCw size={16} className="animate-spin" /> Saving User...</> : (userForm.id ? 'Update User' : 'Save User')}
+                </button>
               </div>
             </form>
           </div>
@@ -4194,7 +4391,7 @@ export default function AdminDashboard({ onSelectEvent }) {
       )}
 
       {/* --- MODAL 6: CREATE / EDIT ROLE --- */}
-      {showRoleModal && (
+      {isSuperAdmin && showRoleModal && (
         <div className="modal-overlay">
           <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px', padding: '2rem', position: 'relative' }}>
             <button
@@ -4217,7 +4414,9 @@ export default function AdminDashboard({ onSelectEvent }) {
               </div>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowRoleModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Role...' : 'Save Role'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  {isSaving ? <><RefreshCw size={16} className="animate-spin" /> Saving Role...</> : 'Save Role'}
+                </button>
               </div>
             </form>
           </div>
@@ -4275,7 +4474,9 @@ export default function AdminDashboard({ onSelectEvent }) {
               </div>
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowTagModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Tag...' : 'Save Tag'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  {isSaving ? <><RefreshCw size={16} className="animate-spin" /> Saving Tag...</> : 'Save Tag'}
+                </button>
               </div>
             </form>
           </div>
@@ -4513,7 +4714,9 @@ export default function AdminDashboard({ onSelectEvent }) {
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowAuditoriumModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Layout...' : 'Save Auditorium Layout'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #0f766e)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  {isSaving ? <><RefreshCw size={16} className="animate-spin" /> Saving Layout...</> : (auditoriumForm.id ? 'Update Auditorium Layout' : 'Save Auditorium Layout')}
+                </button>
               </div>
             </form>
           </div>
@@ -4544,7 +4747,9 @@ export default function AdminDashboard({ onSelectEvent }) {
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowCountryModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Country...' : 'Save Country'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  {isSaving ? <><RefreshCw size={16} className="animate-spin" /> Saving Country...</> : 'Save Country'}
+                </button>
               </div>
             </form>
           </div>
@@ -4583,7 +4788,9 @@ export default function AdminDashboard({ onSelectEvent }) {
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                 <button type="button" onClick={() => setShowCityModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving City...' : 'Save City'}</button>
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  {isSaving ? <><RefreshCw size={16} className="animate-spin" /> Saving City...</> : 'Save City'}
+                </button>
               </div>
             </form>
           </div>
@@ -4656,7 +4863,9 @@ export default function AdminDashboard({ onSelectEvent }) {
 
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                   <button type="button" onClick={() => setShowVenueModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>Cancel</button>
-                  <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>{isSaving ? 'Saving Venue...' : 'Save Venue'}</button>
+                  <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                    {isSaving ? <><RefreshCw size={16} className="animate-spin" /> Saving Venue...</> : (venueForm.id ? 'Update Venue' : 'Save Venue')}
+                  </button>
                 </div>
               </form>
             </div>
@@ -4737,8 +4946,8 @@ export default function AdminDashboard({ onSelectEvent }) {
                 <button type="button" onClick={() => setShowFaqModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>
                   Cancel
                 </button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>
-                  {isSaving ? 'Saving FAQ...' : (faqForm.id ? 'Update FAQ' : 'Save FAQ')}
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  {isSaving ? <><RefreshCw size={16} className="animate-spin" /> Saving FAQ...</> : (faqForm.id ? 'Update FAQ' : 'Save FAQ')}
                 </button>
               </div>
             </form>
@@ -4883,8 +5092,8 @@ export default function AdminDashboard({ onSelectEvent }) {
                 <button type="button" onClick={() => setShowFooterModal(false)} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer' }}>
                   Cancel
                 </button>
-                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>
-                  {isSaving ? 'Updating...' : 'Save Footer Info'}
+                <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #0d9488, #059669)', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  {isSaving ? <><RefreshCw size={16} className="animate-spin" /> Updating Footer Info...</> : 'Save Footer Info'}
                 </button>
               </div>
             </form>
@@ -5288,8 +5497,29 @@ export default function AdminDashboard({ onSelectEvent }) {
                 <button type="button" onClick={() => setShowBankAccountModal(false)} className="btn btn-secondary" style={{ flex: 1, padding: '0.75rem' }}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1, padding: '0.75rem', fontWeight: 700 }}>
-                  {bankAccountForm.id ? 'Save Changes' : 'Create Bank Account'}
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="btn btn-primary"
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    fontWeight: 700,
+                    cursor: isSaving ? 'not-allowed' : 'pointer',
+                    opacity: isSaving ? 0.7 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem'
+                  }}
+                >
+                  {isSaving ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" /> Saving Bank Account...
+                    </>
+                  ) : (
+                    bankAccountForm.id ? 'Save Changes' : 'Create Bank Account'
+                  )}
                 </button>
               </div>
             </form>

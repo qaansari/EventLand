@@ -328,6 +328,23 @@ def build_document():
     note="PayPro switch operations allow Super Admins to audit live gateway settlements, register corporate consumers, and resolve disputed transactions directly.",
     note_title="FINANCIAL SWITCH FEATURE:")
 
+    # Test Case 1.7 (NEW)
+    add_test_case(doc, "Test Case 1.7", "User Profile Photo Upload & Header Dynamic Display (Custom Photo vs Fallback Avatar)", [
+        [("Log in to the application as SuperAdmin or Admin (", False), ("admin@eventland.pk", True), (") via the top navigation header.", False)],
+        [("Inspect top navigation header: Verify authenticated user badge initially displays the role-themed initial avatar circle (e.g. gradient circle with user initials and role border: #c084fc for Admin, #2dd4bf for Organizer, #34d399 for Customer).", False)],
+        [("Navigate to ", False), ("Admin Portal -> Users & Roles", True), (" tab.", False)],
+        [("Locate the active logged-in user in the Users table. Click the Edit button (pencil icon).", False)],
+        [("In the Edit User modal, observe the 'User Profile Image (Optional)' file upload field.", False)],
+        [("Upload a valid portrait image file (JPG or PNG headshot). Verify file upload re-encodes pure raster pixels via SkiaSharp and stores file under /assets/images/users/.", False)],
+        [("Click 'Save User'. Verify real-time event synchronization: app dispatches eventland:user-updated and updates currentUser session state.", False)],
+        [("Observe top navigation header right section: Verify circular profile picture is now visible in the header badge with role-colored border.", False)],
+        [("Open mobile drawer menu: Verify user profile photograph displays in the mobile menu header.", False)],
+        [("Verify Fallback Resilience: Edit user account and remove photo (or simulate 404 image failure). Verify header immediately and gracefully displays the initial avatar fallback without broken image icons or UI glitches.", False)],
+        [("Refresh browser: Verify JWT session re-verification (/api/auth/me) preserves and restores the user profile picture in the header from localStorage and backend.", False)]
+    ], "User profile photo uploaded and saved in database. Top navigation header dynamically displays the custom profile image when present. If no image is uploaded or if image loading fails, header seamlessly renders the role-themed initial avatar without layout shifts.",
+    note="AuthModal, App.jsx session bootstrap, and AdminDashboard synchronize user imageUrl end-to-end to ensure the header accurately displays user photo vs avatar fallback.",
+    note_title="HEADER AVATAR & PHOTO SYSTEM:")
+
     # -------------------------------------------------------------
     # SECTION 3: ADMIN TESTING
     # -------------------------------------------------------------
@@ -396,6 +413,36 @@ def build_document():
     ], "AdminBookingsTab provides end-to-end booking governance, KPI reporting, multi-filter search, CSV/Excel exports, and instant bank proof verification.",
     note="AdminBookingsTab isolates booking administration with dedicated performance optimizations and real-time revenue calculations.",
     note_title="ADMIN HUB ENHANCEMENT:")
+
+    # Test Case 2.6 (NEW)
+    add_test_case(doc, "Test Case 2.6", "Auditorium Seating Chart PDF Export (Landscape Orientation, Zero Blank Space & Multi-Paper Compatibility)", [
+        [("Test Multi-Point Entry: Verify chart PDF export is accessible from 3 key locations: (a) Admin Portal -> Auditorium Charts tab -> click 'Download PDF' directly on any auditorium card; (b) Click 'Preview Chart' to launch InteractiveSeatPicker modal and click 'Download Chart (PDF)'; (c) Organizer Portal -> Event Creation Wizard -> select an auditorium blueprint and click 'Download Chart (PDF)'.", False)],
+        [("Click ", False), ("'Download Chart (PDF)'", True), (" (or 'Download PDF').", False)],
+        [("Observe visual progress feedback: The button immediately disables, the icon switches to a spinning animation with text 'Exporting PDF...', providing instant feedback while the chart renders.", False)],
+        [("Verify direct file download: Browser immediately initiates and completes download of an actual .pdf document named '", False), ("[Auditorium_Name]_Seating_Chart.pdf", True), (" directly to the user's Downloads directory without popup blocker prompts.", False)],
+        [("Open downloaded PDF document: Verify document is rendered in **Landscape Orientation** matching the wide aspect ratio of auditorium seating layouts.", False)],
+        [("Verify Elimination of Blank White Space: Verify that empty vertical white voids are eliminated. Show Name and Show Date are aligned horizontally in a compact top bar; seat boxes scale dynamically (16px - 22px) with clean aisles (18px) and tight 5mm margins, maximizing printable chart area.", False)],
+        [("Verify Multi-Paper Print Compatibility: Open the PDF in Acrobat Reader or browser print dialog. Test printing to different paper types (A4, US Letter, Legal, A3) with 'Fit to Printable Area' / 'Fit to Page'. Verify the landscape chart scales smoothly and fills the sheet without clipping or awkward margins.", False)],
+        [("Verify Seating Indicators: Seats display crisp seat numbers, unavailable/disabled seats show clean 'X' placeholders, and section badges are neatly rendered.", False)],
+        [("Verify Print Fallback: In environments where canvas rasterization fails, verify the system automatically falls back to a hidden iframe print dialog with @page { size: landscape; margin: 5mm; }.", False)]
+    ], "Seating chart exports and downloads directly as a high-definition, landscape printable PDF file. No browser popup blockers are triggered, visual spinners confirm execution, blank white space is eliminated, and chart fits cleanly across different paper sizes.",
+    note="html2canvas and jsPDF are dynamically imported on demand to generate landscape PDFs with minimal 5mm margins and proportional scaling for diverse paper formats.",
+    note_title="LANDSCAPE CHART PDF ARCHITECTURE:")
+
+    # Test Case 2.7 (NEW)
+    add_test_case(doc, "Test Case 2.7", "Admin Role User Management Rights & Roles Tab Access Restrictions", [
+        [("Log in as an authenticated user with role ", False), ("Admin", True), (" (e.g. admin.qa@eventland.pk).", False)],
+        [("Verify Navigation Bar Roles Tab Restriction: Observe the dashboard navigation tab bar. Verify that the ", False), ("Roles", True), (" tab button is strictly hidden and inaccessible.", False)],
+        [("Verify Route / State Guard: If the Admin user manually attempts to trigger or access the roles tab, verify the application immediately redirects back to the ", False), ("Events", True), (" tab.", False)],
+        [("Navigate to ", False), ("Admin Portal -> Users", True), (" tab.", False)],
+        [("Verify User Listing Masking: Observe the user records listed in the table. Verify that ", False), ("Admins and SuperAdmins are completely hidden", True), (" from the list. The Admin user can ONLY view accounts with role ", False), ("Organizer", True), (" or ", False), ("Attendee (Customer)", True), (".", False)],
+        [("Click ", False), ("Create User Account", True), (". Inspect the ", False), ("Assign Role", True), (" dropdown field. Verify that the dropdown ONLY presents ", False), ("Organizer", True), (" and ", False), ("Attendee", True), (" options. Admin and SuperAdmin roles are strictly excluded.", False)],
+        [("Fill in Name, Email, Country, Mobile Number, Password, select role ", False), ("Attendee", True), (", and click 'Save User'. Verify account is created successfully.", False)],
+        [("Click 'Edit' on an existing Organizer or Attendee record. Verify the Role dropdown continues to offer ONLY ", False), ("Organizer", True), (" and ", False), ("Attendee", True), (".", False)],
+        [("Verify Anti-Privilege Escalation Defense: Send a forged API request with RoleId: 1 (SuperAdmin) or RoleId: 2 (Admin). Verify the backend API (", False), ("AdminUsersController", True), (") rejects the request with ", False), ("HTTP 403 Forbidden", True), (".", False)]
+    ], "Admin role users are strictly restricted to managing Organizer and Attendee accounts, cannot view or modify Admins/SuperAdmins, and cannot access the Roles management tab.",
+    note="Enforces least-privilege security: Admins can oversee operational event and attendee records without privilege escalation risks or visibility into executive system administrators.",
+    note_title="FINE-GRAINED RBAC ENFORCEMENT:")
 
     # -------------------------------------------------------------
     # SECTION 4: ORGANIZER TESTING
@@ -660,11 +707,14 @@ def build_document():
         ("TC-1.4", "Super Admin", "Locations & Metadata", "Countries, Cities, FAQs & Tags dynamically managed", "[  ] Pass"),
         ("TC-1.5", "Super Admin", "Turnstile & Rate Limits", "Captcha auto-hides across app; per-IP rate limits enforce 429", "[  ] Pass"),
         ("TC-1.6", "Super Admin", "PayPro Switch Admin", "GPO reports, Consumer CSV import, manual sweep & status overrides", "[  ] Pass"),
+        ("TC-1.7", "Super Admin / User", "Profile Photo & Header Avatar", "Custom user photo displayed in header; seamless fallback to role avatar circle", "[  ] Pass"),
         ("TC-2.1", "Admin", "Venue & Layout Config", "Auditorium & Seating zones created; PDF seating chart exports", "[  ] Pass"),
         ("TC-2.2", "Admin", "Artist Management", "Artist bio and photo uploaded, sanitized and saved", "[  ] Pass"),
         ("TC-2.3", "Admin", "Event Publishing", "Event published with clean SEO URL slug", "[  ] Pass"),
         ("TC-2.4", "Admin", "Multi-Show Scheduling", "Multiple shows scheduled with tier row range mapping", "[  ] Pass"),
         ("TC-2.5", "Admin", "Admin Bookings Hub", "KPI metrics, multi-filters, CSV/Excel export & slip preview", "[  ] Pass"),
+        ("TC-2.6", "Admin / Organizer", "Chart PDF Landscape Export", "Auditorium chart exports in landscape with zero blank space & multi-paper support", "[  ] Pass"),
+        ("TC-2.7", "Admin", "User Management & Role Tab RBAC", "Roles tab hidden; Admin/SuperAdmin accounts masked; role selection restricted to Organizer & Attendee", "[  ] Pass"),
         ("TC-3.1", "Organizer", "Event Creation Wizard", "Multi-step wizard completes event and show registration", "[  ] Pass"),
         ("TC-3.2", "Organizer", "BOLA / IDOR Defense", "Foreign event edits blocked with 403 Forbidden", "[  ] Pass"),
         ("TC-3.3", "Organizer", "Sales Analytics", "Total sales & revenue match DB counts; attendee list exports", "[  ] Pass"),
@@ -709,19 +759,25 @@ def build_document():
 
     # Save logic: save to current workspace directory and e:\EventLand if accessible
     script_dir = os.path.dirname(os.path.abspath(__file__))
+    updated_output_path = os.path.join(script_dir, "EventLand_Full_Role_Testing_Guide_Updated.docx")
+    try:
+        doc.save(updated_output_path)
+        print(f"Successfully generated updated Word document at: {updated_output_path}")
+    except Exception as e:
+        print(f"Warning saving {updated_output_path}: {e}")
+
     primary_output_path = os.path.join(script_dir, "EventLand_Full_Role_Testing_Guide.docx")
     try:
         doc.save(primary_output_path)
         print(f"Successfully generated Word document at: {primary_output_path}")
     except PermissionError:
-        fallback_path = os.path.join(script_dir, "EventLand_Full_Role_Testing_Guide_Updated.docx")
-        doc.save(fallback_path)
         print(f"Notice: 'EventLand_Full_Role_Testing_Guide.docx' is currently open in Microsoft Word and locked.")
-        print(f"Saved latest updated document as: {fallback_path}")
+    except Exception as e:
+        print(f"Warning saving {primary_output_path}: {e}")
 
     alt_dir = r"e:\EventLand"
     if os.path.exists(alt_dir) and os.path.isdir(alt_dir):
-        alt_output_path = os.path.join(alt_dir, "EventLand_Full_Role_Testing_Guide.docx")
+        alt_output_path = os.path.join(alt_dir, "EventLand_Full_Role_Testing_Guide_Updated.docx")
         try:
             doc.save(alt_output_path)
             print(f"Also saved copy at: {alt_output_path}")

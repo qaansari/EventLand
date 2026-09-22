@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Ticket, Calendar, Layers, ZoomIn, ZoomOut, RotateCcw, Maximize2, ShieldAlert, Download } from 'lucide-react';
+import { X, Ticket, Calendar, Layers, ZoomIn, ZoomOut, RotateCcw, Maximize2, ShieldAlert, Download, RefreshCw } from 'lucide-react';
 import { seatHoldApi, eventsApi, auditoriumLayoutsApi, bankAccountsApi, BACKEND_URL } from '../services/api';
 import { parseAuditoriumLayout } from '../data/auditoriumLayouts';
 import { exportAuditoriumChartPdf } from '../utils/pdfChartExporter';
+import { useToast } from '../context/ToastContext';
 
 // Stable per-session guest identity so all seat holds from this browser share one owner
 // (a fresh random email per click fragmented the hold map and broke releases).
@@ -17,10 +18,12 @@ const getGuestEmail = () => {
 };
 
 export default function InteractiveSeatPicker({ event: initialEvent, onClose, onProceedToCheckout, isPreview = false }) {
+  const { showSuccess, showError } = useToast();
   const isPreviewMode = isPreview || !onProceedToCheckout || String(initialEvent?.id || '').startsWith('preview-');
   const [eventData, setEventData] = useState(initialEvent);
   const [dbAuditoriums, setDbAuditoriums] = useState([]);
   const [activeBank, setActiveBank] = useState(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   // Refresh full event details if seatingZones were not preloaded
   useEffect(() => {
@@ -476,23 +479,35 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
   const cityName = rawCity;
   const countryName = (event.countryName || event.country || matchedDbAuditorium?.country || 'Pakistan');
 
-  const handleDownloadPdf = () => {
-    exportAuditoriumChartPdf({
-      auditoriumName,
-      venueName,
-      cityName,
-      countryName,
-      showName: isPreviewMode ? '' : (activeShow?.showTitle || ''),
-      showDate: isPreviewMode ? '' : (activeShow?.startTimeUtc 
-        ? new Date(activeShow.startTimeUtc).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
-        : (event.startDateUtc ? new Date(event.startDateUtc).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '')),
-      resolvedBlueprint,
-      currentZone: {
-        ...currentZone,
-        rows: Math.max(currentZone?.rows || 11, 11)
-      },
-      eventTitle: isPreviewMode ? '' : (event.title || '')
-    });
+  const handleDownloadPdf = async () => {
+    if (isExportingPdf) return;
+    setIsExportingPdf(true);
+    try {
+      const exported = await exportAuditoriumChartPdf({
+        auditoriumName,
+        venueName,
+        cityName,
+        countryName,
+        showName: isPreviewMode ? '' : (activeShow?.showTitle || ''),
+        showDate: isPreviewMode ? '' : (activeShow?.startTimeUtc 
+          ? new Date(activeShow.startTimeUtc).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })
+          : (event.startDateUtc ? new Date(event.startDateUtc).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : '')),
+        resolvedBlueprint,
+        currentZone: {
+          ...currentZone,
+          rows: Math.max(currentZone?.rows || 11, 11)
+        },
+        eventTitle: isPreviewMode ? '' : (event.title || '')
+      });
+      if (exported && showSuccess) {
+        showSuccess('Chart Exported 📥', `${auditoriumName} seating chart downloaded as PDF.`);
+      }
+    } catch (err) {
+      console.error('Error exporting chart PDF:', err);
+      if (showError) showError('Export Failed', 'Failed to export auditorium chart to PDF.');
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   return (
@@ -550,24 +565,33 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
             <button
               type="button"
               onClick={handleDownloadPdf}
+              disabled={isExportingPdf}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.4rem',
                 padding: '0.45rem 0.95rem',
                 borderRadius: '8px',
-                background: 'linear-gradient(135deg, #059669, #0f766e)',
+                background: isExportingPdf ? 'rgba(5, 150, 105, 0.6)' : 'linear-gradient(135deg, #059669, #0f766e)',
                 border: '1px solid rgba(45, 212, 191, 0.4)',
                 color: '#ffffff',
                 fontSize: '0.8rem',
                 fontWeight: 700,
-                cursor: 'pointer',
+                cursor: isExportingPdf ? 'wait' : 'pointer',
                 boxShadow: '0 2px 10px rgba(13, 148, 136, 0.35)',
                 whiteSpace: 'nowrap'
               }}
               title="Download Seating Chart in PDF format with White Background"
             >
-              <Download size={15} /> Download Chart (PDF)
+              {isExportingPdf ? (
+                <>
+                  <RefreshCw size={15} className="animate-spin" /> Exporting PDF...
+                </>
+              ) : (
+                <>
+                  <Download size={15} /> Download Chart (PDF)
+                </>
+              )}
             </button>
 
             <div className="seat-picker-zoom-controls" style={{ display: 'flex', alignItems: 'center', background: 'rgba(30, 41, 59, 0.8)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', padding: '0.15rem' }}>

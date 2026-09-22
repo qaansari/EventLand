@@ -15,7 +15,8 @@ import {
   FileText,
   CreditCard,
   ExternalLink,
-  Zap
+  Zap,
+  RefreshCw
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { bookingsApi, bankAccountsApi, uploadApi, paymentsApi, getEventImageUrl, getQrCodeImageUrl, getPaymentSlipUrl } from '../services/api';
@@ -802,14 +803,23 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                       fontSize: '0.98rem',
                       fontWeight: 800,
                       borderRadius: '10px',
-                      display: 'flex',
+                      display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '0.5rem',
-                      background: 'linear-gradient(135deg, #0d9488, #0f766e)'
+                      background: 'linear-gradient(135deg, #0d9488, #0f766e)',
+                      cursor: isInitiatingPayPro ? 'not-allowed' : 'pointer',
+                      opacity: isInitiatingPayPro ? 0.75 : 1
                     }}
                   >
-                    {isInitiatingPayPro ? 'Connecting to PayPro Gateway...' : 'Proceed to PayPro Online Gateway →'}
+                    {isInitiatingPayPro ? (
+                      <>
+                        <RefreshCw size={18} className="animate-spin" />
+                        <span>Connecting to PayPro Gateway...</span>
+                      </>
+                    ) : (
+                      'Proceed to PayPro Online Gateway →'
+                    )}
                   </button>
                 </div>
               </div>
@@ -1114,9 +1124,28 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                       type="submit"
                       disabled={isProcessing}
                       className="btn btn-primary"
-                      style={{ flex: 1, padding: '0.85rem', fontSize: '1rem', fontWeight: 700, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                      style={{
+                        flex: 1,
+                        padding: '0.85rem',
+                        fontSize: '1rem',
+                        fontWeight: 700,
+                        borderRadius: '10px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.5rem',
+                        cursor: isProcessing ? 'not-allowed' : 'pointer',
+                        opacity: isProcessing ? 0.75 : 1
+                      }}
                     >
-                      {isProcessing ? 'Processing Order...' : 'Submit Payment & Place Booking ✓'}
+                      {isProcessing ? (
+                        <>
+                          <RefreshCw size={18} className="animate-spin" />
+                          <span>Processing Order...</span>
+                        </>
+                      ) : (
+                        'Submit Payment & Place Booking ✓'
+                      )}
                     </button>
                   </div>
                 </form>
@@ -1273,10 +1302,22 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                   background: 'linear-gradient(135deg, #0d9488, #0284c7)',
                   border: 'none',
                   color: '#fff',
-                  cursor: isCheckingStatus ? 'not-allowed' : 'pointer'
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  cursor: isCheckingStatus ? 'not-allowed' : 'pointer',
+                  opacity: isCheckingStatus ? 0.75 : 1
                 }}
               >
-                {isCheckingStatus ? 'Verifying with PayPro...' : 'I Have Paid — Verify Payment & Issue Tickets 🎟️'}
+                {isCheckingStatus ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    <span>Verifying with PayPro...</span>
+                  </>
+                ) : (
+                  'I Have Paid — Verify Payment & Issue Tickets 🎟️'
+                )}
               </button>
               <button
                 onClick={onClose}

@@ -168,6 +168,116 @@
   - Added `willChange: 'transform'` in `EventCard.jsx` for smooth 60fps card hover transitions.
   - Fallback `alt` text on event cards for accessibility and SEO.
 
+- **Header Profile Image & Dynamic Avatar System**:
+  - **Dynamic Image vs Avatar Fallback**: In the top navigation header (`Navbar.jsx`), the authenticated user profile badge inspects `currentUser.imageUrl || currentUser.avatar`. If a valid uploaded photo exists and loads, it renders the circular photo with role-colored borders (`#c084fc` for Admin, `#2dd4bf` for Organizer, `#34d399` for Customer). If no custom image is present or if loading fails (`onError`), it automatically falls back to an inline role-themed gradient avatar circle (`getInitials`) with zero layout shift or broken image icons.
+  - **End-to-End Session & Auth Synchronization**:
+    - `AuthModal.jsx`: Preserves `imageUrl` in `onLoginSuccess` payload for both sign-in and new user registration.
+    - `App.jsx`: Retains `imageUrl` in `authApi.getMe()` JWT verification on app boot and subscribes to `eventland:user-updated` window events.
+    - `AdminDashboard.jsx`: When a user (including Super Admin) edits their own account or uploads a new photo in the Users management tab, changes are instantly synced to `currentUser` and dispatched via `eventland:user-updated`, immediately updating the header badge.
+    - `AttendeeDashboard.jsx`: Displays the user photo / avatar in the verified attendee portal welcome banner and profile tab.
+    - `api.js`: `getUserImageUrl` supports external URLs (`http/https`), inline `data:`/`blob:` URLs, and relative `/assets/images/users/` paths across Vite dev-server proxy and production CDN hosting.
+
+- **High-Definition Auditorium Seating Chart PDF Export System**:
+  - **Direct PDF Download & Anti-Popup-Blocker Architecture** (`pdfChartExporter.js`):
+    - Generates clean, high-contrast, pure-white background, single-page printable PDF seating charts matching real-world auditorium blueprints.
+    - Employs direct dynamic imports of `html2canvas` and `jsPDF` on-demand (chunked into separate vendor bundle to preserve fast initial page load). Renders DOM elements to canvas via `html2canvas` at 2x scale and triggers an immediate client-side file download (`<Auditorium_Name>_Seating_Chart.pdf`).
+    - Multi-point pixel sampling in `isCanvasBlank` detects actual dark pixels across top, middle, and bottom regions before creating the PDF; automatically triggers a hidden `iframe` print dialog fallback if blank canvas is detected.
+    - Eliminates browser popup blocker interruptions previously caused by `window.open('', '_blank')` calls.
+  - **Universal Zero-Trimming & Dynamic Scaling (10 to 10,000+ Seats)**:
+    - **Proportional Column & Row Analysis**: Dynamically computes `maxColsInAnyRow`, `totalRowsCount`, and `maxAislesInAnyRow` across all sections and blocks.
+    - **Auto-Calculated Seat Dimensions**:
+      - Calculates available seating width within high-definition base canvas (`1600px`).
+      - Caches dynamic `seatSizePx`: `20px` for small halls (10-30 cols), `12px-18px` for medium halls (40-70 cols), `8px-12px` for large auditoriums (70-130 cols), and `3.5px-8px` for mega stadiums / arena layouts (130-300+ cols up to 10,000+ seats).
+      - If column count exceeds 300+, canvas width dynamically expands beyond `1600px` (`Math.max(1600, maxColsInAnyRow * 4.2 + 200)`), completely preventing seat truncation.
+    - **Dual-Axis Fit (`Math.min(scaleX, scaleY)`)**:
+      - `jsPDF` calculates both `scaleX = availWidth / canvas.width` and `scaleY = availHeight / canvas.height`.
+      - Proportionally scales by `Math.min(scaleX, scaleY)` and centers with `xOffset` and `yOffset`, guaranteeing 100% visibility on any paper type (A4, US Letter, Legal, A3) with zero clipping on left, right, top, or bottom.
+    - **Anti-Clipping html2canvas Capture**:
+      - Passes explicit `windowWidth` and `windowHeight` matching `containerWidthPx + 60` and `renderedHeight + 60` to html2canvas, eliminating browser viewport clipping on laptops or small screens.
+    - **Micro-Seat Optimization for Mega Venues**:
+      - For venues with 10,000+ seats, micro-seat tiles automatically suppress text overflow when seat size is `< 5.5px`, maintaining clean architectural stadium masterplan visuals.
+  - **Landscape Orientation & Multi-Paper Compatibility**:
+    - Generates PDFs in **Landscape Orientation** (`orientation: 'landscape'`, format: `'a4'`, 297mm × 210mm) matching the natural wide aspect ratio of auditorium seat columns.
+  - **Multi-Point Availability Across Application**:
+    - `InteractiveSeatPicker.jsx`: "Download Chart (PDF)" button in the seat picker header with async `isExportingPdf` loading spinner, disabled state, and toast feedback.
+    - `AdminDashboard.jsx`: Direct "Download PDF" button on every auditorium blueprint card in the Auditorium Charts tab, enabling 1-click exports without opening the preview modal.
+    - `EventOrganizerWizard.jsx`: "Download Chart (PDF)" button upon selecting an auditorium blueprint during event creation, complete with async spinner and toast alerts.
+
+### 8. App-Wide Disabled & In-Button Animated Spinner on Save / CRUD Operations
+- **Core Standard**:
+  - Every "Save", "Submit", or CRUD execution button across the entire application must be explicitly disabled (`disabled={isSaving || isSubmitting}`) throughout the asynchronous operation lifecycle.
+  - While active, the button renders an animated spinning loader (`<RefreshCw className="animate-spin" />`) alongside contextual dynamic loading text directly **inside** the button (e.g., `"Saving Event..."`, `"Saving Organizer..."`, `"Publishing Event..."`, `"Processing Order..."`, `"Submitting Claim..."`).
+  - The button styling applies `cursor: 'not-allowed'` and `opacity: 0.7 - 0.75` while disabled.
+  - Handlers consistently implement `setIsSaving(true)` / `setIsSubmitting(true)` followed by a `try ... finally` block ensuring that the button is reliably re-enabled if errors occur or after completion.
+- **Components Covered**:
+  - `AdminDashboard.jsx`: All 14 CRUD save operations (Event, Organizer, Artist, Ticket Tier, User, Role, Tag, Auditorium Blueprint, Country, City, Venue, FAQ, Footer Info, Bank Account).
+  - `AttendeeDashboard.jsx`: Profile preferences save button (`Saving Preferences...`), refund claim button (`Submitting Claim...`), and booking search button (`Searching...`).
+  - `EventOrganizerWizard.jsx`: Live event publishing button (`Publishing Event...`).
+  - `OrganizerDashboard.jsx`: Payout settlement request button (`Processing Settlement...`) and promo code creation button (`Creating Code...`).
+  - `PayProAdminPanel.jsx`: Single consumer registration (`Registering...`), batch CSV import (`Processing...`), and order inspection query (`Querying...`).
+  - `UnpaidInvoicesModal.jsx`: Bank transaction proof submission button (`Saving Proof...`).
+  - `CheckoutModal.jsx`: PayPro gateway checkout initiation (`Connecting to PayPro Gateway...`), bank transfer order submission (`Processing Order...`), and status verification (`Verifying with PayPro...`).
+  - `AuthModal.jsx`: User login and registration button (`Authenticating...`).
+  - `ArtistBookings.jsx`: Artist management booking inquiry button (`Sending Inquiry...`).
+  - `Footer.jsx`: Newsletter email subscription button (`animate-spin` icon).
+  - `index.css`: Added global `@keyframes spin` and `.animate-spin` / `.spin-animation` utility classes (`animation: spin 0.8s linear infinite !important;`).
+
+### 9. App-Wide Branded Preloader (Designed from Existing Logo)
+- **Signature Visual Identity**:
+  - Center emblem with radial ambient glow aura (`rgba(16, 185, 129, 0.35)` to `rgba(13, 148, 136, 0.15)`), dual counter-rotating orbit rings (outer conic/neon ring + inner dashed ring), and centered `/logo-icon.png` badge featuring gentle breathing pulse (`@keyframes preloaderLogoPulse`).
+  - Stylized brand typography: `Event` in white + `Land` in emerald `#10b981` with neon text-shadow, paired with golden uppercase tagline `DISCOVER • BOOK • EXPERIENCE` (`#d9a05b`).
+  - High-tech glowing progress energy bar (`@keyframes preloaderBeam`) and shimmering status message.
+- **Implementations**:
+  - **`index.html` Initial Boot Splash**: Embedded directly inside `<div id="root">` so visitors immediately see the logo preloader while JavaScript bundles download, eliminating any white or empty screen.
+  - **`EventLandPreloader.jsx` Component**: Reusable component supporting `fullScreen`, `compact`, inline `minHeight`, and custom status text.
+  - **`App.jsx`**: Integrated for `LazyFallback` on code-split views/modals and during initial event discovery (`loadingEvents`).
+  - **`EventDetailPage.jsx`**: Displays during event and seating blueprint fetching.
+  - **`ArtistBookings.jsx`**: Displays during artist roster fetching.
+  - **`PayProReturnPage.jsx`**: Displays during 1Link / PayPro transaction verification.
+  - **`PayProAdminPanel.jsx`**: Displays compact preloader during GPO report and consumer database queries.
+
+### 10. Admin Role User Management & Roles Tab Access Restrictions (Fine-Grained RBAC)
+- **Roles Tab Access Control**:
+  - The Roles management tab button (`<ShieldCheck /> Roles`) is strictly restricted to `SuperAdmin`. Users with the `Admin` role cannot view or click the Roles tab.
+  - Active tab auto-redirect: if a non-superadmin user navigates to or opens the roles tab, the dashboard automatically redirects to `'events'`.
+  - Roles tab content (`activeAdminTab === 'roles'`) and Role creation/editing modal (`showRoleModal`) are gated with `isSuperAdmin &&`.
+  - Backend `AdminRolesController.cs`: Role creation (`POST`), update (`PUT`), and deletion (`DELETE`) are strictly guarded with `[Authorize(Roles = "SuperAdmin,superadmin")]`.
+- **Users Tab Visibility Filtering**:
+  - In `AdminDashboard.jsx`, the Users tab table dynamically filters users so that `Admin` role users can only see `Organizer` and `Attendee` (Customer) accounts.
+  - `Admin` and `SuperAdmin` accounts are completely excluded from the table view when viewed by an `Admin`.
+  - The Users count badge in the navigation bar reflects visible users (`visibleUsersList.length`).
+  - Backend `AdminUsersController.cs` & `AdminService.cs`: `GetUsersAsync` and `GetUserByIdAsync` inspect caller claims (`IsSuperAdmin()`) and filter out `Admin` and `SuperAdmin` accounts when called by an `Admin`.
+- **Role Selection in User Create / Update Modal**:
+  - When an `Admin` adds or updates a user, the Role dropdown (`SearchableSelect`) strictly offers **Organizer** and **Attendee** options only (Admin and SuperAdmin options are completely hidden).
+  - When clicking "Create User Account", the default role is initialized to Organizer (ID 3) or Attendee (ID 4) rather than Admin (ID 2).
+  - When saving (`handleSaveUser`), frontend validates that non-superadmins cannot assign role IDs 1 or 2.
+- **Privilege Escalation & Modification Protection**:
+  - In `AdminDashboard.jsx`, `handleEditUser` and `handleDeleteUser` block any attempt by an `Admin` to modify or delete an `Admin` or `SuperAdmin` account.
+  - In `AdminService.cs`, `CreateUserAsync`, `UpdateUserAsync`, and `DeleteUserAsync` check `isSuperAdmin` and throw `UnauthorizedAccessException` (handled as HTTP 403 Forbidden by `AdminUsersController`) if an `Admin` attempts to create, modify, promote to, or delete an `Admin` or `SuperAdmin` account.
+- **Session Role Fidelity**:
+  - `auth.js` (`isSuperAdmin(user)`), `AuthModal.jsx`, and `App.jsx` preserve `rawRole` and `roleName` from JWT authentication so that `SuperAdmin` is never collapsed into a generic `admin` string.
+
+### 14. Official E-Ticket PDF Export
+- **Exact In-Browser Visual Fidelity**:
+  - The exported PDF renders an exact 1:1 replica of the in-browser digital pass from `DigitalTicketModal.jsx`:
+    - Luxury midnight dark gradient card (`linear-gradient(135deg, #10192d, #1a294a)`) with cyan dashed border (`2px dashed rgba(13, 148, 136, 0.45)`) and 20px rounded corners.
+    - Brand header with EventLand logo, `EVENTLAND PAKISTAN` branding, VIP Category/Tier badge, and `CONFIRMED PASS` badge.
+    - High-definition event banner image.
+    - Prominent Show Date & Time highlight box (`📅 SHOW DATE & TIME` and `⏰ SHOW SLOT / TIME`).
+    - Specifications grid (Pass Holder, Ticket Tier/Category, Reserved Seats, Total Paid in PKR, Booked At).
+    - HD scannable QR Code pass on white card with verification status label.
+    - Security verification barcode strip and ticket reference number.
+- **Strict Ticket Number Filename**:
+  - The downloaded filename strictly equals `${ticketNumber}.pdf` (e.g. `EVL-10023.pdf`, `EVL-100001.pdf`).
+  - Leading hashes or illegal filename characters are sanitized.
+- **Dual-Mode Export Mechanism (`ticketPdfExporter.js`)**:
+  - **Live DOM Capture**: When exported from `DigitalTicketModal.jsx`, `html2canvas` directly captures `ticketCardRef.current` at high resolution (`scale: 2.5`), ensuring zero visual discrepancies.
+  - **Headless Offscreen Mode**: When exported from table or card views in `AttendeeDashboard.jsx` or `AdminBookingsTab.jsx`, an offscreen element matching the exact pass structure and styles is mounted, rendered, and cleaned up automatically.
+  - Both modes scale and center the rendered card proportionally onto an A4 portrait PDF with luxury midnight background (`#070c18`), downloading directly via `pdf.save(fileName)`.
+- **Loading & Disabled States**:
+  - `DigitalTicketModal.jsx`, `AttendeeDashboard.jsx`, and `AdminBookingsTab.jsx` provide disabled state and animated spinning loader (`<RefreshCw className="animate-spin" />`) during export.
+  - Success toast displays `${fileName} downloaded successfully!`.
+
 ---
 
 ## Developer Commands & Verification
@@ -198,4 +308,5 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
 ```
 
 ---
-*Last Updated: September 2026 (Modern Security Hardening: Anti-Virus/Malware Pixel Re-encoding, App-Wide Cloudflare Turnstile Auto-Hide, Dynamic CORS & Vercel/Ngrok Reverse-Proxy Ingress, Per-IP Rate Limiting, Full-Stack Latency & Index Optimizations Completed)*
+*Last Updated: September 2026 (Fine-Grained RBAC for Admin Role: Hidden Roles Tab, Attendee & Organizer Only Role Assignment, Admin/SuperAdmin Visibility Masking & Anti-Escalation Protection; App-Wide Branded Logo Preloader & Initial Splash Screen; App-Wide In-Button Animated Spinner & Disabled State on Save / CRUD Operations; Auditorium Seating Chart PDF Exporter with html2pdf & Anti-Popup-Blocker Fallback; Multi-Point Chart PDF Export; Header Dynamic User Image vs Role Avatar Fallback; Full-Stack Auth Image Sync; Anti-Virus/Malware Pixel Re-encoding; App-Wide Cloudflare Turnstile Auto-Hide; Dynamic CORS & Vercel/Ngrok Reverse-Proxy Ingress; Per-IP Rate Limiting; Full-Stack Latency & Index Optimizations Completed)*
+

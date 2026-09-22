@@ -60,7 +60,34 @@
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <div style="position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle at center, #0f172a 0%, #060d1b 100%); color: #fff; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; z-index: 99999;">
+      <style>
+        @keyframes initPulse { 0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px rgba(16,185,129,0.5)); } 50% { transform: scale(1.06); filter: drop-shadow(0 0 24px rgba(16,185,129,0.85)); } }
+        @keyframes initOrbit { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes initBeam { 0% { transform: translateX(-120%); } 100% { transform: translateX(280%); } }
+      </style>
+      <div style="position: relative; width: 104px; height: 104px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.25rem;">
+        <div style="position: absolute; inset: -14px; border-radius: 50%; background: radial-gradient(circle, rgba(16,185,129,0.35) 0%, rgba(13,148,136,0.15) 50%, transparent 72%); filter: blur(12px);"></div>
+        <div style="position: absolute; inset: 0; border-radius: 50%; border: 2.5px solid transparent; border-top-color: #10b981; border-right-color: #2dd4bf; border-bottom-color: rgba(16,185,129,0.2); border-left-color: #d9a05b; animation: initOrbit 1.2s cubic-bezier(0.5,0.1,0.5,0.9) infinite;"></div>
+        <div style="position: relative; z-index: 2; width: 72px; height: 72px; border-radius: 50%; background: linear-gradient(135deg, #0f1f38 0%, #060d1b 100%); border: 1px solid rgba(45,212,191,0.35); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px rgba(0,0,0,0.6); animation: initPulse 2.4s ease-in-out infinite;">
+          <img src="/logo-icon.png" alt="EventLand Logo" style="height: 42px; width: auto; object-fit: contain; filter: drop-shadow(0 0 10px rgba(16,185,129,0.65));" />
+        </div>
+      </div>
+      <div style="font-size: 1.45rem; font-weight: 900; letter-spacing: -0.02em; color: #fff; line-height: 1.1; margin-bottom: 0.25rem;">
+        Event <span style="color: #10b981; text-shadow: 0 0 16px rgba(16,185,129,0.5);">Land</span>
+      </div>
+      <div style="font-size: 0.58rem; color: #d9a05b; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 1.1rem;">
+        DISCOVER | BOOK | EXPERIENCE
+      </div>
+      <div style="width: 190px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 9999px; overflow: hidden; position: relative; margin-bottom: 0.75rem; border: 1px solid rgba(255,255,255,0.05);">
+        <div style="position: absolute; top: 0; bottom: 0; width: 45%; border-radius: 9999px; background: linear-gradient(90deg, transparent, #0d9488, #10b981, #d9a05b, transparent); animation: initBeam 1.5s cubic-bezier(0.4,0,0.2,1) infinite;"></div>
+      </div>
+      <div style="font-size: 0.82rem; color: #94a3b8; font-weight: 600;">
+        Loading EventLand...
+      </div>
+    </div>
+  </div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 

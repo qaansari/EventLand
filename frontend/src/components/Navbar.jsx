@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PlusCircle, User, Music, Calendar, Menu, X, ShieldCheck, Building2, LogIn, LogOut, FileText } from 'lucide-react';
 import { getUserImageUrl } from '../services/api';
 
@@ -18,15 +18,25 @@ export default function Navbar({
   cities = []
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
-  const getUserAvatarUrl = (user) => {
-    if (!user) return '';
-    if (user.imageUrl || user.avatar) {
-      return getUserImageUrl(user.imageUrl || user.avatar);
-    }
+  useEffect(() => {
+    setImgError(false);
+  }, [currentUser?.imageUrl, currentUser?.avatar, currentUser?.id]);
+
+  const userImgUrl = (currentUser?.imageUrl || currentUser?.avatar)
+    ? getUserImageUrl(currentUser.imageUrl || currentUser.avatar)
+    : '';
+  const showUserImage = Boolean(userImgUrl && !imgError);
+
+  const getInitials = (user) => {
+    if (!user) return 'U';
     const name = user.fullName || user.name || (user.role === 'admin' ? 'Super Admin' : 'User');
-    const bgHex = user.role === 'admin' ? '8b5cf6' : user.role === 'organizer' ? '0d9488' : '059669';
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${bgHex}&color=ffffff&bold=true&rounded=true`;
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2 && parts[0] && parts[1]) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return (name.trim()[0] || 'U').toUpperCase();
   };
 
 
@@ -262,39 +272,71 @@ export default function Navbar({
           {/* User Auth Profile Badge / Sign In Button */}
           {currentUser ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginLeft: '0.2rem' }}>
-              <div style={{
-                backgroundColor: currentUser.role === 'admin' 
-                  ? 'rgba(139, 92, 246, 0.15)' 
-                  : currentUser.role === 'organizer' 
-                  ? 'rgba(13, 148, 136, 0.15)' 
-                  : 'rgba(13, 148, 136, 0.15)',
-                border: currentUser.role === 'admin' 
-                  ? '1px solid rgba(139, 92, 246, 0.4)' 
-                  : currentUser.role === 'organizer' 
-                  ? '1px solid rgba(13, 148, 136, 0.4)' 
-                  : '1px solid rgba(13, 148, 136, 0.4)',
-                color: '#fff',
-                borderRadius: '9999px',
-                padding: '0.2rem 0.65rem 0.2rem 0.2rem',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.4rem'
-              }}>
-                <img
-                  src={getUserAvatarUrl(currentUser)}
-                  alt={currentUser.fullName || currentUser.name || 'User Avatar'}
-                  style={{
-                    width: '26px',
-                    height: '26px',
-                    borderRadius: '50%',
-                    objectFit: 'cover',
-                    border: currentUser.role === 'admin' ? '1.5px solid #c084fc' : '1.5px solid #2dd4bf',
-                    flexShrink: 0
-                  }}
-                />
-                <span>{(currentUser?.name || currentUser?.fullName || 'User').split(' ')[0]}</span>
+              <div 
+                title={`Signed in as ${currentUser?.fullName || currentUser?.name || 'User'} (${currentUser.role || 'Customer'})`}
+                style={{
+                  backgroundColor: currentUser.role === 'admin' 
+                    ? 'rgba(139, 92, 246, 0.15)' 
+                    : currentUser.role === 'organizer' 
+                    ? 'rgba(13, 148, 136, 0.15)' 
+                    : 'rgba(5, 150, 105, 0.15)',
+                  border: currentUser.role === 'admin' 
+                    ? '1px solid rgba(139, 92, 246, 0.4)' 
+                    : currentUser.role === 'organizer' 
+                    ? '1px solid rgba(13, 148, 136, 0.4)' 
+                    : '1px solid rgba(5, 150, 105, 0.4)',
+                  color: '#fff',
+                  borderRadius: '9999px',
+                  padding: '0.2rem 0.65rem 0.2rem 0.2rem',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                {showUserImage ? (
+                  <img
+                    src={userImgUrl}
+                    alt={currentUser.fullName || currentUser.name || 'User Profile'}
+                    onError={() => setImgError(true)}
+                    style={{
+                      width: '26px',
+                      height: '26px',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: currentUser.role === 'admin' ? '1.5px solid #c084fc' : currentUser.role === 'organizer' ? '1.5px solid #2dd4bf' : '1.5px solid #34d399',
+                      flexShrink: 0
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: '26px',
+                      height: '26px',
+                      borderRadius: '50%',
+                      background: currentUser.role === 'admin' 
+                        ? 'linear-gradient(135deg, #a855f7, #6366f1)' 
+                        : currentUser.role === 'organizer' 
+                        ? 'linear-gradient(135deg, #0d9488, #059669)' 
+                        : 'linear-gradient(135deg, #059669, #047857)',
+                      border: currentUser.role === 'admin' ? '1.5px solid #c084fc' : currentUser.role === 'organizer' ? '1.5px solid #2dd4bf' : '1.5px solid #34d399',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#ffffff',
+                      fontWeight: 800,
+                      fontSize: '0.72rem',
+                      flexShrink: 0,
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    {getInitials(currentUser)}
+                  </div>
+                )}
+                <span style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {(currentUser?.name || currentUser?.fullName || 'User').split(' ')[0]}
+                </span>
               </div>
               <button
                 onClick={onLogout}
@@ -427,18 +469,45 @@ export default function Navbar({
             {currentUser ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '10px', marginTop: '0.5rem', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: '#fff', fontWeight: 600, fontSize: '0.88rem' }}>
-                  <img
-                    src={getUserAvatarUrl(currentUser)}
-                    alt={currentUser.fullName || currentUser.name || 'User Avatar'}
-                    style={{
-                      width: '34px',
-                      height: '34px',
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                      border: currentUser.role === 'admin' ? '2px solid #c084fc' : '2px solid #2dd4bf',
-                      flexShrink: 0
-                    }}
-                  />
+                  {showUserImage ? (
+                    <img
+                      src={userImgUrl}
+                      alt={currentUser.fullName || currentUser.name || 'User Profile'}
+                      onError={() => setImgError(true)}
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: currentUser.role === 'admin' ? '2px solid #c084fc' : currentUser.role === 'organizer' ? '2px solid #2dd4bf' : '2px solid #34d399',
+                        flexShrink: 0
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        background: currentUser.role === 'admin' 
+                          ? 'linear-gradient(135deg, #a855f7, #6366f1)' 
+                          : currentUser.role === 'organizer' 
+                          ? 'linear-gradient(135deg, #0d9488, #059669)' 
+                          : 'linear-gradient(135deg, #059669, #047857)',
+                        border: currentUser.role === 'admin' ? '2px solid #c084fc' : currentUser.role === 'organizer' ? '2px solid #2dd4bf' : '2px solid #34d399',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#ffffff',
+                        fontWeight: 800,
+                        fontSize: '0.85rem',
+                        flexShrink: 0,
+                        letterSpacing: '0.5px'
+                      }}
+                    >
+                      {getInitials(currentUser)}
+                    </div>
+                  )}
                   <div>
                     <div style={{ color: '#fff', fontWeight: 700 }}>{currentUser?.name || currentUser?.fullName || 'User'}</div>
                     <div style={{ fontSize: '0.72rem', color: currentUser.role === 'admin' ? '#c084fc' : '#2dd4bf', textTransform: 'capitalize' }}>

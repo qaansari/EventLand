@@ -36,11 +36,11 @@ public interface IAdminService
     Task<bool> DeleteRoleAsync(int id);
 
     // --- Users CRUD ---
-    Task<PagedResult<UserDto>> GetUsersAsync(int pageNumber = 1, int pageSize = 10);
-    Task<UserDto?> GetUserByIdAsync(int id);
-    Task<UserDto> CreateUserAsync(CreateUserDto dto);
-    Task<UserDto> UpdateUserAsync(int id, UpdateUserDto dto);
-    Task<bool> DeleteUserAsync(int id);
+    Task<PagedResult<UserDto>> GetUsersAsync(int pageNumber = 1, int pageSize = 10, bool isSuperAdmin = true);
+    Task<UserDto?> GetUserByIdAsync(int id, bool isSuperAdmin = true);
+    Task<UserDto> CreateUserAsync(CreateUserDto dto, bool isSuperAdmin = true);
+    Task<UserDto> UpdateUserAsync(int id, UpdateUserDto dto, bool isSuperAdmin = true);
+    Task<bool> DeleteUserAsync(int id, bool isSuperAdmin = true);
 
     // --- Events CRUD ---
     Task<PagedResult<EventSummaryDto>> GetEventsAsync(int pageNumber = 1, int pageSize = 10);
