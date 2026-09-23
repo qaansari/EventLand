@@ -50,6 +50,8 @@ public interface IAdminService
     Task<bool> DeleteEventAsync(int id, int? organizerId = null);
 
     // --- EventShows CRUD ---
+    Task<List<EventShowDto>> GetEventShowsAsync(int? eventId = null, int? organizerId = null);
+    Task<EventShowDto?> GetEventShowByIdAsync(int id, int? organizerId = null);
     Task<EventShowDto> CreateEventShowAsync(CreateEventShowDto dto, int? organizerId = null);
     Task<EventShowDto> UpdateEventShowAsync(int id, UpdateEventShowDto dto, int? organizerId = null);
     Task<bool> DeleteEventShowAsync(int id, int? organizerId = null);

@@ -75,8 +75,7 @@
 ## Database Schema & Migrations
 
 - **Database Migrations**:
-  - `20260909105956_InitialCreate`: Consolidated baseline schema migration.
-  - `20260910063614_AddTicketTierEventShowIndex`: Performance indexes including composite index on `TicketTiers(EventId, EventShowId)`.
+  - `20260923090046_InitialCreate`: Single unified baseline schema migration tracking the entire database schema in one pristine migration. Incorporates all core tables, relational foreign keys (including `User.OrganizerId`), gate check-in tracking (`IsCheckedIn`, `CheckedInAt`, `CheckedInBy`, `GateNotes`), and composite performance indexes.
 - **Database Performance & Composite Indexing**:
   - `Bookings`:
     - `IX_Bookings_BookingRef`: Unique index on reference codes.
@@ -84,14 +83,18 @@
     - `IX_Bookings_CreatedAt`: High-performance index for admin sorting by creation timestamp.
     - `IX_Bookings_PaymentStatus_PaymentExpiresAt`: Composite index for the background expiry worker.
     - `IX_Bookings_EventId_Status`: Composite index for event booking state filtering.
+    - `IX_Bookings_EventId_IsCheckedIn`: High-performance composite index for sub-millisecond gate admission lookups and live attendance rollups.
   - `Events`:
     - `IX_Events_OrganizerId`: Fast join index for admin/organizer dashboards.
     - `IX_Events_Published_City_Date`: Composite index covering public multi-filter queries (`IsPublished, CityId, StartDateUtc`).
     - `IX_Events_Published_Date`: Index covering global published date ranges.
     - `IX_Events_IsFeatured`: Fast filter index for homepage hero slider queries.
+  - `TicketTiers`: `IX_TicketTiers_EventId_EventShowId`: Fast composite index linking tiers to events and specific show slots.
   - `Tags`: `IX_Tags_Slug`: Unique index for tag route lookup.
   - `Seats`: `IX_Seats_Zone_Row_Col` (unique) & `IX_Seats_ZoneId_Status`.
-  - `Users`: Unique index on `Email` and `PhoneNumber`.
+  - `Users`:
+    - Unique index on `Email` and `PhoneNumber`.
+    - `IX_Users_OrganizerId`: Relational foreign key index for multi-tenant organizer company resolution.
 - **Primary Key Convention**: All domain entities inherit from `BaseEntity<int>` (or `BaseEntity<TKey>`).
 - **Zero-Reflection Auditing**: `BaseEntity<TKey>` implements the typed `IAuditableEntity` interface (`CreatedAt`, `UpdatedAt`, `IsDeleted`, `DeletedAt`). `ApplicationDbContext.SaveChangesAsync()` updates timestamps and soft-delete states with zero runtime reflection overhead.
 - **Soft Delete**: Global EF Core Query Filter (`!IsDeleted`) automatically applied to all entities.
@@ -278,24 +281,105 @@
   - `DigitalTicketModal.jsx`, `AttendeeDashboard.jsx`, and `AdminBookingsTab.jsx` provide disabled state and animated spinning loader (`<RefreshCw className="animate-spin" />`) during export.
   - Success toast displays `${fileName} downloaded successfully!`.
 
+### 15. Decoupled Multi-Show Architecture & Date Range Validation
+- **Decoupled Show Management**:
+  - Show slot configuration has been completely removed from the Event Create/Edit modal, eliminating bloated event payloads and complex nested state synchronization.
+  - Added a dedicated **Shows** management tab in `AdminDashboard.jsx` (`activeAdminTab === 'shows'`) displaying a rich table of all scheduled shows across events, with live show count badges, event filter dropdown, instant keyword search, and direct action buttons (Edit, Delete, Add Tier).
+  - Quick-action "Add Show Slot" button added to the Events tab header and a direct "Shows" shortcut button on each event table row for fast workflow navigation.
+- **Strict Date Range Validation**:
+  - **Client-Side Validation (`AdminDashboard.jsx`)**:
+    - Before dispatching network requests, `handleSaveShow` verifies that `startTimeUtc < endTimeUtc`.
+    - Compares show slot timestamps against the parent event's `startDateUtc` and `endDateUtc`. If either falls outside the parent event window, an immediate error toast is triggered: `"Show start/end time must be within the parent event's scheduled date range (...)"`.
+    - The Show Slot modal dynamically renders an "Allowed Event Date Range" card when an event is selected, providing instant visual guidance to the administrator.
+  - **Server-Side Validation (`AdminService.cs`)**:
+    - `CreateEventShowAsync` and `UpdateEventShowAsync` fetch the parent `Event` record.
+    - Strictly checks `showDto.StartTimeUtc < showDto.EndTimeUtc` (throws `ArgumentException("Show end time must be after the start time.")`).
+    - Strictly checks `showDto.StartTimeUtc >= ev.StartDateUtc && showDto.EndTimeUtc <= ev.EndDateUtc` (throws `ArgumentException("Show start/end time must be within the event scheduled date range.")`).
+    - Handled by `AdminEventShowsController` to return clean HTTP 400 Bad Request responses with error payloads.
+- **Dedicated Show APIs & Services**:
+  - `GET /api/admin/eventshows`: Lists all shows (optionally filtered by `?eventId=`).
+  - `GET /api/admin/eventshows/{id}`: Retrieves individual show slot by ID.
+  - `POST /api/admin/eventshows`: Validates and creates a show slot.
+  - `PUT /api/admin/eventshows/{id}`: Validates and updates a show slot.
+  - `DELETE /api/admin/eventshows/{id}`: Deletes a show slot and cleans up linked tiers.
+  - `frontend/src/services/api.js`: Added `getAll(eventId)` and `getById(id)` under `adminApi.eventShows`.
+- **UI State & Ticket Tier Integration**:
+  - `showTierModal` dynamically resolves show slots from `showsList` filtered by `tierForm.eventId` (with fallback to `selectedEv.shows`).
+  - In-button animated loading spinner (`<RefreshCw className="animate-spin" />`) and disabled states implemented during show slot creation and updates (`isSavingShow`).
+
+### 16. Gate Ticket Validation, Scanner Hub & Single Baseline Migration Consolidation
+- **Single Consolidated Database Migration**:
+  - All historical incremental migrations were unified into a single pristine baseline migration (`backend/src/EventLand.Infrastructure/Migrations/20260923081109_InitialCreate.cs`).
+  - Includes all core tables, foreign keys, unique constraints, and the new `Booking` check-in tracking fields: `IsCheckedIn` (`bool`, default false), `CheckedInAt` (`DateTimeOffset?`), `CheckedInBy` (`string?`, max 150), and `GateNotes` (`string?`, max 500).
+  - High-performance composite index added: `IX_Bookings_EventId_IsCheckedIn` for sub-millisecond gate lookups and real-time attendance rollups.
+- **Gate Controller & Role-Based Access Control (Admin & SuperAdmin Only)**:
+  - `GateController.cs` (`api/gate`) is strictly guarded by `[Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]`.
+  - Customers, organizers, and unauthenticated users receive HTTP 401 Unauthorized or HTTP 403 Forbidden.
+  - Endpoints:
+    - `POST /api/gate/validate`: Validates booking existence, payment status (`Completed`), event scoping, and single-admission status. Marks ticket as checked in upon successful admission.
+    - `GET /api/gate/stats/{eventId}`: Live attendance KPIs (total sold, checked-in count, remaining count, attendance percentage, and recent scans stream).
+    - `POST /api/gate/reset`: Supervisor check-in reset capability with required audit notes.
+- **Smart Ticket Reference Extraction (`ExtractBookingRef`)**:
+  - Handles raw reference codes (`EVL-10023`), label prefixes (`ID: EVL-10023`), verification URLs (`https://domain/verify/EVL-10023`), and query parameters (`?code=EVL-10023`), enabling universal compatibility with USB/Bluetooth 1D/2D barcode scanners and mobile camera inputs.
+- **High-Security E-Ticket QR Code & Verification Route**:
+  - In `qrGenerator.js`, generated QR codes for digital passes and exported E-ticket PDFs now encode an actionable verification route URL: `${origin}/verify/${ticketId}` with High (`H`) error correction.
+  - Dedicated route in `App.jsx` (`/verify/:ticketId`) backed by `GatePassVerification.jsx`:
+    - **Authorized (Admin / SuperAdmin)**: Automatically triggers `gateApi.validate` upon scan, displaying an instantaneous Green Admission card (Attendee name, tier, seat number, booking reference, and check-in timestamp) or Amber Duplicate Check-In warning card with gatekeeper details.
+    - **Unauthorized / Customer / Guest**: Renders an explicit Red Access Denied security card: *"Access Denied: Ticket validation and venue admission are restricted to authorized EventLand Gate Administrators and SuperAdmins only."* prevents customer confusion or unauthorized gate operation.
+- **Admin Dashboard Gatekeeper Scanner & Admission Hub**:
+  - Added dedicated **Gate Scanner** tab to `AdminDashboard.jsx` with quick event selector, live KPI metric tiles (Sold, Admitted, Remaining, Attendance Rate), auto-focused barcode input, visual scan result alert card, audio-visual feedback, and real-time admission activity feed with 1-click supervisor reset.
+
+### 17. Multi-User Organizer Relational Linkage & Single Baseline Migration
+- **Explicit Relational Foreign Key (`User.OrganizerId` -> `Organizer.Id`)**:
+  - Replaced legacy loose string matching (by email/name) with an explicit relational foreign key: `User.OrganizerId` (`int?`, nullable) referencing `Organizer.Id` with `OnDelete(DeleteBehavior.SetNull)`.
+  - Added navigation collection `ICollection<User> Users` on `Organizer.cs`, supporting real-world multi-tenancy where multiple user accounts (e.g. event manager, marketing lead, finance officer) belong to the same organizer company (e.g. *EventLand Productions*).
+  - High-performance database index added: `IX_Users_OrganizerId`.
+- **Single Consolidated Database Migration**:
+  - Successfully unified all database migrations into a single pristine baseline migration: [`backend/src/EventLand.Infrastructure/Migrations/20260923090046_InitialCreate.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Migrations/20260923090046_InitialCreate.cs).
+  - Verified via `dotnet ef migrations list` that exactly **one** migration tracks the entire database schema.
+- **Admin User Management & Dynamic Company Assignment**:
+  - In `AdminDashboard.jsx`, the User Create/Edit modal dynamically renders an **"Assign to Organizer Company *"** dropdown when the selected role is "Organizer", populated from `organizersList`.
+  - The Users management table displays an **"Organizer Company"** column with an emerald badge showing the assigned company name (`u.organizerName`).
+  - `AdminService.cs` (`GetUsersAsync`, `GetUserByIdAsync`, `CreateUserAsync`, `UpdateUserAsync`) maps `u.OrganizerId` and `u.Organizer.Name` into `UserDto`.
+- **Authentication & Shared Event Management**:
+  - In `AuthService.cs`, when any user assigned to an organizer company logs in, `user.OrganizerId` is directly extracted and embedded into the JWT token claim (`organizerId`).
+  - In `OrganizerDashboard.jsx`, all users belonging to that organizer company automatically share access to the same scoped events, show slots, attendee lists, and sales analytics.
+
+- **Comprehensive Architecture, Security, Performance & Scalability Enhancements**:
+  - **Unified Canonical Authorization Constants (`AppRoles.cs`)**: Centralized `AdminOrSuperAdmin`, `OrganizerOrAdmin`, and `SuperAdminOnly` constants in `backend/src/EventLand.Application/Common/AppRoles.cs`, applied across all 20+ controllers, eliminating case-sensitivity authorization bugs.
+  - **Camera Hardware Unblocking (`Permissions-Policy: camera=(self)`)**: Updated `SecurityHeadersMiddleware.cs` so mobile devices and gatekeepers can access camera hardware for gate ticket QR scanning.
+  - **Resilient Exception Mappings**: `GlobalExceptionHandlerMiddleware.cs` now properly maps `UnauthorizedAccessException` to HTTP 403 Forbidden for authenticated users lacking privileges (preventing accidental session logout), and maps `DbUpdateConcurrencyException` to HTTP 409 Conflict.
+  - **Gate Rate Limiter Partitioning**: Updated `Program.cs` to partition gate validation rate limiting by authenticated `User.GetUserId()`, preventing false 429 throttling when multiple gatekeepers share a single venue NAT IP.
+  - **Database & Query Performance**:
+    - Added `.AsSplitQuery()` in `AdminService.GetEventDetailDtoAsync` to prevent Cartesian explosion across shows, tiers, zones, and seats.
+    - Removed redundant `.Include()` calls prior to `.Select()` projections in `AdminService.GetEventsAsync`.
+    - Cleaned redundant per-entity `HasQueryFilter` calls from individual entity configurations, leveraging the centralized global soft-delete query filter.
+  - **Frontend Modularity & Dead Code Purge**:
+    - Extracted 5 major modal components into `frontend/src/components/admin/modals/`: `AdminEventModal.jsx`, `AdminShowSlotModal.jsx`, `AdminTicketTierModal.jsx`, `AdminUserModal.jsx`, `AdminAuditoriumModal.jsx`.
+    - Extracted shared `FileUploadField.jsx` component into `frontend/src/components/admin/FileUploadField.jsx`.
+    - Reduced `AdminDashboard.jsx` by over 890 lines, eliminating 11 unused icon imports, unused `exportTicketPdf`, and isolating modal state re-renders.
+    - Enhanced `api.js` error handling to attach HTTP `status`, `data`, and `payload` to thrown Error instances.
+
 ---
 
 ## Developer Commands & Verification
 
 ### Run Backend Locally
 ```powershell
-cd e:\EventLand\backend\src\EventLand.Api
+cd d:\Projects\EventLand\backend\src\EventLand.Api
 dotnet run
 ```
 
 ### Build Check (Backend & Frontend)
 ```powershell
 # Backend Solution (.NET 10)
-dotnet build e:\EventLand\backend\EventLand.slnx
+dotnet build d:\Projects\EventLand\backend\EventLand.slnx
+
+# Backend Unit Tests (.NET 10)
+dotnet test d:\Projects\EventLand\backend\EventLand.slnx
 
 # Frontend Production Build (React + Vite)
-cd e:\EventLand\frontend
-npm run build
+npm --prefix frontend run build
 ```
 
 ### Database Migration Commands
@@ -308,5 +392,6 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
 ```
 
 ---
-*Last Updated: September 2026 (Fine-Grained RBAC for Admin Role: Hidden Roles Tab, Attendee & Organizer Only Role Assignment, Admin/SuperAdmin Visibility Masking & Anti-Escalation Protection; App-Wide Branded Logo Preloader & Initial Splash Screen; App-Wide In-Button Animated Spinner & Disabled State on Save / CRUD Operations; Auditorium Seating Chart PDF Exporter with html2pdf & Anti-Popup-Blocker Fallback; Multi-Point Chart PDF Export; Header Dynamic User Image vs Role Avatar Fallback; Full-Stack Auth Image Sync; Anti-Virus/Malware Pixel Re-encoding; App-Wide Cloudflare Turnstile Auto-Hide; Dynamic CORS & Vercel/Ngrok Reverse-Proxy Ingress; Per-IP Rate Limiting; Full-Stack Latency & Index Optimizations Completed)*
+*Last Updated: September 2026 (Comprehensive Full-Stack Audit & Modularization: Canonical AppRoles Authorization Constants; Permissions-Policy camera=(self); 403 vs 401 Exception Mapping; Concurrency 409 Conflict; Gate User-Partitioned Rate Limiting; AsSplitQuery & Include Optimization; AdminDashboard.jsx Monolith Refactoring & Modal Extraction into AdminEventModal, AdminShowSlotModal, AdminTicketTierModal, AdminUserModal, AdminAuditoriumModal; FileUploadField Extraction; api.js Error Status Preservation; Multi-User Organizer Relational Linkage via User.OrganizerId FK; Single Consolidated EF Core Baseline Migration 20260923090046_InitialCreate; Gate Ticket Validation & QR Scanner Admission Hub; E-Ticket PDF QR Route Verification; All 65 Unit Tests Passing)*
+
 

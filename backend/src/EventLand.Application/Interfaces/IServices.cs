@@ -31,4 +31,7 @@ public interface IBookingService
     Task<BookingDto> SubmitPaymentProofAsync(int id, SubmitBankPaymentProofDto dto);
     Task<BookingDto> ConfirmBankPaymentAsync(int id, ConfirmBankPaymentDto dto, int? adminId = null, string? adminEmail = null);
     Task<BookingDto> RejectBankPaymentAsync(int id, RejectBankPaymentDto dto, int? adminId = null, string? adminEmail = null);
+    Task<TicketValidationResultDto> ValidateGateTicketAsync(ValidateGateTicketRequestDto request, int? validatorUserId = null, string? validatorEmail = null);
+    Task<GateStatsDto> GetEventGateStatsAsync(int eventId);
+    Task<TicketValidationResultDto> ResetGateCheckInAsync(ResetGateCheckInRequestDto request, int? adminId = null, string? adminEmail = null);
 }

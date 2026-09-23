@@ -1,5 +1,6 @@
 namespace EventLand.Api.Controllers.Admin;
 
+using EventLand.Application.Common;
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -7,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/admin/bank-accounts")]
-[Authorize(Roles = "admin,superadmin,Admin,SuperAdmin")]
+[Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
 public class AdminBankAccountsController : ControllerBase
 {
     private readonly IBankAccountService _bankAccountService;

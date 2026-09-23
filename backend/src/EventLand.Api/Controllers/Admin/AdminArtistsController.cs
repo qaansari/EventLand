@@ -1,5 +1,6 @@
 namespace EventLand.Api.Controllers.Admin;
 
+using EventLand.Application.Common;
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -7,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/admin/artists")]
-[Authorize(Roles = "SuperAdmin,Admin")]
+[Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
 [Produces("application/json")]
 public class AdminArtistsController : ControllerBase
 {

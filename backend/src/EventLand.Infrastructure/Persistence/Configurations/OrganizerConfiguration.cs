@@ -34,6 +34,5 @@ public sealed class OrganizerConfiguration : IEntityTypeConfiguration<Organizer>
         builder.Property(o => o.WebsiteUrl)
                .HasMaxLength(500);
 
-        builder.HasQueryFilter(o => !o.IsDeleted);
     }
 }

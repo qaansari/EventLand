@@ -1,5 +1,7 @@
 namespace EventLand.Api.Controllers.Admin;
 
+using EventLand.Api.Extensions;
+using EventLand.Application.Common;
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -7,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/admin/users")]
-[Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+[Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
 [Produces("application/json")]
 public class AdminUsersController : ControllerBase
 {
@@ -18,19 +20,17 @@ public class AdminUsersController : ControllerBase
         _adminService = adminService;
     }
 
-    private bool IsSuperAdmin() => User.IsInRole("SuperAdmin") || User.IsInRole("superadmin");
-
     [HttpGet]
     public async Task<ActionResult<PagedResult<UserDto>>> GetUsers([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
     {
-        var users = await _adminService.GetUsersAsync(pageNumber, pageSize, IsSuperAdmin());
+        var users = await _adminService.GetUsersAsync(pageNumber, pageSize, User.IsSuperAdmin());
         return Ok(users);
     }
 
     [HttpGet("{id:int}")]
     public async Task<ActionResult<UserDto>> GetUserById(int id)
     {
-        var user = await _adminService.GetUserByIdAsync(id, IsSuperAdmin());
+        var user = await _adminService.GetUserByIdAsync(id, User.IsSuperAdmin());
         if (user is null) return NotFound(new { message = $"User '{id}' not found." });
         return Ok(user);
     }
@@ -38,43 +38,22 @@ public class AdminUsersController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<UserDto>> CreateUser([FromBody] CreateUserDto dto)
     {
-        try
-        {
-            var user = await _adminService.CreateUserAsync(dto, IsSuperAdmin());
-            return CreatedAtAction(nameof(GetUserById), new { id = user.Id }, user);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
-        }
+        var user = await _adminService.CreateUserAsync(dto, User.IsSuperAdmin());
+        return CreatedAtAction(nameof(GetUserById), new { id = user.Id }, user);
     }
 
     [HttpPut("{id:int}")]
     public async Task<ActionResult<UserDto>> UpdateUser(int id, [FromBody] UpdateUserDto dto)
     {
-        try
-        {
-            var updated = await _adminService.UpdateUserAsync(id, dto, IsSuperAdmin());
-            return Ok(updated);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
-        }
+        var updated = await _adminService.UpdateUserAsync(id, dto, User.IsSuperAdmin());
+        return Ok(updated);
     }
 
     [HttpDelete("{id:int}")]
     public async Task<ActionResult> DeleteUser(int id)
     {
-        try
-        {
-            var success = await _adminService.DeleteUserAsync(id, IsSuperAdmin());
-            if (!success) return NotFound();
-            return NoContent();
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
-        }
+        var success = await _adminService.DeleteUserAsync(id, User.IsSuperAdmin());
+        if (!success) return NotFound();
+        return NoContent();
     }
 }

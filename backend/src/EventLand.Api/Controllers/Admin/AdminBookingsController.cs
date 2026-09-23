@@ -1,6 +1,7 @@
 namespace EventLand.Api.Controllers.Admin;
 
 using EventLand.Api.Extensions;
+using EventLand.Application.Common;
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -8,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/admin/bookings")]
-[Authorize(Roles = "SuperAdmin,Admin,Organizer,organizer,admin,superadmin")]
+[Authorize(Roles = AppRoles.OrganizerOrAdmin)]
 [Produces("application/json")]
 public class AdminBookingsController : ControllerBase
 {
@@ -61,7 +62,7 @@ public class AdminBookingsController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
     public async Task<ActionResult> DeleteBooking(int id)
     {
         var success = await _adminService.DeleteBookingAsync(id);

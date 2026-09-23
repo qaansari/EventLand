@@ -41,6 +41,5 @@ public sealed class SeatingZoneConfiguration : IEntityTypeConfiguration<SeatingZ
         builder.HasIndex(z => new { z.EventId, z.SortOrder })
                .HasDatabaseName("IX_SeatingZones_EventId_SortOrder");
 
-        builder.HasQueryFilter(z => !z.IsDeleted);
     }
 }

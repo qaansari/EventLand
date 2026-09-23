@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using EventLand.Api.Extensions;
+using EventLand.Application.Common;
 using EventLand.Modules.PayPro.Client;
 using EventLand.Modules.PayPro.Dtos;
 using EventLand.Modules.PayPro.Services;
@@ -74,7 +75,7 @@ public class PayProAdminController : ControllerBase
     /// Administrative endpoint: Marks single or multiple orders as Paid in PayPro (moap).
     /// </summary>
     [HttpPost("orders/mark-paid")]
-    [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
     public async Task<IActionResult> MarkOrdersAsPaid([FromBody] List<string> orderNumbers)
     {
         if (orderNumbers == null || orderNumbers.Count == 0)
@@ -90,7 +91,7 @@ public class PayProAdminController : ControllerBase
     /// Administrative endpoint: Marks single or multiple orders as Blocked in PayPro (moab).
     /// </summary>
     [HttpPost("orders/mark-blocked")]
-    [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
     public async Task<IActionResult> MarkOrdersAsBlocked([FromBody] List<string> orderNumbers)
     {
         if (orderNumbers == null || orderNumbers.Count == 0)
@@ -106,7 +107,7 @@ public class PayProAdminController : ControllerBase
     /// Administrative reporting view backed by PayPro Get-Paid-Orders (gpo) with pagination.
     /// </summary>
     [HttpGet("reports/paid-orders")]
-    [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
     public async Task<IActionResult> GetPaidOrdersReport(
         [FromQuery] DateTime? startDate,
         [FromQuery] DateTime? endDate,
@@ -147,7 +148,7 @@ public class PayProAdminController : ControllerBase
     /// Lists all registered PayPro consumers with optional search.
     /// </summary>
     [HttpGet("consumers")]
-    [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
     public async Task<IActionResult> GetConsumers([FromQuery] string? search)
     {
         var consumers = await _consumerService.GetAllConsumersAsync(search, HttpContext.RequestAborted);
@@ -158,7 +159,7 @@ public class PayProAdminController : ControllerBase
     /// Creates a single PayPro consumer (ppro/cc).
     /// </summary>
     [HttpPost("consumers")]
-    [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
     public async Task<IActionResult> CreateConsumer([FromBody] ConsumerRequestDto dto)
     {
         if (dto == null || string.IsNullOrWhiteSpace(dto.ConsumerId) || string.IsNullOrWhiteSpace(dto.Name))
@@ -179,7 +180,7 @@ public class PayProAdminController : ControllerBase
     /// Creates multiple PayPro consumers in batch (ppro/cmc).
     /// </summary>
     [HttpPost("consumers/batch")]
-    [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
     public async Task<IActionResult> CreateBatchConsumers([FromBody] BatchConsumersRequestDto dto)
     {
         if (dto?.Consumers == null || dto.Consumers.Count == 0)
@@ -195,7 +196,7 @@ public class PayProAdminController : ControllerBase
     /// Updates an existing PayPro consumer (ppro/uc).
     /// </summary>
     [HttpPut("consumers/{consumerId}")]
-    [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
     public async Task<IActionResult> UpdateConsumer(string consumerId, [FromBody] ConsumerRequestDto dto)
     {
         if (dto == null || string.IsNullOrWhiteSpace(dto.Name))
@@ -217,7 +218,7 @@ public class PayProAdminController : ControllerBase
     /// Manually triggers a reconciliation sweep.
     /// </summary>
     [HttpPost("reconcile")]
-    [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
     public async Task<IActionResult> TriggerReconciliation([FromQuery] int? olderThanMinutes = null)
     {
         var summary = await _reconciliationService.ReconcilePendingOrdersAsync(olderThanMinutes, HttpContext.RequestAborted);

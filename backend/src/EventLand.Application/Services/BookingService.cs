@@ -433,4 +433,343 @@ public class BookingService : IBookingService
             b.PaymentProcessingFee
         );
     }
+
+    // ── Gate Check-In & Ticket Validation ────────────────────────────────────
+    public async Task<TicketValidationResultDto> ValidateGateTicketAsync(ValidateGateTicketRequestDto request, int? validatorUserId = null, string? validatorEmail = null)
+    {
+        var validatedAt = DateTimeOffset.UtcNow;
+        if (string.IsNullOrWhiteSpace(request.TicketCode))
+        {
+            return new TicketValidationResultDto(
+                IsValid: false,
+                Status: "INVALID",
+                Message: "Ticket code or QR payload cannot be empty.",
+                ValidatedAt: validatedAt
+            );
+        }
+
+        var parsedRef = ExtractBookingRef(request.TicketCode);
+        int.TryParse(parsedRef, out var numericId);
+
+        var booking = await _context.Bookings
+            .Include(b => b.Event)
+            .Include(b => b.TicketTier)
+            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+            .FirstOrDefaultAsync(b => (!string.IsNullOrEmpty(b.BookingRef) && b.BookingRef.ToLower() == parsedRef.ToLower()) 
+                                   || (numericId > 0 && b.Id == numericId));
+
+        if (booking is null || booking.IsDeleted)
+        {
+            return new TicketValidationResultDto(
+                IsValid: false,
+                Status: "NOT_FOUND",
+                Message: $"Ticket pass '{parsedRef}' was not found in the system.",
+                ValidatedAt: validatedAt
+            );
+        }
+
+        var seatLabels = booking.BookingSeats
+            .Where(bs => bs.Seat != null)
+            .Select(bs => bs.Seat!.Label)
+            .ToList();
+
+        // 1. Payment status check
+        if (booking.PaymentStatus != PaymentStatus.Paid || booking.Status != BookingStatus.Confirmed)
+        {
+            var reason = booking.Status == BookingStatus.Cancelled ? "CANCELLED"
+                : booking.PaymentStatus == PaymentStatus.Expired ? "EXPIRED"
+                : booking.PaymentStatus == PaymentStatus.Refunded ? "REFUNDED"
+                : "UNPAID";
+
+            var msg = reason switch
+            {
+                "CANCELLED" => "This ticket pass has been CANCELLED and is invalid for entry.",
+                "EXPIRED" => "This ticket hold has EXPIRED and was never completed.",
+                "REFUNDED" => "This ticket pass has been REFUNDED and is void for entry.",
+                _ => $"Payment status is {booking.PaymentStatus}. Tickets require confirmed payment before gate admission."
+            };
+
+            return new TicketValidationResultDto(
+                IsValid: false,
+                Status: reason,
+                Message: msg,
+                BookingId: booking.Id,
+                BookingRef: booking.BookingRef,
+                CustomerName: booking.CustomerName,
+                CustomerEmail: booking.CustomerEmail,
+                CustomerPhone: booking.CustomerPhone,
+                EventId: booking.EventId,
+                EventTitle: booking.Event?.Title,
+                TicketTierName: booking.TicketTier?.Name,
+                Quantity: booking.Quantity,
+                SeatLabels: seatLabels,
+                ValidatedAt: validatedAt
+            );
+        }
+
+        // 2. Event constraint check (if specified by scanner)
+        if (request.EventId.HasValue && booking.EventId != request.EventId.Value)
+        {
+            return new TicketValidationResultDto(
+                IsValid: false,
+                Status: "EVENT_MISMATCH",
+                Message: $"Wrong Event: This ticket is for '{booking.Event?.Title}', not the selected event.",
+                BookingId: booking.Id,
+                BookingRef: booking.BookingRef,
+                CustomerName: booking.CustomerName,
+                CustomerEmail: booking.CustomerEmail,
+                CustomerPhone: booking.CustomerPhone,
+                EventId: booking.EventId,
+                EventTitle: booking.Event?.Title,
+                TicketTierName: booking.TicketTier?.Name,
+                Quantity: booking.Quantity,
+                SeatLabels: seatLabels,
+                ValidatedAt: validatedAt
+            );
+        }
+
+        // 3. Show constraint check (if specified)
+        if (request.EventShowId.HasValue && booking.TicketTier?.EventShowId != null && booking.TicketTier.EventShowId != request.EventShowId.Value)
+        {
+            return new TicketValidationResultDto(
+                IsValid: false,
+                Status: "SHOW_MISMATCH",
+                Message: "Wrong Show Slot: This ticket is scheduled for a different show timing.",
+                BookingId: booking.Id,
+                BookingRef: booking.BookingRef,
+                CustomerName: booking.CustomerName,
+                CustomerEmail: booking.CustomerEmail,
+                CustomerPhone: booking.CustomerPhone,
+                EventId: booking.EventId,
+                EventTitle: booking.Event?.Title,
+                TicketTierName: booking.TicketTier?.Name,
+                Quantity: booking.Quantity,
+                SeatLabels: seatLabels,
+                ValidatedAt: validatedAt
+            );
+        }
+
+        // 4. Double-entry prevention check
+        if (booking.IsCheckedIn)
+        {
+            var alreadyCheckInTime = booking.CheckedInAt?.ToLocalTime().ToString("g") ?? "Earlier";
+            var gatekeeper = !string.IsNullOrWhiteSpace(booking.CheckedInBy) ? booking.CheckedInBy : "Gatekeeper";
+            return new TicketValidationResultDto(
+                IsValid: false,
+                Status: "ALREADY_CHECKED_IN",
+                Message: $"DUPLICATE ENTRY DETECTED: This pass was already checked in on {alreadyCheckInTime} by {gatekeeper}.",
+                BookingId: booking.Id,
+                BookingRef: booking.BookingRef,
+                CustomerName: booking.CustomerName,
+                CustomerEmail: booking.CustomerEmail,
+                CustomerPhone: booking.CustomerPhone,
+                EventId: booking.EventId,
+                EventTitle: booking.Event?.Title,
+                TicketTierName: booking.TicketTier?.Name,
+                Quantity: booking.Quantity,
+                SeatLabels: seatLabels,
+                CheckedInAt: booking.CheckedInAt,
+                CheckedInBy: booking.CheckedInBy,
+                GateName: booking.GateNotes,
+                ValidatedAt: validatedAt
+            );
+        }
+
+        // 5. Check-In admission execution
+        if (request.CheckIn)
+        {
+            booking.IsCheckedIn = true;
+            booking.CheckedInAt = validatedAt;
+            booking.CheckedInBy = validatorEmail ?? "Gatekeeper";
+            booking.GateNotes = request.GateName;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Ticket {BookingRef} successfully checked in at gate {GateName} by {Validator}.", 
+                booking.BookingRef, request.GateName, validatorEmail);
+
+            return new TicketValidationResultDto(
+                IsValid: true,
+                Status: "APPROVED",
+                Message: $"ENTRY APPROVED! Welcome, {booking.CustomerName}.",
+                BookingId: booking.Id,
+                BookingRef: booking.BookingRef,
+                CustomerName: booking.CustomerName,
+                CustomerEmail: booking.CustomerEmail,
+                CustomerPhone: booking.CustomerPhone,
+                EventId: booking.EventId,
+                EventTitle: booking.Event?.Title,
+                TicketTierName: booking.TicketTier?.Name,
+                Quantity: booking.Quantity,
+                SeatLabels: seatLabels,
+                CheckedInAt: booking.CheckedInAt,
+                CheckedInBy: booking.CheckedInBy,
+                GateName: booking.GateNotes,
+                ValidatedAt: validatedAt
+            );
+        }
+
+        // Validate/preview only mode
+        return new TicketValidationResultDto(
+            IsValid: true,
+            Status: "VALID_NOT_CHECKED_IN",
+            Message: $"Ticket is valid for {booking.CustomerName} ({booking.Quantity} pass{(booking.Quantity > 1 ? "es" : "")}). Ready for check-in.",
+            BookingId: booking.Id,
+            BookingRef: booking.BookingRef,
+            CustomerName: booking.CustomerName,
+            CustomerEmail: booking.CustomerEmail,
+            CustomerPhone: booking.CustomerPhone,
+            EventId: booking.EventId,
+            EventTitle: booking.Event?.Title,
+            TicketTierName: booking.TicketTier?.Name,
+            Quantity: booking.Quantity,
+            SeatLabels: seatLabels,
+            ValidatedAt: validatedAt
+        );
+    }
+
+    public async Task<GateStatsDto> GetEventGateStatsAsync(int eventId)
+    {
+        var ev = await _context.Events
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.Id == eventId && !e.IsDeleted);
+
+        if (ev is null)
+            throw new KeyNotFoundException($"Event with ID '{eventId}' not found.");
+
+        var bookings = await _context.Bookings
+            .AsNoTracking()
+            .Include(b => b.TicketTier)
+            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+            .Where(b => b.EventId == eventId && b.PaymentStatus == PaymentStatus.Paid && !b.IsDeleted)
+            .OrderByDescending(b => b.CheckedInAt)
+            .ToListAsync();
+
+        var totalSold = bookings.Sum(b => b.Quantity);
+        var checkedInList = bookings.Where(b => b.IsCheckedIn).ToList();
+        var totalCheckedIn = checkedInList.Sum(b => b.Quantity);
+        var remaining = Math.Max(0, totalSold - totalCheckedIn);
+        var pct = totalSold > 0 ? Math.Round((double)totalCheckedIn / totalSold * 100, 1) : 0.0;
+
+        var recentScans = checkedInList
+            .Take(25)
+            .Select(b => new RecentGateScanDto(
+                BookingId: b.Id,
+                BookingRef: b.BookingRef,
+                CustomerName: b.CustomerName,
+                TierName: b.TicketTier?.Name ?? "General",
+                SeatSummary: b.BookingSeats.Count > 0 
+                    ? string.Join(", ", b.BookingSeats.Select(s => s.Seat?.Label ?? "")) 
+                    : $"{b.Quantity} Tickets",
+                Status: "APPROVED",
+                CheckedInAt: b.CheckedInAt ?? DateTimeOffset.UtcNow,
+                CheckedInBy: b.CheckedInBy,
+                GateName: b.GateNotes
+            ))
+            .ToList();
+
+        return new GateStatsDto(
+            EventId: ev.Id,
+            EventTitle: ev.Title,
+            TotalTicketsSold: totalSold,
+            TotalCheckedIn: totalCheckedIn,
+            TotalRemaining: remaining,
+            AttendancePercentage: pct,
+            RecentScans: recentScans
+        );
+    }
+
+    public async Task<TicketValidationResultDto> ResetGateCheckInAsync(ResetGateCheckInRequestDto request, int? adminId = null, string? adminEmail = null)
+    {
+        var validatedAt = DateTimeOffset.UtcNow;
+        var parsedRef = ExtractBookingRef(request.TicketCode);
+        int.TryParse(parsedRef, out var numericId);
+
+        var booking = await _context.Bookings
+            .Include(b => b.Event)
+            .Include(b => b.TicketTier)
+            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+            .FirstOrDefaultAsync(b => (!string.IsNullOrEmpty(b.BookingRef) && b.BookingRef.ToLower() == parsedRef.ToLower()) 
+                                   || (numericId > 0 && b.Id == numericId));
+
+        if (booking is null || booking.IsDeleted)
+            throw new KeyNotFoundException($"Booking '{parsedRef}' not found.");
+
+        booking.IsCheckedIn = false;
+        booking.CheckedInAt = null;
+        booking.CheckedInBy = null;
+        booking.GateNotes = !string.IsNullOrWhiteSpace(request.Reason) 
+            ? $"Reset: {request.Reason.Trim()}" 
+            : $"Reset by {adminEmail ?? "Admin"} at {validatedAt:g}";
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Ticket {BookingRef} check-in reset by {AdminEmail}.", booking.BookingRef, adminEmail);
+
+        var seatLabels = booking.BookingSeats
+            .Where(bs => bs.Seat != null)
+            .Select(bs => bs.Seat!.Label)
+            .ToList();
+
+        return new TicketValidationResultDto(
+            IsValid: true,
+            Status: "RESET",
+            Message: $"Check-in status for ticket {booking.BookingRef} has been successfully reset.",
+            BookingId: booking.Id,
+            BookingRef: booking.BookingRef,
+            CustomerName: booking.CustomerName,
+            CustomerEmail: booking.CustomerEmail,
+            CustomerPhone: booking.CustomerPhone,
+            EventId: booking.EventId,
+            EventTitle: booking.Event?.Title,
+            TicketTierName: booking.TicketTier?.Name,
+            Quantity: booking.Quantity,
+            SeatLabels: seatLabels,
+            ValidatedAt: validatedAt
+        );
+    }
+
+    public static string ExtractBookingRef(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+        var trimmed = input.Trim();
+
+        // Handle raw QR text containing "ID: EVL-XXXX"
+        var idMarker = "ID:";
+        var idIndex = trimmed.IndexOf(idMarker, StringComparison.OrdinalIgnoreCase);
+        if (idIndex >= 0)
+        {
+            var substring = trimmed.Substring(idIndex + idMarker.Length).TrimStart();
+            var lineEnd = substring.IndexOfAny(new[] { '\r', '\n', ' ', '\t' });
+            return (lineEnd > 0 ? substring[..lineEnd] : substring).Trim();
+        }
+
+        // Handle verify URL e.g. /verify/EVL-XXXX or https://.../verify/EVL-XXXX
+        var verifyMarker = "/verify/";
+        var verifyIndex = trimmed.IndexOf(verifyMarker, StringComparison.OrdinalIgnoreCase);
+        if (verifyIndex >= 0)
+        {
+            var afterVerify = trimmed.Substring(verifyIndex + verifyMarker.Length).Trim();
+            var slashOrParam = afterVerify.IndexOfAny(new[] { '?', '#', '/', ' ' });
+            return (slashOrParam > 0 ? afterVerify[..slashOrParam] : afterVerify).Trim();
+        }
+
+        // Handle ?verify=EVL-XXXX
+        var paramMarker = "verify=";
+        var paramIndex = trimmed.IndexOf(paramMarker, StringComparison.OrdinalIgnoreCase);
+        if (paramIndex >= 0)
+        {
+            var afterParam = trimmed.Substring(paramIndex + paramMarker.Length).Trim();
+            var endParam = afterParam.IndexOfAny(new[] { '&', '#', ' ' });
+            return (endParam > 0 ? afterParam[..endParam] : afterParam).Trim();
+        }
+
+        // Handle standard EVL- regex or direct ref
+        var evlMatch = System.Text.RegularExpressions.Regex.Match(trimmed, @"(EVL-[A-Za-z0-9\-]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (evlMatch.Success)
+        {
+            return evlMatch.Groups[1].Value.Trim();
+        }
+
+        return trimmed;
+    }
 }

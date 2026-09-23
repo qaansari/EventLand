@@ -24,6 +24,10 @@ public class User : BaseEntity
     public int       RoleId        { get; set; }
     public Role      Role          { get; set; } = null!;
 
+    // Organizer Company Foreign Key & Navigation (allows multiple users per organizer)
+    public int?      OrganizerId   { get; set; }
+    public Organizer? Organizer    { get; set; }
+
     public bool      IsActive      { get; set; } = true;
     public DateTimeOffset? LastLoginAt { get; set; }
 

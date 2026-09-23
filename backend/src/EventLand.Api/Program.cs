@@ -147,6 +147,23 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 10
             }));
 
+    // Per-User rate limiting for gate check-in validation (partitioned by authenticated UserId
+    // rather than IP so multiple gatekeepers on the same venue NAT Wi-Fi don't share a limit)
+    options.AddPolicy("gate", httpContext =>
+    {
+        var userId = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                     ?? httpContext.User.FindFirst("sub")?.Value
+                     ?? ResolveClientIp(httpContext);
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"gate_{userId}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            });
+    });
+
     // Global fallback limiter: 300 requests/minute per client IP
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(

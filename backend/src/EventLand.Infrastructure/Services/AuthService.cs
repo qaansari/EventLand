@@ -92,28 +92,41 @@ public class AuthService : IAuthService
         user.LastLoginAt = DateTimeOffset.UtcNow;
         await _context.SaveChangesAsync();
 
-        int? organizerId = null;
+        int? organizerId = user.OrganizerId;
+        string? organizerName = null;
+
         if (string.Equals(user.Role?.Name, "Organizer", StringComparison.OrdinalIgnoreCase))
         {
-            var org = await _context.Organizers
-                .FirstOrDefaultAsync(o => !o.IsDeleted && (o.Email.ToLower() == normalizedEmail || o.Name.ToLower() == user.FullName.ToLower()));
-            if (org == null)
+            Organizer? org = null;
+            if (organizerId.HasValue && organizerId.Value > 0)
             {
-                org = new Organizer
+                org = await _context.Organizers.FirstOrDefaultAsync(o => o.Id == organizerId.Value && !o.IsDeleted);
+            }
+            else
+            {
+                org = await _context.Organizers
+                    .FirstOrDefaultAsync(o => !o.IsDeleted && (o.Email.ToLower() == normalizedEmail || o.Name.ToLower() == user.FullName.ToLower()));
+                if (org == null)
                 {
-                    Name = user.FullName,
-                    Email = user.Email,
-                    Phone = user.PhoneNumber ?? "",
-                    IsVerified = true
-                };
-                _context.Organizers.Add(org);
+                    org = new Organizer
+                    {
+                        Name = user.FullName,
+                        Email = user.Email,
+                        Phone = user.PhoneNumber ?? "",
+                        IsVerified = true
+                    };
+                    _context.Organizers.Add(org);
+                    await _context.SaveChangesAsync();
+                }
+                organizerId = org.Id;
+                user.OrganizerId = org.Id;
                 await _context.SaveChangesAsync();
             }
-            organizerId = org.Id;
+            organizerName = org?.Name;
         }
 
         var (token, expiresAt) = _tokenGenerator.GenerateToken(user, organizerId);
-        var userDto = new UserDto(user.Id, user.Email, user.FullName, user.Role?.Name ?? "Customer", user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl), user.PhoneNumber, user.CountryId, user.Country?.Name, user.Country?.DialingCode, organizerId);
+        var userDto = new UserDto(user.Id, user.Email, user.FullName, user.Role?.Name ?? "Customer", user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl), user.PhoneNumber, user.CountryId, user.Country?.Name, user.Country?.DialingCode, organizerId, organizerName);
 
         return new LoginResponseDto(token, userDto, expiresAt);
     }
@@ -211,19 +224,23 @@ public class AuthService : IAuthService
             .AsNoTracking()
             .Include(u => u.Role)
             .Include(u => u.Country)
+            .Include(u => u.Organizer)
             .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive && !u.IsDeleted);
 
         if (user == null) return null;
 
-        int? organizerId = null;
-        if (string.Equals(user.Role?.Name, "Organizer", StringComparison.OrdinalIgnoreCase))
+        int? organizerId = user.OrganizerId;
+        string? organizerName = user.Organizer?.Name;
+
+        if (!organizerId.HasValue && string.Equals(user.Role?.Name, "Organizer", StringComparison.OrdinalIgnoreCase))
         {
             var org = await _context.Organizers.AsNoTracking()
                 .FirstOrDefaultAsync(o => !o.IsDeleted && (o.Email.ToLower() == user.Email.ToLower() || o.Name.ToLower() == user.FullName.ToLower()));
             organizerId = org?.Id;
+            organizerName = org?.Name;
         }
 
-        return new UserDto(user.Id, user.Email, user.FullName, user.Role?.Name ?? "Customer", user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl), user.PhoneNumber, user.CountryId, user.Country?.Name, user.Country?.DialingCode, organizerId);
+        return new UserDto(user.Id, user.Email, user.FullName, user.Role?.Name ?? "Customer", user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl), user.PhoneNumber, user.CountryId, user.Country?.Name, user.Country?.DialingCode, organizerId, organizerName);
     }
 
     public async Task ChangePasswordAsync(int userId, ChangePasswordDto dto)

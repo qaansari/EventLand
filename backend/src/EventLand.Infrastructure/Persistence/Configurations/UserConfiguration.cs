@@ -49,6 +49,13 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
                .HasForeignKey(u => u.CountryId)
                .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasQueryFilter(u => !u.IsDeleted);
+        builder.HasOne(u => u.Organizer)
+               .WithMany(o => o.Users)
+               .HasForeignKey(u => u.OrganizerId)
+               .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasIndex(u => u.OrganizerId)
+               .HasDatabaseName("IX_Users_OrganizerId");
+
     }
 }

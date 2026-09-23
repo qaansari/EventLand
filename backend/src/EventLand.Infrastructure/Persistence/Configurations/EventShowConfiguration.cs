@@ -34,6 +34,5 @@ public sealed class EventShowConfiguration : IEntityTypeConfiguration<EventShow>
         builder.HasIndex(s => new { s.EventId, s.StartTimeUtc })
                .HasDatabaseName("IX_EventShows_EventId_StartTimeUtc");
 
-        builder.HasQueryFilter(s => !s.IsDeleted);
     }
 }

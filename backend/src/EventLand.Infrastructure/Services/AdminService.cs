@@ -444,7 +444,19 @@ public class AdminService : IAdminService
             .OrderByDescending(u => u.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(u => new UserDto(u.Id, u.Email, u.FullName, u.Role.Name, u.LastLoginAt, FileUrlHelper.FormatUserImageUrl(u.ImageUrl), u.PhoneNumber, u.CountryId, u.Country != null ? u.Country.Name : null, u.Country != null ? u.Country.DialingCode : null))
+            .Select(u => new UserDto(
+                u.Id,
+                u.Email,
+                u.FullName,
+                u.Role.Name,
+                u.LastLoginAt,
+                FileUrlHelper.FormatUserImageUrl(u.ImageUrl),
+                u.PhoneNumber,
+                u.CountryId,
+                u.Country != null ? u.Country.Name : null,
+                u.Country != null ? u.Country.DialingCode : null,
+                u.OrganizerId,
+                u.Organizer != null ? u.Organizer.Name : null))
             .ToListAsync();
 
         return new PagedResult<UserDto>(items, totalCount, pageNumber, pageSize);
@@ -452,13 +464,29 @@ public class AdminService : IAdminService
 
     public async Task<UserDto?> GetUserByIdAsync(int id, bool isSuperAdmin = true)
     {
-        var query = _context.Users.AsNoTracking().Include(x => x.Role).Include(x => x.Country).Where(x => x.Id == id && !x.IsDeleted);
+        var query = _context.Users.AsNoTracking()
+            .Include(x => x.Role)
+            .Include(x => x.Country)
+            .Include(x => x.Organizer)
+            .Where(x => x.Id == id && !x.IsDeleted);
         if (!isSuperAdmin)
         {
             query = query.Where(x => x.Role.Name != "Admin" && x.Role.Name != "SuperAdmin");
         }
         var u = await query.FirstOrDefaultAsync();
-        return u is null ? null : new UserDto(u.Id, u.Email, u.FullName, u.Role.Name, u.LastLoginAt, FileUrlHelper.FormatUserImageUrl(u.ImageUrl), u.PhoneNumber, u.CountryId, u.Country?.Name, u.Country?.DialingCode);
+        return u is null ? null : new UserDto(
+            u.Id,
+            u.Email,
+            u.FullName,
+            u.Role.Name,
+            u.LastLoginAt,
+            FileUrlHelper.FormatUserImageUrl(u.ImageUrl),
+            u.PhoneNumber,
+            u.CountryId,
+            u.Country?.Name,
+            u.Country?.DialingCode,
+            u.OrganizerId,
+            u.Organizer?.Name);
     }
 
     public async Task<UserDto> CreateUserAsync(CreateUserDto dto, bool isSuperAdmin = true)
@@ -491,6 +519,7 @@ public class AdminService : IAdminService
             RoleId = dto.RoleId,
             PhoneNumber = dto.PhoneNumber?.Trim(),
             CountryId = dto.CountryId,
+            OrganizerId = dto.OrganizerId,
             ImageUrl = FileUrlHelper.ExtractFileName(dto.ImageUrl) ?? dto.ImageUrl,
             IsActive = true
         };
@@ -502,7 +531,8 @@ public class AdminService : IAdminService
         await _context.SaveChangesAsync();
 
         var country = dto.CountryId.HasValue ? await _context.Countries.FirstOrDefaultAsync(c => c.Id == dto.CountryId.Value) : null;
-        return new UserDto(user.Id, user.Email, user.FullName, role.Name, null, FileUrlHelper.FormatUserImageUrl(user.ImageUrl), user.PhoneNumber, user.CountryId, country?.Name, country?.DialingCode);
+        var organizer = dto.OrganizerId.HasValue ? await _context.Organizers.FirstOrDefaultAsync(o => o.Id == dto.OrganizerId.Value) : null;
+        return new UserDto(user.Id, user.Email, user.FullName, role.Name, null, FileUrlHelper.FormatUserImageUrl(user.ImageUrl), user.PhoneNumber, user.CountryId, country?.Name, country?.DialingCode, user.OrganizerId, organizer?.Name);
     }
 
     public async Task<UserDto> UpdateUserAsync(int id, UpdateUserDto dto, bool isSuperAdmin = true)
@@ -537,6 +567,7 @@ public class AdminService : IAdminService
         user.RoleId = dto.RoleId;
         user.PhoneNumber = dto.PhoneNumber?.Trim();
         user.CountryId = dto.CountryId;
+        user.OrganizerId = dto.OrganizerId;
         user.IsActive = dto.IsActive;
 
         if (dto.ImageUrl != null)
@@ -553,7 +584,8 @@ public class AdminService : IAdminService
 
         await _context.SaveChangesAsync();
         var country = dto.CountryId.HasValue ? await _context.Countries.FirstOrDefaultAsync(c => c.Id == dto.CountryId.Value) : null;
-        return new UserDto(user.Id, user.Email, user.FullName, role.Name, user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl), user.PhoneNumber, user.CountryId, country?.Name, country?.DialingCode);
+        var organizer = user.OrganizerId.HasValue ? await _context.Organizers.FirstOrDefaultAsync(o => o.Id == user.OrganizerId.Value) : null;
+        return new UserDto(user.Id, user.Email, user.FullName, role.Name, user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl), user.PhoneNumber, user.CountryId, country?.Name, country?.DialingCode, user.OrganizerId, organizer?.Name);
     }
 
     public async Task<bool> DeleteUserAsync(int id, bool isSuperAdmin = true)
@@ -580,14 +612,6 @@ public class AdminService : IAdminService
 
         var query = _context.Events
             .AsNoTracking()
-            .Include(e => e.Organizer)
-            .Include(e => e.Country)
-            .Include(e => e.City)
-            .Include(e => e.Venue)
-            .Include(e => e.Auditorium)
-            .Include(e => e.EventTags).ThenInclude(et => et.Tag)
-            .Include(e => e.Shows.Where(s => !s.IsDeleted))
-                .ThenInclude(s => s.TicketTiers.Where(t => !t.IsDeleted))
             .Where(e => !e.IsDeleted);
 
         var totalCount = await query.CountAsync();
@@ -1141,6 +1165,58 @@ public class AdminService : IAdminService
     }
 
     // --- EventShows CRUD ---
+    public async Task<List<EventShowDto>> GetEventShowsAsync(int? eventId = null, int? organizerId = null)
+    {
+        var query = _context.EventShows
+            .AsNoTracking()
+            .Include(s => s.Event)
+            .Include(s => s.TicketTiers.Where(t => !t.IsDeleted))
+            .Where(s => !s.IsDeleted && !s.Event.IsDeleted);
+
+        if (eventId.HasValue)
+            query = query.Where(s => s.EventId == eventId.Value);
+
+        if (organizerId.HasValue)
+            query = query.Where(s => s.Event.OrganizerId == organizerId.Value);
+
+        var list = await query
+            .OrderBy(s => s.Id)
+            .ToListAsync();
+
+        return list.OrderBy(s => s.StartTimeUtc).Select(s => new EventShowDto(
+            s.Id,
+            s.EventId,
+            s.ShowTitle,
+            s.StartTimeUtc,
+            s.EndTimeUtc,
+            s.TicketTiers.OrderBy(t => t.SortOrder).Select(t => new TicketTierDto(
+                t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange
+            )).ToList()
+        )).ToList();
+    }
+
+    public async Task<EventShowDto?> GetEventShowByIdAsync(int id, int? organizerId = null)
+    {
+        var show = await _context.EventShows
+            .AsNoTracking()
+            .Include(s => s.Event)
+            .Include(s => s.TicketTiers.Where(t => !t.IsDeleted))
+            .FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted && !s.Event.IsDeleted);
+
+        if (show is null) return null;
+
+        if (organizerId.HasValue && show.Event.OrganizerId != organizerId.Value)
+            return null;
+
+        var tiers = show.TicketTiers
+            .OrderBy(t => t.SortOrder)
+            .Select(t => new TicketTierDto(
+                t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange
+            )).ToList();
+
+        return new EventShowDto(show.Id, show.EventId, show.ShowTitle, show.StartTimeUtc, show.EndTimeUtc, tiers);
+    }
+
     public async Task<EventShowDto> CreateEventShowAsync(CreateEventShowDto dto, int? organizerId = null)
     {
         var ev = await _context.Events.FirstOrDefaultAsync(e => e.Id == dto.EventId && !e.IsDeleted);
@@ -1149,6 +1225,12 @@ public class AdminService : IAdminService
 
         if (organizerId.HasValue && ev.OrganizerId != organizerId.Value)
             throw new UnauthorizedAccessException("Access denied to this event.");
+
+        if (dto.StartTimeUtc >= dto.EndTimeUtc)
+            throw new InvalidOperationException("Show start time must be before show end time.");
+
+        if (dto.StartTimeUtc < ev.StartDateUtc || dto.EndTimeUtc > ev.EndDateUtc)
+            throw new InvalidOperationException($"Show slot timing ({dto.StartTimeUtc:yyyy-MM-dd HH:mm} - {dto.EndTimeUtc:yyyy-MM-dd HH:mm} UTC) must be within the event date range ({ev.StartDateUtc:yyyy-MM-dd HH:mm} - {ev.EndDateUtc:yyyy-MM-dd HH:mm} UTC).");
 
         var showTitleClean = dto.ShowTitle.Trim();
         var duplicateShow = await _context.EventShows.AnyAsync(s => s.EventId == dto.EventId && !s.IsDeleted && s.ShowTitle.ToLower() == showTitleClean.ToLower() && s.StartTimeUtc == dto.StartTimeUtc);
@@ -1186,6 +1268,12 @@ public class AdminService : IAdminService
 
         if (organizerId.HasValue && show.Event.OrganizerId != organizerId.Value)
             throw new UnauthorizedAccessException("Access denied to this event.");
+
+        if (dto.StartTimeUtc >= dto.EndTimeUtc)
+            throw new InvalidOperationException("Show start time must be before show end time.");
+
+        if (dto.StartTimeUtc < show.Event.StartDateUtc || dto.EndTimeUtc > show.Event.EndDateUtc)
+            throw new InvalidOperationException($"Show slot timing ({dto.StartTimeUtc:yyyy-MM-dd HH:mm} - {dto.EndTimeUtc:yyyy-MM-dd HH:mm} UTC) must be within the event date range ({show.Event.StartDateUtc:yyyy-MM-dd HH:mm} - {show.Event.EndDateUtc:yyyy-MM-dd HH:mm} UTC).");
 
         var showTitleClean = dto.ShowTitle.Trim();
         var duplicateShow = await _context.EventShows.AnyAsync(s => s.EventId == show.EventId && s.Id != id && !s.IsDeleted && s.ShowTitle.ToLower() == showTitleClean.ToLower() && s.StartTimeUtc == dto.StartTimeUtc);
@@ -1755,6 +1843,7 @@ public class AdminService : IAdminService
     {
         var ev = await _context.Events
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(e => e.Organizer)
             .Include(e => e.Country)
             .Include(e => e.City)

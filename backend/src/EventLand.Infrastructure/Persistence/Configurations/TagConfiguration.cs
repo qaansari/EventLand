@@ -24,6 +24,5 @@ public sealed class TagConfiguration : IEntityTypeConfiguration<Tag>
                .HasFilter("[IsDeleted] = 0")
                .HasDatabaseName("IX_Tags_Slug");
 
-        builder.HasQueryFilter(t => !t.IsDeleted);
     }
 }

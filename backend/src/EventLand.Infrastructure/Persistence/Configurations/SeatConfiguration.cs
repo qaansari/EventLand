@@ -34,6 +34,5 @@ public sealed class SeatConfiguration : IEntityTypeConfiguration<Seat>
         builder.HasIndex(s => new { s.ZoneId, s.Status })
                .HasDatabaseName("IX_Seats_ZoneId_Status");
 
-        builder.HasQueryFilter(s => !s.IsDeleted);
     }
 }

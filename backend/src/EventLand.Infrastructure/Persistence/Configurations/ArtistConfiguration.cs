@@ -46,6 +46,5 @@ public sealed class ArtistConfiguration : IEntityTypeConfiguration<Artist>
         builder.HasIndex(a => a.IsFeatured)
                .HasDatabaseName("IX_Artists_IsFeatured");
 
-        builder.HasQueryFilter(a => !a.IsDeleted);
     }
 }

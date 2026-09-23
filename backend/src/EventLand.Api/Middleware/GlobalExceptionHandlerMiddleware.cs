@@ -2,6 +2,7 @@ namespace EventLand.Api.Middleware;
 
 using System.Net;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 
 public class GlobalExceptionHandlerMiddleware
 {
@@ -44,7 +45,12 @@ public class GlobalExceptionHandlerMiddleware
         {
             KeyNotFoundException => HttpStatusCode.NotFound,
             InvalidOperationException => HttpStatusCode.BadRequest,
+            // Authenticated users who lack privileges get 403 Forbidden (not 401 which triggers logout)
+            UnauthorizedAccessException when context.User.Identity?.IsAuthenticated == true
+                => HttpStatusCode.Forbidden,
             UnauthorizedAccessException => HttpStatusCode.Unauthorized,
+            DbUpdateConcurrencyException => HttpStatusCode.Conflict,
+            DbUpdateException => HttpStatusCode.BadRequest,
             ArgumentException => HttpStatusCode.BadRequest,
             _ => HttpStatusCode.InternalServerError
         };

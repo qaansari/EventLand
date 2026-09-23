@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EventLand.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260917071121_InitialBaseline")]
-    partial class InitialBaseline
+    [Migration("20260923090046_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -258,6 +258,13 @@ namespace EventLand.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<DateTimeOffset?>("CheckedInAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CheckedInBy")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -288,6 +295,13 @@ namespace EventLand.Infrastructure.Migrations
                     b.Property<decimal>("FeePercentageAtPurchase")
                         .HasPrecision(5, 2)
                         .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("GateNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsCheckedIn")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -391,6 +405,9 @@ namespace EventLand.Infrastructure.Migrations
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("IX_Bookings_UserId");
+
+                    b.HasIndex("EventId", "IsCheckedIn")
+                        .HasDatabaseName("IX_Bookings_EventId_IsCheckedIn");
 
                     b.HasIndex("EventId", "Status")
                         .HasDatabaseName("IX_Bookings_EventId_Status");
@@ -1710,6 +1727,9 @@ namespace EventLand.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("LockoutEndUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<int?>("OrganizerId")
+                        .HasColumnType("int");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -1737,6 +1757,9 @@ namespace EventLand.Infrastructure.Migrations
                         .HasDatabaseName("IX_Users_Email")
                         .HasFilter("[IsDeleted] = 0");
 
+                    b.HasIndex("OrganizerId")
+                        .HasDatabaseName("IX_Users_OrganizerId");
+
                     b.HasIndex("PhoneNumber")
                         .IsUnique()
                         .HasDatabaseName("IX_Users_PhoneNumber")
@@ -1756,7 +1779,7 @@ namespace EventLand.Infrastructure.Migrations
                             FullName = "Super Admin",
                             IsActive = true,
                             IsDeleted = false,
-                            PasswordHash = "AQAAAAIAAYagAAAAEHsRMsgj83jxgHuFr3TTpQzr3/l4xvFEMPgpBV3Iy/3x0kiopGzfJMVKxXCfkng16A==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEIV0PA3rOB1ib/256bKK/zxg6odie0oo5fSscVtnPlMz1CMDm6Y95/CrWZT29pSn0g==",
                             PhoneNumber = "+92 331 2541767",
                             RoleId = 1,
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
@@ -2195,6 +2218,11 @@ namespace EventLand.Infrastructure.Migrations
                         .HasForeignKey("CountryId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("EventLand.Domain.Entities.Organizer", "Organizer")
+                        .WithMany("Users")
+                        .HasForeignKey("OrganizerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("EventLand.Domain.Entities.Role", "Role")
                         .WithMany("Users")
                         .HasForeignKey("RoleId")
@@ -2202,6 +2230,8 @@ namespace EventLand.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Country");
+
+                    b.Navigation("Organizer");
 
                     b.Navigation("Role");
                 });
@@ -2274,6 +2304,8 @@ namespace EventLand.Infrastructure.Migrations
             modelBuilder.Entity("EventLand.Domain.Entities.Organizer", b =>
                 {
                     b.Navigation("Events");
+
+                    b.Navigation("Users");
                 });
 
             modelBuilder.Entity("EventLand.Domain.Entities.Role", b =>

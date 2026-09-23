@@ -26,6 +26,7 @@ const DigitalTicketModal = lazy(() => import('./components/DigitalTicketModal'))
 const UnpaidInvoicesModal = lazy(() => import('./components/UnpaidInvoicesModal'));
 const AttendeeDashboard = lazy(() => import('./components/AttendeeDashboard'));
 const PayProReturnPage = lazy(() => import('./components/PayProReturnPage'));
+const GatePassVerification = lazy(() => import('./components/GatePassVerification'));
 
 const LazyFallback = (
   <EventLandPreloader text="Loading view..." minHeight="50vh" />
@@ -53,6 +54,20 @@ const isPaymentReturnUrl = () => {
   if (path.includes('/payments/return') || path.includes('/payment/return')) return true;
   const searchParams = new URLSearchParams(window.location.search);
   return searchParams.has('ordId') || (searchParams.has('orderNumber') && searchParams.has('status'));
+};
+
+const getVerifyTicketIdFromUrl = () => {
+  if (typeof window === 'undefined') return null;
+  const path = window.location.pathname;
+  if (path.startsWith('/verify/')) {
+    const parts = path.split('/verify/');
+    if (parts[1]) return decodeURIComponent(parts[1].split('/')[0].split('?')[0]);
+  }
+  const searchParams = new URLSearchParams(window.location.search);
+  if (searchParams.has('verify')) {
+    return searchParams.get('verify');
+  }
+  return null;
 };
 
 function mapBookingToTicket(b, fallbackEmail = '') {
@@ -186,11 +201,13 @@ export default function App() {
   };
 
   const [urlEventId, setUrlEventId] = useState(getEventIdFromUrl);
+  const [verifyTicketId, setVerifyTicketId] = useState(getVerifyTicketIdFromUrl);
   const [activeView, setActiveView] = useState(() => {
+    if (getVerifyTicketIdFromUrl()) return 'gate-verify';
     if (isPaymentReturnUrl()) return 'payment-return';
     if (getEventIdFromUrl()) return 'event-detail';
     return 'explore';
-  }); // explore, event-detail, artists, organizer-wizard, my-tickets, organizer, admin, payment-return
+  }); // explore, event-detail, artists, organizer-wizard, my-tickets, organizer, admin, payment-return, gate-verify
   const [userRole, setUserRole] = useState('customer'); // customer, organizer, admin
   const [sortBy, setSortBy] = useState('featured');
 
@@ -1281,6 +1298,27 @@ export default function App() {
                   window.history.pushState({}, '', '/');
                 }
                 setActiveView('my-tickets');
+              }}
+            />
+          </Suspense>
+        )}
+
+        {/* View: Gate Pass Verification (Admins: Validates & Admits; Others: Prints Access Denied Error) */}
+        {activeView === 'gate-verify' && (
+          <Suspense fallback={LazyFallback}>
+            <GatePassVerification
+              ticketId={verifyTicketId}
+              currentUser={currentUser}
+              onNavigateHome={() => {
+                if (typeof window !== 'undefined' && window.history.pushState) {
+                  window.history.pushState({}, '', '/');
+                }
+                setVerifyTicketId(null);
+                setActiveView('explore');
+              }}
+              onOpenLogin={(role = 'admin') => {
+                setAuthModalRole(role);
+                setIsAuthModalOpen(true);
               }}
             />
           </Suspense>

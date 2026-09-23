@@ -104,10 +104,12 @@ async function request(endpoint, options = {}) {
     }
 
     let errorText = 'API Request Failed';
+    let parsedData = null;
     try {
       const rawText = await response.text();
       try {
         const errJson = JSON.parse(rawText);
+        parsedData = errJson;
         if (errJson.errors && typeof errJson.errors === 'object') {
           const errorMessages = Object.entries(errJson.errors)
             .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
@@ -122,7 +124,11 @@ async function request(endpoint, options = {}) {
     } catch {
       errorText = `Error ${response.status}: ${response.statusText}`;
     }
-    throw new Error(errorText || `Error ${response.status}`);
+    const apiError = new Error(errorText || `Error ${response.status}`);
+    apiError.status = response.status;
+    apiError.data = parsedData;
+    apiError.payload = parsedData;
+    throw apiError;
   }
 
   if (response.status === 204) return true;
@@ -254,6 +260,13 @@ export const adminApi = {
     delete: async (id) => request(`/admin/events/${id}`, { method: 'DELETE' })
   },
   eventShows: {
+    getAll: async (eventId = null) => {
+      const query = new URLSearchParams();
+      if (eventId) query.append('eventId', eventId);
+      const qStr = query.toString() ? `?${query.toString()}` : '';
+      return request(`/admin/event-shows${qStr}`);
+    },
+    getById: async (id) => request(`/admin/event-shows/${id}`),
     create: async (dto) => request('/admin/event-shows', { method: 'POST', body: JSON.stringify(dto) }),
     update: async (id, dto) => request(`/admin/event-shows/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
     delete: async (id) => request(`/admin/event-shows/${id}`, { method: 'DELETE' })
@@ -447,6 +460,21 @@ export const bankAccountsApi = {
   adminUpdate: async (id, dto) => request(`/admin/bank-accounts/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   adminDelete: async (id) => request(`/admin/bank-accounts/${id}`, { method: 'DELETE' }),
   adminToggleActive: async (id) => request(`/admin/bank-accounts/${id}/toggle-active`, { method: 'PUT' })
+};
+
+// --- Venue Gate Ticket Validation & Check-In API (Admin & SuperAdmin only) ---
+export const gateApi = {
+  validate: async ({ ticketCode, eventId = null, eventShowId = null, checkIn = true, gateName = null }) =>
+    request('/gate/validate', {
+      method: 'POST',
+      body: JSON.stringify({ ticketCode, eventId, eventShowId, checkIn, gateName })
+    }),
+  getStats: async (eventId) => request(`/gate/stats/${eventId}`),
+  reset: async ({ ticketCode, reason = null }) =>
+    request('/gate/reset', {
+      method: 'POST',
+      body: JSON.stringify({ ticketCode, reason })
+    })
 };
 
 // --- Phone Number Dialing Code Helpers ---

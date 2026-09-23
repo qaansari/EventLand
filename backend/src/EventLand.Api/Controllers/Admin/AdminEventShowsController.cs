@@ -1,6 +1,7 @@
 namespace EventLand.Api.Controllers.Admin;
 
 using EventLand.Api.Extensions;
+using EventLand.Application.Common;
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -8,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/admin/event-shows")]
-[Authorize(Roles = "SuperAdmin,Admin,Organizer,organizer,admin,superadmin")]
+[Authorize(Roles = AppRoles.OrganizerOrAdmin)]
 [Produces("application/json")]
 public class AdminEventShowsController : ControllerBase
 {
@@ -17,6 +18,27 @@ public class AdminEventShowsController : ControllerBase
     public AdminEventShowsController(IAdminService adminService)
     {
         _adminService = adminService;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<List<EventShowDto>>> GetEventShows([FromQuery] int? eventId = null)
+    {
+        int? scopedOrgId = User.IsAdmin() ? null : User.GetOrganizerId();
+        if (!User.IsAdmin() && !scopedOrgId.HasValue) return Forbid();
+
+        var shows = await _adminService.GetEventShowsAsync(eventId, scopedOrgId);
+        return Ok(shows);
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<EventShowDto>> GetEventShow(int id)
+    {
+        int? scopedOrgId = User.IsAdmin() ? null : User.GetOrganizerId();
+        if (!User.IsAdmin() && !scopedOrgId.HasValue) return Forbid();
+
+        var show = await _adminService.GetEventShowByIdAsync(id, scopedOrgId);
+        if (show is null) return NotFound();
+        return Ok(show);
     }
 
     [HttpPost]

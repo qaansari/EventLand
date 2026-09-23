@@ -1,5 +1,6 @@
 namespace EventLand.Api.Controllers.Admin;
 
+using EventLand.Application.Common;
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -7,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/admin/roles")]
-[Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+[Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
 [Produces("application/json")]
 public class AdminRolesController : ControllerBase
 {
@@ -26,7 +27,7 @@ public class AdminRolesController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
-    [Authorize(Roles = "SuperAdmin,superadmin")]
+    [Authorize(Roles = AppRoles.SuperAdminOnly)]
     public async Task<ActionResult<RoleDto>> GetRoleById(int id)
     {
         var role = await _adminService.GetRoleByIdAsync(id);
@@ -35,7 +36,7 @@ public class AdminRolesController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "SuperAdmin,superadmin")]
+    [Authorize(Roles = AppRoles.SuperAdminOnly)]
     public async Task<ActionResult<RoleDto>> CreateRole([FromBody] CreateRoleDto dto)
     {
         var role = await _adminService.CreateRoleAsync(dto);
@@ -43,7 +44,7 @@ public class AdminRolesController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = "SuperAdmin,superadmin")]
+    [Authorize(Roles = AppRoles.SuperAdminOnly)]
     public async Task<ActionResult<RoleDto>> UpdateRole(int id, [FromBody] UpdateRoleDto dto)
     {
         var updated = await _adminService.UpdateRoleAsync(id, dto);
@@ -51,7 +52,7 @@ public class AdminRolesController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "SuperAdmin,superadmin")]
+    [Authorize(Roles = AppRoles.SuperAdminOnly)]
     public async Task<ActionResult> DeleteRole(int id)
     {
         var success = await _adminService.DeleteRoleAsync(id);

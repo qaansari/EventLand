@@ -29,7 +29,7 @@ public class SecurityHeadersMiddleware
         context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
         
         // Restrict browser features/permissions
-        context.Response.Headers.Append("Permissions-Policy", "geolocation=(), camera=(), microphone=(), payment=(self)");
+        context.Response.Headers.Append("Permissions-Policy", "geolocation=(), camera=(self), microphone=(), payment=(self)");
         
         // Isolate browsing context from cross-origin windows while permitting safe popups (WhatsApp share, auth)
         context.Response.Headers.Append("Cross-Origin-Opener-Policy", "same-origin-allow-popups");

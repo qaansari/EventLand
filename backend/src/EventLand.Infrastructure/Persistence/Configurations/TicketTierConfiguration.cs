@@ -47,6 +47,5 @@ public sealed class TicketTierConfiguration : IEntityTypeConfiguration<TicketTie
         builder.HasIndex(t => new { t.EventId, t.EventShowId })
                .HasDatabaseName("IX_TicketTiers_EventId_EventShowId");
 
-        builder.HasQueryFilter(t => !t.IsDeleted);
     }
 }

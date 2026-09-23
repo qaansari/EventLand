@@ -28,6 +28,5 @@ public sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
                .HasForeignKey(u => u.RoleId)
                .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasQueryFilter(r => !r.IsDeleted);
     }
 }

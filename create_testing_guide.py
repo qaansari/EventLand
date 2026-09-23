@@ -185,7 +185,7 @@ def build_document():
     desc_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     desc_p.paragraph_format.space_before = Pt(0)
     desc_p.paragraph_format.space_after = Pt(20)
-    run_desc = desc_p.add_run("Comprehensive test execution manual covering all platform features across Super Admin, Admin, Organizer, Attendee/Customer roles, PayPro v2 Financial Switch & Gateway, Automated Webhooks, Background Reconciliation, Admin Bookings Hub, Cloudflare Turnstile Bot Defense, and SkiaSharp Pixel Sanitization.")
+    run_desc = desc_p.add_run("Comprehensive test execution manual covering all platform features across Super Admin, Admin, Organizer, Attendee/Customer roles, PayPro v2 Financial Switch & Gateway, Automated Webhooks, Background Reconciliation, Admin Bookings Hub, Gate Ticket Validation & QR Scanner Hub, Multi-User Organizer Relational Linkage, Modular Admin Architecture, Cloudflare Turnstile Bot Defense, and SkiaSharp Pixel Sanitization.")
     run_desc.font.size = Pt(10.5)
     run_desc.font.italic = True
 
@@ -210,7 +210,7 @@ def build_document():
     p.add_run("This manual provides a zero-to-hero, step-by-step procedure to test the entire ")
     r_bold = p.add_run("EventLand")
     r_bold.bold = True
-    p.add_run(" ticketing and event management ecosystem from scratch. It verifies core business logic including user role authorization, interactive seat reservations, SignalR real-time locks, PayPro v2 financial switch operations, 1Pay instant online payment checkout, direct bank transfer manual verification, autonomous 30-minute hold expiration, automated webhook processing, background reconciliation, and digital E-Ticket QR code issuance.")
+    p.add_run(" ticketing and event management ecosystem from scratch. It verifies core business logic including user role authorization, interactive seat reservations, SignalR real-time locks, PayPro v2 financial switch operations, 1Pay instant online payment checkout, direct bank transfer manual verification, autonomous 30-minute hold expiration, automated webhook processing, background reconciliation, digital E-Ticket QR code issuance, Gate Ticket Validation & QR Scanner Admission Hub, and multi-user organizer company tenancy.")
 
     add_callout(doc, 
                 "Before starting test execution, ensure both backend API (.NET 10 Web API at localhost:5000 / https://localhost:7147) and frontend SPA (React 19 + Vite at localhost:5173) are running. PayPro sandbox credentials (Username, Password, ClientSecret, MerchantId) are configured in appsettings.Development.json under the 'PayPro' configuration section.", 
@@ -387,18 +387,20 @@ def build_document():
         [("Verify SEO URL Slug: Check that the event receives a clean slug URL (e.g. ", False), ("/event/atif-aslam-live-in-concert-2026-1001", True), (").", False)]
     ], "Event saved in DB with status 'Live' / 'Published'. SEO slug generated automatically. Event is visible on homepage.")
 
-    # Test Case 2.4 (NEW)
-    add_test_case(doc, "Test Case 2.4", "Multi-Show Scheduling & Ticket Tier Row Range Mapping", [
-        [("Edit the newly created event. Navigate to the ", False), ("Shows & Schedules", True), (" section.", False)],
-        [("Add Show 1: ", False), ("Show Date/Time: Saturday 8:00 PM, Show Title: 'Saturday Night Live'", True), (".", False)],
-        [("Add Show 2: ", False), ("Show Date/Time: Sunday 7:00 PM, Show Title: 'Sunday Grand Finale'", True), (".", False)],
-        [("Navigate to ", False), ("Ticket Tiers", True), (" section.", False)],
-        [("Create Tier 1: Name: ", False), ("VIP Passes", True), (", Price: ", False), ("PKR 6,000", True), (", Capacity: ", False), ("60", True), (", Row Range: ", False), ("A-C", True), (", Linked Show: ", False), ("Saturday Night Live", True), (".", False)],
-        [("Create Tier 2: Name: ", False), ("Executive Passes", True), (", Price: ", False), ("PKR 3,000", True), (", Capacity: ", False), ("140", True), (", Row Range: ", False), ("D-J", True), (", Linked Show: ", False), ("Saturday Night Live", True), (".", False)],
-        [("Save tiers. Verify composite database index on TicketTiers(EventId, EventShowId) ensures high-speed querying.", False)]
-    ], "Multiple shows created via AdminEventShowsController. Ticket tiers linked to specific shows with row ranges. Public event detail page renders show selector dropdown.",
-    note="Multi-show support allows a single event to run across multiple dates while keeping seat reservations segregated per show.",
-    note_title="MULTI-SHOW SCHEDULING:")
+    # Test Case 2.4 (UPDATED: DEDICATED SHOWS TAB & DATE RANGE VALIDATION)
+    add_test_case(doc, "Test Case 2.4", "Dedicated Shows Tab Management & Event Date Range Validation", [
+        [("Navigate to the Admin Dashboard and verify the new dedicated ", False), ("Shows ({count})", True), (" tab in the navigation bar (positioned alongside Events and Ticket Tiers).", False)],
+        [("Notice that Show Slot configuration is completely decoupled from the Event Create/Edit modal for cleaner, modular maintenance.", False)],
+        [("Click ", False), ("'Add Show Slot'", True), (" (from either the Events tab header, the Shows tab header, or an Event row's 'Shows' action).", False)],
+        [("Select an Event in the modal. Verify that the modal dynamically renders the ", False), ("'Allowed Event Date Range'", True), (" badge showing the parent event's start and end timestamps.", False)],
+        [("Test Negative Validation (Out-of-Bounds Date): Enter a start or end time outside the event's date window (or an end time before start time). Click 'Save Show Slot'.", False)],
+        [("Verify that client-side validation blocks submission with an immediate error toast, and the backend ", False), ("AdminEventShowsController (HTTP 400)", True), (" strictly verifies that Show Start/End is within [Event.StartDateUtc, Event.EndDateUtc].", False)],
+        [("Test Positive Validation: Enter valid show timings within the event date range. Click 'Save Show Slot'. Verify in-button animated spinner and immediate refresh of the Shows table.", False)],
+        [("Verify the Shows table displays Event Title badges, Show Slot Titles, Start/End Time chips, Linked Ticket Tiers count, and Quick Actions (Edit, Delete, Add Tier).", False)],
+        [("Navigate to ", False), ("Ticket Tiers", True), (" tab. Verify that the show slot dropdown populates accurately from the shows list and tiers can be linked seamlessly.", False)]
+    ], "Dedicated Shows tab provides isolated, scalable show slot management with strict two-tier date range validation on both frontend and backend.",
+    note="Decoupling shows from the event modal ensures lightweight event payloads and eliminates out-of-bounds scheduling errors.",
+    note_title="DEDICATED SHOWS ARCHITECTURE:")
 
     # Test Case 2.5 (NEW)
     add_test_case(doc, "Test Case 2.5", "Admin Bookings & E-Tickets Management Hub (AdminBookingsTab)", [
@@ -443,6 +445,38 @@ def build_document():
     ], "Admin role users are strictly restricted to managing Organizer and Attendee accounts, cannot view or modify Admins/SuperAdmins, and cannot access the Roles management tab.",
     note="Enforces least-privilege security: Admins can oversee operational event and attendee records without privilege escalation risks or visibility into executive system administrators.",
     note_title="FINE-GRAINED RBAC ENFORCEMENT:")
+
+    # Test Case 2.8 (NEW: GATE TICKET VALIDATION & QR SCANNER HUB)
+    add_test_case(doc, "Test Case 2.8", "Gate Ticket Validation & QR Scanner Admission Hub (Admin & SuperAdmin Only)", [
+        [("Verify Role Access Restriction on Gate Validation: Log out or log in as an Attendee/Organizer. Navigate directly to a ticket verification link (e.g. ", False), ("/verify/EVL-10023", True), (").", False)],
+        [("Verify Unauthorized Scanner Denial: Verify the application renders a prominent red/amber ", False), ("'Access Denied: Unauthorized Gate Scanner'", True), (" security screen stating that ticket validation at the gate is restricted to authenticated EventLand Administrators and Staff only.", False)],
+        [("Log in as an authenticated ", False), ("Admin or SuperAdmin", True), (" and open the verification link. Verify that the backend API (", False), ("POST /api/gate/validate", True), (") validates the pass and renders complete attendee, event, and seating metadata.", False)],
+        [("Navigate to ", False), ("Admin Dashboard -> Gate Scanner", True), (" tab in the navigation bar.", False)],
+        [("Inspect Gate Station Controls: Select an active event from the Event dropdown and enter the active entrance station name (e.g. 'Main Gate - Entrance A').", False)],
+        [("Inspect Live Attendance KPIs: Verify live cards for ", False), ("Total Paid Tickets, Checked In at Gate, Awaiting Entry, and Attendance Rate (%)", True), (" dynamically update.", False)],
+        [("Test Valid Check-In: Scan or input a valid confirmed ticket pass reference (e.g. EVL-10023) and press Enter. Verify green ", False), ("'ENTRY APPROVED'", True), (" banner with customer name, tier, and assigned seats. Verify ticket is logged into the Live Gate Activity Log.", False)],
+        [("Test Double-Entry Fraud Prevention: Immediately re-scan the exact same ticket pass reference. Verify the system blocks entry with amber ", False), ("'DUPLICATE ENTRY DETECTED'", True), (" alert displaying previous check-in time and gatekeeper details.", False)],
+        [("Test Supervisor Check-In Reset: Click ", False), ("'Reset Check-In Status'", True), (" on the duplicate alert or activity log. Confirm reset. Verify ticket check-in is reversed and the ticket can be admitted again.", False)],
+        [("Test Unpaid / Invalid Rejection: Scan a pending bank transfer reference or invalid code. Verify immediate red ", False), ("'ENTRY REJECTED - UNPAID / NOT FOUND'", True), (" alert.", False)],
+        [("Verify E-Ticket PDF QR Code: Export a confirmed ticket PDF. Verify the embedded QR code encodes the authoritative verify URL (", False), ("${origin}/verify/${ticketId}", True), (") scannable by 2D barcode guns and camera smartphones.", False)]
+    ], "Gate validation hub enforces strict Admin/SuperAdmin RBAC, stops unauthorized scanners, prevents duplicate entry fraud, tracks real-time event attendance, and links to PDF tickets.",
+    note="Gate validation utilizes composite database index IX_Bookings_EventId_IsCheckedIn for sub-millisecond check-in lookups and attendance rollups.",
+    note_title="GATE VALIDATION & SECURITY:")
+
+    # Test Case 2.9 (NEW: MULTI-USER ORGANIZER LINKAGE & EXPLICIT ASSIGNMENT)
+    add_test_case(doc, "Test Case 2.9", "Multi-User Organizer Linkage & Explicit Company Assignment", [
+        [("Log in as ", False), ("Admin or SuperAdmin", True), (" and navigate to ", False), ("Admin Dashboard -> Users", True), (" tab.", False)],
+        [("Click ", False), ("'Create User Account'", True), (" button. Fill in full name, email, phone number, and password.", False)],
+        [("Select Role as ", False), ("'Organizer'", True), (". Verify that an ", False), ("'Assign to Organizer Company *'", True), (" searchable dropdown dynamically appears below the role selector.", False)],
+        [("Select an established organizer company (e.g. ", False), ("'EventLand Productions'", True), (") from the dropdown and save the user account.", False)],
+        [("Create a second user account with a different email (e.g. ", False), ("staff2@eventland.com", True), (") and assign it to the ", False), ("exact same organizer company", True), (" ('EventLand Productions').", False)],
+        [("Inspect the Users table in the Admin Dashboard. Verify that the new column ", False), ("'Organizer Company'", True), (" displays an emerald badge with the assigned company name ('EventLand Productions') for both accounts.", False)],
+        [("Log out and log in as ", False), ("staff1@eventland.com", True), (". Verify that the user lands in the Organizer Dashboard and can see, manage, and monitor all events belonging to 'EventLand Productions'.", False)],
+        [("Log out and log in as ", False), ("staff2@eventland.com", True), (". Verify that the second user also sees the exact same events, sales analytics, and show slots for 'EventLand Productions'.", False)],
+        [("Verify Foreign Key Integrity: Verify in database that the ", False), ("Users", True), (" table contains an explicit ", False), ("OrganizerId", True), (" foreign key referencing ", False), ("Organizers.Id", True), (" with index IX_Users_OrganizerId.", False)]
+    ], "Explicit relational linkage allows an organizer company to have multiple user accounts that can collectively manage their organization's events and sales.",
+    note="When an Organizer account is created or updated, User.OrganizerId is populated. AuthService embeds this organizerId into JWT claims on login for automatic scoping.",
+    note_title="ORGANIZER MULTI-TENANCY:")
 
     # -------------------------------------------------------------
     # SECTION 4: ORGANIZER TESTING
@@ -673,6 +707,17 @@ def build_document():
         [("Verify Ngrok Interstitial Bypass: Verify frontend requests include 'ngrok-skip-browser-warning': 'true' header to ensure clean CORS support across tunneling environments.", False)]
     ], "HTTP security headers enforced. Clickjacking prevented. SQL injection neutralized by EF Core parameterized queries. Reverse-proxy headers configured cleanly.")
 
+    # Test Case 6.4 (NEW)
+    add_test_case(doc, "Test Case 6.4", "Gate Scanner Security, Camera Permissions-Policy & User-Partitioned Rate Limiting", [
+        [("Inspect HTTP Response Headers using browser DevTools Network tab: Verify ", False), ("Permissions-Policy: camera=(self)", True), (" is present in response headers, ensuring mobile/desktop browser camera hardware is unblocked for gate QR scanners.", False)],
+        [("Verify Role Authorization Guard: Verify that GateController endpoints (", False), ("/api/gate/validate", True), (", ", False), ("/api/gate/stats/{eventId}", True), (", and ", False), ("/api/gate/reset", True), (") are strictly guarded by canonical ", False), ("AppRoles.AdminOrSuperAdmin", True), (".", False)],
+        [("Verify Resilient 403 Forbidden Exception Mapping: Log in as Attendee or Organizer and attempt to call ", False), ("POST /api/gate/validate", True), (". Verify GlobalExceptionHandlerMiddleware returns ", False), ("HTTP 403 Forbidden", True), (" (rather than HTTP 401 Unauthorized), preventing accidental session logout for authenticated users lacking privileges.", False)],
+        [("Verify User-Partitioned Gate Rate Limiting: Examine the 'gate' rate limiter policy in Program.cs. Verify rate limiting is partitioned by authenticated ", False), ("User.GetUserId() ('gate_{userId}', 120 req/min)", True), (" rather than client IP.", False)],
+        [("Test Multi-Gatekeeper NAT Scenario: Verify that multiple gate personnel scanning concurrently on the same venue Wi-Fi network (sharing one public NAT IP) each have their own independent 120 req/min budget without false 429 throttling.", False)]
+    ], "Gate scanner security unblocks camera hardware via Permissions-Policy, maps non-privileged requests to 403 Forbidden without session disruption, and partitions gate rate limiting per gatekeeper user.",
+    note="User-partitioned rate limiting ensures venue staff scanning hundreds of attendees at peak ingress times are never falsely throttled due to shared Wi-Fi NAT IPs.",
+    note_title="GATE SCANNER HARDENING:")
+
     # -------------------------------------------------------------
     # SECTION 8: FULL QA TEST MATRIX SUMMARY
     # -------------------------------------------------------------
@@ -686,7 +731,7 @@ def build_document():
     p = doc.add_paragraph()
     p.add_run("Use this structured execution checklist to log and verify QA test runs across all roles and system components:")
 
-    tbl_matrix = doc.add_table(rows=32, cols=5)
+    tbl_matrix = doc.add_table(rows=1, cols=5)
     tbl_matrix.alignment = WD_TABLE_ALIGNMENT.CENTER
     set_table_borders(tbl_matrix)
 
@@ -711,10 +756,12 @@ def build_document():
         ("TC-2.1", "Admin", "Venue & Layout Config", "Auditorium & Seating zones created; PDF seating chart exports", "[  ] Pass"),
         ("TC-2.2", "Admin", "Artist Management", "Artist bio and photo uploaded, sanitized and saved", "[  ] Pass"),
         ("TC-2.3", "Admin", "Event Publishing", "Event published with clean SEO URL slug", "[  ] Pass"),
-        ("TC-2.4", "Admin", "Multi-Show Scheduling", "Multiple shows scheduled with tier row range mapping", "[  ] Pass"),
+        ("TC-2.4", "Admin", "Shows Tab & Date Validation", "Dedicated Shows tab with strict date-range validation & tier mapping", "[  ] Pass"),
         ("TC-2.5", "Admin", "Admin Bookings Hub", "KPI metrics, multi-filters, CSV/Excel export & slip preview", "[  ] Pass"),
         ("TC-2.6", "Admin / Organizer", "Chart PDF Landscape Export", "Auditorium chart exports in landscape with zero blank space & multi-paper support", "[  ] Pass"),
         ("TC-2.7", "Admin", "User Management & Role Tab RBAC", "Roles tab hidden; Admin/SuperAdmin accounts masked; role selection restricted to Organizer & Attendee", "[  ] Pass"),
+        ("TC-2.8", "Admin / SuperAdmin", "Gate Ticket Validation", "QR/barcode scanning, duplicate entry defense, unauth scanner block & live KPIs", "[  ] Pass"),
+        ("TC-2.9", "Admin / SuperAdmin", "Multi-User Organizer Link", "Explicit User.OrganizerId FK link, company assignment dropdown & shared event access", "[  ] Pass"),
         ("TC-3.1", "Organizer", "Event Creation Wizard", "Multi-step wizard completes event and show registration", "[  ] Pass"),
         ("TC-3.2", "Organizer", "BOLA / IDOR Defense", "Foreign event edits blocked with 403 Forbidden", "[  ] Pass"),
         ("TC-3.3", "Organizer", "Sales Analytics", "Total sales & revenue match DB counts; attendee list exports", "[  ] Pass"),
@@ -734,7 +781,8 @@ def build_document():
         ("TC-5.5", "Gateway Switch", "Auto-Reconciliation", "10-min background worker resolves unpaid orders with PayPro API", "[  ] Pass"),
         ("TC-6.1", "Security", "Malware & Upload Defense", "Executable PE/ELF headers rejected; SkiaSharp re-encodes pure pixels", "[  ] Pass"),
         ("TC-6.2", "Security", "IP Rate Limiting", "Per-IP rate limiting enforces 429 on login/booking/upload floods", "[  ] Pass"),
-        ("TC-6.3", "Security", "OWASP & Security Headers", "Clickjacking blocked; EF Core SQL injection immune; CORS hardened", "[  ] Pass")
+        ("TC-6.3", "Security", "OWASP & Security Headers", "Clickjacking blocked; EF Core SQL injection immune; CORS hardened", "[  ] Pass"),
+        ("TC-6.4", "Security / Gate", "Gate Security & User Rate Limit", "Camera Permissions-Policy unblocked, 403 vs 401 handling, User-partitioned gate limit", "[  ] Pass")
     ]
 
     for row_idx, data in enumerate(matrix_rows, start=1):

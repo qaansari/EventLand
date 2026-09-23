@@ -3,6 +3,7 @@ namespace EventLand.Api.Controllers.Admin;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using EventLand.Application.Common;
 using EventLand.Application.Common.Interfaces;
 using EventLand.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -14,7 +15,7 @@ public record UpdateFaqDto(string Question, string Answer, int DisplayOrder = 0,
 
 [ApiController]
 [Route("api/admin/faqs")]
-[Authorize(Roles = "SuperAdmin,Admin")]
+[Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
 public class AdminFaqsController : ControllerBase
 {
     private readonly IApplicationDbContext _context;

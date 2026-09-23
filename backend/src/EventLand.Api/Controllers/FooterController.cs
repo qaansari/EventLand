@@ -3,6 +3,7 @@ namespace EventLand.Api.Controllers;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using EventLand.Application.Common;
 using EventLand.Application.Common.Interfaces;
 using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -69,7 +70,7 @@ public class FooterController : ControllerBase
     }
 
     [HttpPut]
-    [Authorize(Roles = "SuperAdmin,Admin")]
+    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
     public async Task<IActionResult> UpdateFooterInfo([FromBody] UpdateFooterInfoDto dto)
     {
         var footer = await _context.FooterInfo.FirstOrDefaultAsync();

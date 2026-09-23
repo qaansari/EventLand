@@ -1,7 +1,7 @@
 namespace EventLand.Api.Controllers;
 
-using System.Security.Claims;
 using EventLand.Api.Extensions;
+using EventLand.Application.Common;
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -104,7 +104,7 @@ public class BookingsController : ControllerBase
 
     /// <summary>Admin verifies bank payment and issues official E-Ticket pass.</summary>
     [HttpPost("{id:int}/confirm-bank-payment")]
-    [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
     public async Task<ActionResult<BookingDto>> ConfirmBankPayment(int id, [FromBody] ConfirmBankPaymentDto dto)
     {
         var adminId = User.GetUserId();
@@ -123,7 +123,7 @@ public class BookingsController : ControllerBase
 
     /// <summary>Admin rejects bank payment and releases held seats.</summary>
     [HttpPost("{id:int}/reject-bank-payment")]
-    [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
     public async Task<ActionResult<BookingDto>> RejectBankPayment(int id, [FromBody] RejectBankPaymentDto dto)
     {
         var adminId = User.GetUserId();

@@ -60,6 +60,12 @@ public class Booking : BaseEntity
     public DateTimeOffset? RefundedAt          { get; set; }
     public string?        RefundReason         { get; set; }
 
+    // Gate validation & check-in tracking
+    public bool           IsCheckedIn          { get; set; } = false;
+    public DateTimeOffset? CheckedInAt          { get; set; }
+    public string?        CheckedInBy          { get; set; }
+    public string?        GateNotes            { get; set; }
+
     // Navigation
     public ICollection<BookingSeat>        BookingSeats        { get; set; } = new List<BookingSeat>();
     public ICollection<PaymentTransaction> PaymentTransactions { get; set; } = new List<PaymentTransaction>();

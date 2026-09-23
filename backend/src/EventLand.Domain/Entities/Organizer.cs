@@ -17,4 +17,7 @@ public class Organizer : BaseEntity
 
     // Navigation — Events organized by this company
     public ICollection<Event> Events { get; set; } = new List<Event>();
+
+    // Navigation — User accounts associated with this organizer company
+    public ICollection<User> Users { get; set; } = new List<User>();
 }

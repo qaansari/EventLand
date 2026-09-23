@@ -102,6 +102,5 @@ public sealed class EventConfiguration : IEntityTypeConfiguration<Event>
                .HasDatabaseName("IX_Events_Published_Date");
 
         // Soft delete global filter
-        builder.HasQueryFilter(e => !e.IsDeleted);
     }
 }

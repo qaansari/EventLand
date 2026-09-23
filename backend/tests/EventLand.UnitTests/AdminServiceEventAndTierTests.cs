@@ -445,6 +445,136 @@ public class AdminServiceEventAndTierTests : IDisposable
         Assert.NotNull(dbTier);
         Assert.Equal(3500, dbTier.Price);
     }
+
+    [Fact]
+    public async Task CreateEventShowAsync_ThrowsException_WhenShowTimingOutsideEventDateRange()
+    {
+        var (ev, _, _) = await SeedEventWithShowAndTierAsync();
+
+        // ev.StartDateUtc is AddDays(1), ev.EndDateUtc is AddDays(3)
+        // Attempt show before event start
+        var invalidBeforeDto = new CreateEventShowDto(
+            EventId: ev.Id,
+            ShowTitle: "Early Bird Show",
+            StartTimeUtc: ev.StartDateUtc.AddHours(-2),
+            EndTimeUtc: ev.StartDateUtc.AddHours(2)
+        );
+
+        var exBefore = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _adminService.CreateEventShowAsync(invalidBeforeDto));
+        Assert.Contains("must be within the event date range", exBefore.Message);
+
+        // Attempt show after event end
+        var invalidAfterDto = new CreateEventShowDto(
+            EventId: ev.Id,
+            ShowTitle: "Late Night Show",
+            StartTimeUtc: ev.EndDateUtc.AddHours(-1),
+            EndTimeUtc: ev.EndDateUtc.AddHours(2)
+        );
+
+        var exAfter = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _adminService.CreateEventShowAsync(invalidAfterDto));
+        Assert.Contains("must be within the event date range", exAfter.Message);
+    }
+
+    [Fact]
+    public async Task CreateEventShowAsync_Succeeds_WhenShowTimingWithinEventDateRange()
+    {
+        var (ev, _, _) = await SeedEventWithShowAndTierAsync();
+
+        var validDto = new CreateEventShowDto(
+            EventId: ev.Id,
+            ShowTitle: "Matinee Performance",
+            StartTimeUtc: ev.StartDateUtc.AddHours(2),
+            EndTimeUtc: ev.StartDateUtc.AddHours(5)
+        );
+
+        var created = await _adminService.CreateEventShowAsync(validDto);
+        Assert.NotNull(created);
+        Assert.Equal("Matinee Performance", created.ShowTitle);
+        Assert.Equal(ev.Id, created.EventId);
+
+        var shows = await _adminService.GetEventShowsAsync(ev.Id);
+        Assert.Contains(shows, s => s.ShowTitle == "Matinee Performance");
+    }
+
+    [Fact]
+    public async Task UpdateEventShowAsync_ThrowsException_WhenShowTimingOutsideEventDateRange()
+    {
+        var (ev, show, _) = await SeedEventWithShowAndTierAsync();
+
+        var invalidUpdateDto = new UpdateEventShowDto(
+            ShowTitle: show.ShowTitle,
+            StartTimeUtc: ev.StartDateUtc.AddHours(1),
+            EndTimeUtc: ev.EndDateUtc.AddHours(3) // Exceeds event end time
+        );
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _adminService.UpdateEventShowAsync(show.Id, invalidUpdateDto));
+        Assert.Contains("must be within the event date range", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateUserAsync_WithOrganizerId_SuccessfullyLinksUserToOrganizer()
+    {
+        var role = new Role { Id = 3, Name = "Organizer" };
+        var org = new Organizer { Id = 200, Name = "EventLand Productions", Email = "contact@eventland.com" };
+        _context.Roles.Add(role);
+        _context.Organizers.Add(org);
+        await _context.SaveChangesAsync();
+
+        var createDto = new CreateUserDto(
+            Email: "staff1@eventland.com",
+            Password: "Password123!",
+            FullName: "Staff One",
+            RoleId: 3,
+            PhoneNumber: "+923001234567",
+            OrganizerId: 200
+        );
+
+        var userDto = await _adminService.CreateUserAsync(createDto);
+
+        Assert.NotNull(userDto);
+        Assert.Equal(200, userDto.OrganizerId);
+        Assert.Equal("EventLand Productions", userDto.OrganizerName);
+
+        var savedUser = await _context.Users.FindAsync(userDto.Id);
+        Assert.NotNull(savedUser);
+        Assert.Equal(200, savedUser.OrganizerId);
+    }
+
+    [Fact]
+    public async Task UpdateUserAsync_WithOrganizerId_UpdatesUserOrganizerLink()
+    {
+        var role = new Role { Id = 3, Name = "Organizer" };
+        var org1 = new Organizer { Id = 201, Name = "Alpha Events", Email = "alpha@events.com" };
+        var org2 = new Organizer { Id = 202, Name = "Beta Events", Email = "beta@events.com" };
+        _context.Roles.Add(role);
+        _context.Organizers.AddRange(org1, org2);
+        await _context.SaveChangesAsync();
+
+        var createDto = new CreateUserDto(
+            Email: "manager@events.com",
+            Password: "Password123!",
+            FullName: "Event Manager",
+            RoleId: 3,
+            PhoneNumber: "+923007654321",
+            OrganizerId: 201
+        );
+        var created = await _adminService.CreateUserAsync(createDto);
+
+        var updateDto = new UpdateUserDto(
+            FullName: "Event Manager Updated",
+            RoleId: 3,
+            PhoneNumber: "+923007654321",
+            IsActive: true,
+            OrganizerId: 202
+        );
+        var updated = await _adminService.UpdateUserAsync(created.Id, updateDto);
+
+        Assert.Equal(202, updated.OrganizerId);
+        Assert.Equal("Beta Events", updated.OrganizerName);
+    }
 }
 
 public class FakeCacheService : ICacheService

@@ -8,22 +8,21 @@ import QRCode from 'qrcode';
 export async function generateTicketQrDataUrl(ticket) {
   if (!ticket) return '';
 
-  const ticketId = ticket.ticketId || ticket.id || 'EVL-100001';
-  const eventTitle = ticket.eventTitle || ticket.title || 'EventLand Pass';
-  const attendee = ticket.attendeeName || ticket.customerName || 'Pass Holder';
-  const verifyUrl = `https://ticketwala.pk/verify/${ticketId}`;
-
-  const payload = `EVENTLAND TICKET PASS\nID: ${ticketId}\nEVENT: ${eventTitle}\nATTENDEE: ${attendee}\nVERIFY: ${verifyUrl}`;
+  const ticketId = ticket.ticketId || ticket.bookingRef || ticket.id || 'EVL-100001';
+  const origin = (typeof window !== 'undefined' && window.location?.origin)
+    ? window.location.origin
+    : 'https://eventlandpk.vercel.app';
+  const verifyUrl = `${origin}/verify/${encodeURIComponent(ticketId)}`;
 
   try {
-    const dataUrl = await QRCode.toDataURL(payload, {
-      width: 300,
+    const dataUrl = await QRCode.toDataURL(verifyUrl, {
+      width: 320,
       margin: 1,
       color: {
         dark: '#07131b',
         light: '#ffffff'
       },
-      errorCorrectionLevel: 'M'
+      errorCorrectionLevel: 'H'
     });
     return dataUrl;
   } catch (err) {

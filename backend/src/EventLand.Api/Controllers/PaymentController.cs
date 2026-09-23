@@ -4,6 +4,7 @@ using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using EventLand.Api.Extensions;
+using EventLand.Application.Common;
 using EventLand.Application.Common.Interfaces;
 using EventLand.Application.Interfaces;
 using EventLand.Domain.Entities;
@@ -119,7 +120,7 @@ public class PaymentController : ControllerBase
     /// Administrative Refund Route for Bank Transfer bookings.
     /// </summary>
     [HttpPost("refund")]
-    [Authorize(Roles = "SuperAdmin,Admin,superadmin,admin")]
+    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
     public async Task<IActionResult> ProcessRefund([FromBody] ProcessBankRefundRequestDto dto)
     {
         var adminId = User.GetUserId();
