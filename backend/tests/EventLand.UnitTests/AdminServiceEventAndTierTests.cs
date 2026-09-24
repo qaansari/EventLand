@@ -575,6 +575,39 @@ public class AdminServiceEventAndTierTests : IDisposable
         Assert.Equal(202, updated.OrganizerId);
         Assert.Equal("Beta Events", updated.OrganizerName);
     }
+
+    [Fact]
+    public async Task CreateUserAsync_SpacedAndUnspacedPhoneNumbers_ThrowsDuplicateException()
+    {
+        var role = new Role { Id = 3, Name = "Organizer" };
+        _context.Roles.Add(role);
+        await _context.SaveChangesAsync();
+
+        var firstUserDto = new CreateUserDto(
+            Email: "first@eventland.com",
+            Password: "Password123!",
+            FullName: "First User",
+            RoleId: 3,
+            PhoneNumber: "+92 331 2541767"
+        );
+        var created = await _adminService.CreateUserAsync(firstUserDto);
+        Assert.NotNull(created);
+        Assert.Equal("+923312541767", created.PhoneNumber);
+
+        var duplicateDto = new CreateUserDto(
+            Email: "second@eventland.com",
+            Password: "Password123!",
+            FullName: "Second User",
+            RoleId: 3,
+            PhoneNumber: "+92 3312541767"
+        );
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _adminService.CreateUserAsync(duplicateDto)
+        );
+
+        Assert.Contains("already exists", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 public class FakeCacheService : ICacheService

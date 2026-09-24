@@ -495,9 +495,9 @@ public class AdminService : IAdminService
         if (exists)
             throw new InvalidOperationException($"A user with email '{dto.Email}' already exists.");
 
-        if (!string.IsNullOrWhiteSpace(dto.PhoneNumber))
+        var cleanPhone = PhoneHelper.Normalize(dto.PhoneNumber);
+        if (!string.IsNullOrWhiteSpace(cleanPhone))
         {
-            var cleanPhone = dto.PhoneNumber.Trim();
             var phoneExists = await _context.Users.AnyAsync(u => u.PhoneNumber == cleanPhone && !u.IsDeleted);
             if (phoneExists)
                 throw new InvalidOperationException($"A user with phone number '{cleanPhone}' already exists.");
@@ -517,7 +517,7 @@ public class AdminService : IAdminService
             Email = dto.Email.Trim(),
             FullName = dto.FullName.Trim(),
             RoleId = dto.RoleId,
-            PhoneNumber = dto.PhoneNumber?.Trim(),
+            PhoneNumber = cleanPhone,
             CountryId = dto.CountryId,
             OrganizerId = dto.OrganizerId,
             ImageUrl = FileUrlHelper.ExtractFileName(dto.ImageUrl) ?? dto.ImageUrl,
@@ -546,9 +546,9 @@ public class AdminService : IAdminService
             throw new UnauthorizedAccessException("Admins cannot modify Administrator or Super Administrator accounts.");
         }
 
-        if (!string.IsNullOrWhiteSpace(dto.PhoneNumber))
+        var cleanPhone = PhoneHelper.Normalize(dto.PhoneNumber);
+        if (!string.IsNullOrWhiteSpace(cleanPhone))
         {
-            var cleanPhone = dto.PhoneNumber.Trim();
             var phoneExists = await _context.Users.AnyAsync(u => u.Id != id && u.PhoneNumber == cleanPhone && !u.IsDeleted);
             if (phoneExists)
                 throw new InvalidOperationException($"Another user with phone number '{cleanPhone}' already exists.");
@@ -565,7 +565,7 @@ public class AdminService : IAdminService
 
         user.FullName = dto.FullName.Trim();
         user.RoleId = dto.RoleId;
-        user.PhoneNumber = dto.PhoneNumber?.Trim();
+        user.PhoneNumber = cleanPhone;
         user.CountryId = dto.CountryId;
         user.OrganizerId = dto.OrganizerId;
         user.IsActive = dto.IsActive;

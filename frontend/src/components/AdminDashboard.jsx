@@ -1159,7 +1159,7 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
 
     // Duplicate Phone Number check (excluding current user when editing)
     if (formattedPhone) {
-      const isDupPhone = usersList.some(u => u.id !== userForm.id && u.phoneNumber?.trim() === formattedPhone.trim());
+      const isDupPhone = usersList.some(u => u.id !== userForm.id && formatPhoneNumberOnSubmit(u.phoneNumber) === formattedPhone);
       if (isDupPhone) {
         const msg = `A user with the phone number '${formattedPhone}' already exists.`;
         setErrorMsg(msg);
@@ -2164,78 +2164,6 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       {/* Navigation Tabs */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '1rem' }}>
         <button
-          onClick={() => setActiveAdminTab('events')}
-          style={{
-            padding: '0.75rem 1.25rem',
-            borderRadius: '10px',
-            border: 'none',
-            background: activeAdminTab === 'events' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
-            color: '#ffffff',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <Ticket size={18} /> Events ({eventsList.length})
-        </button>
-
-        <button
-          onClick={() => setActiveAdminTab('shows')}
-          style={{
-            padding: '0.75rem 1.25rem',
-            borderRadius: '10px',
-            border: 'none',
-            background: activeAdminTab === 'shows' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
-            color: '#ffffff',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <Calendar size={18} /> Shows ({showsList.length})
-        </button>
-
-        <button
-          onClick={() => setActiveAdminTab('ticket-tiers')}
-          style={{
-            padding: '0.75rem 1.25rem',
-            borderRadius: '10px',
-            border: 'none',
-            background: activeAdminTab === 'ticket-tiers' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
-            color: '#ffffff',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <Layers size={18} /> Ticket Tiers ({ticketTiersList.length})
-        </button>
-
-        <button
-          onClick={() => setActiveAdminTab('organizers')}
-          style={{
-            padding: '0.75rem 1.25rem',
-            borderRadius: '10px',
-            border: 'none',
-            background: activeAdminTab === 'organizers' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
-            color: '#ffffff',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <Building2 size={18} /> Organizers ({organizersList.length})
-        </button>
-
-        <button
           onClick={() => setActiveAdminTab('artists')}
           style={{
             padding: '0.75rem 1.25rem',
@@ -2252,80 +2180,6 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
         >
           <Music size={18} /> Artists ({artistsList.length})
         </button>
-
-        <button
-          onClick={() => setActiveAdminTab('bookings')}
-          style={{
-            padding: '0.75rem 1.25rem',
-            borderRadius: '10px',
-            border: 'none',
-            background: activeAdminTab === 'bookings' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
-            color: '#ffffff',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <DollarSign size={18} /> Bookings ({bookingsList.length})
-        </button>
-
-        <button
-          onClick={() => setActiveAdminTab('gate-scanner')}
-          style={{
-            padding: '0.75rem 1.25rem',
-            borderRadius: '10px',
-            border: 'none',
-            background: activeAdminTab === 'gate-scanner' ? 'linear-gradient(135deg, #06b6d4, #0284c7)' : 'rgba(255, 255, 255, 0.05)',
-            color: '#ffffff',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <ScanLine size={18} /> Gate Scanner
-        </button>
-
-        <button
-          onClick={() => setActiveAdminTab('users')}
-          style={{
-            padding: '0.75rem 1.25rem',
-            borderRadius: '10px',
-            border: 'none',
-            background: activeAdminTab === 'users' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
-            color: '#ffffff',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}
-        >
-          <Users size={18} /> Users ({visibleUsersList.length})
-        </button>
-
-        {isSuperAdmin && (
-          <button
-            onClick={() => setActiveAdminTab('roles')}
-            style={{
-              padding: '0.75rem 1.25rem',
-              borderRadius: '10px',
-              border: 'none',
-              background: activeAdminTab === 'roles' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
-              color: '#ffffff',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            <ShieldCheck size={18} /> Roles ({rolesList.length})
-          </button>
-        )}
 
         <button
           onClick={() => setActiveAdminTab('auditoriums')}
@@ -2345,13 +2199,33 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
           <Grid size={18} /> Auditorium Charts ({auditoriumsList.length})
         </button>
 
+        {isSuperAdmin && (
+          <button
+            onClick={() => setActiveAdminTab('bank-accounts')}
+            style={{
+              padding: '0.75rem 1.25rem',
+              borderRadius: '10px',
+              border: 'none',
+              background: activeAdminTab === 'bank-accounts' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
+              color: '#ffffff',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <Building2 size={18} /> Bank Accounts ({bankAccountsList.length})
+          </button>
+        )}
+
         <button
-          onClick={() => setActiveAdminTab('venues')}
+          onClick={() => setActiveAdminTab('bookings')}
           style={{
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'venues' ? 'linear-gradient(135deg, #0d9488, #059669)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'bookings' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -2360,7 +2234,7 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
             gap: '0.5rem'
           }}
         >
-          <Building2 size={18} /> Venues ({venuesList.length})
+          <DollarSign size={18} /> Bookings ({bookingsList.length})
         </button>
 
         <button
@@ -2400,12 +2274,12 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
         </button>
 
         <button
-          onClick={() => setActiveAdminTab('tags')}
+          onClick={() => setActiveAdminTab('events')}
           style={{
             padding: '0.75rem 1.25rem',
             borderRadius: '10px',
             border: 'none',
-            background: activeAdminTab === 'tags' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
+            background: activeAdminTab === 'events' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
             color: '#ffffff',
             fontWeight: 600,
             cursor: 'pointer',
@@ -2414,7 +2288,7 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
             gap: '0.5rem'
           }}
         >
-          <Tag size={18} /> Tags ({tagsList.length})
+          <Ticket size={18} /> Events ({eventsList.length})
         </button>
 
         <button
@@ -2456,25 +2330,41 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
           <FileText size={18} /> Footer Info
         </button>
 
-        {isSuperAdmin && (
-          <button
-            onClick={() => setActiveAdminTab('bank-accounts')}
-            style={{
-              padding: '0.75rem 1.25rem',
-              borderRadius: '10px',
-              border: 'none',
-              background: activeAdminTab === 'bank-accounts' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
-              color: '#ffffff',
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            <Building2 size={18} /> Bank Accounts ({bankAccountsList.length})
-          </button>
-        )}
+        <button
+          onClick={() => setActiveAdminTab('gate-scanner')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'gate-scanner' ? 'linear-gradient(135deg, #06b6d4, #0284c7)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <ScanLine size={18} /> Gate Scanner
+        </button>
+
+        <button
+          onClick={() => setActiveAdminTab('organizers')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'organizers' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Building2 size={18} /> Organizers ({organizersList.length})
+        </button>
 
         {isSuperAdmin && (
           <button
@@ -2495,6 +2385,116 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
             <ShieldCheck size={18} /> PayPro Gateway
           </button>
         )}
+
+        {isSuperAdmin && (
+          <button
+            onClick={() => setActiveAdminTab('roles')}
+            style={{
+              padding: '0.75rem 1.25rem',
+              borderRadius: '10px',
+              border: 'none',
+              background: activeAdminTab === 'roles' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
+              color: '#ffffff',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            <ShieldCheck size={18} /> Roles ({rolesList.length})
+          </button>
+        )}
+
+        <button
+          onClick={() => setActiveAdminTab('shows')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'shows' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Calendar size={18} /> Shows ({showsList.length})
+        </button>
+
+        <button
+          onClick={() => setActiveAdminTab('tags')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'tags' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Tag size={18} /> Tags ({tagsList.length})
+        </button>
+
+        <button
+          onClick={() => setActiveAdminTab('ticket-tiers')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'ticket-tiers' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Layers size={18} /> Ticket Tiers ({ticketTiersList.length})
+        </button>
+
+        <button
+          onClick={() => setActiveAdminTab('users')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'users' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Users size={18} /> Users ({visibleUsersList.length})
+        </button>
+
+        <button
+          onClick={() => setActiveAdminTab('venues')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'venues' ? 'linear-gradient(135deg, #0d9488, #059669)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Building2 size={18} /> Venues ({venuesList.length})
+        </button>
       </div>
 
       {/* --- TAB 1: EVENTS MANAGEMENT --- */}

@@ -478,24 +478,34 @@ export const gateApi = {
 };
 
 // --- Phone Number Dialing Code Helpers ---
-export const formatPhoneNumberOnSubmit = (rawPhone, dialingCode) => {
-  if (!rawPhone || !rawPhone.trim()) return null;
-  let clean = rawPhone.trim();
-  // Trim leading zero if present
-  if (clean.startsWith('0')) {
-    clean = clean.substring(1).trim();
+export const formatPhoneNumberOnSubmit = (rawPhone, dialingCode = '+92') => {
+  if (!rawPhone || !String(rawPhone).trim()) return null;
+
+  const rawStr = String(rawPhone).trim();
+  // Extract all digits
+  let digits = rawStr.replace(/\D/g, '');
+  if (!digits) return null;
+
+  // Extract dialing code digits (e.g. "+92" -> "92")
+  const prefixDigits = (dialingCode ? String(dialingCode) : '+92').replace(/\D/g, '') || '92';
+
+  // If user typed domestic leading 0 (e.g. "0331..."), strip it
+  if (digits.startsWith('0')) {
+    digits = digits.substring(1);
   }
-  const prefix = dialingCode ? dialingCode.trim() : '+92';
-  if (clean.startsWith(prefix)) {
-    return clean;
+
+  // If user included the country code in the input digits (e.g. "92331..."), strip to isolate national number
+  if (digits.startsWith(prefixDigits) && digits.length > prefixDigits.length + 5) {
+    digits = digits.substring(prefixDigits.length);
   }
-  return `${prefix} ${clean}`;
+
+  return `+${prefixDigits}${digits}`;
 };
 
 export const splitPhoneNumberForEdit = (fullPhone, countryList = [], countryId = null) => {
   if (!fullPhone) return { dialingCode: '+92', nationalNumber: '', countryId: countryId || 1 };
 
-  let clean = fullPhone.trim();
+  let clean = String(fullPhone).trim();
   let foundCountry = countryList.find(c => c.id === countryId);
   let dialingCode = foundCountry?.dialingCode || '+92';
 
@@ -509,6 +519,9 @@ export const splitPhoneNumberForEdit = (fullPhone, countryList = [], countryId =
   if (dialingCode && clean.startsWith(dialingCode)) {
     clean = clean.slice(dialingCode.length).trim();
   }
+
+  // Remove any remaining spaces, dashes, or non-digits for clean input display
+  clean = clean.replace(/\D/g, '');
 
   return {
     dialingCode,

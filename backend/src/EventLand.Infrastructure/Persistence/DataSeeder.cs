@@ -49,7 +49,7 @@ public static class DataSeeder
             {
                 Email = "admin@eventland.pk",
                 FullName = "Super Admin",
-                PhoneNumber = "+92 331 2541767",
+                PhoneNumber = "+923312541767",
                 RoleId = superAdminRole.Id,
                 IsActive = true
             };
@@ -57,9 +57,9 @@ public static class DataSeeder
             context.Users.Add(superAdmin);
             await context.SaveChangesAsync();
         }
-        else if (existingSuperAdmin.PhoneNumber != "+92 331 2541767")
+        else if (existingSuperAdmin.PhoneNumber != "+923312541767")
         {
-            existingSuperAdmin.PhoneNumber = "+92 331 2541767";
+            existingSuperAdmin.PhoneNumber = "+923312541767";
             await context.SaveChangesAsync();
         }
 

@@ -149,7 +149,7 @@ public class AuthService : IAuthService
         if (emailExists)
             throw new InvalidOperationException("An account with this email address already exists.");
 
-        var cleanPhone = string.IsNullOrWhiteSpace(dto.PhoneNumber) ? null : dto.PhoneNumber.Trim();
+        var cleanPhone = PhoneHelper.Normalize(dto.PhoneNumber);
         if (!string.IsNullOrWhiteSpace(cleanPhone))
         {
             var phoneExists = await _context.Users.AnyAsync(u => u.PhoneNumber == cleanPhone && !u.IsDeleted);
@@ -164,7 +164,7 @@ public class AuthService : IAuthService
         {
             Email = email,
             FullName = fullName,
-            PhoneNumber = string.IsNullOrWhiteSpace(dto.PhoneNumber) ? null : dto.PhoneNumber.Trim(),
+            PhoneNumber = cleanPhone,
             CountryId = dto.CountryId ?? 1,
             RoleId = customerRole.Id,
             Role = customerRole,
@@ -291,7 +291,7 @@ public class AuthService : IAuthService
             {
                 Email = "admin@eventland.pk",
                 FullName = "Super Admin",
-                PhoneNumber = "+92 331 2541767",
+                PhoneNumber = "+923312541767",
                 CountryId = 1,
                 RoleId = superAdminRole.Id,
                 IsActive = true
@@ -312,9 +312,9 @@ public class AuthService : IAuthService
             _context.Users.Add(superAdmin);
             await _context.SaveChangesAsync();
         }
-        else if (superAdmin.PhoneNumber != "+92 331 2541767" || superAdmin.CountryId != 1)
+        else if (superAdmin.PhoneNumber != "+923312541767" || superAdmin.CountryId != 1)
         {
-            superAdmin.PhoneNumber = "+92 331 2541767";
+            superAdmin.PhoneNumber = "+923312541767";
             superAdmin.CountryId = 1;
             await _context.SaveChangesAsync();
         }

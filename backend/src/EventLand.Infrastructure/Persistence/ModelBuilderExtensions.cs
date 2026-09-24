@@ -29,7 +29,7 @@ public static class ModelBuilderExtensions
                 Id = 1,
                 Email = "admin@eventland.pk",
                 FullName = "Super Admin",
-                PhoneNumber = "+92 331 2541767",
+                PhoneNumber = "+923312541767",
                 PasswordHash = adminPasswordHash,
                 RoleId = 1,
                 IsActive = true,
