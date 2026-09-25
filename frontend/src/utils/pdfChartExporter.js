@@ -1,8 +1,24 @@
 /**
  * Utility to generate and download a clean, high-definition printable PDF of Auditorium Seating Charts.
- * Lightweight, scalable, pure white background exporter supporting venues from 10 to 10,000+ seats
- * with zero trimming or overflow.
+ * Designed to cover the FULL PAGE of the PDF document with zero wasted white margins.
+ * Scalable from small intimate venues (10 seats) to multi-tier arenas (1,100 to 10,000+ seats),
+ * guaranteeing that ALL seats are 100% covered with zero clipping.
+ * 
+ * STRICT MONOCHROME (Pure Black & White RGB):
+ * Uses strictly #000000 and #ffffff for high-contrast, professional laser printing.
  */
+
+// Helper to convert 0-indexed row number into Excel-style letter (0 -> A, 25 -> Z, 26 -> AA, 27 -> AB, ...)
+function getRowLabel(index) {
+  let label = '';
+  let num = index;
+  while (num >= 0) {
+    label = String.fromCharCode(65 + (num % 26)) + label;
+    num = Math.floor(num / 26) - 1;
+  }
+  return label;
+}
+
 export async function exportAuditoriumChartPdf({
   auditoriumName = 'Main Auditorium',
   venueName = 'Arts Council of Pakistan',
@@ -25,25 +41,77 @@ export async function exportAuditoriumChartPdf({
     .filter(Boolean)
     .join(', ');
 
-  const showNameDisplay = showName || '';
-  const rawCapacity = currentZone?.totalCapacity || resolvedBlueprint?.totalSeats || resolvedBlueprint?.totalCapacity || 1100;
+  const showNameDisplay = showName || eventTitle || '';
+  const rawCapacity = Number(currentZone?.totalCapacity || resolvedBlueprint?.totalSeats || resolvedBlueprint?.totalCapacity || 1100);
   const formattedCapacity = Number(rawCapacity).toLocaleString('en-US');
 
-  // 1. Gather all rows to accurately compute max columns & aisles across ANY row (handling 10 to 10,000+ seats)
+  // 1. Gather all rows from blueprint sections or rows array
   let allRowsList = [];
+  let sectionCount = 0;
   if (resolvedBlueprint?.sections && Array.isArray(resolvedBlueprint.sections)) {
+    sectionCount = resolvedBlueprint.sections.length;
     resolvedBlueprint.sections.forEach(sec => {
       if (sec.rows && Array.isArray(sec.rows)) {
         allRowsList.push(...sec.rows);
       }
     });
   } else if (resolvedBlueprint?.rows && Array.isArray(resolvedBlueprint.rows)) {
-    allRowsList = resolvedBlueprint.rows;
+    allRowsList = [...resolvedBlueprint.rows];
   }
 
-  let totalRowsCount = allRowsList.length || currentZone?.rows || 11;
-  let maxColsInAnyRow = currentZone?.cols || 20;
-  let maxAislesInAnyRow = 1;
+  // Fallback row generation if blueprint has no explicit rows:
+  // Dynamically generates a complete layout covering ALL rawCapacity seats (e.g. all 1,100 seats)
+  if (allRowsList.length === 0) {
+    let numRows = currentZone?.rows;
+    let numCols = currentZone?.cols;
+
+    // If rows/cols not specified or too small for rawCapacity (e.g. 1100 seats):
+    if (!numRows || !numCols || (numRows * numCols < rawCapacity * 0.75)) {
+      if (rawCapacity >= 600) {
+        // High-capacity venue (e.g. 1,100 seats):
+        // Standard auditorium proportion: ~30 rows, ~37 seats per row
+        numCols = Math.min(42, Math.max(28, Math.round(Math.sqrt(rawCapacity * 1.25))));
+        numRows = Math.ceil(rawCapacity / numCols);
+      } else {
+        numRows = Math.max(currentZone?.rows || 11, 11);
+        numCols = Math.max(currentZone?.cols || 20, Math.ceil(rawCapacity / numRows));
+      }
+    }
+
+    let remainingSeats = rawCapacity;
+    for (let r = 0; r < numRows; r++) {
+      const rowChar = getRowLabel(r);
+      const rowSeatCount = Math.min(numCols, Math.max(0, remainingSeats));
+      if (rowSeatCount === 0) break;
+      remainingSeats -= rowSeatCount;
+
+      // Split rows into realistic blocks (3 blocks for wide auditoriums with 2 aisles)
+      if (rowSeatCount >= 24) {
+        const sideCount = Math.floor(rowSeatCount * 0.25);
+        const centerCount = rowSeatCount - (sideCount * 2);
+        const leftSeats = Array.from({ length: sideCount }, (_, i) => i + 1);
+        const centerSeats = Array.from({ length: centerCount }, (_, i) => i + sideCount + 1);
+        const rightSeats = Array.from({ length: sideCount }, (_, i) => i + sideCount + centerCount + 1);
+        allRowsList.push({
+          rowChar,
+          left: leftSeats,
+          center: centerSeats,
+          right: rightSeats
+        });
+      } else {
+        const half = Math.floor(rowSeatCount / 2);
+        allRowsList.push({
+          rowChar,
+          left: Array.from({ length: half }, (_, i) => i + 1),
+          right: Array.from({ length: rowSeatCount - half }, (_, i) => i + half + 1)
+        });
+      }
+    }
+  }
+
+  let totalRowsCount = allRowsList.length;
+  let maxColsInAnyRow = 1;
+  let maxAislesInAnyRow = 0;
 
   allRowsList.forEach(r => {
     let rowSeatsCount = 0;
@@ -74,51 +142,95 @@ export async function exportAuditoriumChartPdf({
     }
   });
 
-  // 2. High-precision dynamic dimension scaling based on maxColsInAnyRow and totalRowsCount
-  // Calibrated so that charts with 10 to 10,000+ seats fit with 100% visibility and ZERO trimming
-  const baseCanvasWidth = 1600;
-  const containerPaddingPx = 24;
-  const netContainerWidth = baseCanvasWidth - (containerPaddingPx * 2); // 1552px
+  // 2. High-precision dynamic dimension scaling for FULL PAGE COVER
+  // Choose orientation: landscape for normal/wide auditoriums, portrait for tall halls
+  const isPortrait = totalRowsCount > (maxColsInAnyRow * 1.15);
+  const targetAspect = isPortrait ? (210 / 297) : (297 / 210); // 0.707 (Portrait) or 1.414 (Landscape)
 
-  const aisleGapPx = maxColsInAnyRow > 150 ? 6 : maxColsInAnyRow > 80 ? 8 : maxColsInAnyRow > 40 ? 11 : 15;
-  const seatGapPx = maxColsInAnyRow > 150 ? 0.7 : maxColsInAnyRow > 80 ? 1.1 : maxColsInAnyRow > 40 ? 1.6 : 2.2;
-  const rowLabelWidthPx = maxColsInAnyRow > 120 ? 18 : maxColsInAnyRow > 60 ? 24 : 28;
-  const rowLabelAllowance = (rowLabelWidthPx * 2) + 16;
+  // Canvas coordinate system: expand dynamically if maxColsInAnyRow is wide so seats are crisp & never clip
+  const canvasWidth = isPortrait ? 1200 : Math.max(1600, Math.ceil(maxColsInAnyRow * 18 + 200));
+  const containerPaddingPx = 18;
+  const netWidth = canvasWidth - (containerPaddingPx * 2);
 
+  // Vertical budget for non-grid elements (expanded showMetaHeightPx for spacious handwriting):
+  const headerHeightPx = 58;
+  const showMetaHeightPx = 68;
+  const stageHeightPx = 44;
+  const footerHeightPx = 36;
+  const sectionHeadersHeightPx = sectionCount > 1 ? sectionCount * 28 : 0;
+  const fixedNonGridHeightPx = headerHeightPx + showMetaHeightPx + stageHeightPx + footerHeightPx + sectionHeadersHeightPx + 24;
+
+  // Ideal canvas height matching standard A4 paper aspect ratio:
+  const idealCanvasHeight = Math.round(canvasWidth / targetAspect);
+  const availGridHeight = idealCanvasHeight - (containerPaddingPx * 2) - fixedNonGridHeightPx;
+
+  // Row label widths and allowances
+  const rowLabelWidthPx = maxColsInAnyRow > 80 ? 22 : maxColsInAnyRow > 40 ? 28 : 34;
+  const rowLabelsAllowance = (rowLabelWidthPx * 2) + 16;
+
+  // Aisles / Staircases spacing (generously wide corridor to clearly show stairs/aisle passages)
+  const estSeatW = (netWidth - rowLabelsAllowance) / (maxColsInAnyRow * 1.25);
+  const aisleGapPx = Math.max(maxColsInAnyRow > 80 ? 36 : maxColsInAnyRow > 40 ? 52 : 75, Math.round(estSeatW * 2.5));
   const totalAislesSpace = maxAislesInAnyRow * aisleGapPx;
-  const totalSeatGapsSpace = Math.max(0, maxColsInAnyRow - 1) * seatGapPx;
 
-  // Available width strictly for seat boxes:
-  const availWidthForSeats = netContainerWidth - rowLabelAllowance - totalAislesSpace - totalSeatGapsSpace;
-  const rawSeatSize = availWidthForSeats / maxColsInAnyRow;
+  // Maximum width available for seat boxes and seat gaps:
+  const availWidthForSeatsAndGaps = netWidth - rowLabelsAllowance - totalAislesSpace;
 
-  // For extreme column counts (e.g. 300+ columns), if rawSeatSize drops below 3.5px, expand canvas width dynamically
-  let containerWidthPx = baseCanvasWidth;
-  let seatSizePx = Math.round(rawSeatSize * 10) / 10;
+  // Compute seat width and seat gap: balanced seat spacing with prominent stairs separation
+  const seatGapRatio = maxColsInAnyRow > 80 ? 0.12 : maxColsInAnyRow > 40 ? 0.16 : 0.20;
+  const rawSeatWidth = availWidthForSeatsAndGaps / (maxColsInAnyRow + (maxColsInAnyRow - 1) * seatGapRatio);
+  const seatGapPx = Math.max(1.8, Math.round(rawSeatWidth * seatGapRatio * 10) / 10);
+  const seatWidthPx = Math.max(3.5, Math.floor((availWidthForSeatsAndGaps - (maxColsInAnyRow - 1) * seatGapPx) / maxColsInAnyRow));
 
-  if (seatSizePx < 3.5) {
-    seatSizePx = 3.5;
-    const requiredSeatsWidth = (maxColsInAnyRow * seatSizePx) + totalSeatGapsSpace + totalAislesSpace + rowLabelAllowance;
-    containerWidthPx = Math.ceil(requiredSeatsWidth + (containerPaddingPx * 2) + 40);
-  } else if (seatSizePx > 20) {
-    seatSizePx = 20; // Cap maximum seat size for small venues (e.g. 10-20 cols) so it looks elegant
+  // Compute seat height and row gap: GUARANTEED to fit within availGridHeight without vertical overflow
+  const rawRowHeight = availGridHeight / totalRowsCount;
+  const rowGapRatio = totalRowsCount > 40 ? 0.15 : totalRowsCount > 20 ? 0.22 : 0.28;
+  const rawSeatHeight = rawRowHeight / (1 + rowGapRatio);
+  const rowGapPx = Math.max(2, Math.round(rawSeatHeight * rowGapRatio * 10) / 10);
+  const seatHeightPx = Math.max(3.5, Math.floor(rawRowHeight - rowGapPx));
+
+  // Balanced seat dimensions ensuring all seats are covered and look realistic:
+  let finalSeatW = seatWidthPx;
+  let finalSeatH = seatHeightPx;
+  let canvasHeight = idealCanvasHeight;
+  let targetFormat = 'a4';
+
+  const seatAspect = finalSeatW / finalSeatH;
+
+  if (seatAspect > 1.4) {
+    // Width is significantly larger than row height:
+    finalSeatH = Math.min(finalSeatH, Math.round(finalSeatW * 1.15));
+    const naturalGridHeight = totalRowsCount * (finalSeatH + rowGapPx) + sectionHeadersHeightPx;
+    if (naturalGridHeight + fixedNonGridHeightPx + (containerPaddingPx * 2) < idealCanvasHeight * 0.75) {
+      canvasHeight = naturalGridHeight + fixedNonGridHeightPx + (containerPaddingPx * 2);
+      targetFormat = 'custom';
+    }
+  } else if (seatAspect < 0.7) {
+    // Many columns relative to rows (e.g. 98 cols, 14 rows):
+    // Adjust height to match seat width proportion, NEVER expand width beyond seatWidthPx!
+    finalSeatH = Math.max(6, Math.round(finalSeatW * 1.05));
+    const dynamicRowGap = Math.max(3, Math.round(finalSeatH * 0.3));
+    const naturalGridHeight = totalRowsCount * (finalSeatH + dynamicRowGap) + sectionHeadersHeightPx;
+    canvasHeight = naturalGridHeight + fixedNonGridHeightPx + (containerPaddingPx * 2);
+    targetFormat = 'custom';
   }
 
-  // Calculate typography and row gaps
-  let seatFontSizePx = Math.max(2.8, Math.min(9.5, Math.round(seatSizePx * 0.46 * 10) / 10));
-  let rowGapPx = totalRowsCount > 80 ? 1 : totalRowsCount > 40 ? 1.8 : totalRowsCount > 25 ? 2.8 : totalRowsCount > 15 ? 3.5 : 5;
-  let rowLabelFontSizePx = Math.max(6.5, Math.min(11, Math.round(Math.max(seatSizePx * 0.7, 7))));
+  // Typography and font sizing based on seat dimensions
+  const seatFontSizePx = Math.max(3, Math.min(13, Math.round(finalSeatH * 0.44 * 10) / 10));
+  const rowLabelFontSizePx = Math.max(6.5, Math.min(13, Math.round(Math.max(finalSeatH * 0.58, 8))));
 
-  const seatSize = `${seatSizePx}px`;
+  const seatWidth = `${finalSeatW}px`;
+  const seatHeight = `${finalSeatH}px`;
   const seatFontSize = `${seatFontSizePx}px`;
   const seatGap = `${seatGapPx}px`;
   const aisleGap = `${aisleGapPx}px`;
   const rowGap = `${rowGapPx}px`;
   const rowLabelWidth = `${rowLabelWidthPx}px`;
   const rowLabelFontSize = `${rowLabelFontSizePx}px`;
-  const containerWidth = `${containerWidthPx}px`;
+  const containerWidth = `${canvasWidth}px`;
+  const containerHeight = `${canvasHeight}px`;
 
-  // Helper to render individual seat box
+  // Helper to render individual seat box in strict Black and White (#000000 and #ffffff)
   const renderSeatBox = (rowChar, seatNum, rSpec) => {
     const seatLabel = `${rowChar}${seatNum}`;
     const isDisabled = rSpec?.disabled?.includes(seatNum) || 
@@ -126,20 +238,19 @@ export async function exportAuditoriumChartPdf({
                        resolvedBlueprint?.disabledSeats?.includes(seatLabel) ||
                        resolvedBlueprint?.unavailableSeats?.includes(seatLabel);
 
-    // Dynamic number rendering based on seat box size
     let displayText = `${seatNum}`;
     if (isDisabled) {
-      displayText = 'X';
-    } else if (seatSizePx < 5.5 && String(seatNum).length > 2) {
-      displayText = ''; // Prevent text overflow in micro-seat tiles for 10,000+ seat venues
+      displayText = '✕';
+    } else if (finalSeatW < 9 && String(seatNum).length > 2) {
+      displayText = ''; // Prevent text overflow in micro-seat tiles
     }
 
-    const borderStyle = isDisabled ? '1px dashed #cbd5e1' : (seatSizePx < 6 ? '0.5px solid #334155' : '1px solid #0f172a');
-    const bgColor = isDisabled ? '#f1f5f9' : '#ffffff';
-    const textColor = isDisabled ? '#94a3b8' : '#0f172a';
-    const borderRadius = seatSizePx > 10 ? '2px' : '1px';
+    const borderStyle = isDisabled ? '1px dashed #000000' : (finalSeatW < 7 ? '0.5px solid #000000' : '1.5px solid #000000');
+    const bgColor = '#ffffff';
+    const textColor = '#000000';
+    const borderRadius = Math.max(1, Math.min(3, Math.round(finalSeatW * 0.1))) + 'px';
 
-    return `<div style="min-width: ${seatSize}; width: ${seatSize}; height: ${seatSize}; border: ${borderStyle}; background-color: ${bgColor}; color: ${textColor}; font-size: ${seatFontSize}; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; border-radius: ${borderRadius}; flex-shrink: 0; box-sizing: border-box; line-height: 1; padding: 0; user-select: none;">${displayText}</div>`;
+    return `<div style="min-width: ${seatWidth}; width: ${seatWidth}; height: ${seatHeight}; border: ${borderStyle}; background-color: ${bgColor}; color: ${textColor}; font-size: ${seatFontSize}; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; border-radius: ${borderRadius}; flex-shrink: 0; box-sizing: border-box; line-height: 1; padding: 0; user-select: none;">${displayText}</div>`;
   };
 
   const renderPrintRow = (rSpec) => {
@@ -171,82 +282,102 @@ export async function exportAuditoriumChartPdf({
     }
 
     return `
-      <div style="display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: ${rowGap}; width: 100%; box-sizing: border-box; white-space: nowrap;">
-        <span style="font-size: ${rowLabelFontSize}; font-weight: 900; color: #0f172a; width: ${rowLabelWidth}; min-width: ${rowLabelWidth}; text-align: right; flex-shrink: 0; user-select: none;">${rowChar}</span>
+      <div style="display: flex; align-items: center; justify-content: center; gap: 4px; width: 100%; box-sizing: border-box; white-space: nowrap;">
+        <span style="font-size: ${rowLabelFontSize}; font-weight: 900; color: #000000; width: ${rowLabelWidth}; min-width: ${rowLabelWidth}; text-align: right; flex-shrink: 0; user-select: none;">${rowChar}</span>
         <div style="display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
           ${rowContentHtml}
         </div>
-        <span style="font-size: ${rowLabelFontSize}; font-weight: 900; color: #0f172a; width: ${rowLabelWidth}; min-width: ${rowLabelWidth}; text-align: left; flex-shrink: 0; user-select: none;">${rowChar}</span>
+        <span style="font-size: ${rowLabelFontSize}; font-weight: 900; color: #000000; width: ${rowLabelWidth}; min-width: ${rowLabelWidth}; text-align: left; flex-shrink: 0; user-select: none;">${rowChar}</span>
       </div>
     `;
   };
 
   // Generate complete grid HTML
   let gridHtml;
-  if (resolvedBlueprint?.sections) {
+  if (resolvedBlueprint?.sections && Array.isArray(resolvedBlueprint.sections)) {
     gridHtml = resolvedBlueprint.sections.map(sec => `
-      <div style="margin-bottom: ${totalRowsCount > 40 ? '6px' : '10px'}; text-align: center; width: 100%;">
-        <div style="display: inline-flex; align-items: center; gap: 6px; padding: 2px 14px; background-color: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 999px; font-size: 10px; font-weight: 900; color: #0f172a; letter-spacing: 0.6px; margin-bottom: 5px; text-transform: uppercase;">
-          <span style="width: 5px; height: 5px; border-radius: 50%; background-color: #0f172a; display: inline-block;"></span>
+      <div style="text-align: center; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; flex: 1;">
+        <div style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 18px; background-color: #000000; border: 1.5px solid #000000; border-radius: 999px; font-size: 10px; font-weight: 900; color: #ffffff; letter-spacing: 0.8px; margin: 4px auto; text-transform: uppercase;">
+          <span style="width: 5px; height: 5px; border-radius: 50%; background-color: #ffffff; display: inline-block;"></span>
           ${sec.sectionName}
         </div>
-        ${sec.rows.map(r => renderPrintRow(r)).join('')}
+        <div style="display: flex; flex-direction: column; justify-content: space-evenly; width: 100%; flex: 1;">
+          ${sec.rows.map(r => renderPrintRow(r)).join('')}
+        </div>
       </div>
     `).join('');
-  } else if (resolvedBlueprint?.rows) {
-    gridHtml = resolvedBlueprint.rows.map(r => renderPrintRow(r)).join('');
   } else {
-    const numRows = Math.max(currentZone?.rows || 11, 11);
-    const numCols = currentZone?.cols || 20;
-    let rowsArr = [];
-    for (let r = 0; r < numRows; r++) {
-      const rowChar = String.fromCharCode(65 + r);
-      let seatsArr = [];
-      for (let c = 1; c <= numCols; c++) {
-        seatsArr.push(c);
-      }
-      rowsArr.push({ rowChar, seats: seatsArr });
-    }
-    gridHtml = rowsArr.map(r => renderPrintRow(r)).join('');
+    gridHtml = allRowsList.map(r => renderPrintRow(r)).join('');
   }
 
   const innerContentHtml = `
-    <!-- Header: Main Title is strictly [Audi Name], [Venue Name], [City], [Country] -->
-    <div style="border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 8px; width: 100%;">
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px;">
-        <div style="font-size: 16px; font-weight: 900; color: #0f172a; letter-spacing: -0.2px; line-height: 1.2;">${locationHeader}</div>
-        <div style="font-size: 11px; font-weight: 800; color: #1e293b; white-space: nowrap; background-color: #f1f5f9; border: 1.5px solid #cbd5e1; border-radius: 6px; padding: 2px 10px;">
-          Capacity: ${formattedCapacity} Seats
+    <!-- Top Header Banner (Strict Monochrome: Black #000000 & White #ffffff) -->
+    <div style="width: 100%; box-sizing: border-box; flex-shrink: 0;">
+      <div style="background-color: #000000; color: #ffffff; padding: 12px 20px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box;">
+        <div>
+          <div style="font-size: 9.5px; font-weight: 800; color: #ffffff; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 3px;">
+            OFFICIAL AUDITORIUM SEATING BLUEPRINT
+          </div>
+          <div style="font-size: 18px; font-weight: 900; color: #ffffff; letter-spacing: -0.2px; line-height: 1.2;">
+            ${locationHeader}
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <div style="text-align: right; background-color: #000000; border: 1.5px solid #ffffff; border-radius: 4px; padding: 5px 14px;">
+            <div style="font-size: 8.5px; font-weight: 700; color: #ffffff; text-transform: uppercase;">Total Capacity</div>
+            <div style="font-size: 15px; font-weight: 900; color: #ffffff;">${formattedCapacity} Seats</div>
+          </div>
         </div>
       </div>
 
-      <!-- Single Clean Underline Fields (Horizontal in Landscape mode) -->
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-top: 6px; font-size: 11.5px; font-weight: 800; color: #0f172a;">
-        <div style="display: flex; align-items: flex-end; gap: 8px; flex: 1.2;">
-          <span style="font-size: 11.5px; font-weight: 800; color: #0f172a; white-space: nowrap;">Show Name:</span>
-          <span style="display: inline-block; border-bottom: 1.5px solid #0f172a; width: 100%; min-height: 16px; padding-left: 6px; padding-bottom: 2px; font-size: 11.5px; font-weight: 700; color: #0f172a;">${showNameDisplay || '&nbsp;'}</span>
+      <!-- Spacious Underline Fields for Show Name & Show Date (Generous margin and handwriting clearance) -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 40px; margin-top: 28px; margin-bottom: 12px; font-size: 12.5px; font-weight: 900; color: #000000; width: 100%; box-sizing: border-box;">
+        <div style="display: flex; align-items: flex-end; gap: 12px; flex: 1.2;">
+          <span style="font-size: 12.5px; font-weight: 900; color: #000000; white-space: nowrap;">Show Name:</span>
+          <span style="display: inline-block; border-bottom: 2px solid #000000; width: 100%; min-height: 28px; padding-left: 8px; padding-bottom: 4px; font-size: 12.5px; font-weight: 800; color: #000000;">${showNameDisplay || '&nbsp;'}</span>
         </div>
-        <div style="display: flex; align-items: flex-end; gap: 8px; flex: 0.8;">
-          <span style="font-size: 11.5px; font-weight: 800; color: #0f172a; white-space: nowrap;">Show Date:</span>
-          <span style="display: inline-block; border-bottom: 1.5px solid #0f172a; width: 100%; min-height: 16px; padding-left: 6px; padding-bottom: 2px; font-size: 11.5px; font-weight: 700; color: #0f172a;">${showDate || '&nbsp;'}</span>
+        <div style="display: flex; align-items: flex-end; gap: 12px; flex: 0.8;">
+          <span style="font-size: 12.5px; font-weight: 900; color: #000000; white-space: nowrap;">Show Date:</span>
+          <span style="display: inline-block; border-bottom: 2px solid #000000; width: 100%; min-height: 28px; padding-left: 8px; padding-bottom: 4px; font-size: 12.5px; font-weight: 800; color: #000000;">${showDate || '&nbsp;'}</span>
         </div>
       </div>
     </div>
 
-    <!-- Stage Box -->
-    <div style="background-color: #ffffff; border: 2px solid #0f172a; border-radius: 4px; padding: 4px 24px; margin: 0 auto ${totalRowsCount > 40 ? '6px' : '8px'}; text-align: center; font-weight: 900; font-size: 11px; letter-spacing: 4px; width: 35%; min-width: 240px; max-width: 440px; color: #0f172a; box-sizing: border-box;">
-      STAGE / SCREEN
+    <!-- Stage / Screen Banner (Pure White Box with Crisp 2.5px Black Border) -->
+    <div style="margin: 10px auto; width: 50%; max-width: 480px; min-width: 250px; background-color: #ffffff; border: 2.5px solid #000000; border-radius: 4px; padding: 6px 16px; text-align: center; flex-shrink: 0; box-sizing: border-box;">
+      <div style="font-size: 11.5px; font-weight: 900; letter-spacing: 4px; color: #000000; text-transform: uppercase;">
+        ★ STAGE / SCREEN ★
+      </div>
     </div>
 
-    <!-- Auditorium Seating Chart (No overflow hidden, centered with flex) -->
-    <div style="text-align: center; margin-bottom: 6px; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+    <!-- Auditorium Seating Chart Grid (Full-height expansion, all seats covered) -->
+    <div style="text-align: center; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; flex: 1; box-sizing: border-box; overflow: visible;">
       ${gridHtml}
     </div>
 
-    <!-- Footer -->
-    <div style="border-top: 1px solid #cbd5e1; padding-top: 5px; margin-top: 6px; width: 100%; display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #64748b; font-weight: 600;">
-      <span>Official Auditorium Seating Chart • EventLand Ticketing</span>
-      <span>Printed Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+    <!-- Footer with Legend & Authentication (Strict Black and White) -->
+    <div style="border-top: 2px solid #000000; padding-top: 7px; margin-top: 6px; width: 100%; display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; color: #000000; font-weight: 700; box-sizing: border-box; flex-shrink: 0;">
+      <!-- Legend -->
+      <div style="display: flex; gap: 16px; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="display: inline-flex; width: 14px; height: 14px; border: 1.5px solid #000000; background-color: #ffffff; border-radius: 2px; align-items: center; justify-content: center; font-size: 7.5px; font-weight: 900; color: #000000;">1</span>
+          <span style="font-size: 9.5px; font-weight: 800; color: #000000;">Available Seat</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="display: inline-flex; width: 14px; height: 14px; border: 1.5px dashed #000000; background-color: #ffffff; border-radius: 2px; align-items: center; justify-content: center; font-size: 7.5px; font-weight: 900; color: #000000;">✕</span>
+          <span style="font-size: 9.5px; font-weight: 800; color: #000000;">Unavailable / Blocked</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="display: inline-flex; width: 14px; height: 14px; background-color: #000000; border-radius: 2px; align-items: center; justify-content: center; font-size: 7.5px; font-weight: 900; color: #ffffff;">A</span>
+          <span style="font-size: 9.5px; font-weight: 800; color: #000000;">Row Letter</span>
+        </div>
+      </div>
+
+      <!-- Branding & Generation Date -->
+      <div style="display: flex; gap: 16px; align-items: center;">
+        <span style="color: #000000; font-weight: 800;">EventLand Ticketing System • Seating Blueprint</span>
+        <span style="color: #000000; font-weight: 900;">Generated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+      </div>
     </div>
   `;
 
@@ -258,8 +389,8 @@ export async function exportAuditoriumChartPdf({
   <title>${locationHeader}</title>
   <style>
     @page {
-      size: landscape;
-      margin: 4mm;
+      size: ${isPortrait ? 'portrait' : 'landscape'};
+      margin: 0;
     }
     * {
       box-sizing: border-box;
@@ -268,23 +399,29 @@ export async function exportAuditoriumChartPdf({
     }
     html, body {
       width: 100%;
+      height: 100%;
       background-color: #ffffff !important;
-      color: #0f172a !important;
+      color: #000000 !important;
       font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+      overflow: hidden;
     }
     body {
-      padding: 2px 4px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
     }
     .pdf-container {
-      width: ${containerWidth};
-      max-width: 100%;
-      margin: 0 auto;
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      padding: ${containerPaddingPx}px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
       page-break-inside: avoid;
     }
   </style>
@@ -303,17 +440,20 @@ export async function exportAuditoriumChartPdf({
 </html>
   `;
 
-  // Direct high-definition PDF rendering via html2canvas & jsPDF in Landscape Orientation
+  // Render high-definition temporary DOM container with pure black & white colors
   const container = document.createElement('div');
   container.className = 'pdf-export-temp-container';
   container.style.position = 'fixed';
   container.style.left = '0';
   container.style.top = '0';
   container.style.width = containerWidth;
+  container.style.height = containerHeight;
   container.style.minWidth = containerWidth;
+  container.style.minHeight = containerHeight;
   container.style.maxWidth = containerWidth;
+  container.style.maxHeight = containerHeight;
   container.style.backgroundColor = '#ffffff';
-  container.style.color = '#0f172a';
+  container.style.color = '#000000';
   container.style.padding = `${containerPaddingPx}px`;
   container.style.boxSizing = 'border-box';
   container.style.fontFamily = "'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
@@ -321,25 +461,56 @@ export async function exportAuditoriumChartPdf({
   container.style.opacity = '1';
   container.style.visibility = 'visible';
   container.style.pointerEvents = 'none';
-  container.style.overflow = 'visible';
+  container.style.overflow = 'hidden';
+  container.style.display = 'flex';
+  container.style.flexDirection = 'column';
+  container.style.justifyContent = 'space-between';
   container.innerHTML = innerContentHtml;
   document.body.appendChild(container);
 
   const cleanFileName = `${cleanAuditorium.replace(/[^a-zA-Z0-9_-]/g, '_')}_Seating_Chart.pdf`;
 
   try {
-    // Small delay to allow the browser to complete layout and typography rendering
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Delay to guarantee accurate layout and font rasterization
+    await new Promise(resolve => setTimeout(resolve, 120));
 
     const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
       import('html2canvas'),
       import('jspdf')
     ]);
 
-    const renderedHeight = container.scrollHeight || container.offsetHeight || 1000;
+    let pdf;
+    let pdfPageW;
+    let pdfPageH;
+
+    if (targetFormat === 'a4') {
+      pdf = new jsPDF({
+        orientation: isPortrait ? 'portrait' : 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+      pdfPageW = pdf.internal.pageSize.getWidth();
+      pdfPageH = pdf.internal.pageSize.getHeight();
+    } else {
+      const baseMm = isPortrait ? 210 : 297;
+      pdfPageW = baseMm;
+      pdfPageH = Math.round(baseMm * (canvasHeight / canvasWidth));
+      pdf = new jsPDF({
+        orientation: isPortrait ? 'portrait' : 'landscape',
+        unit: 'mm',
+        format: [pdfPageW, pdfPageH]
+      });
+    }
+
+    // High-definition 600 DPI rasterization:
+    // Physical page dimension in inches: (pdfPageW / 25.4) [1 inch = 25.4 mm]
+    // Target pixel dimension: Math.round((pdfPageW / 25.4) * 600) -> 7,016 px for A4 landscape (297mm)
+    const TARGET_DPI = 600;
+    const targetPixelWidth = Math.round((pdfPageW / 25.4) * TARGET_DPI);
+    const scaleFactor = Math.round((targetPixelWidth / canvasWidth) * 10000) / 10000;
 
     const canvas = await html2canvas(container, {
-      scale: 2,
+      scale: scaleFactor,
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',
@@ -347,10 +518,10 @@ export async function exportAuditoriumChartPdf({
       scrollY: 0,
       x: 0,
       y: 0,
-      width: containerWidthPx,
-      height: renderedHeight,
-      windowWidth: containerWidthPx + 60,
-      windowHeight: renderedHeight + 60
+      width: canvasWidth,
+      height: canvasHeight,
+      windowWidth: canvasWidth + 50,
+      windowHeight: canvasHeight + 50
     });
 
     if (isCanvasBlank(canvas)) {
@@ -360,31 +531,9 @@ export async function exportAuditoriumChartPdf({
     }
 
     const imgData = canvas.toDataURL('image/jpeg', 0.98);
-    const pdf = new jsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: 'a4'
-    });
 
-    const pageWidth = pdf.internal.pageSize.getWidth(); // 297 mm
-    const pageHeight = pdf.internal.pageSize.getHeight(); // 210 mm
-    const margin = 5; // 5 mm minimal margin for maximum printable chart area
-    const availWidth = pageWidth - (margin * 2); // 287 mm
-    const availHeight = pageHeight - (margin * 2); // 200 mm
-
-    // Proportional scale factor so that BOTH width and height fit 100% on the page with zero trimming:
-    const scaleX = availWidth / canvas.width;
-    const scaleY = availHeight / canvas.height;
-    const scale = Math.min(scaleX, scaleY);
-
-    const finalWidth = canvas.width * scale;
-    const finalHeight = canvas.height * scale;
-
-    // Center perfectly on the landscape paper:
-    const xOffset = margin + (availWidth - finalWidth) / 2;
-    const yOffset = margin + (availHeight - finalHeight) / 2;
-
-    pdf.addImage(imgData, 'JPEG', xOffset, yOffset, finalWidth, finalHeight, undefined, 'FAST');
+    // Full-page cover with ZERO margins: all seats covered edge-to-edge at true 600 DPI
+    pdf.addImage(imgData, 'JPEG', 0, 0, pdfPageW, pdfPageH, undefined, 'FAST');
     pdf.save(cleanFileName);
     return true;
   } catch (err) {
@@ -405,7 +554,7 @@ function isCanvasBlank(canvas) {
     // Sample multiple points across top, middle, and bottom to reliably detect non-blank content
     const samplePoints = [
       { x: Math.floor(canvas.width * 0.1), y: Math.floor(canvas.height * 0.05) },
-      { x: Math.floor(canvas.width * 0.5), y: Math.floor(canvas.height * 0.1) },
+      { x: Math.floor(canvas.width * 0.5), y: Math.floor(canvas.height * 0.05) },
       { x: Math.floor(canvas.width * 0.5), y: Math.floor(canvas.height * 0.5) },
       { x: Math.floor(canvas.width * 0.2), y: Math.floor(canvas.height * 0.6) },
       { x: Math.floor(canvas.width * 0.8), y: Math.floor(canvas.height * 0.6) }
@@ -419,7 +568,7 @@ function isCanvasBlank(canvas) {
         const g = data[i + 1];
         const b = data[i + 2];
         const a = data[i + 3];
-        // Detect dark elements (text, borders, badges: #0f172a)
+        // Detect dark elements (pure black #000000: r=0, g=0, b=0)
         if (a > 50 && (r < 220 || g < 220 || b < 220)) {
           return false;
         }

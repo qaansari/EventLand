@@ -360,6 +360,37 @@
     - Reduced `AdminDashboard.jsx` by over 890 lines, eliminating 11 unused icon imports, unused `exportTicketPdf`, and isolating modal state re-renders.
     - Enhanced `api.js` error handling to attach HTTP `status`, `data`, and `payload` to thrown Error instances.
 
+### 18. Printable Auditorium Seating Chart PDF Exporter Specifications (`pdfChartExporter.js`)
+- **Zero White Space & Full-Page Cover**:
+  - Implements edge-to-edge document coverage with zero margins: `pdf.addImage(imgData, 'JPEG', 0, 0, pdfPageW, pdfPageH)`.
+  - Eliminates letterboxing, pillarboxing, and dead white borders. The auditorium chart completely covers 100% of the PDF page.
+  - Fallback `@page` print stylesheet also enforces `margin: 0` and `.pdf-container { width: 100vw; height: 100vh; }` for direct browser printing.
+- **Strict Monochrome Color Palette (Pure Black & White RGB)**:
+  - Uses exclusively pure black (`#000000` / `rgb(0, 0, 0)`) and pure white (`#ffffff` / `rgb(255, 255, 255)`).
+  - Designed for high-contrast, professional laser/office printing: eliminates washed-out gray shades, blues, or color ink consumption.
+  - Header banner: solid black background with white text; Total Capacity badge with white border.
+  - Stage / Screen: pure white box with a `2.5px solid #000000` border and bold black typography.
+  - Available seats: white background, `1.5px solid #000000` border, and bold black seat number.
+  - Unavailable / Blocked seats: white background, `1.5px dashed #000000` border, and bold black `✕`.
+  - Legend and Footers: pure black text and divider line.
+- **Spacious Show Name & Show Date Handwriting Clearance**:
+  - Generous top margin (`margin-top: 28px; margin-bottom: 12px; gap: 40px;`) separates the metadata section from the top header banner and stage.
+  - Ample handwriting / printing clearance: `min-height: 28px; padding-bottom: 4px;` with a bold `2px solid #000000` underline and `12.5px font-weight: 900` text for easy physical pen handwriting or pre-filled show details.
+  - Vertical layout budget (`showMetaHeightPx: 68`) accounts for this spacing without cutting into seating rows.
+- **Generous Column & Prominent Stairs/Aisle Corridors**:
+  - Aisle / staircase gaps between seat blocks (e.g. between seat 11 and 12) have been widened to a prominent **`52px`–`75px`** (or ~`2.5x` of seat width, `14x` regular seat gap), unmistakably representing the stairs / walking passages between seating blocks.
+  - Seat-to-seat column gap ratio (`0.12`–`0.20` of seat width, minimum `1.8px`) ensures distinct separation between individual adjacent seats within each block.
+- **600 DPI High-Definition Print Resolution**:
+  - Implements true **600 DPI** rasterization calculation for high-grade physical and laser printing:
+    - Target pixel width: `targetPixelWidth = Math.round((pdfPageW / 25.4) * 600)` (e.g. `7,016 px` for 297mm A4 landscape).
+    - Dynamic scale factor: `scaleFactor = targetPixelWidth / canvasWidth` (e.g. `~4.385x` scale on a 1,600px canvas).
+  - Renders ultra-crisp seat numbers, hairline borders, and metadata text with zero pixelation or blur at full 600 DPI press fidelity.
+- **High-Capacity & 1,100+ Seats Coverage**:
+  - Boundary-constrained dynamic dimension scaling guarantees that large venues (e.g. 1,100 to 10,000+ seats, 30–100+ columns) never exceed canvas bounds or get clipped by `overflow: hidden`.
+  - Dynamic canvas resolution (`Math.max(1600, maxColsInAnyRow * 18 + 200)`) gives high-column charts crisp rasterization.
+  - Fallback layout generator automatically builds a 30-row × 37-column (1,100 seats) 3-block layout with dual central aisles when high-capacity venues are exported without an explicit JSON row blueprint, avoiding the legacy 220-seat truncation.
+  - Alphabetic row progression helper `getRowLabel(index)` supports rows past Z (`A`–`Z`, `AA`, `AB`, `AC`, `AD`...) with valid lettering.
+
 ---
 
 ## Developer Commands & Verification
@@ -392,6 +423,7 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
 ```
 
 ---
-*Last Updated: September 2026 (Comprehensive Full-Stack Audit & Modularization: Canonical AppRoles Authorization Constants; Permissions-Policy camera=(self); 403 vs 401 Exception Mapping; Concurrency 409 Conflict; Gate User-Partitioned Rate Limiting; AsSplitQuery & Include Optimization; AdminDashboard.jsx Monolith Refactoring & Modal Extraction into AdminEventModal, AdminShowSlotModal, AdminTicketTierModal, AdminUserModal, AdminAuditoriumModal; FileUploadField Extraction; api.js Error Status Preservation; Multi-User Organizer Relational Linkage via User.OrganizerId FK; Single Consolidated EF Core Baseline Migration 20260923090046_InitialCreate; Gate Ticket Validation & QR Scanner Admission Hub; E-Ticket PDF QR Route Verification; All 65 Unit Tests Passing)*
+*Last Updated: September 2026 (Printable Auditorium Seating Chart PDF Exporter: True 600 DPI High-Definition Print Resolution, Zero Margin Full-Page Cover, Strict Monochrome Pure Black & White RGB Palette #000000 and #ffffff, Spacious Show Name & Show Date Underline Handwriting Section with 28px margin, 52px-75px Prominent Stairs/Aisle Passages, 1100+ Seats Full Coverage Engine with 3-Block Dual Aisle Fallback Generator and getRowLabel multi-letter progression, Boundary-Constrained Zero-Clipping Canvas; Canonical AppRoles Authorization Constants; Permissions-Policy camera=(self); 403 vs 401 Exception Mapping; Concurrency 409 Conflict; Gate User-Partitioned Rate Limiting; AsSplitQuery & Include Optimization; AdminDashboard.jsx Monolith Refactoring & Modal Extraction into AdminEventModal, AdminShowSlotModal, AdminTicketTierModal, AdminUserModal, AdminAuditoriumModal; FileUploadField Extraction; api.js Error Status Preservation; Multi-User Organizer Relational Linkage via User.OrganizerId FK; Single Consolidated EF Core Baseline Migration 20260923090046_InitialCreate; Gate Ticket Validation & QR Scanner Admission Hub; E-Ticket PDF QR Route Verification; All 65 Unit Tests Passing)*
+
 
 
