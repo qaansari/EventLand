@@ -259,7 +259,9 @@ builder.Services.AddCors(options =>
             try
             {
                 var host = new Uri(origin).Host;
-                if (host.EndsWith("vercel.app", StringComparison.OrdinalIgnoreCase) ||
+                if (host.Equals("vercel.app", StringComparison.OrdinalIgnoreCase) ||
+                    host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase) ||
+                    host.EndsWith("vercel.app", StringComparison.OrdinalIgnoreCase) ||
                     host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
                     host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
                     host.EndsWith("ngrok-free.dev", StringComparison.OrdinalIgnoreCase) ||
@@ -278,7 +280,8 @@ builder.Services.AddCors(options =>
         })
         .AllowAnyHeader()
         .AllowAnyMethod()
-        .AllowCredentials();
+        .AllowCredentials()
+        .SetPreflightMaxAge(TimeSpan.FromHours(1));
     });
 });
 
@@ -287,14 +290,19 @@ var app = builder.Build();
 // Forwarded headers must run before any middleware relying on remote IP (rate limiting, logging)
 app.UseForwardedHeaders();
 
-// Global Exception Handler & Security Headers must be FIRST so they catch
-// exceptions from every subsequent middleware (routing, auth, rate limiting, etc.)
+// Enable CORS immediately after forwarded headers so ALL requests (including preflights,
+// early 404s, and unhandled errors) receive Access-Control headers before hitting downstream pipeline
+app.UseCors("AllowFrontend");
+
+// Global Exception Handler & Security Headers
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 app.UseMiddleware<SecurityHeadersMiddleware>();
 
 app.UseResponseCompression();
 
 app.UseRouting();
+
+// Re-apply CORS in endpoint pipeline to satisfy endpoint-level routing metadata
 app.UseCors("AllowFrontend");
 
 // Enable Swagger & Swagger UI only in Development (Served at application root http://localhost:4257/)
@@ -328,8 +336,8 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapControllers();
-app.MapHub<SeatingHub>("/hubs/seating");
+app.MapControllers().RequireCors("AllowFrontend");
+app.MapHub<SeatingHub>("/hubs/seating").RequireCors("AllowFrontend");
 
 // Auto-migrate database & seed Super Admin account on startup — wrapped so SQL
 // unavailability does not crash the host (e.g. during health probe cold start).

@@ -39,6 +39,19 @@ public class GlobalExceptionHandlerMiddleware
             return Task.CompletedTask;
         }
 
+        // Ensure CORS headers are attached on error responses so browsers do not mask
+        // 4xx/500 errors as CORS violations
+        if (context.Request.Headers.TryGetValue("Origin", out var originValues) &&
+            !context.Response.Headers.ContainsKey("Access-Control-Allow-Origin"))
+        {
+            var origin = originValues.ToString();
+            if (!string.IsNullOrWhiteSpace(origin))
+            {
+                context.Response.Headers.Append("Access-Control-Allow-Origin", origin);
+                context.Response.Headers.Append("Access-Control-Allow-Credentials", "true");
+            }
+        }
+
         context.Response.ContentType = "application/json";
 
         var statusCode = exception switch
