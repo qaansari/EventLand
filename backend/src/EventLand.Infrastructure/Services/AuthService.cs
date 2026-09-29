@@ -468,7 +468,12 @@ public class AuthService : IAuthService
             throw new UnauthorizedAccessException("Facebook token does not belong to this application.");
 
         // Step 2: Fetch user profile using the user's own access token.
-        var profileUrl = $"https://graph.facebook.com/me?fields=id,name,email,picture.type(large)&access_token={inputToken}";
+        // Include appsecret_proof (HMAC-SHA256 of access token with app secret) for compliance with Meta's 'Require app secret' setting.
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_facebookAppSecret));
+        var proofBytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(dto.AccessToken));
+        var appSecretProof = Convert.ToHexString(proofBytes).ToLowerInvariant();
+
+        var profileUrl = $"https://graph.facebook.com/me?fields=id,name,email,picture.type(large)&access_token={inputToken}&appsecret_proof={appSecretProof}";
         FacebookProfileResponse? profile;
         try
         {
