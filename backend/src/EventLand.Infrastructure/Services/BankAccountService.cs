@@ -23,19 +23,10 @@ public class BankAccountService : IBankAccountService
     {
         var account = await _context.BankAccounts
             .AsNoTracking()
-            .Where(b => b.IsActive && !b.IsDeleted)
+            .Where(b => b.IsActive && b.IsEnabled && !b.IsDeleted)
             .OrderBy(b => b.DisplayOrder)
             .ThenByDescending(b => b.CreatedAt)
             .FirstOrDefaultAsync();
-
-        if (account is null)
-        {
-            // Return first non-deleted if none explicitly marked active
-            account = await _context.BankAccounts
-                .AsNoTracking()
-                .Where(b => !b.IsDeleted)
-                .FirstOrDefaultAsync();
-        }
 
         return account is null ? null : MapToDto(account);
     }
@@ -87,6 +78,7 @@ public class BankAccountService : IBankAccountService
             QrCodeImageUrl = FileUrlHelper.ExtractFileName(dto.QrCodeImageUrl?.Trim()),
             Instructions = dto.Instructions?.Trim(),
             IsActive = dto.IsActive,
+            IsEnabled = dto.IsEnabled,
             DisplayOrder = dto.DisplayOrder,
             MaintenanceNotice = string.IsNullOrWhiteSpace(dto.MaintenanceNotice) ? null : dto.MaintenanceNotice.Trim(),
             MaintenanceStartUtc = dto.MaintenanceStartUtc,
@@ -130,6 +122,7 @@ public class BankAccountService : IBankAccountService
         if (dto.QrCodeImageUrl != null) entity.QrCodeImageUrl = FileUrlHelper.ExtractFileName(dto.QrCodeImageUrl.Trim());
         if (dto.Instructions != null) entity.Instructions = dto.Instructions.Trim();
         if (dto.IsActive.HasValue) entity.IsActive = dto.IsActive.Value;
+        if (dto.IsEnabled.HasValue) entity.IsEnabled = dto.IsEnabled.Value;
         if (dto.DisplayOrder.HasValue) entity.DisplayOrder = dto.DisplayOrder.Value;
 
         // Maintenance fields
@@ -186,6 +179,21 @@ public class BankAccountService : IBankAccountService
         return MapToDto(entity);
     }
 
+    public async Task<BankAccountDto> ToggleEnabledAsync(int id)
+    {
+        var entity = await _context.BankAccounts
+            .FirstOrDefaultAsync(b => b.Id == id && !b.IsDeleted);
+
+        if (entity is null)
+            throw new KeyNotFoundException($"Bank account with ID '{id}' not found.");
+
+        entity.IsEnabled = !entity.IsEnabled;
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Toggled IsEnabled for BankAccount ID {Id} to {IsEnabled}", id, entity.IsEnabled);
+        return MapToDto(entity);
+    }
+
     private static BankAccountDto MapToDto(BankAccount b)
     {
         var now = DateTimeOffset.UtcNow;
@@ -224,6 +232,7 @@ public class BankAccountService : IBankAccountService
             FileUrlHelper.FormatBankAccountQrCodeUrl(b.QrCodeImageUrl),
             b.Instructions,
             b.IsActive,
+            b.IsEnabled,
             b.DisplayOrder,
             b.MaintenanceNotice,
             b.MaintenanceStartUtc,

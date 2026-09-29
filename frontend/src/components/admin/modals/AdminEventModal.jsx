@@ -106,7 +106,7 @@ export default function AdminEventModal({
                     <SearchableSelect
                       value={eventForm.status || 'Live'}
                       onChange={e => setEventForm({ ...eventForm, status: e.target.value })}
-                      options={['Live', 'Draft', 'Completed', 'Cancelled']}
+                      options={['Live', 'SellingFast', 'SoldOut', 'Upcoming', 'Closed', 'Draft', 'Cancelled']}
                     />
                   </div>
                 </div>
@@ -299,10 +299,10 @@ export default function AdminEventModal({
               {/* SECTION 4: Media Banner Upload */}
               <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem' }}>
                 <FileUploadField
-                  label="Event Banner Image (Recommended: 1200x500px)"
+                  label="Event Banner Image (Strict: 1200×500px)"
                   value={eventForm.banner}
                   onChange={(url) => setEventForm({ ...eventForm, banner: url })}
-                  placeholder="Upload 1200x500px banner image or enter URL..."
+                  placeholder="Upload 1200×500px banner image or enter URL..."
                   type="events"
                   entityName={eventForm.title}
                   entityId={eventForm.id}
@@ -363,8 +363,13 @@ export default function AdminEventModal({
 
           {/* Right Column: Live Event Card Preview */}
           <div style={{ minWidth: '300px', alignSelf: 'flex-start', position: 'sticky', top: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: '#2dd4bf', fontWeight: 700, fontSize: '0.875rem', letterSpacing: '0.05em' }}>
-              <Sparkles size={16} /> LIVE CARD PREVIEW
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', color: '#2dd4bf', fontWeight: 700, fontSize: '0.875rem', letterSpacing: '0.05em' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Sparkles size={16} /> LIVE CARD PREVIEW
+              </span>
+              <span style={{ fontSize: '0.75rem', color: '#2dd4bf', background: 'rgba(13, 148, 136, 0.15)', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid rgba(13, 148, 136, 0.3)' }}>
+                1200×500px Banner
+              </span>
             </div>
             <EventCard event={previewEvent} onSelect={() => {}} isSaved={false} onToggleSave={() => {}} />
           </div>

@@ -145,29 +145,10 @@ public class PayProService : IPayProService
         string paymentUrl = orderResult.Click2PayUrl ?? string.Empty;
         string voucherCode = orderResult.ConnectPayId ?? orderResult.PayProId ?? string.Empty;
 
-        // Fallback for Demo simulation if PayPro credentials are not yet configured or gateway is offline
         if (!orderResult.IsSuccess || string.IsNullOrWhiteSpace(paymentUrl))
         {
-            var (isConfigValid, _) = _options.Validate();
-            if (!isConfigValid || _options.IsDemo)
-            {
-                var baseUrl = _options.BaseUrl.TrimEnd('/');
-                paymentUrl = $"{baseUrl}/invoice/PP-{booking.BookingRef}?amt={booking.TotalAmount:F2}&ref={booking.BookingRef}";
-                if (!string.IsNullOrWhiteSpace(returnUrl))
-                {
-                    paymentUrl += $"&return_url={Uri.EscapeDataString(returnUrl)}";
-                }
-                if (string.IsNullOrWhiteSpace(voucherCode))
-                {
-                    voucherCode = $"9{RandomNumberGenerator.GetInt32(1000000, 9999999)}";
-                }
-                _logger.LogInformation("Operating in PayPro Demo mode. Generated deterministic PayPro checkout link for Booking {BookingRef}.", booking.BookingRef);
-            }
-            else
-            {
-                _logger.LogError("PayPro V2 order creation failed for Booking {BookingRef}: {Description}", booking.BookingRef, orderResult.Description);
-                throw new InvalidOperationException($"Unable to initiate PayPro payment: {orderResult.Description}");
-            }
+            _logger.LogError("PayPro V2 order creation failed for Booking {BookingRef}: {Description}", booking.BookingRef, orderResult.Description);
+            throw new InvalidOperationException($"Unable to initiate PayPro payment: {orderResult.Description}");
         }
 
         var internalRef = $"TXN-EVL-{RandomNumberGenerator.GetInt32(100000, 1000000)}";
@@ -431,6 +412,12 @@ public class PayProService : IPayProService
         DateTimeOffset paidAt,
         CancellationToken cancellationToken)
     {
+        if (booking.PaymentStatus == PaymentStatus.Paid)
+        {
+            _logger.LogInformation("Booking {BookingRef} is already marked as Paid (idempotency guard).", booking.BookingRef);
+            return;
+        }
+
         booking.PaymentStatus = PaymentStatus.Paid;
         booking.Status = BookingStatus.Confirmed;
         booking.PaidAt = paidAt;

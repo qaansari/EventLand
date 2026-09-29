@@ -36,3 +36,16 @@ public record ChangePasswordDto(
     string NewPassword
 );
 
+public record ForgotPasswordRequestDto(string Email);
+
+public record ResetPasswordRequestDto(
+    string Email,
+    string ResetToken,
+    string NewPassword
+);
+
+/// <summary>Sent by the frontend after Google Identity Services returns an ID Token (JWT).</summary>
+public record GoogleAuthRequestDto(string IdToken);
+
+/// <summary>Sent by the frontend after Facebook JS SDK returns a User Access Token.</summary>
+public record FacebookAuthRequestDto(string AccessToken);

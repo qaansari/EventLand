@@ -1,10 +1,14 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
+
+
   // Load .env.local so VITE_BACKEND_URL is available at config time
   const env = loadEnv(mode, process.cwd(), '');
+
 
   // Prefer env-configured backend; fall back to localhost for local development.
   // To use ngrok or another tunnel, set VITE_BACKEND_URL in .env.local — no code change required.
@@ -13,33 +17,36 @@ export default defineConfig(({ mode }) => {
     : 'http://localhost:4257';
 
   return {
-    plugins: [react()],
+    plugins: [react(), basicSsl()],
     server: {
       port: 5174,
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin-allow-popups'
+      },
       proxy: {
         '/api': {
           target: backendTarget,
           changeOrigin: true,
-          secure: true,
+          secure: false,
           headers: { 'ngrok-skip-browser-warning': '1' }
         },
         '/hubs': {
           target: backendTarget,
           ws: true,
           changeOrigin: true,
-          secure: true,
+          secure: false,
           headers: { 'ngrok-skip-browser-warning': '1' }
         },
         '/uploads': {
           target: backendTarget,
           changeOrigin: true,
-          secure: true,
+          secure: false,
           headers: { 'ngrok-skip-browser-warning': '1' }
         },
         '/assets': {
           target: backendTarget,
           changeOrigin: true,
-          secure: true,
+          secure: false,
           headers: { 'ngrok-skip-browser-warning': '1' }
         }
       }
@@ -72,4 +79,5 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 600
     }
   };
+
 })

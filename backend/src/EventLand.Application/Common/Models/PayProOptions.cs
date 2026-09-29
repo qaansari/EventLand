@@ -49,6 +49,11 @@ public class PayProOptions
     public string ClientSecret { get; set; } = string.Empty;
 
     /// <summary>
+    /// Return URL where customers are redirected after completing Click2Pay card payment.
+    /// </summary>
+    public string ReturnUrl { get; set; } = string.Empty;
+
+    /// <summary>
     /// Indicates whether the gateway is configured in Demo / Sandbox mode.
     /// </summary>
     public bool IsDemo => string.Equals(Environment, "Demo", StringComparison.OrdinalIgnoreCase) ||

@@ -4,9 +4,12 @@ using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 [ApiController]
 [Route("api/bank-accounts")]
+[Produces("application/json")]
+[EnableRateLimiting("general")]
 public class BankAccountsController : ControllerBase
 {
     private readonly IBankAccountService _bankAccountService;
@@ -44,6 +47,7 @@ public class BankAccountsController : ControllerBase
             account.QrCodeImageUrl,
             account.Instructions,
             account.IsActive,
+            account.IsEnabled,
             account.DisplayOrder,
             // Maintenance: only expose the notice message and computed boolean
             account.MaintenanceNotice,

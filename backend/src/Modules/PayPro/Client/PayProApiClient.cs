@@ -53,8 +53,12 @@ public class PayProApiClient : IPayProApiClient
     private string CleanPakistaniPhone(string? phone)
     {
         if (string.IsNullOrWhiteSpace(phone)) return string.Empty;
-        var clean = phone.Trim().Replace("+92", "0").Replace("-", "").Replace(" ", "");
-        return (clean.StartsWith("03") && clean.Length == 11) ? clean : string.Empty;
+        var digits = new string(phone.Where(char.IsDigit).ToArray());
+        if (digits.StartsWith("923") && digits.Length == 12) return "0" + digits.Substring(2);
+        if (digits.StartsWith("03") && digits.Length == 11) return digits;
+        if (digits.StartsWith("3") && digits.Length == 10) return "0" + digits;
+        if (digits.Length == 11) return digits;
+        return string.Empty;
     }
 
     private object MapOrderToPayload(PayProOrderInput order)
@@ -73,7 +77,8 @@ public class PayProApiClient : IPayProApiClient
             ["CustomerName"] = string.IsNullOrWhiteSpace(order.CustomerName) ? "Customer" : order.CustomerName.Trim(),
             ["CustomerMobile"] = CleanPakistaniPhone(order.CustomerMobile),
             ["CustomerEmail"] = order.CustomerEmail?.Trim() ?? string.Empty,
-            ["CustomerAddress"] = order.CustomerAddress?.Trim() ?? string.Empty
+            ["CustomerAddress"] = order.CustomerAddress?.Trim() ?? string.Empty,
+            ["Ecommerce_return_url"] = _options.ReturnUrl ?? string.Empty
         };
 
         if (!string.IsNullOrWhiteSpace(order.ReusableConsumerId))

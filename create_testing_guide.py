@@ -185,7 +185,7 @@ def build_document():
     desc_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     desc_p.paragraph_format.space_before = Pt(0)
     desc_p.paragraph_format.space_after = Pt(20)
-    run_desc = desc_p.add_run("Comprehensive test execution manual covering all platform features across Super Admin, Admin, Organizer, Attendee/Customer roles, PayPro v2 Financial Switch & Gateway, Automated Webhooks, Background Reconciliation, Admin Bookings Hub, Gate Ticket Validation & QR Scanner Hub, Multi-User Organizer Relational Linkage, Modular Admin Architecture, Cloudflare Turnstile Bot Defense, and SkiaSharp Pixel Sanitization.")
+    run_desc = desc_p.add_run("Comprehensive test execution manual covering all platform features across Super Admin, Admin, Organizer, Attendee/Customer roles, PayPro v2 Financial Switch & Gateway, Automated Webhooks, Background Reconciliation, Admin Bookings Hub, Gate Ticket Validation & QR Scanner Hub, Multi-User Organizer Relational Linkage, Event & Show Slot Closing Mechanisms, Explicit Ticket Tier Statuses (Available, SoldOut, Closed) & Sort Ordering, Modular Admin Architecture, Cloudflare Turnstile Bot Defense, and SkiaSharp Pixel Sanitization.")
     run_desc.font.size = Pt(10.5)
     run_desc.font.italic = True
 
@@ -237,10 +237,10 @@ def build_document():
         r.font.color.rgb = RGBColor(255, 255, 255)
 
     env_data = [
-        ("Super Admin", "http://localhost:5173 (Admin Portal)", "admin@eventland.pk / SuperAdmin123!"),
-        ("Admin", "http://localhost:5173 (Admin Portal)", "admin.qa@eventland.pk (Created via SuperAdmin)"),
-        ("Organizer", "http://localhost:5173 (Organizer Portal)", "organizer.qa@eventland.pk or Self-Register"),
-        ("Attendee / Customer", "http://localhost:5173 (Public Web App)", "Guest or Self-Registered Customer Account")
+        ("Super Admin", "https://localhost:5174 (Admin Portal)", "admin@eventland.pk / SuperAdmin123!"),
+        ("Admin", "https://localhost:5174 (Admin Portal)", "admin.qa@eventland.pk (Created via SuperAdmin)"),
+        ("Organizer", "https://localhost:5174 (Organizer Portal)", "organizer.qa@eventland.pk or Self-Register"),
+        ("Attendee / Customer", "https://localhost:5174 (Public Web App)", "Guest, Social Sign-In (Google/Facebook), or Registered Account")
     ]
 
     for row_idx, data in enumerate(env_data, start=1):
@@ -478,6 +478,37 @@ def build_document():
     note="When an Organizer account is created or updated, User.OrganizerId is populated. AuthService embeds this organizerId into JWT claims on login for automatic scoping.",
     note_title="ORGANIZER MULTI-TENANCY:")
 
+    # Test Case 2.10 (NEW: EVENT & SHOW SLOT CLOSING MECHANISMS)
+    add_test_case(doc, "Test Case 2.10", "Event & Show Slot Closing Mechanisms (Admin Dashboard & API)", [
+        [("Log in as ", False), ("Admin or SuperAdmin", True), (" and navigate to ", False), ("Admin Dashboard -> Events", True), (" tab.", False)],
+        [("Inspect the Events table: Verify the new ", False), ("'Status'", True), (" column displaying visual badges (LIVE in green, SELLING FAST in amber, SOLD OUT in orange, UPCOMING in blue, CLOSED in red).", False)],
+        [("Test 1-Click Event Closing: Click the ", False), ("'Close'", True), (" button on an active event row. Confirm the browser prompt.", False)],
+        [("Verify the event status immediately changes to ", False), ("'CLOSED' (bold red badge)", True), (" and the action button dynamically flips to ", False), ("'Reopen' (green button)", True), (".", False)],
+        [("Test API Endpoint: Verify that ", False), ("PATCH /api/admin/events/{id}/close?isClosed=true", True), (" was executed by inspecting the network request.", False)],
+        [("Navigate to the ", False), ("Shows ({count})", True), (" tab. Inspect the new ", False), ("'Status'", True), (" column showing ", False), ("'OPEN'", True), (" (green) or ", False), ("'CLOSED'", True), (" (red) badges for each show slot.", False)],
+        [("Test 1-Click Show Closing: Click the ", False), ("'Close'", True), (" button on a specific performance slot. Confirm the prompt.", False)],
+        [("Verify the show slot badge immediately updates to ", False), ("'CLOSED'", True), (" and its button flips to ", False), ("'Reopen'", True), (".", False)],
+        [("Test Show Slot Modal Toggle: Click ", False), ("'Edit'", True), (" on a show slot. Verify the modal features a dedicated checkbox: ", False), ("'Close this show slot (Disables ticket booking for this show)'", True), (".", False)],
+        [("Test Reopening: Click ", False), ("'Reopen'", True), (" on the closed show slot. Verify its status reverts to ", False), ("'OPEN'", True), (" cleanly without page refresh.", False)]
+    ], "Admins can close and reopen events or individual performance slots in 1 click, immediately controlling public booking availability across the platform.",
+    note="Closing an event or show immediately updates database entities (Event.Status = Closed, EventShow.IsClosed = true) and triggers live booking rejection guards in BookingService.",
+    note_title="CLOSING CONTROL LIFECYCLE:")
+
+    # Test Case 2.11 (NEW: EXPLICIT TICKET TIER STATUSES & SORT ORDERING)
+    add_test_case(doc, "Test Case 2.11", "Explicit Ticket Tier Statuses, Effective Status & Sort Order", [
+        [("Navigate to ", False), ("Admin Dashboard -> Ticket Tiers", True), (" tab.", False)],
+        [("Inspect the Ticket Tiers table: Verify the new ", False), ("'Status'", True), (" column featuring an interactive inline dropdown selector: ", False), ("Available (Green), Sold Out (Yellow), Closed (Red)", True), (".", False)],
+        [("Test Quick Status Transition: Change a tier's status from 'Available' to ", False), ("'Closed'", True), (" using the inline dropdown.", False)],
+        [("Verify a success toast confirms the update, and network call ", False), ("PATCH /api/admin/ticket-tiers/{id}/status?status=Closed", True), (" completes successfully.", False)],
+        [("Change another tier's status to ", False), ("'SoldOut'", True), (" via the dropdown. Verify immediate visual badge update to amber/yellow.", False)],
+        [("Click ", False), ("'Edit'", True), (" on a ticket tier to open ", False), ("AdminTicketTierModal", True), (". Verify the modal includes both the ", False), ("'Tier Status' dropdown", True), (" (Available, Sold Out, Closed) and the ", False), ("'Sort Order #' field", True), (".", False)],
+        [("Test Sort Ordering: Assign sequential sort order numbers (e.g. 1 for VIP, 2 for Gold, 3 for Standard). Save each tier.", False)],
+        [("Verify the Ticket Tiers table sorts rows cleanly by Sort Order # ascending (e.g. #1, #2, #3), followed by price.", False)],
+        [("Verify Dynamic Effective Status: In backend TicketTier entity, ", False), ("EffectiveStatus", True), (" evaluates: Closed if Status is Closed; SoldOut if Status is SoldOut OR AvailableQuantity <= SoldCount OR AvailableQuantity <= 0; otherwise Available.", False)]
+    ], "Ticket tiers support explicit Available, SoldOut, and Closed statuses with 1-click inline updates, custom sort ordering, and dynamic capacity-driven EffectiveStatus rules.",
+    note="EffectiveStatus ensures tiers marked SoldOut or depleted of inventory are strictly protected from overbooking, while Closed tiers can be held back by organizers.",
+    note_title="TIER STATUS GOVERNANCE:")
+
     # -------------------------------------------------------------
     # SECTION 4: ORGANIZER TESTING
     # -------------------------------------------------------------
@@ -556,14 +587,17 @@ def build_document():
         [("Verify the 30-minute hold countdown timer (PaymentExpiresAt) is actively ticking down in CheckoutModal.", False)]
     ], "Booking record created in DB with status 'Pending'. Seats locked for 30 minutes. Ephemeral Redis lock transitioned to DB hold.")
 
-    # Test Case 4.4
-    add_test_case(doc, "Test Case 4.4", "PayPro 1Pay Instant Online Gateway Checkout", [
+    # Test Case 4.4 (UPDATED: ACPKHI HOSTED REDIRECT)
+    add_test_case(doc, "Test Case 4.4", "PayPro V2 Seamless Hosted Gateway Checkout (ACPKHI Model)", [
         [("In Step 2 of Checkout Modal, select ", False), ("PayPro Online Gateway ⚡", True), (".", False)],
-        [("Choose payment channel (e.g. ", False), ("EasyPaisa / JazzCash / Cards", True), (" or ", False), ("PayPro Instant QR Code", True), (").", False)],
+        [("Verify customer mobile number is automatically normalized to standard 11 digits (03XXXXXXXXX) regardless of input format (+92, 92, 03).", False)],
         [("Click ", False), ("Proceed to PayPro Online Gateway →", True), (".", False)],
-        [("System calls ", False), ("POST /api/payments/paypro/checkout", True), (" which authenticates against PayPro sandbox and creates order via /v2/ppro/co.", False)],
-        [("Observe generated PayPro Consumer Voucher / OTC Number and Click2Pay portal link.", False)]
-    ], "PayPro order generated with unique OTC Voucher Number and hosted checkout URL. Step 3 renders PayProStatusTracker.")
+        [("Verify CheckoutModal displays transitional securing screen ('Securing your reservation...') and persists order recovery keys (last_order_number, last_booking_ref, last_event_title) in localStorage.", False)],
+        [("Backend calls PayPro /v2/ppro/co with Ecommerce_return_url configured to https://<domain>/payment-return and zero mock simulation URLs.", False)],
+        [("Verify frontend executes seamless full-page hosted redirect via window.location.assign(paymentUrl) directly to PayPro Click2Pay portal.", False)]
+    ], "Order registered on PayPro switch with Ecommerce_return_url and 11-digit phone format. Full-page redirect securely navigates attendee to Click2Pay hosted checkout.",
+    note="Following the Arts Council Karachi (acpkhi.com/events) pattern, popup modals with external tabs are replaced by full-page hosted redirect with localStorage crash recovery.",
+    note_title="ACPKHI HOSTED CHECKOUT PATTERN:")
 
     # Test Case 4.5
     add_test_case(doc, "Test Case 4.5", "Direct Bank Transfer Checkout & Payment Proof Submission", [
@@ -584,22 +618,24 @@ def build_document():
     note="PendingBookingExpiryService runs on composite index IX_Bookings_PaymentStatus_PaymentExpiresAt for sub-second cleanup.",
     note_title="BACKGROUND EXPIRY WORKER:")
 
-    # Test Case 4.7 (NEW)
-    add_test_case(doc, "Test Case 4.7", "Interactive PayPro Status Tracker Widget (PayProStatusTracker)", [
-        [("On Step 3 of PayPro Checkout, observe the ", False), ("PayProStatusTracker", True), (" widget.", False)],
-        [("Verify live pulsing badge indicating automated polling every 5 seconds.", False)],
-        [("Click the manual refresh button to trigger an immediate status query.", False)],
-        [("Click 'Copy Order Number' button to verify 1-click clipboard copy.", False)],
-        [("Click 'Pay Online via PayPro 1Pay Portal' to test hosted portal navigation.", False)]
-    ], "PayProStatusTracker polls /api/paypro/order-status/{orderNumber} seamlessly. Stops auto-polling upon reaching terminal status (Paid/Blocked).")
+    # Test Case 4.7 (UPDATED: CRASH & CROSS-TAB RECOVERY)
+    add_test_case(doc, "Test Case 4.7", "PayPro Cross-Tab & Mobile Tab Crash Recovery (localStorage)", [
+        [("Initiate PayPro checkout to trigger hosted redirection to the payment gateway.", False)],
+        [("Simulate mobile memory kill or accidental tab closure by closing the browser tab during payment.", False)],
+        [("Re-open browser and directly navigate to ", False), ("http://localhost:5173/payment-return", True), (" (without query parameters).", False)],
+        [("Verify PayProReturnPage automatically falls back to last_order_number stored in localStorage and retrieves receipt.", False)],
+        [("Verify order details (Event Title, Booking Ref, Amount) are safely recovered without session loss.", False)]
+    ], "localStorage recovery ensures attendees never lose active reservations even if mobile browsers terminate background tabs.")
 
-    # Test Case 4.8 (NEW)
-    add_test_case(doc, "Test Case 4.8", "PayPro Hosted Return Page (PayProReturnPage)", [
-        [("Simulate user redirection back from PayPro hosted portal by opening URL: ", False), ("http://localhost:5173/payments/return?ordId=EVL-894215&status=paid&msg=Success", True), (".", False)],
-        [("Observe PayProReturnPage automatically verifies payment status against backend APIs.", False)],
-        [("Verify receipt details: Order Number, Amount Paid, Payment Status, and E-Ticket confirmation.", False)],
-        [("Click 'View My Digital Tickets' to navigate directly to Attendee Dashboard.", False)]
-    ], "PayProReturnPage verifies order state, presents user-friendly receipt, and provides 1-click navigation to digital tickets.")
+    # Test Case 4.8 (UPDATED: 4-STATE RECEIPT & E-TICKET WIRE)
+    add_test_case(doc, "Test Case 4.8", "PayPro Return Receipt Hub & 1-Click E-Ticket Wire (PayProReturnPage)", [
+        [("Simulate redirect return from PayPro portal by navigating to: ", False), ("http://localhost:5173/payment-return?ordId=EVL-894215&status=paid", True), (".", False)],
+        [("Observe PayProReturnPage invokes public rate-limited endpoint ", False), ("GET /api/payments/paypro-return?ordId=EVL-894215", True), (" (no JWT auth required).", False)],
+        [("Verify backend returns sanitized receipt with masked customer email (e.g. fa**********@example.com) and verifies live status with PayPro.", False)],
+        [("Verify 4-state visual layout: Confirmed (Green Checkmark, Order Ref, PayPro ID, Total Amount, Confirmation To).", False)],
+        [("Click ", False), ("'View My E-Ticket'", True), (" and verify App.jsx onViewTicket handler instantly opens DigitalTicketModal with scannable QR gate pass.", False)],
+        [("Simulate pending/OTC status: Verify PayProReturnPage renders amber warning with 1Link 1Bill clearing instructions and 'Re-check Payment Status' button.", False)]
+    ], "Decoupled public return endpoint reconciles live PayPro status, sanitizes PII, and wires directly to DigitalTicketModal for instant E-Ticket pass display.")
 
     # Test Case 4.9 (NEW)
     add_test_case(doc, "Test Case 4.9", "Client-Side Bot Defense & Auto-Hide Lifecycle", [
@@ -608,6 +644,55 @@ def build_document():
         [("Close modal and scroll to the website footer. Verify newsletter captcha is already marked verified and hidden.", False)],
         [("Proceed to checkout an event ticket. Verify no disruptive captcha challenges block the checkout flow.", False)]
     ], "Cloudflare Turnstile auto-hide coordinates state across components via sessionStorage and custom events, ensuring zero checkout friction.")
+
+    # Test Case 4.10 (NEW: CUSTOMER EXPERIENCE ON CLOSED EVENTS, SHOWS & TIERS)
+    add_test_case(doc, "Test Case 4.10", "Public Customer Experience on Closed Events, Shows & Tiers", [
+        [("Navigate to the Homepage / Explore Events catalog.", False)],
+        [("Inspect an event previously marked as Closed: Verify the ", False), ("EventCard", True), (" displays a prominent ", False), ("'CLOSED' badge in bold red", True), (" below the 1200x500 banner (never overlaying the organizer artwork).", False)],
+        [("Inspect an event marked Sold Out: Verify the EventCard displays a prominent ", False), ("'SOLD OUT' badge in amber/yellow", True), (".", False)],
+        [("Click on a closed event to view ", False), ("EventDetailPage.jsx", True), (". Verify a prominent red alert banner: ", False), ("'Event Closed: This event is currently closed and is not accepting bookings.'", True), (" appears at the top of the ticket section.", False)],
+        [("Inspect the Show Slot selector: Notice any show marked closed renders a ", False), ("'CLOSED' red badge", True), (" with muted opacity.", False)],
+        [("Click on a closed show slot: Verify a warning toast appears (", False), ("'Show Slot Closed'", True), (") and the system prevents selecting or booking the closed slot.", False)],
+        [("Inspect Ticket Tiers list for an active show: Verify tiers marked ", False), ("'Closed'", True), (" display a red ", False), ("'CLOSED' badge", True), (" and the quantity stepper is replaced with a disabled ", False), ("'Closed'", True), (" button.", False)],
+        [("Verify tiers marked ", False), ("'SoldOut'", True), (" (or with 0 remaining inventory) display an amber ", False), ("'SOLD OUT' badge", True), (" and a disabled ", False), ("'Sold Out'", True), (" button.", False)],
+        [("Test Booking API Rejection Guard (Negative Test): Attempt to submit a booking for a closed event, closed show, or closed tier directly via API or browser console. Verify ", False), ("BookingService.cs throws InvalidOperationException", True), (" rejecting the reservation with an explicit message (e.g. 'Event is closed and no longer accepting bookings.').", False)]
+    ], "Closed events, shows, and ticket tiers provide crystal-clear visual feedback to customers while strictly barring ticket selection and booking reservations at both frontend and backend layers.")
+
+    # Test Case 4.11 (NEW: GOOGLE IDENTITY SERVICES SOCIAL OAUTH)
+    add_test_case(doc, "Test Case 4.11", "Google Identity Services (GSI) One-Click Social Authentication", [
+        [("Navigate to EventLand over secure HTTPS at ", False), ("https://localhost:5174", True), (" (or public domain).", False)],
+        [("Click ", False), ("'Login / Register'", True), (" in the top navigation header.", False)],
+        [("Verify the Google Identity Services button (", False), ("'Continue with Google'", True), (") renders inside the AuthModal.", False)],
+        [("Click the Google button and complete authentication with a valid Google account in the popup dialog.", False)],
+        [("Verify Google Identity Services returns an ID credential token to the frontend callback.", False)],
+        [("Verify frontend transmits credential to ", False), ("POST /api/auth/google", True), (" (rate-limited under 'login' policy).", False)],
+        [("Verify backend validates token with Google.Apis.Auth, extracts GoogleId, email, and fullName.", False)],
+        [("Verify automated account provisioning/linking: If user does not exist, a new user is created with AuthProvider = 'Google' and role = 'customer'; if user already exists, GoogleId is safely linked to existing record.", False)],
+        [("Verify AuthModal closes, a success toast ('Welcome Back! 🎉') is displayed, and the user's name/avatar appear in the top navbar.", False)]
+    ], "One-click Google authentication provisions secure JWT sessions and links social profiles without exposing credentials.")
+
+    # Test Case 4.12 (NEW: META FACEBOOK OAUTH & ACCOUNT LINKING)
+    add_test_case(doc, "Test Case 4.12", "Meta (Facebook) OAuth Authentication & Account Linking", [
+        [("Navigate to EventLand at ", False), ("https://localhost:5174", True), (" and click ", False), ("'Login / Register'", True), (".", False)],
+        [("Click ", False), ("'Continue with Facebook'", True), (" button in AuthModal.", False)],
+        [("Verify Facebook JavaScript SDK opens the official Facebook OAuth dialog requesting 'public_profile' and 'email' permissions.", False)],
+        [("Grant permissions. Verify SDK receives an accessToken and transmits it to ", False), ("POST /api/auth/facebook", True), (".", False)],
+        [("Verify backend queries Meta Graph API (graph.facebook.com/me?fields=id,name,email), securely verifying the token.", False)],
+        [("Verify user creation or linkage: FacebookId is stored, AuthProvider set to 'Facebook', and filtered unique index IX_Users_FacebookId enforces uniqueness.", False)],
+        [("Verify authenticated user session is established with a valid EventLand JWT token.", False)]
+    ], "Facebook OAuth integration satisfies Meta security guidelines with token exchange over HTTPS, strict scope limiting, and automatic account linking.")
+
+    # Test Case 4.13 (NEW: PRIVACY POLICY & META USER DATA DELETION COMPLIANCE)
+    add_test_case(doc, "Test Case 4.13", "Privacy Policy & Meta User Data Deletion Compliance (PrivacyPolicyPage)", [
+        [("Navigate directly to ", False), ("https://localhost:5174/privacy", True), (" or scroll to the footer and click ", False), ("'Privacy Policy'", True), (".", False)],
+        [("Verify the Privacy Policy page renders with rich glassmorphism styling, legal trust badges, and an interactive dual-column layout.", False)],
+        [("Verify the Sticky Table of Contents sidebar provides instant smooth-scrolling to all 12 legal sections.", False)],
+        [("Inspect Section 3 ('Google & Meta Social Logins'): Verify clear disclosures regarding OAuth token exchange and zero password collection.", False)],
+        [("Inspect Section 5 ('Payment & Financial Data'): Verify zero plaintext card/PIN storage guarantee.", False)],
+        [("Inspect Section 8 ('Meta Facebook User Data Deletion Instructions'): Verify compliance with Meta Platform Terms §4.b providing two distinct options: Option 1 (Self-service removal via Facebook Settings > Apps and Websites > EventLand > Remove) and Option 2 (Direct email purge request to support@eventland.pk).", False)],
+        [("Test Quick Actions: Click ", False), ("'Copy Privacy Contact'", True), (" and verify support@eventland.pk is copied to clipboard; click ", False), ("'Print / Save PDF'", True), (" and verify browser print dialog launches.", False)],
+        [("Click ", False), ("'Back to Events'", True), (" and verify seamless client-side navigation back to the explore catalog without page reload.", False)]
+    ], "Privacy Policy page fulfills Meta (Facebook) app review compliance requirements, provides clear user data deletion instructions, and adheres to WCAG accessibility standards.")
 
     # -------------------------------------------------------------
     # SECTION 6: PAYMENT VERIFICATION & E-TICKET LIFECYCLE
@@ -690,14 +775,15 @@ def build_document():
     note="UploadController enforces strict folder allowlists (events, slips, qr_codes, organizers, users) and cryptographically random GUID-based filenames.",
     note_title="UPLOAD HARDENING:")
 
-    # Test Case 6.2 (NEW)
+    # Test Case 6.2 (UPDATED: IP & PAYPRO RETURN RATE LIMITING)
     add_test_case(doc, "Test Case 6.2", "Per-IP Partitioned Rate Limiting Verification", [
         [("Test Login Policy: Execute 31 login attempts within 60s from the same IP address.", False)],
         [("Verify response: 31st request returns HTTP 429 Too Many Requests.", False)],
         [("Test Booking Policy: Execute 31 booking creation attempts within 60s from the same IP.", False)],
         [("Verify response: Exceeding 30 req/min triggers HTTP 429 Too Many Requests.", False)],
-        [("Test Upload Policy: Execute 21 file uploads within 60s from the same IP. Verify 21st request returns HTTP 429.", False)]
-    ], "Rate limiting partitions requests per client IP (respecting CF-Connecting-IP and X-Forwarded-For). Halts brute force, ticket scalping, and upload flooding.")
+        [("Test Upload Policy: Execute 21 file uploads within 60s from the same IP. Verify 21st request returns HTTP 429.", False)],
+        [("Test PayPro Return Policy: Execute 61 requests to /api/payments/paypro-return within 60s. Verify 61st request returns HTTP 429 Too Many Requests.", False)]
+    ], "Rate limiting partitions requests per client IP (respecting CF-Connecting-IP and X-Forwarded-For). Dedicated paypro-return token bucket policy (60 req/min) protects public payment receipt endpoint.")
 
     # Test Case 6.3 (NEW)
     add_test_case(doc, "Test Case 6.3", "OWASP Top 10 Defenses & Header Protections", [
@@ -762,25 +848,31 @@ def build_document():
         ("TC-2.7", "Admin", "User Management & Role Tab RBAC", "Roles tab hidden; Admin/SuperAdmin accounts masked; role selection restricted to Organizer & Attendee", "[  ] Pass"),
         ("TC-2.8", "Admin / SuperAdmin", "Gate Ticket Validation", "QR/barcode scanning, duplicate entry defense, unauth scanner block & live KPIs", "[  ] Pass"),
         ("TC-2.9", "Admin / SuperAdmin", "Multi-User Organizer Link", "Explicit User.OrganizerId FK link, company assignment dropdown & shared event access", "[  ] Pass"),
+        ("TC-2.10", "Admin / SuperAdmin", "Event & Show Closing", "1-Click Close/Reopen on Events & Shows; red CLOSED badges; scoped by organizer", "[  ] Pass"),
+        ("TC-2.11", "Admin / SuperAdmin", "Ticket Tier Statuses & Ordering", "Available, SoldOut, Closed statuses; inline select & edit modal; EffectiveStatus rule", "[  ] Pass"),
         ("TC-3.1", "Organizer", "Event Creation Wizard", "Multi-step wizard completes event and show registration", "[  ] Pass"),
         ("TC-3.2", "Organizer", "BOLA / IDOR Defense", "Foreign event edits blocked with 403 Forbidden", "[  ] Pass"),
         ("TC-3.3", "Organizer", "Sales Analytics", "Total sales & revenue match DB counts; attendee list exports", "[  ] Pass"),
         ("TC-4.1", "Attendee", "Discovery & Search", "Database-wide search & category filters update list smoothly", "[  ] Pass"),
         ("TC-4.2", "Attendee", "SignalR Live Seat Lock", "Seat locked in real-time across multiple browsers", "[  ] Pass"),
         ("TC-4.3", "Attendee", "30-Min Seat Hold", "EVL reference generated & countdown active in modal", "[  ] Pass"),
-        ("TC-4.4", "Attendee", "PayPro Online Gateway", "PayPro 1Pay voucher generated & 1Pay portal link active", "[  ] Pass"),
+        ("TC-4.4", "Attendee", "PayPro Hosted Checkout", "ACPKHI full-page redirect to Click2Pay with phone normalization", "[  ] Pass"),
         ("TC-4.5", "Attendee", "Bank Transfer Checkout", "Proof image or bank fallback details submitted cleanly", "[  ] Pass"),
         ("TC-4.6", "Attendee", "Hold Expiration", "Expired holds auto-cancel and return seats to available pool", "[  ] Pass"),
-        ("TC-4.7", "Attendee", "PayPro Status Tracker", "Live polling widget tracks status & provides Click2Pay link", "[  ] Pass"),
-        ("TC-4.8", "Attendee", "PayPro Return Page", "Hosted return page verifies order & renders digital receipt", "[  ] Pass"),
+        ("TC-4.7", "Attendee", "PayPro Crash Recovery", "localStorage recovers last_order_number on mobile tab death", "[  ] Pass"),
+        ("TC-4.8", "Attendee", "PayPro Return Receipt Hub", "Public rate-limited return reconciles order & wires to E-Ticket", "[  ] Pass"),
         ("TC-4.9", "Attendee", "Turnstile Bot Defense", "Turnstile verification passes seamlessly without checkout friction", "[  ] Pass"),
+        ("TC-4.10", "Attendee", "Closed State Customer Guards", "Event card CLOSED badge; detail banner; stepper disabled for closed/soldout; booking API blocks", "[  ] Pass"),
+        ("TC-4.11", "Attendee / Auth", "Google OAuth (GSI)", "One-click Google Sign-In, token exchange, GoogleId set, role preserved", "[  ] Pass"),
+        ("TC-4.12", "Attendee / Auth", "Meta (Facebook) OAuth", "Facebook Login popup/redirect, Graph API exchange, FacebookId link, auto-link email", "[  ] Pass"),
+        ("TC-4.13", "Compliance / Legal", "Privacy Policy & Data Deletion", "12 legal sections, sticky TOC, Meta §4.b deletion instructions (options 1 & 2), PDF print", "[  ] Pass"),
         ("TC-5.1", "Admin / Attendee", "Bank Proof Review", "Full-resolution receipt preview modal renders uploaded slip", "[  ] Pass"),
         ("TC-5.2", "Admin / Attendee", "Manual Ticket Issuance", "Payment approval marks seats booked & issues digital QR pass", "[  ] Pass"),
         ("TC-5.3", "Attendee", "Digital E-Ticket View", "Attendee views scannable QR ticket & downloads PDF ticket", "[  ] Pass"),
         ("TC-5.4", "Gateway Switch", "PayPro IPN Webhook", "Inbound POST /paypro/uis confirms orders idempotently in real-time", "[  ] Pass"),
         ("TC-5.5", "Gateway Switch", "Auto-Reconciliation", "10-min background worker resolves unpaid orders with PayPro API", "[  ] Pass"),
         ("TC-6.1", "Security", "Malware & Upload Defense", "Executable PE/ELF headers rejected; SkiaSharp re-encodes pure pixels", "[  ] Pass"),
-        ("TC-6.2", "Security", "IP Rate Limiting", "Per-IP rate limiting enforces 429 on login/booking/upload floods", "[  ] Pass"),
+        ("TC-6.2", "Security", "IP & PayPro Rate Limiting", "Per-IP limit on login/booking/upload & paypro-return token bucket (60 req/min)", "[  ] Pass"),
         ("TC-6.3", "Security", "OWASP & Security Headers", "Clickjacking blocked; EF Core SQL injection immune; CORS hardened", "[  ] Pass"),
         ("TC-6.4", "Security / Gate", "Gate Security & User Rate Limit", "Camera Permissions-Policy unblocked, 403 vs 401 handling, User-partitioned gate limit", "[  ] Pass")
     ]
@@ -805,7 +897,16 @@ def build_document():
 
     doc.add_paragraph().paragraph_format.space_after = Pt(20)
 
-    # Save logic: save to current workspace directory and e:\EventLand if accessible
+    # Save logic: save to D:\EventLand-Docx, script_dir, and e:\EventLand
+    target_docx_dir = r"D:\EventLand-Docx"
+    if os.path.exists(target_docx_dir) and os.path.isdir(target_docx_dir):
+        docx_dest_path = os.path.join(target_docx_dir, "EventLand_Full_Role_Testing_Guide.docx")
+        try:
+            doc.save(docx_dest_path)
+            print(f"Successfully updated document at: {docx_dest_path}")
+        except Exception as e:
+            print(f"Warning saving to {docx_dest_path}: {e}")
+
     script_dir = os.path.dirname(os.path.abspath(__file__))
     updated_output_path = os.path.join(script_dir, "EventLand_Full_Role_Testing_Guide_Updated.docx")
     try:

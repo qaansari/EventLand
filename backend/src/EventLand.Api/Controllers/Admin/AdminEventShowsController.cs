@@ -101,4 +101,25 @@ public class AdminEventShowsController : ControllerBase
         if (!success) return NotFound();
         return NoContent();
     }
+
+    [HttpPatch("{id:int}/close")]
+    public async Task<ActionResult<EventShowDto>> ToggleClose(int id, [FromQuery] bool isClosed = true)
+    {
+        int? scopedOrgId = User.IsAdmin() ? null : User.GetOrganizerId();
+        if (!User.IsAdmin() && !scopedOrgId.HasValue) return Forbid();
+
+        try
+        {
+            var updated = await _adminService.ToggleCloseEventShowAsync(id, isClosed, scopedOrgId);
+            return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
 }

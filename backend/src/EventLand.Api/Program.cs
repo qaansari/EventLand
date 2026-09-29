@@ -147,6 +147,17 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 10
             }));
 
+    // Per-IP rate limiting for PayPro return and status verification
+    options.AddPolicy("paypro-return", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"paypro_ret_{ResolveClientIp(httpContext)}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 5
+            }));
+
     // Per-User rate limiting for gate check-in validation (partitioned by authenticated UserId
     // rather than IP so multiple gatekeepers on the same venue NAT Wi-Fi don't share a limit)
     options.AddPolicy("gate", httpContext =>
@@ -163,6 +174,17 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0
             });
     });
+
+    // General public endpoint rate limiting (60 req/min per IP — for low-sensitivity public reads)
+    options.AddPolicy("general", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"general_{ResolveClientIp(httpContext)}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
 
     // Global fallback limiter: 300 requests/minute per client IP
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>

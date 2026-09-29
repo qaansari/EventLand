@@ -6,7 +6,9 @@ public record CreateShowTicketTierInputDto(
     decimal Price = 1500,
     int AvailableQuantity = 100,
     string? Description = null,
-    string? RowRange = null
+    string? RowRange = null,
+    int SortOrder = 0,
+    string? Status = "Available"
 );
 
 public record CreateEventShowInputDto(
@@ -15,7 +17,8 @@ public record CreateEventShowInputDto(
     DateTimeOffset StartTimeUtc = default,
     DateTimeOffset EndTimeUtc = default,
     decimal? StartingPrice = null,
-    List<CreateShowTicketTierInputDto>? TicketTiers = null
+    List<CreateShowTicketTierInputDto>? TicketTiers = null,
+    bool IsClosed = false
 );
 
 public record CreateAdminEventDto(
@@ -118,13 +121,15 @@ public record CreateEventShowDto(
     int EventId,
     string ShowTitle,
     DateTimeOffset StartTimeUtc,
-    DateTimeOffset EndTimeUtc
+    DateTimeOffset EndTimeUtc,
+    bool IsClosed = false
 );
 
 public record UpdateEventShowDto(
     string ShowTitle,
     DateTimeOffset StartTimeUtc,
-    DateTimeOffset EndTimeUtc
+    DateTimeOffset EndTimeUtc,
+    bool IsClosed = false
 );
 
 public record CreateTicketTierDto(
@@ -136,7 +141,8 @@ public record CreateTicketTierDto(
     int AvailableQuantity,
     int MaxPerOrder,
     int SortOrder,
-    string? RowRange = null
+    string? RowRange = null,
+    string Status = "Available"
 );
 
 public record UpdateTicketTierDto(
@@ -147,7 +153,8 @@ public record UpdateTicketTierDto(
     int AvailableQuantity,
     int MaxPerOrder,
     int SortOrder,
-    string? RowRange = null
+    string? RowRange = null,
+    string Status = "Available"
 );
 
 public record CreateSeatingZoneDto(

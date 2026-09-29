@@ -161,7 +161,35 @@ export const authApi = {
   changePassword: async (oldPassword, newPassword) => request('/auth/change-password', {
     method: 'POST',
     body: JSON.stringify({ oldPassword, newPassword })
-  })
+  }),
+  forgotPassword: async (email) => request('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email })
+  }),
+  resetPassword: async (email, resetToken, newPassword) => request('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ email, resetToken, newPassword })
+  }),
+  googleAuth: async (idToken) => {
+    const data = await request('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ idToken })
+    });
+    if (data.token) {
+      setStoredSession(data.token, data.user);
+    }
+    return data;
+  },
+  facebookAuth: async (accessToken) => {
+    const data = await request('/auth/facebook', {
+      method: 'POST',
+      body: JSON.stringify({ accessToken })
+    });
+    if (data.token) {
+      setStoredSession(data.token, data.user);
+    }
+    return data;
+  }
 };
 
 // --- Public Events API ---
@@ -257,7 +285,8 @@ export const adminApi = {
     getById: async (id) => request(`/admin/events/${id}`),
     create: async (dto) => request('/admin/events', { method: 'POST', body: JSON.stringify(dto) }),
     update: async (id, dto) => request(`/admin/events/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
-    delete: async (id) => request(`/admin/events/${id}`, { method: 'DELETE' })
+    delete: async (id) => request(`/admin/events/${id}`, { method: 'DELETE' }),
+    toggleClose: async (id, isClosed = true) => request(`/admin/events/${id}/close?isClosed=${isClosed}`, { method: 'PATCH' })
   },
   eventShows: {
     getAll: async (eventId = null) => {
@@ -269,7 +298,8 @@ export const adminApi = {
     getById: async (id) => request(`/admin/event-shows/${id}`),
     create: async (dto) => request('/admin/event-shows', { method: 'POST', body: JSON.stringify(dto) }),
     update: async (id, dto) => request(`/admin/event-shows/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
-    delete: async (id) => request(`/admin/event-shows/${id}`, { method: 'DELETE' })
+    delete: async (id) => request(`/admin/event-shows/${id}`, { method: 'DELETE' }),
+    toggleClose: async (id, isClosed = true) => request(`/admin/event-shows/${id}/close?isClosed=${isClosed}`, { method: 'PATCH' })
   },
   organizers: {
     getAll: async () => request('/admin/organizers'),
@@ -288,7 +318,8 @@ export const adminApi = {
     },
     create: async (dto) => request('/admin/ticket-tiers', { method: 'POST', body: JSON.stringify(dto) }),
     update: async (id, dto) => request(`/admin/ticket-tiers/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
-    delete: async (id) => request(`/admin/ticket-tiers/${id}`, { method: 'DELETE' })
+    delete: async (id) => request(`/admin/ticket-tiers/${id}`, { method: 'DELETE' }),
+    updateStatus: async (id, status) => request(`/admin/ticket-tiers/${id}/status?status=${encodeURIComponent(status)}`, { method: 'PATCH' })
   },
   seatingZones: {
     create: async (dto) => request('/admin/seating-zones', { method: 'POST', body: JSON.stringify(dto) }),
@@ -386,12 +417,7 @@ export const paymentsApi = {
     method: 'POST',
     body: JSON.stringify({ bookingRef, paymentMethod, returnUrl })
   }),
-  initiatePayProCheckout: async (bookingRef, paymentMethod = 'paypro', returnUrl = window.location.href) => request('/payments/create', {
-    method: 'POST',
-    body: JSON.stringify({ bookingRef, paymentMethod, returnUrl })
-  }),
   getStatus: async (bookingRef) => request(`/payments/status/${bookingRef}`),
-  getPaymentStatus: async (bookingRef) => request(`/payments/status/${bookingRef}`),
   getPaymentStatusById: async (paymentId) => request(`/payments/${paymentId}/status`),
   processRefund: async (dto) => request('/payments/refund', { method: 'POST', body: JSON.stringify(dto) })
 };
@@ -459,7 +485,8 @@ export const bankAccountsApi = {
   adminCreate: async (dto) => request('/admin/bank-accounts', { method: 'POST', body: JSON.stringify(dto) }),
   adminUpdate: async (id, dto) => request(`/admin/bank-accounts/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
   adminDelete: async (id) => request(`/admin/bank-accounts/${id}`, { method: 'DELETE' }),
-  adminToggleActive: async (id) => request(`/admin/bank-accounts/${id}/toggle-active`, { method: 'PUT' })
+  adminToggleActive: async (id) => request(`/admin/bank-accounts/${id}/toggle-active`, { method: 'PUT' }),
+  adminToggleEnabled: async (id) => request(`/admin/bank-accounts/${id}/toggle-enabled`, { method: 'PUT' })
 };
 
 // --- Venue Gate Ticket Validation & Check-In API (Admin & SuperAdmin only) ---

@@ -40,12 +40,34 @@ public class BookingService : IBookingService
         if (ev is null)
             throw new KeyNotFoundException($"Event with ID '{dto.EventId}' not found.");
 
+        if (ev.Status == EventStatus.Closed)
+            throw new InvalidOperationException($"Event '{ev.Title}' is closed and no longer accepting bookings.");
+
+        if (dto.EventShowId.HasValue && dto.EventShowId.Value > 0)
+        {
+            var show = await _context.EventShows
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == dto.EventShowId.Value && s.EventId == dto.EventId && !s.IsDeleted);
+            if (show != null && show.IsClosed)
+                throw new InvalidOperationException($"The show '{show.ShowTitle}' is closed.");
+        }
+
         var tier = await _context.TicketTiers
             .AsNoTracking()
+            .Include(t => t.EventShow)
             .FirstOrDefaultAsync(t => t.Id == dto.TicketTierId && t.EventId == dto.EventId && !t.IsDeleted);
 
         if (tier is null)
             throw new KeyNotFoundException($"Ticket tier '{dto.TicketTierId}' not found for event '{dto.EventId}'.");
+
+        if (tier.EventShow != null && (tier.EventShow.IsClosed || tier.EventShow.IsDeleted))
+            throw new InvalidOperationException($"The show '{tier.EventShow.ShowTitle}' for this ticket tier is closed.");
+
+        if (tier.EffectiveStatus == TicketTierStatus.Closed)
+            throw new InvalidOperationException($"Ticket tier '{tier.Name}' is closed.");
+
+        if (tier.EffectiveStatus == TicketTierStatus.SoldOut)
+            throw new InvalidOperationException($"Ticket tier '{tier.Name}' is sold out.");
 
         // Deduplicate any repeated seat ids the client may have sent.
         var seatIds = dto.SelectedSeatIds?.Where(id => id > 0).Distinct().ToList() ?? new List<int>();
@@ -170,7 +192,7 @@ public class BookingService : IBookingService
             await using var transaction = await _context.Database.BeginTransactionAsync();
 
             var reserved = await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"UPDATE TicketTiers SET SoldCount = SoldCount + {effectiveQuantity} WHERE Id = {tier.Id} AND IsDeleted = 0 AND (SoldCount + {effectiveQuantity}) <= AvailableQuantity");
+                $"UPDATE TicketTiers SET SoldCount = SoldCount + {effectiveQuantity} WHERE Id = {tier.Id} AND IsDeleted = 0 AND Status = 'Available' AND (SoldCount + {effectiveQuantity}) <= AvailableQuantity");
 
             if (reserved == 0)
                 throw new InvalidOperationException($"Not enough tickets available in tier '{tier.Name}'.");

@@ -6,10 +6,12 @@ import {
 } from 'lucide-react';
 import { payProApi } from '../services/paypro.api';
 import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 import EventLandPreloader from './EventLandPreloader';
 
 export default function PayProAdminPanel() {
   const { showSuccess, showError, showWarning, showInfo } = useToast();
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState('reports'); // 'reports', 'consumers', 'ops'
 
   // --- TAB 1: PAID ORDERS REPORT (GPO) STATE ---
@@ -189,7 +191,17 @@ export default function PayProAdminPanel() {
       return;
     }
     const orderNum = manualOrderNumber.trim();
-    const confirmed = window.confirm(`Are you sure you want to mark order '${orderNum}' as ${action.toUpperCase()} in PayPro?`);
+    const isBlockAction = action.toLowerCase() === 'blocked';
+    const confirmed = await confirm({
+      title: isBlockAction ? 'Block PayPro Order' : 'Mark Order as Paid',
+      message: `Are you sure you want to mark order '${orderNum}' as ${action.toUpperCase()} in PayPro?`,
+      description: isBlockAction
+        ? 'Blocking this order will prevent payment settlement.'
+        : 'Marking this order as paid will settle the order in PayPro.',
+      confirmText: isBlockAction ? 'Block Order' : 'Mark Paid',
+      cancelText: 'Cancel',
+      variant: isBlockAction ? 'danger' : 'success',
+    });
     if (!confirmed) return;
 
     setManualActionLoading(true);

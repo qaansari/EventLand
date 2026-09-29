@@ -53,6 +53,9 @@
     radial-gradient(circle at 90% 40%, rgba(217, 119, 6, 0.08), transparent 50%),
     radial-gradient(circle at 10% 80%, rgba(16, 185, 129, 0.08), transparent 50%);
 
+  --safe-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  --safe-top: env(safe-area-inset-top, 0px);
+
   color-scheme: dark;
 }
 
@@ -283,25 +286,32 @@ h1, h2, h3, h4, h5, h6 {
 /* Mature Data Table System */
 .mature-table-wrapper {
   width: 100%;
+  max-width: 100%;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
   background: var(--bg-card-solid);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  position: relative;
 }
 
 .mature-table-wrapper::-webkit-scrollbar {
-  height: 5px;
-  width: 5px;
+  height: 6px;
+  width: 6px;
 }
 
 .mature-table-wrapper::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
 }
 
 .mature-table-wrapper::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
+  background: rgba(45, 212, 191, 0.25);
+  border-radius: 4px;
+}
+
+.mature-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(45, 212, 191, 0.45);
 }
 
 .mature-data-table {
@@ -311,6 +321,11 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.88rem;
   line-height: 1.5;
   table-layout: auto;
+  min-width: 720px;
+}
+
+.mature-data-table.mature-data-table-wide {
+  min-width: 880px;
 }
 
 .mature-data-table th {
@@ -332,6 +347,51 @@ h1, h2, h3, h4, h5, h6 {
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   vertical-align: middle;
   word-break: break-word;
+}
+
+.mature-data-table td.actions-cell,
+.mature-data-table th.actions-cell,
+.mature-data-table td:last-child {
+  white-space: nowrap;
+}
+
+.mature-data-table button {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+
+.table-actions-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+/* Horizontally Scrollable Admin Navigation Tabs */
+.admin-tabs-scroll-container {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 0.85rem;
+}
+
+.admin-tabs-scroll-container button {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+}
+
+.admin-tabs-scroll-container::-webkit-scrollbar {
+  height: 5px;
+}
+
+.admin-tabs-scroll-container::-webkit-scrollbar-thumb {
+  background: rgba(45, 212, 191, 0.3);
+  border-radius: 4px;
 }
 
 .mature-data-table tbody tr:last-child td {
@@ -364,7 +424,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   display: none !important;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1024px) {
   .desktop-only {
     display: none !important;
   }
@@ -704,11 +764,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 }
 
 @media (max-width: 640px) {
-  .modal-overlay {
+  .modal-overlay:not(.modal-dialog-centered) {
     padding: 0.5rem;
     align-items: flex-end;
   }
-  .modal-content {
+  .modal-overlay:not(.modal-dialog-centered) > .modal-content {
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
     max-height: 95vh;
@@ -815,13 +875,17 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   }
 
   /* Event Card */
-  .event-card .event-card-image {
-    min-height: 220px !important;
-    flex: 1 1 360px !important;
+  .event-card .event-card-image,
+  .event-card .event-card-banner {
+    width: 100% !important;
+    aspect-ratio: 1200 / 500 !important;
+    min-height: unset !important;
+    max-height: unset !important;
+    flex: none !important;
   }
 
   .event-card .event-card-body {
-    flex: 1 1 340px !important;
+    flex: 1 1 auto !important;
     padding: 1.35rem !important;
   }
 
@@ -944,15 +1008,22 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
     border-radius: 14px !important;
   }
 
-  .event-card .event-card-image {
+  .event-card .event-card-image,
+  .event-card .event-card-banner {
     flex: none !important;
-    min-height: 200px !important;
-    max-height: 220px !important;
     width: 100% !important;
+    aspect-ratio: 1200 / 500 !important;
+    min-height: unset !important;
+    max-height: unset !important;
   }
 
-  .event-card .event-card-image img {
-    max-height: 220px !important;
+  .event-card .event-card-image img,
+  .event-card .event-card-banner img {
+    width: 100% !important;
+    height: 100% !important;
+    aspect-ratio: 1200 / 500 !important;
+    object-fit: cover !important;
+    max-height: unset !important;
   }
 
   .event-card .event-card-body {
@@ -999,23 +1070,47 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
     justify-content: flex-start !important;
   }
 
+  /* Responsive Form Grid Utility */
+  .responsive-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: 1rem;
+  }
+
   /* Buttons Full Width on Small Cards */
   .btn-mobile-block {
     width: 100% !important;
+    justify-content: center !important;
   }
 
-  /* ── All Modals ─────────────────────────────────────────────────────────── */
-  .modal-overlay {
+  /* ── All Modals (Differentiating Page Sheets vs Centered Dialogs) ──────── */
+  .modal-overlay:not(.modal-dialog-centered) {
     padding: 0 !important;
     align-items: flex-end !important;
   }
 
-  .modal-content {
+  .modal-overlay:not(.modal-dialog-centered) > .modal-content {
     max-width: 100% !important;
     width: 100% !important;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
     max-height: 94vh !important;
     padding: 1.25rem !important;
+  }
+
+  .modal-overlay.modal-dialog-centered,
+  .modal-dialog-centered {
+    padding: 1rem !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .modal-overlay.modal-dialog-centered > .modal-content,
+  .modal-dialog-centered .modal-content {
+    border-radius: var(--radius-lg) !important;
+    max-width: 520px !important;
+    width: 100% !important;
+    max-height: 90vh !important;
+    margin: auto !important;
   }
 
   /* Event Detail Modal Internal Layout */
@@ -1396,13 +1491,19 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   }
 
   /* Event Card */
-  .event-card .event-card-image {
-    min-height: 170px !important;
-    max-height: 190px !important;
+  .event-card .event-card-image,
+  .event-card .event-card-banner {
+    width: 100% !important;
+    aspect-ratio: 1200 / 500 !important;
+    min-height: unset !important;
+    max-height: unset !important;
   }
 
-  .event-card .event-card-image img {
-    max-height: 190px !important;
+  .event-card .event-card-image img,
+  .event-card .event-card-banner img {
+    aspect-ratio: 1200 / 500 !important;
+    max-height: unset !important;
+    height: 100% !important;
   }
 
   .event-card .event-card-body {

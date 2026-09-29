@@ -93,9 +93,9 @@ export default function DigitalTicketModal({ ticket, onClose }) {
         </div>
 
         {/* Ticket Graphic Body */}
-        <div style={{ padding: '1.5rem' }}>
+        <div style={{ padding: 'clamp(1rem, 2.5vw, 1.5rem)' }}>
           <div ref={ticketCardRef} style={{
-            background: 'linear-gradient(135deg, #10192d 0%, #1a294a 100%)',
+            background: 'linear-gradient(135deg, #0d212e 0%, #06111a 100%)',
             border: '2px dashed rgba(13, 148, 136, 0.45)',
             borderRadius: '20px',
             overflow: 'hidden',

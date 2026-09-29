@@ -5,5 +5,6 @@ public enum EventStatus
     Live,
     SellingFast,
     SoldOut,
-    Upcoming
+    Upcoming,
+    Closed
 }

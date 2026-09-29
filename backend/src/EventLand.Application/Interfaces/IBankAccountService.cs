@@ -11,4 +11,5 @@ public interface IBankAccountService
     Task<BankAccountDto> UpdateBankAccountAsync(int id, UpdateBankAccountDto dto);
     Task<bool> DeleteBankAccountAsync(int id);
     Task<BankAccountDto> ToggleActiveAsync(int id);
+    Task<BankAccountDto> ToggleEnabledAsync(int id);
 }

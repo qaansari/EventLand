@@ -1,6 +1,7 @@
 namespace EventLand.Infrastructure.Persistence.Configurations;
 
 using EventLand.Domain.Entities;
+using EventLand.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -35,6 +36,12 @@ public sealed class TicketTierConfiguration : IEntityTypeConfiguration<TicketTie
 
         builder.Property(t => t.SortOrder)
                .IsRequired();
+
+        builder.Property(t => t.Status)
+               .IsRequired()
+               .HasConversion<string>()
+               .HasMaxLength(20)
+               .HasDefaultValue(TicketTierStatus.Available);
 
         builder.ToTable(t => t.HasCheckConstraint(
             "CK_TicketTiers_SoldCount",

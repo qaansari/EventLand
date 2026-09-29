@@ -1,10 +1,14 @@
 namespace EventLand.Infrastructure.Services;
 
+using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using EventLand.Application.Common;
 using EventLand.Application.Common.Interfaces;
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using EventLand.Domain.Entities;
+using Google.Apis.Auth;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -15,8 +19,10 @@ public class AuthService : IAuthService
     private readonly IApplicationDbContext _context;
     private readonly IPasswordHasher<User> _passwordHasher;
     private readonly IJwtTokenGenerator _tokenGenerator;
+    private readonly ICacheService _cacheService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthService> _logger;
+    private readonly HttpClient _facebookHttpClient;
     private readonly int _passwordMinLength;
     private readonly bool _passwordRequireNonAlphanumeric;
     private readonly bool _passwordRequireDigit;
@@ -24,20 +30,27 @@ public class AuthService : IAuthService
     private readonly bool _passwordRequireLowercase;
     private readonly int _maxLoginAttempts;
     private readonly int _lockoutDurationMinutes;
+    private readonly string _googleClientId;
+    private readonly string _facebookAppId;
+    private readonly string _facebookAppSecret;
 
     public AuthService(
         IApplicationDbContext context,
         IPasswordHasher<User> passwordHasher,
         IJwtTokenGenerator tokenGenerator,
+        ICacheService cacheService,
         IConfiguration configuration,
-        ILogger<AuthService> logger)
+        ILogger<AuthService> logger,
+        IHttpClientFactory httpClientFactory)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _tokenGenerator = tokenGenerator;
+        _cacheService = cacheService;
         _configuration = configuration;
         _logger = logger;
-        
+        _facebookHttpClient = httpClientFactory.CreateClient("FacebookGraph");
+
         // Load security settings from configuration
         _passwordMinLength = configuration.GetValue<int>("Security:PasswordMinLength", 10);
         _passwordRequireNonAlphanumeric = configuration.GetValue<bool>("Security:PasswordRequireNonAlphanumeric", true);
@@ -46,6 +59,10 @@ public class AuthService : IAuthService
         _passwordRequireLowercase = configuration.GetValue<bool>("Security:PasswordRequireLowercase", true);
         _maxLoginAttempts = configuration.GetValue<int>("Security:MaxLoginAttempts", 5);
         _lockoutDurationMinutes = configuration.GetValue<int>("Security:LockoutDurationMinutes", 15);
+
+        _googleClientId = configuration["Google:ClientId"] ?? string.Empty;
+        _facebookAppId = configuration["Facebook:AppId"] ?? string.Empty;
+        _facebookAppSecret = configuration["Facebook:AppSecret"] ?? string.Empty;
     }
 
     public async Task<LoginResponseDto> LoginAsync(LoginRequestDto dto)
@@ -319,4 +336,273 @@ public class AuthService : IAuthService
             await _context.SaveChangesAsync();
         }
     }
+
+    public async Task<string> ForgotPasswordAsync(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            throw new InvalidOperationException("Email address is required.");
+
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => EF.Functions.Like(u.Email, normalizedEmail) && !u.IsDeleted);
+
+        var tokenBytes = RandomNumberGenerator.GetBytes(32);
+        var resetToken = Convert.ToHexString(tokenBytes);
+
+        if (user != null && user.IsActive)
+        {
+            var tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(resetToken)));
+            await _cacheService.SetAsync($"auth:pwd-reset:{normalizedEmail}", tokenHash, TimeSpan.FromMinutes(15));
+            _logger.LogInformation("Password reset token generated for user {Email}", normalizedEmail);
+        }
+        else
+        {
+            _logger.LogWarning("Password reset requested for non-existent or inactive user {Email}", normalizedEmail);
+        }
+
+        return resetToken;
+    }
+
+    public async Task ResetPasswordAsync(ResetPasswordRequestDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.ResetToken) || string.IsNullOrWhiteSpace(dto.NewPassword))
+            throw new InvalidOperationException("Email, reset token, and new password are required.");
+
+        ValidatePassword(dto.NewPassword);
+
+        var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+        var cachedHash = await _cacheService.GetAsync<string>($"auth:pwd-reset:{normalizedEmail}");
+
+        if (string.IsNullOrWhiteSpace(cachedHash))
+            throw new InvalidOperationException("Invalid or expired password reset token.");
+
+        var incomingHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(dto.ResetToken.Trim())));
+
+        if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(cachedHash), Encoding.UTF8.GetBytes(incomingHash)))
+            throw new InvalidOperationException("Invalid or expired password reset token.");
+
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => EF.Functions.Like(u.Email, normalizedEmail) && !u.IsDeleted);
+
+        if (user == null || !user.IsActive)
+            throw new InvalidOperationException("User account not found or is inactive.");
+
+        user.PasswordHash = _passwordHasher.HashPassword(user, dto.NewPassword);
+        user.AccessFailedCount = 0;
+        user.LockoutEndUtc = null;
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _context.SaveChangesAsync();
+        await _cacheService.RemoveAsync($"auth:pwd-reset:{normalizedEmail}");
+
+        _logger.LogInformation("Password successfully reset for user {Email}", normalizedEmail);
+    }
+
+    // ── Google OAuth ────────────────────────────────────────────────────────────
+
+    public async Task<LoginResponseDto> GoogleAuthAsync(GoogleAuthRequestDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.IdToken))
+            throw new UnauthorizedAccessException("Google ID token is required.");
+
+        if (string.IsNullOrWhiteSpace(_googleClientId))
+            throw new InvalidOperationException("Google authentication is not configured on this server.");
+
+        GoogleJsonWebSignature.Payload payload;
+        try
+        {
+            payload = await GoogleJsonWebSignature.ValidateAsync(dto.IdToken, new GoogleJsonWebSignature.ValidationSettings
+            {
+                Audience = new[] { _googleClientId }
+            });
+        }
+        catch (InvalidJwtException ex)
+        {
+            _logger.LogWarning("Google ID token validation failed: {Message}", ex.Message);
+            throw new UnauthorizedAccessException("Invalid or expired Google token. Please sign in again.");
+        }
+
+        if (!payload.EmailVerified)
+            throw new UnauthorizedAccessException("Your Google account email address has not been verified.");
+
+        return await FindOrCreateSocialUserAsync(
+            googleId: payload.Subject,
+            facebookId: null,
+            email: payload.Email,
+            fullName: payload.Name ?? payload.Email,
+            imageUrl: payload.Picture,
+            provider: "google");
+    }
+
+    // ── Facebook OAuth ──────────────────────────────────────────────────────────
+
+    public async Task<LoginResponseDto> FacebookAuthAsync(FacebookAuthRequestDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.AccessToken))
+            throw new UnauthorizedAccessException("Facebook access token is required.");
+
+        if (string.IsNullOrWhiteSpace(_facebookAppId) || string.IsNullOrWhiteSpace(_facebookAppSecret))
+            throw new InvalidOperationException("Facebook authentication is not configured on this server.");
+
+        // Step 1: Verify the user access token via Facebook's debug_token endpoint.
+        // The app access token format is: {AppId}|{AppSecret}
+        var appToken = Uri.EscapeDataString($"{_facebookAppId}|{_facebookAppSecret}");
+        var inputToken = Uri.EscapeDataString(dto.AccessToken);
+        var debugUrl = $"https://graph.facebook.com/debug_token?input_token={inputToken}&access_token={appToken}";
+
+        FacebookDebugResponse? debug;
+        try
+        {
+            debug = await _facebookHttpClient.GetFromJsonAsync<FacebookDebugResponse>(debugUrl);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to reach Facebook debug_token endpoint.");
+            throw new UnauthorizedAccessException("Unable to verify Facebook token. Please try again.");
+        }
+
+        if (debug?.Data is not { IsValid: true })
+            throw new UnauthorizedAccessException("Invalid or expired Facebook access token.");
+
+        if (debug.Data.AppId != _facebookAppId)
+            throw new UnauthorizedAccessException("Facebook token does not belong to this application.");
+
+        // Step 2: Fetch user profile using the user's own access token.
+        var profileUrl = $"https://graph.facebook.com/me?fields=id,name,email,picture.type(large)&access_token={inputToken}";
+        FacebookProfileResponse? profile;
+        try
+        {
+            profile = await _facebookHttpClient.GetFromJsonAsync<FacebookProfileResponse>(profileUrl);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch Facebook user profile.");
+            throw new UnauthorizedAccessException("Unable to retrieve Facebook profile. Please try again.");
+        }
+
+        if (profile is null || string.IsNullOrWhiteSpace(profile.Id))
+            throw new UnauthorizedAccessException("Facebook profile could not be retrieved.");
+
+        // Facebook email is optional — generate a deterministic placeholder if not granted.
+        var email = !string.IsNullOrWhiteSpace(profile.Email)
+            ? profile.Email
+            : $"fb.{profile.Id}@facebook.noemail.eventland";
+
+        return await FindOrCreateSocialUserAsync(
+            googleId: null,
+            facebookId: profile.Id,
+            email: email,
+            fullName: profile.Name ?? "Facebook User",
+            imageUrl: profile.Picture?.Data?.Url,
+            provider: "facebook");
+    }
+
+    // ── Shared social find-or-create helper ─────────────────────────────────────
+
+    private async Task<LoginResponseDto> FindOrCreateSocialUserAsync(
+        string? googleId,
+        string? facebookId,
+        string email,
+        string fullName,
+        string? imageUrl,
+        string provider)
+    {
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+
+        // 1. Try to find by provider-specific ID first (most precise — survives email changes).
+        User? user = null;
+        if (!string.IsNullOrWhiteSpace(googleId))
+            user = await _context.Users.Include(u => u.Role).Include(u => u.Country)
+                .FirstOrDefaultAsync(u => u.GoogleId == googleId && !u.IsDeleted);
+
+        if (user is null && !string.IsNullOrWhiteSpace(facebookId))
+            user = await _context.Users.Include(u => u.Role).Include(u => u.Country)
+                .FirstOrDefaultAsync(u => u.FacebookId == facebookId && !u.IsDeleted);
+
+        // 2. Fall back to email match for account linking (e.g., existing local account).
+        if (user is null)
+            user = await _context.Users.Include(u => u.Role).Include(u => u.Country)
+                .FirstOrDefaultAsync(u => EF.Functions.Like(u.Email, normalizedEmail) && !u.IsDeleted);
+
+        if (user is not null)
+        {
+            // 3. Link provider ID if found by email but not yet connected.
+            var dirty = false;
+            if (!string.IsNullOrWhiteSpace(googleId) && user.GoogleId != googleId)
+            { user.GoogleId = googleId; dirty = true; }
+
+            if (!string.IsNullOrWhiteSpace(facebookId) && user.FacebookId != facebookId)
+            { user.FacebookId = facebookId; dirty = true; }
+
+            // Update avatar only if the user has no existing image.
+            if (string.IsNullOrWhiteSpace(user.ImageUrl) && !string.IsNullOrWhiteSpace(imageUrl))
+            { user.ImageUrl = imageUrl; dirty = true; }
+
+            if (dirty)
+            {
+                user.UpdatedAt = DateTimeOffset.UtcNow;
+                await _context.SaveChangesAsync();
+            }
+        }
+        else
+        {
+            // 4. Auto-register brand-new social user.
+            var customerRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Customer")
+                ?? throw new InvalidOperationException("The Customer role is not configured on the server.");
+
+            user = new User
+            {
+                Email = normalizedEmail,
+                FullName = fullName,
+                PasswordHash = string.Empty,  // No local password for social accounts
+                GoogleId = googleId,
+                FacebookId = facebookId,
+                AuthProvider = provider,
+                ImageUrl = imageUrl,
+                RoleId = customerRole.Id,
+                Role = customerRole,
+                IsActive = true,
+                CountryId = 1  // Default to Pakistan; user can update in profile
+            };
+
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Auto-registered new {Provider} user {Email} (Id={UserId})", provider, normalizedEmail, user.Id);
+        }
+
+        if (!user.IsActive)
+            throw new UnauthorizedAccessException("Your account has been deactivated. Please contact support.");
+
+        user.LastLoginAt = DateTimeOffset.UtcNow;
+        await _context.SaveChangesAsync();
+
+        var (token, expiresAt) = _tokenGenerator.GenerateToken(user, user.OrganizerId);
+        var userDto = new UserDto(
+            user.Id, user.Email, user.FullName, user.Role?.Name ?? "Customer",
+            user.LastLoginAt, FileUrlHelper.FormatUserImageUrl(user.ImageUrl),
+            user.PhoneNumber, user.CountryId, user.Country?.Name, user.Country?.DialingCode,
+            user.OrganizerId, null);
+
+        return new LoginResponseDto(token, userDto, expiresAt);
+    }
 }
+
+// ── Facebook Graph API response models ──────────────────────────────────────────
+
+internal sealed record FacebookDebugResponse(FacebookDebugData? Data);
+
+internal sealed record FacebookDebugData(
+    [property: System.Text.Json.Serialization.JsonPropertyName("app_id")] string AppId,
+    [property: System.Text.Json.Serialization.JsonPropertyName("is_valid")] bool IsValid,
+    [property: System.Text.Json.Serialization.JsonPropertyName("expires_at")] long ExpiresAt);
+
+internal sealed record FacebookProfileResponse(
+    string Id,
+    string? Name,
+    string? Email,
+    FacebookPicture? Picture);
+
+internal sealed record FacebookPicture(FacebookPictureData? Data);
+
+internal sealed record FacebookPictureData(string? Url);
+

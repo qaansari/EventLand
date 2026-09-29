@@ -5,7 +5,7 @@ import { footerApi } from '../services/api';
 import { getStoredCaptchaToken } from '../utils/captcha';
 import CloudflareTurnstile from './CloudflareTurnstile';
 
-export default function Footer({ onSelectCity }) {
+export default function Footer({ onSelectCity, onNavigatePrivacyPolicy }) {
   const { showSuccess } = useToast();
   const [openFaq, setOpenFaq] = useState(null);
   const [newsletterEmail, setNewsletterEmail] = useState('');
@@ -317,7 +317,20 @@ export default function Footer({ onSelectCity }) {
         }}>
           <span>{footerData.copyrightText}</span>
           <div style={{ display: 'flex', gap: '1.25rem' }}>
-            <a href={footerData.privacyPolicyUrl || '#'} style={{ color: '#94a3b8', textDecoration: 'none' }}>Privacy Policy</a>
+            <a
+              href="/privacy"
+              onClick={(e) => {
+                if (onNavigatePrivacyPolicy) {
+                  e.preventDefault();
+                  onNavigatePrivacyPolicy();
+                }
+              }}
+              style={{ color: '#94a3b8', textDecoration: 'none', transition: 'color 0.15s ease' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#2dd4bf'}
+              onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+            >
+              Privacy Policy
+            </a>
             <a href={footerData.termsOfServiceUrl || '#'} style={{ color: '#94a3b8', textDecoration: 'none' }}>Terms of Service</a>
             <a href={footerData.organizerSupportUrl || '#'} style={{ color: '#94a3b8', textDecoration: 'none' }}>Organizer Support</a>
           </div>

@@ -34,5 +34,12 @@ public class User : BaseEntity
     // Account lockout & brute-force defense
     public int       AccessFailedCount { get; set; } = 0;
     public DateTimeOffset? LockoutEndUtc { get; set; }
+
+    // Social authentication provider IDs (nullable — local accounts leave these null)
+    public string?   GoogleId      { get; set; }   // Google Subject ID (immutable)
+    public string?   FacebookId    { get; set; }   // Facebook User ID (immutable)
+
+    /// <summary>The channel through which this account was first created: "local", "google", or "facebook".</summary>
+    public string    AuthProvider  { get; set; } = "local";
 }
 

@@ -90,4 +90,29 @@ public class AdminTicketTiersController : ControllerBase
         if (!success) return NotFound();
         return NoContent();
     }
+
+    [HttpPatch("{id:int}/status")]
+    public async Task<ActionResult<TicketTierDto>> UpdateStatus(int id, [FromQuery] string status)
+    {
+        int? scopedOrgId = User.IsAdmin() ? null : User.GetOrganizerId();
+        if (!User.IsAdmin() && !scopedOrgId.HasValue) return Forbid();
+
+        try
+        {
+            var updated = await _adminService.UpdateTicketTierStatusAsync(id, status, scopedOrgId);
+            return Ok(updated);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
 }

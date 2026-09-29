@@ -18,9 +18,11 @@ import {
 } from 'lucide-react';
 import { bookingsApi, bankAccountsApi, uploadApi, getEventImageUrl, getPaymentSlipUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuccess, onInvoicePaid }) {
   const { showSuccess, showError, showWarning } = useToast();
+  const confirm = useConfirm();
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -244,8 +246,16 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
     }
   };
 
-  const handleCancelInvoice = (refKey) => {
-    if (!window.confirm(`Are you sure you want to cancel unpaid invoice #${refKey}? This will release your seat reservation.`)) {
+  const handleCancelInvoice = async (refKey) => {
+    const isConfirmed = await confirm({
+      title: 'Cancel Unpaid Invoice',
+      message: `Are you sure you want to cancel unpaid invoice #${refKey}?`,
+      description: 'This will release your seat reservation so others may book these seats.',
+      confirmText: 'Cancel Reservation',
+      cancelText: 'Keep Reservation',
+      variant: 'danger',
+    });
+    if (!isConfirmed) {
       return;
     }
 
@@ -302,18 +312,8 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
   }
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      backgroundColor: 'rgba(3, 7, 18, 0.85)',
-      backdropFilter: 'blur(12px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000,
-      padding: '1rem'
-    }}>
-      <div className="glass-panel animate-scale-up" style={{
+    <div className="modal-overlay">
+      <div className="modal-content glass-panel animate-scale-up" style={{
         width: '100%',
         maxWidth: '780px',
         maxHeight: '90vh',
@@ -326,12 +326,12 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
       }}>
         {/* Header */}
         <div style={{
-          padding: '1.5rem',
+          padding: 'clamp(1rem, 2.5vw, 1.5rem)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          backgroundColor: '#0b1329'
+          backgroundColor: 'var(--bg-card-solid)'
         }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -427,7 +427,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
               <p>Loading unpaid invoices...</p>
             </div>
           ) : filteredInvoices.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem', background: '#0b1329', border: '1px dashed rgba(13, 148, 136, 0.2)', borderRadius: '16px' }}>
+            <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem', background: 'var(--bg-card-solid)', border: '1px dashed rgba(13, 148, 136, 0.2)', borderRadius: '16px' }}>
               <CheckCircle size={48} color="#0d9488" style={{ margin: '0 auto 1rem auto', opacity: 0.8 }} />
               <h3 style={{ fontSize: '1.15rem', color: '#fff', fontWeight: 700 }}>No Unpaid Invoices Found</h3>
               <p style={{ fontSize: '0.85rem', color: '#94a3b8', maxWidth: '420px', margin: '0.5rem auto 0 auto' }}>
@@ -447,10 +447,10 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
                   <div
                     key={refKey}
                     style={{
-                      backgroundColor: '#0b1329',
+                      backgroundColor: 'var(--bg-card-solid)',
                       border: isExpired ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(13, 148, 136, 0.25)',
                       borderRadius: '16px',
-                      padding: '1.25rem',
+                      padding: 'clamp(0.85rem, 2vw, 1.25rem)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '1rem'

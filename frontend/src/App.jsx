@@ -12,6 +12,7 @@ import { Ticket, MapPin, Trash2, Search, RefreshCw, ShieldCheck } from 'lucide-r
 import { eventsApi, bookingsApi, tagsApi, locationsApi, adminApi, authApi, toEventSlug } from './services/api';
 import { getStoredUser, getStoredToken, setStoredSession, clearStoredSession, normalizeRole, isAdmin, isOrganizer } from './utils/auth';
 import { useToast } from './context/ToastContext';
+import { useConfirm } from './context/ConfirmContext';
 import { isCaptchaVerified, getStoredCaptchaToken } from './utils/captcha';
 import EventLandPreloader from './components/EventLandPreloader';
 import './App.css';
@@ -27,6 +28,7 @@ const UnpaidInvoicesModal = lazy(() => import('./components/UnpaidInvoicesModal'
 const AttendeeDashboard = lazy(() => import('./components/AttendeeDashboard'));
 const PayProReturnPage = lazy(() => import('./components/PayProReturnPage'));
 const GatePassVerification = lazy(() => import('./components/GatePassVerification'));
+const PrivacyPolicyPage = lazy(() => import('./components/PrivacyPolicyPage'));
 
 const LazyFallback = (
   <EventLandPreloader text="Loading view..." minHeight="50vh" />
@@ -70,6 +72,14 @@ const getVerifyTicketIdFromUrl = () => {
   return null;
 };
 
+const isPrivacyPolicyUrl = () => {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname;
+  if (path === '/privacy' || path === '/privacy-policy' || path === '/privacy.html') return true;
+  const searchParams = new URLSearchParams(window.location.search);
+  return searchParams.has('privacy');
+};
+
 function mapBookingToTicket(b, fallbackEmail = '') {
   return {
     ticketId: b.bookingRef || `EVL-${b.id}`,
@@ -92,6 +102,7 @@ function mapBookingToTicket(b, fallbackEmail = '') {
 
 export default function App() {
   const { showSuccess, showInfo, showError, showWarning } = useToast();
+  const confirm = useConfirm();
   const [events, setEvents] = useState([]);
 
   const [tags, setTags] = useState([]);
@@ -131,6 +142,45 @@ export default function App() {
   const [selectedTag, setSelectedTag] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Identify active city object and cityId
+  const selectedCityObj = useMemo(() => {
+    if (!selectedCity || selectedCity === 'All Cities') return null;
+    return (cities || []).find(c => {
+      const cName = typeof c === 'string' ? c : c.name;
+      return cName && cName.toLowerCase() === selectedCity.toLowerCase();
+    });
+  }, [cities, selectedCity]);
+
+  const selectedCityId = selectedCityObj?.id || null;
+
+  // Cascading Venues: Loaded ONLY when a city is selected (via cityId)
+  const [cityVenues, setCityVenues] = useState([]);
+  const [loadingVenues, setLoadingVenues] = useState(false);
+
+  useEffect(() => {
+    if (!selectedCityId) {
+      setCityVenues([]);
+      setSelectedVenue('All Venues');
+      return;
+    }
+
+    setLoadingVenues(true);
+    locationsApi.getVenues(selectedCityId)
+      .then(res => {
+        const list = Array.isArray(res) ? res : (res?.items || []);
+        const venueNames = list.map(v => typeof v === 'string' ? v : v.name).filter(Boolean);
+        setCityVenues(venueNames);
+        // If current selected venue is not in this city, reset to 'All Venues'
+        setSelectedVenue(prev => (prev !== 'All Venues' && !venueNames.includes(prev)) ? 'All Venues' : prev);
+      })
+      .catch(err => {
+        console.error('Failed to load venues for cityId:', selectedCityId, err);
+        setCityVenues([]);
+        setSelectedVenue('All Venues');
+      })
+      .finally(() => setLoadingVenues(false));
+  }, [selectedCityId]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
@@ -205,14 +255,39 @@ export default function App() {
   const [activeView, setActiveView] = useState(() => {
     if (getVerifyTicketIdFromUrl()) return 'gate-verify';
     if (isPaymentReturnUrl()) return 'payment-return';
+    if (isPrivacyPolicyUrl()) return 'privacy';
     if (getEventIdFromUrl()) return 'event-detail';
     return 'explore';
-  }); // explore, event-detail, artists, organizer-wizard, my-tickets, organizer, admin, payment-return, gate-verify
-  const [userRole, setUserRole] = useState('customer'); // customer, organizer, admin
+  }); // explore, event-detail, artists, organizer-wizard, my-tickets, organizer, admin, payment-return, gate-verify, privacy
   const [sortBy, setSortBy] = useState('featured');
+  // userRole is derived from currentUser to avoid redundant state.
 
-  // User Authentication State
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
+  // Derived from currentUser — no separate state needed
+  const userRole = currentUser?.role || 'customer';
+
+  // Synchronize browser history (back/forward navigation) with activeView
+  useEffect(() => {
+    const handlePopState = () => {
+      if (getVerifyTicketIdFromUrl()) {
+        setVerifyTicketId(getVerifyTicketIdFromUrl());
+        setActiveView('gate-verify');
+      } else if (isPaymentReturnUrl()) {
+        setActiveView('payment-return');
+      } else if (isPrivacyPolicyUrl()) {
+        setActiveView('privacy');
+      } else if (getEventIdFromUrl()) {
+        setUrlEventId(getEventIdFromUrl());
+        setActiveView('event-detail');
+      } else {
+        setActiveDetailEvent(null);
+        setUrlEventId(null);
+        setActiveView('explore');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalRole, setAuthModalRole] = useState('customer');
@@ -277,14 +352,14 @@ export default function App() {
     const handleAuthExpired = () => {
       setCurrentUser(null);
       showWarning('Session Expired', 'Your session has expired. Please sign in again.');
-      if (activeView === 'admin' || activeView === 'organizer' || activeView === 'organizer-wizard') {
-        setActiveView('explore');
-      }
+      setActiveView(prev =>
+        ['admin', 'organizer', 'organizer-wizard'].includes(prev) ? 'explore' : prev
+      );
     };
 
     window.addEventListener('eventland:auth-expired', handleAuthExpired);
     return () => window.removeEventListener('eventland:auth-expired', handleAuthExpired);
-  }, [activeView, showWarning]);
+  }, [showWarning]);
 
   // Route Guards: restrict administrative and organizer views to authorized roles
   useEffect(() => {
@@ -317,7 +392,6 @@ export default function App() {
 
   const handleLoginSuccess = (userData) => {
     setCurrentUser(userData);
-    setUserRole(userData.role);
     setIsAuthModalOpen(false);
 
     showSuccess(
@@ -346,11 +420,11 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
-    setUserRole('customer');
     setPurchasedTickets([]);
-    if (activeView === 'my-tickets' || activeView === 'unpaid-invoices' || activeView === 'admin' || activeView === 'organizer' || activeView === 'organizer-wizard') {
-      setActiveView('explore');
-    }
+    setActiveView(prev =>
+      ['my-tickets', 'unpaid-invoices', 'admin', 'organizer', 'organizer-wizard'].includes(prev)
+        ? 'explore' : prev
+    );
     clearStoredSession();
     showInfo('Logged Out', 'You have been logged out successfully.');
   };
@@ -363,7 +437,6 @@ export default function App() {
         setIsAuthModalOpen(true);
         return;
       }
-      setUserRole('admin');
       setActiveView('admin');
     } else if (newRole === 'organizer') {
       if (!currentUser || (currentUser.role !== 'organizer' && currentUser.role !== 'admin')) {
@@ -371,10 +444,8 @@ export default function App() {
         setIsAuthModalOpen(true);
         return;
       }
-      setUserRole('organizer');
       setActiveView('organizer');
     } else {
-      setUserRole('customer');
       setActiveView('explore');
     }
   };
@@ -407,7 +478,7 @@ export default function App() {
     if (cached) {
       try {
         userTickets = JSON.parse(cached).filter(t => (t.attendeeEmail || '').toLowerCase() === userEmail);
-      } catch (e) {}
+      } catch (e) { console.warn('Failed to parse cached tickets:', e); }
     }
 
     // Migrate any legacy tickets belonging to this user
@@ -421,7 +492,7 @@ export default function App() {
             userTickets.push(t);
           }
         });
-      } catch (e) {}
+      } catch (e) { console.warn('Failed to parse legacy tickets:', e); }
     }
 
     setPurchasedTickets(userTickets);
@@ -619,6 +690,9 @@ export default function App() {
       title = `Admin Console & Operations | Event Land`;
     } else if (activeView === 'organizer') {
       title = `Organizer Command Center | Event Land`;
+    } else if (activeView === 'privacy') {
+      title = `Privacy Policy & Data Security | Event Land Pakistan`;
+      description = `Learn how EventLand safeguards your personal information, social authentications (Google & Meta), and payments across Pakistan.`;
     } else {
       // Explore View
       if (searchQuery.trim()) {
@@ -681,7 +755,7 @@ export default function App() {
         return;
       }
     }
-    if (window.location.pathname.startsWith('/event/') || window.location.search.includes('event=')) {
+    if (window.location.pathname.startsWith('/event/') || window.location.search.includes('event=') || window.location.pathname === '/privacy') {
       window.history.pushState({}, '', '/');
     }
     setActiveDetailEvent(null);
@@ -808,52 +882,21 @@ export default function App() {
     }));
   };
 
-  const handleDeleteEvent = (eventId) => {
+  const handleDeleteEvent = async (eventId) => {
     const evToDelete = events.find(e => e.id === eventId);
-    if (window.confirm("Are you sure you want to delete this event listing?")) {
-      setEvents(events.filter(ev => ev.id !== eventId));
-      showSuccess('Event Listing Deleted', `"${evToDelete?.title || 'Event'}" removed from EventLand.`);
-    }
+    const confirmed = await confirm({
+      title: 'Delete Event Listing',
+      message: `Are you sure you want to delete "${evToDelete?.title || 'this event listing'}"?`,
+      description: 'This will remove the event listing from EventLand.',
+      confirmText: 'Delete Event',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+    setEvents(events.filter(ev => ev.id !== eventId));
+    showSuccess('Event Listing Deleted', `"${evToDelete?.title || 'Event'}" removed from EventLand.`);
   };
 
-  // Identify active city object and cityId
-  const selectedCityObj = useMemo(() => {
-    if (!selectedCity || selectedCity === 'All Cities') return null;
-    return (cities || []).find(c => {
-      const cName = typeof c === 'string' ? c : c.name;
-      return cName && cName.toLowerCase() === selectedCity.toLowerCase();
-    });
-  }, [cities, selectedCity]);
-
-  const selectedCityId = selectedCityObj?.id || null;
-
-  // Cascading Venues: Loaded ONLY when a city is selected (via cityId)
-  const [cityVenues, setCityVenues] = useState([]);
-  const [loadingVenues, setLoadingVenues] = useState(false);
-
-  useEffect(() => {
-    if (!selectedCityId) {
-      setCityVenues([]);
-      setSelectedVenue('All Venues');
-      return;
-    }
-
-    setLoadingVenues(true);
-    locationsApi.getVenues(selectedCityId)
-      .then(res => {
-        const list = Array.isArray(res) ? res : (res?.items || []);
-        const venueNames = list.map(v => typeof v === 'string' ? v : v.name).filter(Boolean);
-        setCityVenues(venueNames);
-        // If current selected venue is not in this city, reset to 'All Venues'
-        setSelectedVenue(prev => (prev !== 'All Venues' && !venueNames.includes(prev)) ? 'All Venues' : prev);
-      })
-      .catch(err => {
-        console.error('Failed to load venues for cityId:', selectedCityId, err);
-        setCityVenues([]);
-        setSelectedVenue('All Venues');
-      })
-      .finally(() => setLoadingVenues(false));
-  }, [selectedCityId]);
 
   // Reset all search and filter criteria in 1 click
   const handleClearAllFilters = () => {
@@ -1299,6 +1342,11 @@ export default function App() {
                 }
                 setActiveView('my-tickets');
               }}
+              onViewTicket={(ticket) => {
+                if (ticket) {
+                  setActiveTicketView(ticket);
+                }
+              }}
             />
           </Suspense>
         )}
@@ -1319,6 +1367,21 @@ export default function App() {
               onOpenLogin={(role = 'admin') => {
                 setAuthModalRole(role);
                 setIsAuthModalOpen(true);
+              }}
+            />
+          </Suspense>
+        )}
+
+        {/* View: Privacy Policy Page */}
+        {activeView === 'privacy' && (
+          <Suspense fallback={LazyFallback}>
+            <PrivacyPolicyPage
+              onBack={() => {
+                if (typeof window !== 'undefined' && window.history.pushState) {
+                  window.history.pushState({}, '', '/');
+                }
+                setActiveView('explore');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
             />
           </Suspense>
@@ -1379,11 +1442,20 @@ export default function App() {
       )}
 
       {/* Footer */}
-      <Footer onSelectCity={(city) => {
-        setSelectedCity(city);
-        setActiveView('explore');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }} />
+      <Footer
+        onSelectCity={(city) => {
+          setSelectedCity(city);
+          setActiveView('explore');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onNavigatePrivacyPolicy={() => {
+          if (typeof window !== 'undefined' && window.history.pushState) {
+            window.history.pushState({}, '', '/privacy');
+          }
+          setActiveView('privacy');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
     </div>
   );
 }

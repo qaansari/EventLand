@@ -649,7 +649,7 @@ public class AdminService : IAdminService
                     s.ShowTitle,
                     s.StartTimeUtc,
                     s.EndTimeUtc,
-                    s.TicketTiers.Where(t => !t.IsDeleted).Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange)).ToList()
+                    s.TicketTiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder).ThenBy(t => t.Price).Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.EffectiveStatus.ToString())).ToList()
                 )).ToList()
             ))
             .ToListAsync();
@@ -818,6 +818,7 @@ public class AdminService : IAdminService
                     int sort = 1;
                     foreach (var tInput in sInput.TicketTiers)
                     {
+                        Enum.TryParse<TicketTierStatus>(tInput.Status, true, out var tStatus);
                         _context.TicketTiers.Add(new TicketTier
                         {
                             EventId = ev.Id,
@@ -826,71 +827,12 @@ public class AdminService : IAdminService
                             Description = tInput.Description ?? $"{tInput.Name} pass for {show.ShowTitle}",
                             Price = tInput.Price > 0 ? tInput.Price : (dto.StartingPrice > 0 ? dto.StartingPrice : 1500m),
                             AvailableQuantity = tInput.AvailableQuantity > 0 ? tInput.AvailableQuantity : 100,
-                            SortOrder = sort++,
+                            SortOrder = tInput.SortOrder > 0 ? tInput.SortOrder : sort++,
+                            Status = tStatus,
                             RowRange = tInput.RowRange
                         });
                     }
                 }
-                else if (ticketingType == TicketingType.Categorized)
-                {
-                    var basePrice = sInput.StartingPrice ?? (dto.StartingPrice > 0 ? dto.StartingPrice : 1500m);
-                    _context.TicketTiers.Add(new TicketTier
-                    {
-                        EventId = ev.Id,
-                        EventShow = show,
-                        Name = "Standard Pass",
-                        Description = $"Standard admission pass for {show.ShowTitle}",
-                        Price = basePrice,
-                        AvailableQuantity = 150,
-                        SortOrder = 1
-                    });
-                    _context.TicketTiers.Add(new TicketTier
-                    {
-                        EventId = ev.Id,
-                        EventShow = show,
-                        Name = "VIP Pass",
-                        Description = $"VIP fast-track pass for {show.ShowTitle}",
-                        Price = basePrice * 2.25m,
-                        AvailableQuantity = 50,
-                        SortOrder = 2
-                    });
-                }
-            }
-        }
-        else
-        {
-            var defaultShow = new EventShow
-            {
-                EventId = ev.Id,
-                ShowTitle = "Standard Performance",
-                StartTimeUtc = dto.StartDateUtc,
-                EndTimeUtc = dto.EndDateUtc
-            };
-            _context.EventShows.Add(defaultShow);
-
-            if (ticketingType == TicketingType.Categorized)
-            {
-                var basePrice = dto.StartingPrice > 0 ? dto.StartingPrice : 1500m;
-                _context.TicketTiers.Add(new TicketTier
-                {
-                    EventId = ev.Id,
-                    EventShow = defaultShow,
-                    Name = "Standard Pass",
-                    Description = "Standard admission pass",
-                    Price = basePrice,
-                    AvailableQuantity = 150,
-                    SortOrder = 1
-                });
-                _context.TicketTiers.Add(new TicketTier
-                {
-                    EventId = ev.Id,
-                    EventShow = defaultShow,
-                    Name = "VIP Pass",
-                    Description = "VIP fast-track pass",
-                    Price = basePrice * 2.25m,
-                    AvailableQuantity = 50,
-                    SortOrder = 2
-                });
             }
         }
         await _context.SaveChangesAsync();
@@ -1090,7 +1032,11 @@ public class AdminService : IAdminService
                             tier.AvailableQuantity = tInput.AvailableQuantity >= 0 ? tInput.AvailableQuantity : 100;
                             if (tInput.Description != null) tier.Description = tInput.Description;
                             tier.RowRange = tInput.RowRange;
-                            tier.SortOrder = sort++;
+                            tier.SortOrder = tInput.SortOrder > 0 ? tInput.SortOrder : (tier.SortOrder > 0 ? tier.SortOrder : sort++);
+                            if (!string.IsNullOrWhiteSpace(tInput.Status) && Enum.TryParse<TicketTierStatus>(tInput.Status, true, out var parsedTierStatus))
+                            {
+                                tier.Status = parsedTierStatus;
+                            }
                             tier.IsDeleted = false;
                             tier.DeletedAt = null;
                         }
@@ -1104,7 +1050,8 @@ public class AdminService : IAdminService
                                 Description = tInput.Description ?? $"{tInput.Name} pass for {currentShow.ShowTitle}",
                                 Price = tInput.Price > 0 ? tInput.Price : dto.StartingPrice,
                                 AvailableQuantity = tInput.AvailableQuantity >= 0 ? tInput.AvailableQuantity : 100,
-                                SortOrder = sort++,
+                                SortOrder = tInput.SortOrder > 0 ? tInput.SortOrder : sort++,
+                                Status = Enum.TryParse<TicketTierStatus>(tInput.Status, true, out var nTierStatus) ? nTierStatus : TicketTierStatus.Available,
                                 RowRange = tInput.RowRange
                             };
                             _context.TicketTiers.Add(newTier);
@@ -1112,26 +1059,7 @@ public class AdminService : IAdminService
                         }
                     }
                 }
-                else if (ticketingType == TicketingType.Categorized)
-                {
-                    var hasActiveTiers = allExistingTiers.Any(t => t.EventShowId == currentShow.Id && !t.IsDeleted);
-                    if (!hasActiveTiers)
-                    {
-                        var basePrice = dto.StartingPrice > 0 ? dto.StartingPrice : 1500m;
-                        var defaultTier = new TicketTier
-                        {
-                            EventId = id,
-                            EventShowId = currentShow.Id,
-                            Name = "Standard Pass",
-                            Description = $"Standard admission pass for {currentShow.ShowTitle}",
-                            Price = basePrice,
-                            AvailableQuantity = 150,
-                            SortOrder = 1
-                        };
-                        _context.TicketTiers.Add(defaultTier);
-                        allExistingTiers.Add(defaultTier);
-                    }
-                }
+                
             }
         }
 
@@ -1190,7 +1118,7 @@ public class AdminService : IAdminService
             s.StartTimeUtc,
             s.EndTimeUtc,
             s.TicketTiers.OrderBy(t => t.SortOrder).Select(t => new TicketTierDto(
-                t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange
+                t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.EffectiveStatus.ToString()
             )).ToList()
         )).ToList();
     }
@@ -1211,10 +1139,10 @@ public class AdminService : IAdminService
         var tiers = show.TicketTiers
             .OrderBy(t => t.SortOrder)
             .Select(t => new TicketTierDto(
-                t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange
+                t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.EffectiveStatus.ToString()
             )).ToList();
 
-        return new EventShowDto(show.Id, show.EventId, show.ShowTitle, show.StartTimeUtc, show.EndTimeUtc, tiers);
+        return new EventShowDto(show.Id, show.EventId, show.ShowTitle, show.StartTimeUtc, show.EndTimeUtc, tiers, show.IsClosed);
     }
 
     public async Task<EventShowDto> CreateEventShowAsync(CreateEventShowDto dto, int? organizerId = null)
@@ -1242,7 +1170,8 @@ public class AdminService : IAdminService
             EventId = dto.EventId,
             ShowTitle = showTitleClean,
             StartTimeUtc = dto.StartTimeUtc,
-            EndTimeUtc = dto.EndTimeUtc
+            EndTimeUtc = dto.EndTimeUtc,
+            IsClosed = dto.IsClosed
         };
 
         _context.EventShows.Add(show);
@@ -1254,10 +1183,10 @@ public class AdminService : IAdminService
         var tiers = await _context.TicketTiers
             .Where(t => t.EventId == dto.EventId && t.EventShowId == show.Id && !t.IsDeleted)
             .OrderBy(t => t.SortOrder)
-            .Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange))
+            .Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.EffectiveStatus.ToString()))
             .ToListAsync();
 
-        return new EventShowDto(show.Id, show.EventId, show.ShowTitle, show.StartTimeUtc, show.EndTimeUtc, tiers);
+        return new EventShowDto(show.Id, show.EventId, show.ShowTitle, show.StartTimeUtc, show.EndTimeUtc, tiers, show.IsClosed);
     }
 
     public async Task<EventShowDto> UpdateEventShowAsync(int id, UpdateEventShowDto dto, int? organizerId = null)
@@ -1283,6 +1212,7 @@ public class AdminService : IAdminService
         show.ShowTitle = showTitleClean;
         show.StartTimeUtc = dto.StartTimeUtc;
         show.EndTimeUtc = dto.EndTimeUtc;
+        show.IsClosed = dto.IsClosed;
         await _context.SaveChangesAsync();
 
         await SyncEventPricingAsync(show.EventId);
@@ -1291,10 +1221,10 @@ public class AdminService : IAdminService
         var tiers = await _context.TicketTiers
             .Where(t => t.EventId == show.EventId && t.EventShowId == show.Id && !t.IsDeleted)
             .OrderBy(t => t.SortOrder)
-            .Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange))
+            .Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.EffectiveStatus.ToString()))
             .ToListAsync();
 
-        return new EventShowDto(show.Id, show.EventId, show.ShowTitle, show.StartTimeUtc, show.EndTimeUtc, tiers);
+        return new EventShowDto(show.Id, show.EventId, show.ShowTitle, show.StartTimeUtc, show.EndTimeUtc, tiers, show.IsClosed);
     }
 
     public async Task<bool> DeleteEventShowAsync(int id, int? organizerId = null)
@@ -1519,7 +1449,8 @@ public class AdminService : IAdminService
             t.SoldCount,
             t.MaxPerOrder,
             t.SortOrder,
-            t.RowRange
+            t.RowRange,
+            t.EffectiveStatus.ToString()
         )).ToList();
     }
 
@@ -1548,6 +1479,15 @@ public class AdminService : IAdminService
         if (exists)
             throw new InvalidOperationException($"A ticket tier named '{nameClean}' already exists for this show slot.");
 
+        int sortOrder = dto.SortOrder > 0
+            ? dto.SortOrder
+            : ((await _context.TicketTiers
+                .Where(t => t.EventId == dto.EventId && t.EventShowId == eventShowId && !t.IsDeleted)
+                .Select(t => (int?)t.SortOrder)
+                .MaxAsync()) ?? 0) + 1;
+
+        var cleanStatus = (dto.Status ?? "Available").Replace(" ", "");
+        Enum.TryParse<TicketTierStatus>(cleanStatus, true, out var parsedCreateStatus);
         var tier = new TicketTier
         {
             EventId = dto.EventId,
@@ -1558,7 +1498,8 @@ public class AdminService : IAdminService
             RowRange = dto.RowRange,
             AvailableQuantity = dto.AvailableQuantity,
             MaxPerOrder = dto.MaxPerOrder > 0 ? dto.MaxPerOrder : 5,
-            SortOrder = dto.SortOrder > 0 ? dto.SortOrder : 1
+            SortOrder = sortOrder,
+            Status = parsedCreateStatus
         };
 
         _context.TicketTiers.Add(tier);
@@ -1567,7 +1508,7 @@ public class AdminService : IAdminService
         await SyncEventPricingAsync(dto.EventId);
         await _cacheService.ClearEventCacheAsync(dto.EventId);
 
-        return new TicketTierDto(tier.Id, tier.EventId, tier.EventShowId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder, tier.RowRange);
+        return new TicketTierDto(tier.Id, tier.EventId, tier.EventShowId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder, tier.RowRange, tier.EffectiveStatus.ToString());
     }
 
     public async Task<TicketTierDto> UpdateTicketTierAsync(int id, UpdateTicketTierDto dto, int? organizerId = null)
@@ -1598,14 +1539,22 @@ public class AdminService : IAdminService
         if (dto.RowRange != null) tier.RowRange = dto.RowRange;
         tier.AvailableQuantity = dto.AvailableQuantity;
         tier.MaxPerOrder = dto.MaxPerOrder > 0 ? dto.MaxPerOrder : 5;
-        tier.SortOrder = dto.SortOrder > 0 ? dto.SortOrder : 1;
+        tier.SortOrder = dto.SortOrder > 0 ? dto.SortOrder : tier.SortOrder;
+        if (!string.IsNullOrWhiteSpace(dto.Status))
+        {
+            var cleanStatus = dto.Status.Replace(" ", "");
+            if (Enum.TryParse<TicketTierStatus>(cleanStatus, true, out var parsedUpdateStatus))
+            {
+                tier.Status = parsedUpdateStatus;
+            }
+        }
 
         await _context.SaveChangesAsync();
 
         await SyncEventPricingAsync(tier.EventId);
         await _cacheService.ClearEventCacheAsync(tier.EventId);
 
-        return new TicketTierDto(tier.Id, tier.EventId, tier.EventShowId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder, tier.RowRange);
+        return new TicketTierDto(tier.Id, tier.EventId, tier.EventShowId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder, tier.RowRange, tier.EffectiveStatus.ToString());
     }
 
     public async Task<bool> DeleteTicketTierAsync(int id, int? organizerId = null)
@@ -1623,6 +1572,65 @@ public class AdminService : IAdminService
         await SyncEventPricingAsync(tier.EventId);
         await _cacheService.ClearEventCacheAsync(tier.EventId);
         return true;
+    }
+
+
+    public async Task<EventShowDto> ToggleCloseEventShowAsync(int id, bool isClosed, int? organizerId = null)
+    {
+        var show = await _context.EventShows.Include(s => s.Event).FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted);
+        if (show is null)
+            throw new KeyNotFoundException($"Event show '{id}' not found.");
+
+        if (organizerId.HasValue && show.Event.OrganizerId != organizerId.Value)
+            throw new UnauthorizedAccessException("Access denied to this event.");
+
+        show.IsClosed = isClosed;
+        await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync(show.EventId);
+
+        var tiers = await _context.TicketTiers
+            .Where(t => t.EventId == show.EventId && t.EventShowId == show.Id && !t.IsDeleted)
+            .OrderBy(t => t.SortOrder)
+            .Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.EffectiveStatus.ToString()))
+            .ToListAsync();
+
+        return new EventShowDto(show.Id, show.EventId, show.ShowTitle, show.StartTimeUtc, show.EndTimeUtc, tiers, show.IsClosed);
+    }
+
+    public async Task<TicketTierDto> UpdateTicketTierStatusAsync(int id, string status, int? organizerId = null)
+    {
+        var tier = await _context.TicketTiers.Include(t => t.Event).FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted);
+        if (tier is null)
+            throw new KeyNotFoundException($"Ticket tier '{id}' not found.");
+
+        if (organizerId.HasValue && tier.Event.OrganizerId != organizerId.Value)
+            throw new UnauthorizedAccessException("Access denied to this event.");
+
+        var cleanStatus = (status ?? "").Replace(" ", "");
+        if (!Enum.TryParse<TicketTierStatus>(cleanStatus, true, out var parsedStatus))
+            throw new InvalidOperationException($"Invalid tier status '{status}'. Valid statuses are: Available, SoldOut, Closed.");
+
+        tier.Status = parsedStatus;
+        await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync(tier.EventId);
+
+        return new TicketTierDto(tier.Id, tier.EventId, tier.EventShowId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder, tier.RowRange, tier.EffectiveStatus.ToString());
+    }
+
+    public async Task<EventDetailDto> ToggleCloseEventAsync(int id, bool isClosed, int? organizerId = null)
+    {
+        var ev = await _context.Events.FirstOrDefaultAsync(e => e.Id == id && !e.IsDeleted);
+        if (ev is null)
+            throw new KeyNotFoundException($"Event '{id}' not found.");
+
+        if (organizerId.HasValue && ev.OrganizerId != organizerId.Value)
+            throw new UnauthorizedAccessException("Access denied to this event.");
+
+        ev.Status = isClosed ? EventStatus.Closed : EventStatus.Live;
+        await _context.SaveChangesAsync();
+        await _cacheService.ClearEventCacheAsync(id);
+
+        return await GetEventDetailDtoAsync(id);
     }
 
     // --- SeatingZones & Seats CRUD ---
@@ -1891,9 +1899,9 @@ public class AdminService : IAdminService
                 s.ShowTitle,
                 s.StartTimeUtc,
                 s.EndTimeUtc,
-                s.TicketTiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder).ThenBy(t => t.Price).Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange)).ToList()
+                s.TicketTiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder).ThenBy(t => t.Price).Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.EffectiveStatus.ToString())).ToList()
             )).ToList(),
-            ev.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange)).ToList(),
+            ev.TicketTiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder).ThenBy(t => t.Price).Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.EffectiveStatus.ToString())).ToList(),
             ev.SeatingZones.Select(z => new SeatingZoneDto(z.Id, z.EventId, z.Zone, z.Rows, z.Cols, z.Price, z.TotalCapacity, z.SortOrder, z.LayoutJson, z.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString(), s.Price)).ToList())).ToList(),
             ev.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList()
         );

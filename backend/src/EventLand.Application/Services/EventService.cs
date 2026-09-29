@@ -105,7 +105,8 @@ public class EventService : IEventService
                     s.ShowTitle,
                     s.StartTimeUtc,
                     s.EndTimeUtc,
-                    s.TicketTiers.Where(t => !t.IsDeleted).Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange)).ToList()
+                    s.TicketTiers.Where(t => !t.IsDeleted).Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.Status == TicketTierStatus.Closed ? "Closed" : (t.Status == TicketTierStatus.SoldOut || t.AvailableQuantity <= t.SoldCount || t.AvailableQuantity <= 0 ? "SoldOut" : "Available"))).ToList(),
+                    s.IsClosed
                 )).ToList()
             ))
             .ToListAsync();
@@ -235,9 +236,10 @@ public class EventService : IEventService
             s.ShowTitle,
             s.StartTimeUtc,
             s.EndTimeUtc,
-            s.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange)).ToList()
+            s.TicketTiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder).ThenBy(t => t.Price).Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.EffectiveStatus.ToString())).ToList(),
+            s.IsClosed
         )).ToList(),
-        e.TicketTiers.Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange)).ToList(),
+        e.TicketTiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder).ThenBy(t => t.Price).Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.EffectiveStatus.ToString())).ToList(),
         e.SeatingZones.Select(z => new SeatingZoneDto(z.Id, z.EventId, z.Zone, z.Rows, z.Cols, z.Price, z.TotalCapacity, z.SortOrder, z.LayoutJson, z.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString())).ToList())).ToList(),
         e.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList()
     );
@@ -248,6 +250,7 @@ public class EventService : IEventService
         EventStatus.SellingFast => "SELLING FAST",
         EventStatus.SoldOut     => "SOLD OUT",
         EventStatus.Upcoming    => "UPCOMING",
+        EventStatus.Closed      => "CLOSED",
         _                       => s.ToString().ToUpper()
     };
 }

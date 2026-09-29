@@ -32,7 +32,8 @@ public record EventShowDto(
     string ShowTitle,
     DateTimeOffset StartTimeUtc,
     DateTimeOffset EndTimeUtc,
-    List<TicketTierDto> TicketTiers
+    List<TicketTierDto> TicketTiers,
+    bool IsClosed = false
 );
 
 public record EventDetailDto(
@@ -74,7 +75,8 @@ public record TicketTierDto(
     int SoldCount,
     int MaxPerOrder,
     int SortOrder,
-    string? RowRange = null
+    string? RowRange = null,
+    string Status = "Available"
 );
 
 public record SeatingZoneDto(

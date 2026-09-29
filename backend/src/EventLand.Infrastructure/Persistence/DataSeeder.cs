@@ -15,16 +15,6 @@ public static class DataSeeder
 {
     public static async Task SeedAsync(ApplicationDbContext context)
     {
-        // Apply schema. If migrations exist, run MigrateAsync.
-        if (context.Database.GetMigrations().Any())
-        {
-            await context.Database.MigrateAsync();
-        }
-        else
-        {
-            await context.Database.EnsureCreatedAsync();
-        }
-
         var passwordHasher = new PasswordHasher<User>();
 
         // 1. Default Roles Seeding

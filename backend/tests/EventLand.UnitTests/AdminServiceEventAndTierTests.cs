@@ -608,7 +608,237 @@ public class AdminServiceEventAndTierTests : IDisposable
 
         Assert.Contains("already exists", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public async Task CreateEventAsync_DoesNotCreateDefaultShowsOrTiers_WhenNoShowsProvided()
+    {
+        await SeedEventWithShowAndTierAsync();
+        var createDto = new CreateAdminEventDto(
+            Title: "Raw Indie Show 2026",
+            Status: "Live",
+            IsFeatured: false,
+            IsPublished: true,
+            CountryId: 1,
+            CityId: 1,
+            VenueId: 1,
+            AuditoriumId: null,
+            City: "Karachi",
+            Venue: "Main Hall",
+            StartDateUtc: DateTimeOffset.UtcNow.AddDays(15),
+            EndDateUtc: DateTimeOffset.UtcNow.AddDays(16),
+            StartingPrice: 2000,
+            TicketingType: "categorized",
+            Banner: "http://example.com/banner.jpg",
+            Description: "Event without predefined shows or tiers",
+            ScarcityText: null,
+            OrganizerId: 1,
+            TagIds: new List<int>(),
+            Shows: null // No shows provided
+        );
+
+        var created = await _adminService.CreateEventAsync(createDto);
+
+        Assert.NotNull(created);
+        // Verify 0 shows and 0 ticket tiers were created
+        var dbShows = await _context.EventShows.Where(s => s.EventId == created.Id && !s.IsDeleted).ToListAsync();
+        Assert.Empty(dbShows);
+
+        var dbTiers = await _context.TicketTiers.Where(t => t.EventId == created.Id && !t.IsDeleted).ToListAsync();
+        Assert.Empty(dbTiers);
+
+        Assert.Empty(created.Shows);
+        Assert.Empty(created.TicketTiers);
+    }
+
+    [Fact]
+    public async Task CreateEventAsync_SetsTiersWithCustomSortOrder_WhenProvided()
+    {
+        await SeedEventWithShowAndTierAsync();
+        var showSlot = new CreateEventShowInputDto(
+            ShowTitle: "Evening Showcase",
+            StartTimeUtc: DateTimeOffset.UtcNow.AddDays(20),
+            EndTimeUtc: DateTimeOffset.UtcNow.AddDays(20).AddHours(3),
+            TicketTiers: new List<CreateShowTicketTierInputDto>
+            {
+                new CreateShowTicketTierInputDto(Name: "VIP Front Row", Price: 5000, AvailableQuantity: 20, SortOrder: 1),
+                new CreateShowTicketTierInputDto(Name: "Premium Pass", Price: 3000, AvailableQuantity: 50, SortOrder: 2),
+                new CreateShowTicketTierInputDto(Name: "General Admission", Price: 1500, AvailableQuantity: 100, SortOrder: 3)
+            }
+        );
+
+        var createDto = new CreateAdminEventDto(
+            Title: "Grand Gala 2026",
+            Status: "Live",
+            IsFeatured: false,
+            IsPublished: true,
+            CountryId: 1,
+            CityId: 1,
+            VenueId: 1,
+            AuditoriumId: null,
+            City: "Karachi",
+            Venue: "Main Hall",
+            StartDateUtc: DateTimeOffset.UtcNow.AddDays(20),
+            EndDateUtc: DateTimeOffset.UtcNow.AddDays(21),
+            StartingPrice: 1500,
+            TicketingType: "categorized",
+            Banner: "http://example.com/banner.jpg",
+            Description: "Event with explicit sort orders",
+            ScarcityText: null,
+            OrganizerId: 1,
+            TagIds: new List<int>(),
+            Shows: new List<CreateEventShowInputDto> { showSlot }
+        );
+
+        var created = await _adminService.CreateEventAsync(createDto);
+
+        Assert.NotNull(created);
+        var show = Assert.Single(created.Shows);
+        Assert.Equal(3, show.TicketTiers.Count);
+
+        // Verify custom sort order numbers are preserved exactly
+        Assert.Equal("VIP Front Row", show.TicketTiers[0].Name);
+        Assert.Equal(1, show.TicketTiers[0].SortOrder);
+
+        Assert.Equal("Premium Pass", show.TicketTiers[1].Name);
+        Assert.Equal(2, show.TicketTiers[1].SortOrder);
+
+        Assert.Equal("General Admission", show.TicketTiers[2].Name);
+        Assert.Equal(3, show.TicketTiers[2].SortOrder);
+    }
+
+    [Fact]
+    public async Task CreateTicketTierAsync_SetsExplicitSortOrder()
+    {
+        var (ev, show, _) = await SeedEventWithShowAndTierAsync();
+
+        var newTierDto = new CreateTicketTierDto(
+            EventId: ev.Id,
+            EventShowId: show.Id,
+            Name: "Backstage Access",
+            Description: "Exclusive pass",
+            Price: 7500,
+            AvailableQuantity: 10,
+            MaxPerOrder: 2,
+            SortOrder: 10
+        );
+
+        var created = await _adminService.CreateTicketTierAsync(newTierDto);
+
+        Assert.NotNull(created);
+        Assert.Equal(10, created.SortOrder);
+
+        var dbTier = await _context.TicketTiers.FirstOrDefaultAsync(t => t.Id == created.Id);
+        Assert.NotNull(dbTier);
+        Assert.Equal(10, dbTier.SortOrder);
+    }
+
+    [Fact]
+    public async Task CreateTicketTierAsync_AssignsNextSortOrderSequentially_WhenZeroOrNotProvided()
+    {
+        var (ev, show, tier1) = await SeedEventWithShowAndTierAsync();
+        // tier1 has SortOrder = 1
+
+        var newTierDto = new CreateTicketTierDto(
+            EventId: ev.Id,
+            EventShowId: show.Id,
+            Name: "Balcony Standard",
+            Description: "Standard balcony",
+            Price: 2000,
+            AvailableQuantity: 50,
+            MaxPerOrder: 5,
+            SortOrder: 0 // Not provided or 0
+        );
+
+        var created = await _adminService.CreateTicketTierAsync(newTierDto);
+
+        Assert.NotNull(created);
+        // Expect next sequential sort order: 2
+        Assert.Equal(2, created.SortOrder);
+
+        var dbTier = await _context.TicketTiers.FirstOrDefaultAsync(t => t.Id == created.Id);
+        Assert.NotNull(dbTier);
+        Assert.Equal(2, dbTier.SortOrder);
+    }
+
+    [Fact]
+    public async Task ToggleCloseEventAsync_ClosesAndReopensEvent()
+    {
+        var (ev, _, _) = await SeedEventWithShowAndTierAsync();
+
+        // 1. Close event
+        var closedEvent = await _adminService.ToggleCloseEventAsync(ev.Id, true);
+        Assert.Equal("Closed", closedEvent.Status, StringComparer.OrdinalIgnoreCase);
+
+        var dbEvent = await _context.Events.FindAsync(ev.Id);
+        Assert.NotNull(dbEvent);
+        Assert.Equal(EventLand.Domain.Enums.EventStatus.Closed, dbEvent.Status);
+
+        // 2. Reopen event
+        var reopenedEvent = await _adminService.ToggleCloseEventAsync(ev.Id, false);
+        Assert.Equal("Live", reopenedEvent.Status, StringComparer.OrdinalIgnoreCase);
+
+        dbEvent = await _context.Events.FindAsync(ev.Id);
+        Assert.NotNull(dbEvent);
+        Assert.Equal(EventLand.Domain.Enums.EventStatus.Live, dbEvent.Status);
+    }
+
+    [Fact]
+    public async Task ToggleCloseEventShowAsync_ClosesAndReopensShow()
+    {
+        var (_, show, _) = await SeedEventWithShowAndTierAsync();
+
+        // 1. Close show
+        var closedShow = await _adminService.ToggleCloseEventShowAsync(show.Id, true);
+        Assert.True(closedShow.IsClosed);
+
+        var dbShow = await _context.EventShows.FindAsync(show.Id);
+        Assert.NotNull(dbShow);
+        Assert.True(dbShow.IsClosed);
+
+        // 2. Reopen show
+        var reopenedShow = await _adminService.ToggleCloseEventShowAsync(show.Id, false);
+        Assert.False(reopenedShow.IsClosed);
+
+        dbShow = await _context.EventShows.FindAsync(show.Id);
+        Assert.NotNull(dbShow);
+        Assert.False(dbShow.IsClosed);
+    }
+
+    [Fact]
+    public async Task UpdateTicketTierStatusAsync_SetsStatusCorrectly()
+    {
+        var (_, _, tier) = await SeedEventWithShowAndTierAsync();
+
+        // 1. Set to Closed
+        var closedTier = await _adminService.UpdateTicketTierStatusAsync(tier.Id, "Closed");
+        Assert.Equal("Closed", closedTier.Status);
+
+        var dbTier = await _context.TicketTiers.FindAsync(tier.Id);
+        Assert.NotNull(dbTier);
+        Assert.Equal(EventLand.Domain.Enums.TicketTierStatus.Closed, dbTier.Status);
+        Assert.Equal(EventLand.Domain.Enums.TicketTierStatus.Closed, dbTier.EffectiveStatus);
+
+        // 2. Set to SoldOut
+        var soldOutTier = await _adminService.UpdateTicketTierStatusAsync(tier.Id, "SoldOut");
+        Assert.Equal("SoldOut", soldOutTier.Status);
+
+        dbTier = await _context.TicketTiers.FindAsync(tier.Id);
+        Assert.NotNull(dbTier);
+        Assert.Equal(EventLand.Domain.Enums.TicketTierStatus.SoldOut, dbTier.Status);
+        Assert.Equal(EventLand.Domain.Enums.TicketTierStatus.SoldOut, dbTier.EffectiveStatus);
+
+        // 3. Set to Available
+        var availableTier = await _adminService.UpdateTicketTierStatusAsync(tier.Id, "Available");
+        Assert.Equal("Available", availableTier.Status);
+
+        dbTier = await _context.TicketTiers.FindAsync(tier.Id);
+        Assert.NotNull(dbTier);
+        Assert.Equal(EventLand.Domain.Enums.TicketTierStatus.Available, dbTier.Status);
+        Assert.Equal(EventLand.Domain.Enums.TicketTierStatus.Available, dbTier.EffectiveStatus);
+    }
+
 }
+
 
 public class FakeCacheService : ICacheService
 {

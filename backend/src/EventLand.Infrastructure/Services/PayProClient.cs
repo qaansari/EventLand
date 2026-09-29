@@ -142,10 +142,24 @@ public class PayProClient : IPayProClient
         var dueDateStr = (dueDate?.UtcDateTime ?? DateTime.UtcNow.AddMinutes(30)).ToString("dd/MM/yyyy");
 
         // Format phone to 03XXXXXXXXX if Pakistani format or pass empty if non-standard
-        var cleanPhone = (customerPhone ?? "").Trim().Replace("+92", "0").Replace("-", "").Replace(" ", "");
-        if (!cleanPhone.StartsWith("03") || cleanPhone.Length != 11)
+        var rawPhone = customerPhone ?? "";
+        var digits = new string(rawPhone.Where(char.IsDigit).ToArray());
+        string cleanPhone = "";
+        if (digits.StartsWith("923") && digits.Length == 12)
         {
-            cleanPhone = "";
+            cleanPhone = "0" + digits.Substring(2);
+        }
+        else if (digits.StartsWith("03") && digits.Length == 11)
+        {
+            cleanPhone = digits;
+        }
+        else if (digits.StartsWith("3") && digits.Length == 10)
+        {
+            cleanPhone = "0" + digits;
+        }
+        else if (digits.Length == 11)
+        {
+            cleanPhone = digits;
         }
 
         // Exact V2 Request Structure: Array of 2 JSON objects
@@ -163,7 +177,8 @@ public class PayProClient : IPayProClient
                 CustomerName = string.IsNullOrWhiteSpace(customerName) ? "Customer" : customerName.Trim(),
                 CustomerMobile = cleanPhone,
                 CustomerEmail = customerEmail ?? "",
-                CustomerAddress = ""
+                CustomerAddress = "",
+                Ecommerce_return_url = _options.ReturnUrl ?? ""
             }
         };
 

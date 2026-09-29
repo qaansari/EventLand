@@ -87,6 +87,19 @@ export default function AdminShowSlotModal({
             </div>
           </div>
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+            <input
+              type="checkbox"
+              id="isClosedShow"
+              checked={!!showForm.isClosed}
+              onChange={e => setShowForm({ ...showForm, isClosed: e.target.checked })}
+              style={{ width: '18px', height: '18px', accentColor: '#ef4444', cursor: 'pointer' }}
+            />
+            <label htmlFor="isClosedShow" style={{ fontSize: '0.875rem', color: showForm.isClosed ? '#f87171' : '#cbd5e1', cursor: 'pointer', fontWeight: 500 }}>
+              Close this show slot (Disables ticket booking for this show)
+            </label>
+          </div>
+
           <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
             <button
               type="button"

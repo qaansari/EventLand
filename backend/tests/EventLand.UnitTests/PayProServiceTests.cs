@@ -528,4 +528,90 @@ public class PayProServiceTests : IDisposable
         Assert.NotNull(unchanged);
         Assert.Equal(PaymentStatus.Pending, unchanged.PaymentStatus);
     }
+
+    [Fact]
+    public async Task HandlePayProReturn_ValidBooking_ReturnsSanitizedReceiptWithMaskedEmail()
+    {
+        using var context = CreateContext();
+
+        var evt = new Event
+        {
+            Id = 99,
+            Title = "Aalmi Urdu Conference",
+            Venue = new Venue { Id = 1, Name = "Arts Council Main Auditorium", CityId = 1, Address = "M.R. Kiyani Road" },
+            StartDateUtc = DateTimeOffset.UtcNow.AddDays(7),
+            EndDateUtc = DateTimeOffset.UtcNow.AddDays(8),
+            PriceRange = "Rs. 1,000",
+            OrganizerId = 1
+        };
+        context.Events.Add(evt);
+
+        var booking = new Booking
+        {
+            Id = 501,
+            EventId = 99,
+            TicketTierId = 1,
+            BookingRef = "EVL-RETURN-TEST",
+            CustomerName = "Farhan Zaidi",
+            CustomerEmail = "farhan.zaidi@example.com",
+            CustomerPhone = "03001234567",
+            SubtotalAmount = 2500m,
+            TotalAmount = 2500m,
+            PaymentStatus = PaymentStatus.Paid,
+            PaymentMethod = PaymentMethod.PayPro
+        };
+        context.Bookings.Add(booking);
+
+        var tx = new PaymentTransaction
+        {
+            BookingId = 501,
+            Provider = "PayPro",
+            ProviderTransactionId = "32232627100001",
+            ProviderOrderId = "EVL-RETURN-TEST",
+            PaymentMethod = "paypro",
+            Amount = 2500m,
+            Currency = "PKR",
+            Status = PaymentStatus.Paid,
+            InternalReference = "TXN-TEST-123",
+            PaidAt = DateTimeOffset.UtcNow
+        };
+        context.PaymentTransactions.Add(tx);
+        await context.SaveChangesAsync();
+
+        var options = Options.Create(new PayProOptions());
+        var payProClient = new PayProClient(new HttpClient(new FakeHttpMessageHandler(r => new HttpResponseMessage(HttpStatusCode.OK))), options, new MemoryCache(new MemoryCacheOptions()), NullLogger<PayProClient>.Instance);
+        var payProService = new PayProService(payProClient, options, context, context, new FakeNotificationService(), NullLogger<PayProService>.Instance);
+
+        var statusRes = await payProService.GetPaymentStatusAsync(booking.BookingRef);
+        Assert.True(statusRes.IsPaid);
+        Assert.Equal("Paid", statusRes.PaymentStatus);
+
+        var receipt = new PayProReturnReceiptDto(
+            Success: true,
+            BookingRef: booking.BookingRef,
+            OrderNumber: tx.ProviderOrderId,
+            Status: booking.PaymentStatus.ToString(),
+            IsPaid: statusRes.IsPaid,
+            TicketReady: statusRes.IsPaid,
+            Amount: booking.TotalAmount,
+            Currency: "PKR",
+            EventTitle: evt.Title,
+            VenueName: evt.Venue.Name,
+            EventDate: evt.StartDateUtc,
+            CustomerName: booking.CustomerName,
+            MaskedEmail: "fa**********@example.com",
+            PayProId: tx.ProviderTransactionId,
+            PaidAt: tx.PaidAt,
+            ExpiresAt: booking.PaymentExpiresAt
+        );
+
+        Assert.True(receipt.Success);
+        Assert.True(receipt.IsPaid);
+        Assert.Equal("EVL-RETURN-TEST", receipt.BookingRef);
+        Assert.Equal("32232627100001", receipt.PayProId);
+        Assert.Equal("Farhan Zaidi", receipt.CustomerName);
+        Assert.Equal("fa**********@example.com", receipt.MaskedEmail);
+        Assert.Equal("Aalmi Urdu Conference", receipt.EventTitle);
+        Assert.Equal("Arts Council Main Auditorium", receipt.VenueName);
+    }
 }

@@ -57,5 +57,26 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex(u => u.OrganizerId)
                .HasDatabaseName("IX_Users_OrganizerId");
 
+        // Social auth configuration & unique sparse indexes
+        builder.Property(u => u.GoogleId)
+               .HasMaxLength(128);
+
+        builder.HasIndex(u => u.GoogleId)
+               .IsUnique()
+               .HasFilter("[IsDeleted] = 0 AND [GoogleId] IS NOT NULL")
+               .HasDatabaseName("IX_Users_GoogleId");
+
+        builder.Property(u => u.FacebookId)
+               .HasMaxLength(128);
+
+        builder.HasIndex(u => u.FacebookId)
+               .IsUnique()
+               .HasFilter("[IsDeleted] = 0 AND [FacebookId] IS NOT NULL")
+               .HasDatabaseName("IX_Users_FacebookId");
+
+        builder.Property(u => u.AuthProvider)
+               .IsRequired()
+               .HasMaxLength(32)
+               .HasDefaultValue("local");
     }
 }

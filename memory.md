@@ -30,14 +30,25 @@
 
 ### 1. Dual Payment Gateway & Direct Bank Transfer Workflows
 
-#### A. PayPro 1Pay Instant Online Gateway Integration
-1. **Payment Channel Selection**: Customer selects **PayPro Online Gateway ⚡** on `CheckoutModal.jsx` and chooses channel (`easypaisa_jazzcash` for 1Pay Portal/Cards/Wallets or `qr_code` for Dynamic Banking App QR Code).
-2. **Invoice Generation**: Clicking proceed invokes `POST /api/payments/paypro/checkout` via `paymentsApi.initiatePayProCheckout` in `api.js`.
-3. **PayPro Service & API Execution**: Backend `PayProService.cs` connects to PayPro API (`https://demoapi.paypro.com.pk`) to generate a unique **PayPro Consumer Voucher / OTC Number** and 1Pay portal URL (`connectUrl`).
-4. **Instant Online Payment & IPN Webhook**:
-   - Checkout modal displays the Consumer Voucher Number (with 1-click copy) and a direct **Pay Online via PayPro 1Pay** button opening `connectUrl`.
-   - Customer pays via JazzCash app, EasyPaisa app, 1Link ATM, or Debit/Credit Card.
-   - PayPro IPN Webhook (`POST /api/payments/paypro-ipn`) receives payment callback, validates signatures server-side, automatically updates booking status to `Paid`/`Confirmed`, permanently marks seats as `Booked`, and issues digital E-Ticket with QR code.
+#### A. PayPro V2 Seamless Hosted Gateway & 1Link Architecture (ACPKHI Model)
+1. **Full-Page Hosted Checkout Initiation**:
+   - Customer selects **PayPro Online Gateway ⚡** on `CheckoutModal.jsx`.
+   - Clicking proceed invokes `POST /api/payments/paypro/checkout` via `payProApi.initiateCheckout`.
+   - `CheckoutModal.jsx` sets an interactive securing transition screen ("Securing your reservation...") and stores recovery keys (`last_order_number`, `last_booking_ref`, `last_event_title`) in `localStorage` for cross-tab and mobile browser recovery.
+   - Triggers direct full-page hosted redirect via `window.location.assign(paymentUrl)`.
+2. **PayPro V2 Service & API Execution**:
+   - Backend `PayProClient.cs` and `PayProApiClient.cs` connect to PayPro `/v2/ppro/co` to create the order with `Ecommerce_return_url = _options.ReturnUrl`.
+   - Pakistani phone numbers are automatically normalized (`+92`, `92`, `03`) to the standard 11-digit `03XXXXXXXXX` format.
+   - Eliminates mock simulation fallback URLs (`/invoice/PP-`), returning genuine PayPro Click2Pay URLs and 1Link Connect IDs.
+3. **Decoupled Public Return Reconciliation (`/payment-return`)**:
+   - Upon completing or cancelling payment on the PayPro switch, the user is redirected to `https://<domain>/payment-return?ordId={orderNumber}&status={status}`.
+   - `PayProReturnPage.jsx` queries the public, rate-limited endpoint `GET /api/payments/paypro-return?ordId={orderNumber}` (protected by an ASP.NET Core Token Bucket Rate Limiter at 60 req/min).
+   - The backend checks live order status with PayPro, settles the booking idempotently, issues tickets, and returns a sanitized `PayProReturnReceiptDto` with masked customer PII (e.g. `fa**********@example.com`).
+   - `PayProReturnPage.jsx` renders a 4-state receipt view (Checking, Confirmed / Paid, Pending / 1Link OTC reconciliation, or Failed).
+   - From the verified receipt view, clicking "View My E-Ticket" triggers `onViewTicket` wired directly to `DigitalTicketModal` in `App.jsx`, providing immediate QR gate pass access.
+4. **IPN Webhook & Concurrency Idempotency**:
+   - For OTC and asynchronous banking app payments, PayPro UIS Webhook (`POST /paypro/uis`) notifies the server.
+   - `PayProService.ApplySuccessfulPaymentAsync` enforces strict idempotency guards to prevent duplicate ticket issuance or redundant confirmation emails if the browser return and IPN fire simultaneously.
 
 #### B. Direct Bank Transfer Payment Workflow
 1. **Seat/Tier Selection**: Customer selects seats or ticket tier for an event.
@@ -76,6 +87,7 @@
 
 - **Database Migrations**:
   - `20260923090046_InitialCreate`: Single unified baseline schema migration tracking the entire database schema in one pristine migration. Incorporates all core tables, relational foreign keys (including `User.OrganizerId`), gate check-in tracking (`IsCheckedIn`, `CheckedInAt`, `CheckedInBy`, `GateNotes`), and composite performance indexes.
+  - `20260929093014_AddSocialAuthFields`: Adds `GoogleId` (nvarchar 256), `FacebookId` (nvarchar 256), and `AuthProvider` (nvarchar 50, default 'Local') to `Users`, protected with filtered unique indexes.
 - **Database Performance & Composite Indexing**:
   - `Bookings`:
     - `IX_Bookings_BookingRef`: Unique index on reference codes.
@@ -95,6 +107,8 @@
   - `Users`:
     - Unique index on `Email` and `PhoneNumber`.
     - `IX_Users_OrganizerId`: Relational foreign key index for multi-tenant organizer company resolution.
+    - `IX_Users_GoogleId`: Filtered unique index (`WHERE [GoogleId] IS NOT NULL`) for Google OAuth 2.0 logins.
+    - `IX_Users_FacebookId`: Filtered unique index (`WHERE [FacebookId] IS NOT NULL`) for Meta Facebook logins.
 - **Primary Key Convention**: All domain entities inherit from `BaseEntity<int>` (or `BaseEntity<TKey>`).
 - **Zero-Reflection Auditing**: `BaseEntity<TKey>` implements the typed `IAuditableEntity` interface (`CreatedAt`, `UpdatedAt`, `IsDeleted`, `DeletedAt`). `ApplicationDbContext.SaveChangesAsync()` updates timestamps and soft-delete states with zero runtime reflection overhead.
 - **Soft Delete**: Global EF Core Query Filter (`!IsDeleted`) automatically applied to all entities.
@@ -391,6 +405,77 @@
   - Fallback layout generator automatically builds a 30-row × 37-column (1,100 seats) 3-block layout with dual central aisles when high-capacity venues are exported without an explicit JSON row blueprint, avoiding the legacy 220-seat truncation.
   - Alphabetic row progression helper `getRowLabel(index)` supports rows past Z (`A`–`Z`, `AA`, `AB`, `AC`, `AD`...) with valid lettering.
 
+### 19. PayPro V2 Enterprise Hosted Gateway & 1Link Architecture (ACPKHI Model)
+- **Live Gateway Working State**:
+  - The demo credentials in `backend/src/EventLand.Api/appsettings.Development.json` (`Username: Event_land`, `ClientId: 8mZHsWr6QZpcmpe`, `Biller ID: 3223`) are **100% active and verified live** on `https://demoapi.paypro.com.pk/v2/ppro`.
+  - Generates authentic PayPro IDs (e.g. `32232627100001`) and live Click2Pay hosted checkout URLs (`https://marketplace.paypro.com.pk/pyb-demo/?bid=...`).
+  - Production readiness: switching to real merchant credentials requires zero code changes, only setting environment variables (`PayPro__BaseUrl`, `PayPro__ClientId`, `PayPro__ClientSecret`, `PayPro__Username`, `PayPro__Password`, `PayPro__ReturnUrl`).
+- **ACPKHI Architectural Blueprint (`acpkhi.com/events`)**:
+  - **Single Full-Page Redirect**: Rather than popups or modals with external tabs, the frontend uses `window.location.assign(paymentUrl)` with a smooth transitional loading screen ("Securing your reservation...").
+  - **Cross-Tab & Mobile Crash Recovery**: Persists `last_order_number`, `last_booking_ref`, and `last_event_title` in browser `localStorage`. If an attendee closes their browser tab or switches to a mobile banking app, navigating back to `/payment-return` automatically retrieves and reconciles their order.
+  - **Pakistani Phone Number Normalization**: Automatically normalizes any Pakistani phone variant (`+923001234567`, `923001234567`, `03001234567`, `3001234567`) to the required 11-digit `03XXXXXXXXX` format.
+  - **Ecommerce Return URL**: Passes `Ecommerce_return_url = _options.ReturnUrl` in `/v2/ppro/co` payload so PayPro redirects back to `https://<domain>/payment-return?ordId={orderNumber}&status={status}` upon payment completion.
+- **Decoupled Public Receipt & Reconciliation Endpoint**:
+  - Public endpoint `GET /api/payments/paypro-return?ordId={orderNumber}` in `PaymentController.cs` resolves orders without requiring a JWT session, ensuring seamless return even if customer session expired or was in incognito mode.
+  - Protected by ASP.NET Core Token Bucket Rate Limiter (`paypro-return` policy: 60 req/min, QueueLimit = 5).
+  - PII Protection: Returns sanitized `PayProReturnReceiptDto` with masked email (`fa**********@example.com`).
+  - Active Reconciliation: If the booking status is still `Pending`, the endpoint checks live status with PayPro, settles the booking, issues tickets, and records the bank reference atomically.
+- **High-Fidelity 4-State Return Hub (`PayProReturnPage.jsx`)**:
+  - State 1 (*Checking*): Animated preloader reconciling with the PayPro financial network.
+  - State 2 (*Confirmed / Paid*): Verified badge, itemized receipt breakdown (Event, Venue, Order Ref, PayPro 1Link ID, Total Paid), confirmation email display, and direct single-click "View My E-Ticket" button opening `DigitalTicketModal`.
+  - State 3 (*Pending*): Explanatory guide for 1Link 1Bill & OTC clearing (1-5 min), manual re-check button with network spinner, and "Resume PayPro Checkout" link.
+  - State 4 (*Failed*): Clear error explanation and single-click return to events.
+- **Zero-Mock & Strict Idempotency Safeguards**:
+  - Purged all mock simulation links (`/invoice/PP-...`) and random vouchers from `PayProService.cs`.
+  - `ApplySuccessfulPaymentAsync` guards state transitions: once a booking is marked `Paid`, concurrent webhooks or duplicate redirect callbacks return immediately, preventing duplicate ticket generation or duplicate email dispatch.
+- **Production Guide Reference**: Complete deployment and webhook onboarding procedures documented in `docs/paypro-production-guide.md`.
+
+### 20. Event, Show Slot, and Ticket Tier Closing Mechanisms & Explicit Tier Statuses
+- **Domain & Architecture Overview**:
+  - Full end-to-end mechanism for closing and reopening events, individual show slots, and specific ticket tiers.
+  - Ticket tiers support explicit statuses: `Available`, `SoldOut`, `Closed` (`TicketTierStatus` enum).
+  - Effective Tier Status (`EffectiveStatus`):
+    - Evaluates dynamically:
+      1. If `tier.Status == TicketTierStatus.Closed`, effective status is `Closed`.
+      2. If `tier.Status == TicketTierStatus.SoldOut` OR remaining capacity (`AvailableQuantity <= SoldCount` or `AvailableQuantity <= 0`), effective status is `SoldOut`.
+      3. Otherwise `Available`.
+- **Backend Implementation**:
+  - **Domain Entities**:
+    - `EventStatus` enum updated with `Closed` (options: `Live`, `SellingFast`, `SoldOut`, `Upcoming`, `Closed`).
+    - `EventShow.cs` contains mapped boolean `IsClosed` with EF Core default value `false`.
+    - `TicketTier.cs` contains `TicketTierStatus Status` enum mapped as string with max length 20, default `Available`.
+  - **Admin API & Service**:
+    - `PATCH /api/admin/events/{id}/close?isClosed=true|false`: Toggles event status between `Closed` and `Live`.
+    - `PATCH /api/admin/event-shows/{id}/close?isClosed=true|false`: Toggles `EventShow.IsClosed`.
+    - `PATCH /api/admin/ticket-tiers/{id}/status?status=Available|SoldOut|Closed`: Updates tier status.
+    - All admin mutation operations scoped strictly by `OrganizerId` for non-superadmins.
+  - **Booking Validation Safeguards (`BookingService.cs`)**:
+    - Validates event state: immediately rejects booking with descriptive exception if `ev.Status == EventStatus.Closed`.
+    - Validates show state: rejects booking if show is closed (`show.IsClosed == true`).
+    - Validates tier state: rejects booking if `tier.EffectiveStatus == TicketTierStatus.Closed` or `TicketTierStatus.SoldOut`.
+    - Atomic SQL update enforces status: `UPDATE TicketTiers SET SoldCount = SoldCount + ... WHERE Id = ... AND Status = 'Available' AND ...`.
+- **Frontend Implementation**:
+  - **Admin Dashboard (`AdminDashboard.jsx`)**:
+    - Events Tab: displays status badge (`LIVE`, `SELLING FAST`, `SOLD OUT`, `UPCOMING`, `CLOSED`) and direct single-click "Close" / "Reopen" action button.
+    - Shows Tab: displays `Status` column with `OPEN` / `CLOSED` badge and single-click "Close" / "Reopen" action button.
+    - Ticket Tiers Tab: displays `Status` column with inline dropdown selector (`Available`, `Sold Out`, `Closed`) and status badge for immediate status transitions.
+    - Modals (`AdminTicketTierModal.jsx`, `AdminShowSlotModal.jsx`, `AdminEventModal.jsx`): include status selectors and closing controls during creation/editing.
+  - **Customer Event Discovery & Detail View (`EventCard.jsx`, `EventDetailPage.jsx`)**:
+    - `EventCard.jsx`: renders `CLOSED` badge in bold red if event status is closed.
+    - `EventDetailPage.jsx`:
+      - Shows banner: *"This event is currently closed and is not accepting bookings."*
+      - Closed shows show `CLOSED` badge in red and disable selection.
+      - Closed ticket tiers show `CLOSED` badge in red and disable quantity stepper with disabled "Closed" button.
+      - Sold out ticket tiers show `SOLD OUT` in amber with disabled "Sold Out" button.
+      - Booking submission handlers block navigation if the event or selected show is closed.
+
+- **Database Migration & Backend Runtime**:
+  - Migration `20260929054026_AddClosingMechanismsAndTierStatus` applied to SQL Server:
+    - Added `[Status]` (`nvarchar(20) DEFAULT N'Available'`) to `[TicketTiers]`.
+    - Added `[IsClosed]` (`bit DEFAULT 0`) to `[EventShows]`.
+  - Backend API server re-compiled and restarted to bind newly registered routes (`PATCH /api/admin/ticket-tiers/{id}/status`, `PATCH /api/admin/events/{id}/close`, `PATCH /api/admin/event-shows/{id}/close`).
+  - Added frontend optimistic update and automatic fallback in `AdminDashboard.jsx` `handleUpdateTierStatus` to fall back to `adminApi.ticketTiers.update` if `PATCH` fails.
+
 ---
 
 ## Developer Commands & Verification
@@ -422,8 +507,50 @@ dotnet ef migrations add <MigrationName> --project backend/src/EventLand.Infrast
 dotnet ef database update --project backend/src/EventLand.Infrastructure --startup-project backend/src/EventLand.Api
 ```
 
+### Social Authentication Architecture (Google & Facebook)
+- **Backend Architecture & Security**:
+  - `Google.Apis.Auth` (`v1.77.0`) integration: Validates Google ID tokens via `GoogleJsonWebSignature.ValidateAsync(idToken, settings)` using Google's public key certificate endpoints.
+  - Meta Graph API integration: Validates Facebook access tokens via direct HTTPS call to `https://graph.facebook.com/me?fields=id,name,email&access_token={accessToken}`.
+  - Endpoints: `POST /api/auth/google` and `POST /api/auth/facebook` in `AuthController.cs` under the `"login"` rate limiting policy.
+  - `AuthService.FindOrCreateSocialUserAsync`:
+    - Prioritizes lookup by provider ID (`GoogleId` or `FacebookId`).
+    - If provider ID not found, queries by verified email. If found, links the social provider ID automatically (account linking).
+    - If neither exists, provisions a new User record with role `'customer'`, `AuthProvider` set to `'Google'` or `'Facebook'`, and `PasswordHash = string.Empty`.
+  - Comprehensive unit test coverage: 98 unit tests passing in `SocialAuthTests.cs` and `EventLand.UnitTests`.
+
+- **Frontend HTTPS & Cross-Origin Popups**:
+  - Native HTTPS dev server configured via `@vitejs/plugin-basic-ssl` running on `https://localhost:5174/`.
+  - Headers configured in `vite.config.js`: `'Cross-Origin-Opener-Policy': 'same-origin-allow-popups'` (resolves postMessage communication blocking between Google/Facebook login popup dialogs and the parent window).
+  - Proxy targets set `secure: false` for self-signed certificates during local development.
+  - `AuthModal.jsx`: Native Google Identity Services (`window.google.accounts.id.renderButton`) integration with synchronous GSI callback and Facebook SDK `FB.login` with popup fallback.
+
+### Privacy Policy & Meta Platform Compliance
+- **Component: `frontend/src/components/PrivacyPolicyPage.jsx`**:
+  - Structured legal document with 12 comprehensive sections tailored to EventLand Pakistan:
+    1. *Overview & Scope*
+    2. *Information We Collect* (Personal, Ticketing, Technical/Turnstile metadata)
+    3. *Google & Meta (Facebook) Social Logins* (OAuth 2.0 token exchange, scope transparency, zero password storage)
+    4. *How We Use Your Data* (Digital ticket issuance, seating capacity locks, gate verification, transactional notifications)
+    5. *Payment & Financial Data* (Zero plaintext financial footprint promise: PayPro PCI-DSS hosted gateway and 1Link)
+    6. *QR Gate Pass & Verification* (Cryptographic HMAC validation preventing counterfeit duplicates)
+    7. *Third-Party Sharing & Processors* (Detailed matrix for Google, Meta, PayPro, Cloudflare, and Venues)
+    8. **Meta (Facebook) User Data Deletion Instructions (Mandatory for Meta Platform Terms §4.b)**:
+       - *Option 1*: Step-by-step instructions to remove EventLand via Facebook settings (`Settings & Privacy > Settings > Apps and Websites > EventLand > Remove`).
+       - *Option 2*: Direct account/social profile purge request via email to `support@eventland.pk` with subject `Data Deletion Request - Facebook`, guaranteed execution within 30 days.
+    9. *Cookies & Local Storage* (Session JWTs, city preferences, Turnstile tokens)
+    10. *Security & Retention Policies* (TLS 1.3, role-gated APIs, parameterized EF Core queries)
+    11. *Your Rights & Choices* (Access, rectification, right to be forgotten, newsletter opt-out)
+    12. *Contact & Grievances Officer* (`support@eventland.pk`, `+92 307 9353185`, Pakistan)
+  - Interactive dual-column layout with sticky table of contents, print/PDF button (`window.print()`), and one-click contact email copy.
+- **Routing & Navigation (`App.jsx` & `Footer.jsx`)**:
+  - Code-split via `React.lazy`: `const PrivacyPolicyPage = lazy(() => import('./components/PrivacyPolicyPage'));`.
+  - URL detection (`isPrivacyPolicyUrl`) for `/privacy`, `/privacy-policy`, or `?privacy=true`.
+  - Browser `popstate` event listener synchronizing browser Back/Forward navigation with `activeView`.
+  - Footer link wired with client-side view transition (`onNavigatePrivacyPolicy`).
+
 ---
-*Last Updated: September 2026 (Printable Auditorium Seating Chart PDF Exporter: True 600 DPI High-Definition Print Resolution, Zero Margin Full-Page Cover, Strict Monochrome Pure Black & White RGB Palette #000000 and #ffffff, Spacious Show Name & Show Date Underline Handwriting Section with 28px margin, 52px-75px Prominent Stairs/Aisle Passages, 1100+ Seats Full Coverage Engine with 3-Block Dual Aisle Fallback Generator and getRowLabel multi-letter progression, Boundary-Constrained Zero-Clipping Canvas; Canonical AppRoles Authorization Constants; Permissions-Policy camera=(self); 403 vs 401 Exception Mapping; Concurrency 409 Conflict; Gate User-Partitioned Rate Limiting; AsSplitQuery & Include Optimization; AdminDashboard.jsx Monolith Refactoring & Modal Extraction into AdminEventModal, AdminShowSlotModal, AdminTicketTierModal, AdminUserModal, AdminAuditoriumModal; FileUploadField Extraction; api.js Error Status Preservation; Multi-User Organizer Relational Linkage via User.OrganizerId FK; Single Consolidated EF Core Baseline Migration 20260923090046_InitialCreate; Gate Ticket Validation & QR Scanner Admission Hub; E-Ticket PDF QR Route Verification; All 65 Unit Tests Passing)*
+*Last Updated: September 2026 (Unified Social Authentication [Google + Facebook], Native HTTPS Local Dev, Complete Privacy Policy & Meta User Data Deletion Compliance, 98/98 Unit Tests Passing, Clean 0-Error Vite Production Build, Regenerated EventLand_Full_Role_Testing_Guide.docx)*
+
 
 
 

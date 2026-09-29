@@ -517,7 +517,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
         onClick={(e) => e.stopPropagation()} 
         style={{ 
           maxWidth: '96vw', 
-          width: '1440px', 
+          width: 'min(1440px, 98vw)', 
           height: '92vh', 
           maxHeight: '94vh', 
           padding: 0, 
@@ -530,9 +530,9 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
       >
         {/* Modal Header */}
         <div style={{
-          padding: '1rem 1.5rem',
+          padding: 'clamp(0.75rem, 1.8vw, 1.25rem)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-          background: 'rgba(15, 23, 42, 0.9)',
+          background: 'rgba(15, 23, 42, 0.95)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -718,10 +718,12 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
         {/* Interactive Seating Area (Expansive Canvas) */}
         <div className="seat-picker-container" style={{ 
           flex: 1, 
-          padding: '2rem 1.5rem', 
+          padding: 'clamp(1rem, 2.5vw, 2rem) 1rem', 
           textAlign: 'center', 
           backgroundColor: '#070b14', 
           overflow: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-x pan-y',
           position: 'relative'
         }}>
           {/* Zoomable Container */}

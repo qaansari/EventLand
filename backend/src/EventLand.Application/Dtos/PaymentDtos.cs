@@ -123,3 +123,24 @@ public record PayProCreateOrderResult(
     decimal OrderAmount,
     string? Description = null
 );
+
+public record PayProReturnReceiptDto(
+    bool Success,
+    string BookingRef,
+    string OrderNumber,
+    string Status,
+    bool IsPaid,
+    bool TicketReady,
+    decimal Amount,
+    string Currency,
+    string? EventTitle,
+    string? VenueName,
+    DateTimeOffset? EventDate,
+    string? CustomerName,
+    string? MaskedEmail,
+    string? PayProId,
+    DateTimeOffset? PaidAt,
+    DateTimeOffset? ExpiresAt,
+    string? Message = null
+);
+

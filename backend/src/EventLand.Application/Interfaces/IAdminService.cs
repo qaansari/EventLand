@@ -48,12 +48,14 @@ public interface IAdminService
     Task<EventDetailDto> CreateEventAsync(CreateAdminEventDto dto);
     Task<EventDetailDto> UpdateEventAsync(int id, UpdateAdminEventDto dto, int? organizerId = null);
     Task<bool> DeleteEventAsync(int id, int? organizerId = null);
+    Task<EventDetailDto> ToggleCloseEventAsync(int id, bool isClosed, int? organizerId = null);
 
     // --- EventShows CRUD ---
     Task<List<EventShowDto>> GetEventShowsAsync(int? eventId = null, int? organizerId = null);
     Task<EventShowDto?> GetEventShowByIdAsync(int id, int? organizerId = null);
     Task<EventShowDto> CreateEventShowAsync(CreateEventShowDto dto, int? organizerId = null);
     Task<EventShowDto> UpdateEventShowAsync(int id, UpdateEventShowDto dto, int? organizerId = null);
+    Task<EventShowDto> ToggleCloseEventShowAsync(int id, bool isClosed, int? organizerId = null);
     Task<bool> DeleteEventShowAsync(int id, int? organizerId = null);
 
     // --- Organizers CRUD ---
@@ -74,6 +76,7 @@ public interface IAdminService
     Task<List<TicketTierDto>> GetTicketTiersAsync(int? eventId = null, int? eventShowId = null, int? organizerId = null);
     Task<TicketTierDto> CreateTicketTierAsync(CreateTicketTierDto dto, int? organizerId = null);
     Task<TicketTierDto> UpdateTicketTierAsync(int id, UpdateTicketTierDto dto, int? organizerId = null);
+    Task<TicketTierDto> UpdateTicketTierStatusAsync(int id, string status, int? organizerId = null);
     Task<bool> DeleteTicketTierAsync(int id, int? organizerId = null);
 
     // --- SeatingZones & Seats CRUD ---

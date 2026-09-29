@@ -21,6 +21,10 @@ public sealed class EventShowConfiguration : IEntityTypeConfiguration<EventShow>
         builder.Property(s => s.EndTimeUtc)
                .IsRequired();
 
+        builder.Property(s => s.IsClosed)
+               .IsRequired()
+               .HasDefaultValue(false);
+
         builder.HasOne(s => s.Event)
                .WithMany(e => e.Shows)
                .HasForeignKey(s => s.EventId)

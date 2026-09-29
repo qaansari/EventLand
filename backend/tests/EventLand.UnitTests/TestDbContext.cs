@@ -49,6 +49,7 @@ public class TestDbContext : DbContext, IApplicationDbContext, IPayProDbContext
         base.OnModelCreating(modelBuilder);
         modelBuilder.Entity<BookingSeat>().HasKey(bs => new { bs.BookingId, bs.SeatId });
         modelBuilder.Entity<EventTag>().HasKey(et => new { et.EventId, et.TagId });
+        modelBuilder.Entity<TicketTier>().Property(t => t.Status).HasConversion<string>();
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

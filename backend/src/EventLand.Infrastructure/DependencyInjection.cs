@@ -155,6 +155,12 @@ public static class DependencyInjection
             client.Timeout = TimeSpan.FromSeconds(10);
         });
 
+        // Facebook Graph API HttpClient (used by AuthService for token verification)
+        services.AddHttpClient("FacebookGraph", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+
         return services;
     }
 }

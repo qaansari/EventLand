@@ -70,7 +70,7 @@ export default function AdminTicketTierModal({
             <input type="text" placeholder="e.g. Front row seating with fast-track entry" value={tierForm.description || ''} onChange={e => setTierForm({ ...tierForm, description: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.75rem' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Price per Ticket (PKR) *</label>
               <input type="number" required value={tierForm.price} onChange={e => setTierForm({ ...tierForm, price: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#2dd4bf', fontWeight: 700 }} />
@@ -78,6 +78,39 @@ export default function AdminTicketTierModal({
             <div>
               <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Available Capacity</label>
               <input type="number" value={tierForm.availableQuantity || 100} onChange={e => setTierForm({ ...tierForm, availableQuantity: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.75rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Tier Status *</label>
+              {(() => {
+                const rawStatus = (tierForm.status || 'Available').replace(/\s+/g, '');
+                const normalizedStatus = (rawStatus.toLowerCase() === 'soldout') ? 'SoldOut' : (rawStatus.toLowerCase() === 'closed') ? 'Closed' : 'Available';
+                return (
+                  <select
+                    value={normalizedStatus}
+                    onChange={e => setTierForm({ ...tierForm, status: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      background: 'rgba(15, 23, 42, 0.6)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: normalizedStatus === 'Closed' ? '#ef4444' : normalizedStatus === 'SoldOut' ? '#eab308' : '#22c55e',
+                      fontWeight: 600
+                    }}
+                  >
+                    <option value="Available" style={{ background: '#0f172a', color: '#22c55e' }}>Available</option>
+                    <option value="SoldOut" style={{ background: '#0f172a', color: '#eab308' }}>Sold Out</option>
+                    <option value="Closed" style={{ background: '#0f172a', color: '#ef4444' }}>Closed</option>
+                  </select>
+                );
+              })()}
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8125rem', color: '#38bdf8', fontWeight: 600, marginBottom: '0.25rem' }}>Sort Order #</label>
+              <input type="number" min="1" placeholder="e.g. 1, 2..." value={tierForm.sortOrder ?? ''} onChange={e => setTierForm({ ...tierForm, sortOrder: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: '8px', color: '#38bdf8', fontWeight: 700 }} title="Sort order number for displaying this ticket tier" />
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ArrowLeft, Calendar, MapPin, Sparkles, ShieldCheck, Ticket, Layers, Grid, 
   Globe, Clock, Eye, Copy, Check, Share2, Info, AlertCircle, Compass, 
@@ -162,6 +162,24 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
       });
   };
 
+  const effectiveShows = (event?.shows && event.shows.length > 0)
+    ? event.shows
+    : (event ? [{
+        id: event.id,
+        showTitle: 'Standard Performance',
+        startTimeUtc: event.startDateUtc || event.startDate,
+        endTimeUtc: event.endDateUtc || event.endDate
+      }] : []);
+
+  const activeShow = effectiveShows.find(s => s.id === selectedShowId) || effectiveShows[0];
+  const displayTiers = useMemo(() => {
+    if (!event) return [];
+    const raw = (activeShow?.ticketTiers && activeShow.ticketTiers.length > 0)
+      ? activeShow.ticketTiers
+      : (event.ticketTiers || []);
+    return [...raw].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0) || (a.price || 0) - (b.price || 0));
+  }, [activeShow, event]);
+
   if (loading) {
     return (
       <div className="container" style={{ padding: '4rem 1.5rem' }}>
@@ -186,20 +204,6 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
       </div>
     );
   }
-
-  const effectiveShows = (event.shows && event.shows.length > 0)
-    ? event.shows
-    : [{
-        id: event.id,
-        showTitle: 'Standard Performance',
-        startTimeUtc: event.startDateUtc || event.startDate,
-        endTimeUtc: event.endDateUtc || event.endDate
-      }];
-
-  const activeShow = effectiveShows.find(s => s.id === selectedShowId) || effectiveShows[0];
-  const displayTiers = (activeShow?.ticketTiers && activeShow.ticketTiers.length > 0)
-    ? activeShow.ticketTiers
-    : (event.ticketTiers || []);
 
   const handleQuantityChange = (tierId, delta) => {
     const current = selectedTiers[tierId] || 0;
@@ -231,6 +235,14 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
   }, 0) || 0;
 
   const handleCategorizedBookNow = () => {
+    if ((event.status || '').toUpperCase() === 'CLOSED') {
+      showError('Event Closed', 'This event is closed and no longer accepting bookings.');
+      return;
+    }
+    if (activeShow?.isClosed) {
+      showError('Show Closed', `The show "${activeShow.showTitle || 'This show'}" is closed.`);
+      return;
+    }
     const seats = getCategorizedSeatsList();
     if (seats.length === 0) {
       showWarning('Ticket Quantity Required', 'Please select at least 1 ticket quantity.');
@@ -241,6 +253,14 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
   };
 
   const handleMappedBookNow = () => {
+    if ((event.status || '').toUpperCase() === 'CLOSED') {
+      showError('Event Closed', 'This event is closed and no longer accepting bookings.');
+      return;
+    }
+    if (activeShow?.isClosed) {
+      showError('Show Closed', `The show "${activeShow.showTitle || 'This show'}" is closed.`);
+      return;
+    }
     const updatedEvent = activeShow ? { ...event, selectedShow: activeShow } : event;
     onProceedToBooking(updatedEvent, 'seat-picker', []);
   };
@@ -260,7 +280,7 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullLocation)}`;
 
   return (
-    <div className="event-detail-page animate-fade-in" style={{ padding: '2rem 1rem 6rem' }}>
+    <div className="event-detail-page animate-fade-in" style={{ padding: `2rem 1rem ${selectedCategorizedCount > 0 ? '7.5rem' : '4rem'}` }}>
       <div className="container" style={{ maxWidth: '1080px', margin: '0 auto' }}>
         
         {/* Top Control Bar: Back & Share */}
@@ -312,74 +332,69 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
           </button>
         </div>
 
-        {/* Cinematic Hero Poster Banner */}
-        <div className="event-hero-container" style={{ marginBottom: '2rem' }}>
+        {/* Event Banner (Strictly 1200x500px, 2.4 : 1 Aspect Ratio, Zero Text Overlay) */}
+        <div className="event-hero-container" style={{ aspectRatio: '1200 / 500', width: '100%', marginBottom: '1.25rem', overflow: 'hidden', borderRadius: '20px', border: '1px solid rgba(13, 148, 136, 0.35)' }}>
           <img
             src={getEventImageUrl(event.banner)}
             alt={event.title}
             className="event-hero-img"
+            style={{ width: '100%', height: '100%', aspectRatio: '1200 / 500', objectFit: 'cover', display: 'block' }}
           />
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(to top, rgba(6, 16, 23, 0.95) 0%, rgba(6, 16, 23, 0.4) 50%, transparent 100%)',
-            pointerEvents: 'none'
-          }} />
+        </div>
 
-          {/* Floating Badges Overlay */}
-          <div style={{
-            position: 'absolute',
-            bottom: '22px',
-            left: '24px',
-            right: '24px',
+        {/* Hero Metadata Badges Bar (Adjusted Below the Banner) */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
+          marginBottom: '2rem',
+          padding: '0.75rem 1.25rem',
+          background: 'rgba(15, 23, 42, 0.6)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '14px',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <span className={`badge ${event.status === 'LIVE' ? 'badge-live' : 'badge-fast'}`} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.4rem 0.95rem', borderRadius: '8px' }}>
+            <span className="pulse-dot"></span> {event.status || 'LIVE'}
+          </span>
+          <span className="badge badge-city" style={{ padding: '0.4rem 0.95rem', borderRadius: '8px' }}>
+            <MapPin size={14} style={{ display: 'inline', marginRight: '4px' }} /> {event.cityName || event.city || 'Karachi'}
+          </span>
+          <span style={{
+            backgroundColor: 'rgba(13, 148, 136, 0.2)',
+            color: '#99f6e4',
+            border: '1px solid rgba(45, 212, 191, 0.4)',
+            borderRadius: '8px',
+            padding: '0.4rem 0.95rem',
+            fontSize: '0.82rem',
+            fontWeight: 700,
             display: 'flex',
             alignItems: 'center',
-            gap: '0.75rem',
-            flexWrap: 'wrap'
+            gap: '0.4rem'
           }}>
-            <span className={`badge ${event.status === 'LIVE' ? 'badge-live' : 'badge-fast'}`} style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.4rem 0.95rem', borderRadius: '8px' }}>
-              <span className="pulse-dot"></span> {event.status || 'LIVE'}
-            </span>
-            <span className="badge badge-city" style={{ padding: '0.4rem 0.95rem', borderRadius: '8px' }}>
-              <MapPin size={14} style={{ display: 'inline', marginRight: '4px' }} /> {event.cityName || event.city || 'Karachi'}
-            </span>
+            {event.ticketingType === 'mapped' ? <Grid size={14} /> : <Layers size={14} />}
+            {event.ticketingType === 'mapped' ? 'Mapped Seating Layout' : 'Categorized Passes'}
+          </span>
+
+          {event.startingPrice && (
             <span style={{
-              backgroundColor: 'rgba(13, 148, 136, 0.35)',
-              color: '#99f6e4',
-              border: '1px solid rgba(45, 212, 191, 0.5)',
+              marginLeft: 'auto',
+              backgroundColor: 'rgba(13, 148, 136, 0.15)',
+              color: '#2dd4bf',
+              border: '1px solid rgba(45, 212, 191, 0.35)',
               borderRadius: '8px',
               padding: '0.4rem 0.95rem',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-              backdropFilter: 'blur(8px)'
+              fontSize: '0.86rem',
+              fontWeight: 800
             }}>
-              {event.ticketingType === 'mapped' ? <Grid size={14} /> : <Layers size={14} />}
-              {event.ticketingType === 'mapped' ? 'Mapped Seating Layout' : 'Categorized Passes'}
+              From PKR {event.startingPrice.toLocaleString()}
             </span>
-
-            {event.startingPrice && (
-              <span style={{
-                marginLeft: 'auto',
-                backgroundColor: 'rgba(0, 0, 0, 0.65)',
-                color: '#2dd4bf',
-                border: '1px solid rgba(45, 212, 191, 0.4)',
-                borderRadius: '8px',
-                padding: '0.4rem 0.95rem',
-                fontSize: '0.86rem',
-                fontWeight: 800,
-                backdropFilter: 'blur(8px)'
-              }}>
-                From PKR {event.startingPrice.toLocaleString()}
-              </span>
-            )}
-          </div>
+          )}
         </div>
 
         {/* Main Event Card */}
-        <div className="glass-card" style={{ padding: '2.25rem', borderRadius: '24px', border: '1px solid rgba(13, 148, 136, 0.3)', marginBottom: '2.5rem' }}>
+        <div className="glass-card" style={{ padding: 'clamp(1rem, 3vw, 2.25rem)', borderRadius: '24px', border: '1px solid rgba(13, 148, 136, 0.3)', marginBottom: '2.5rem' }}>
           
           {/* Event Title Header */}
           <div style={{ marginBottom: '1.75rem' }}>
@@ -524,11 +539,35 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
              ======================================================== */}
           {activeTab === 'tickets' && (
             <div>
+              {((event.status || '').toUpperCase() === 'CLOSED') && (
+                <div style={{
+                  padding: '1.25rem 1.5rem',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  borderRadius: '16px',
+                  color: '#f87171',
+                  marginBottom: '1.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.85rem',
+                  fontSize: '0.95rem',
+                  fontWeight: 600
+                }}>
+                  <AlertCircle size={22} style={{ flexShrink: 0 }} />
+                  <div>
+                    <strong style={{ fontSize: '1.05rem', display: 'block' }}>Event Closed</strong>
+                    <div style={{ fontSize: '0.85rem', opacity: 0.85, marginTop: '0.2rem' }}>
+                      This event is currently closed and is not accepting bookings.
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Show Slot Selector */}
               {effectiveShows && effectiveShows.length > 0 && (
                 <div style={{
                   marginBottom: '2rem',
-                  padding: '1.25rem 1.4rem',
+                  padding: 'clamp(0.85rem, 2.5vw, 1.4rem)',
                   background: 'rgba(11, 23, 37, 0.85)',
                   border: '1px solid rgba(13, 148, 136, 0.3)',
                   borderRadius: '18px'
@@ -540,20 +579,29 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
                     <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>PKT (Pakistan Standard Time)</span>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.85rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '0.85rem' }}>
                     {effectiveShows.map((show) => {
                       const isSelected = (selectedShowId === show.id || (!selectedShowId && show.id === effectiveShows[0]?.id));
+                      const isShowClosed = !!show.isClosed;
                       return (
                         <div
                           key={show.id}
-                          onClick={() => { setSelectedShowId(show.id); setSelectedTiers({}); }}
+                          onClick={() => {
+                            if (isShowClosed) {
+                              showWarning('Show Slot Closed', `"${show.showTitle || 'This show'}" is closed and not accepting bookings.`);
+                              return;
+                            }
+                            setSelectedShowId(show.id);
+                            setSelectedTiers({});
+                          }}
                           style={{
                             padding: '0.9rem 1.15rem',
                             borderRadius: '14px',
-                            border: isSelected ? '1.5px solid #0d9488' : '1px solid rgba(255, 255, 255, 0.08)',
-                            background: isSelected ? 'linear-gradient(135deg, rgba(13, 148, 136, 0.28) 0%, rgba(11, 23, 37, 0.9) 100%)' : 'rgba(15, 29, 46, 0.6)',
-                            color: isSelected ? '#fff' : '#cbd5e1',
-                            cursor: 'pointer',
+                            border: isSelected ? '1.5px solid #0d9488' : isShowClosed ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
+                            background: isSelected ? 'linear-gradient(135deg, rgba(13, 148, 136, 0.28) 0%, rgba(11, 23, 37, 0.9) 100%)' : isShowClosed ? 'rgba(30, 15, 20, 0.6)' : 'rgba(15, 29, 46, 0.6)',
+                            color: isSelected ? '#fff' : isShowClosed ? '#94a3b8' : '#cbd5e1',
+                            cursor: isShowClosed ? 'not-allowed' : 'pointer',
+                            opacity: isShowClosed ? 0.6 : 1,
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '0.35rem',
@@ -562,10 +610,16 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <strong style={{ color: isSelected ? '#2dd4bf' : '#fff', fontSize: '0.92rem' }}>
+                            <strong style={{ color: isSelected ? '#2dd4bf' : isShowClosed ? '#f87171' : '#fff', fontSize: '0.92rem' }}>
                               {show.showTitle || `Performance Slot #${show.id}`}
                             </strong>
-                            {isSelected && <CheckCircle2 size={16} color="#2dd4bf" />}
+                            {isShowClosed ? (
+                              <span style={{ fontSize: '0.7rem', fontWeight: 800, background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                                CLOSED
+                              </span>
+                            ) : isSelected ? (
+                              <CheckCircle2 size={16} color="#2dd4bf" />
+                            ) : null}
                           </div>
                           {show.startTimeUtc && (
                             <span style={{ fontSize: '0.82rem', color: isSelected ? '#99f6e4' : '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -600,7 +654,9 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
                     ) : (
                       displayTiers.map((tier) => {
                         const qty = selectedTiers[tier.id] || 0;
-                        const isSoldOut = tier.availableQuantity !== null && tier.availableQuantity !== undefined && tier.availableQuantity <= 0;
+                        const tierStatus = (tier.status || 'Available').toUpperCase();
+                        const isTierClosed = tierStatus === 'CLOSED' || !!activeShow?.isClosed || (event.status || '').toUpperCase() === 'CLOSED';
+                        const isSoldOut = !isTierClosed && (tierStatus === 'SOLDOUT' || tierStatus === 'SOLD OUT' || (tier.availableQuantity !== null && tier.availableQuantity !== undefined && tier.availableQuantity <= 0));
 
                         return (
                           <div
@@ -612,7 +668,7 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
                               justifyContent: 'space-between',
                               flexWrap: 'wrap',
                               gap: '1.25rem',
-                              opacity: isSoldOut ? 0.6 : 1
+                              opacity: (isTierClosed || isSoldOut) ? 0.6 : 1
                             }}
                           >
                             <div style={{ flex: 1, minWidth: '240px' }}>
@@ -620,8 +676,12 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
                                 <h4 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', margin: 0 }}>
                                   {tier.name}
                                 </h4>
-                                {isSoldOut ? (
+                                {isTierClosed ? (
                                   <span style={{ fontSize: '0.72rem', fontWeight: 800, background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '0.2rem 0.55rem', borderRadius: '6px' }}>
+                                    CLOSED
+                                  </span>
+                                ) : isSoldOut ? (
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 800, background: 'rgba(234, 179, 8, 0.2)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.4)', padding: '0.2rem 0.55rem', borderRadius: '6px' }}>
                                     SOLD OUT
                                   </span>
                                 ) : tier.availableQuantity && tier.availableQuantity < 20 ? (
@@ -646,7 +706,7 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
                             </div>
 
                             {/* Quantity Stepper */}
-                            {!isSoldOut ? (
+                            {!isTierClosed && !isSoldOut ? (
                               <div style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -697,9 +757,13 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
                                   +
                                 </button>
                               </div>
+                            ) : isTierClosed ? (
+                              <button disabled style={{ padding: '0.65rem 1.25rem', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.12)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', fontWeight: 700, cursor: 'not-allowed' }}>
+                                Closed
+                              </button>
                             ) : (
-                              <button disabled style={{ padding: '0.65rem 1.25rem', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.05)', color: '#64748b', border: 'none', fontWeight: 700, cursor: 'not-allowed' }}>
-                                Unavailable
+                              <button disabled style={{ padding: '0.65rem 1.25rem', borderRadius: '10px', background: 'rgba(234, 179, 8, 0.12)', color: '#facc15', border: '1px solid rgba(234, 179, 8, 0.3)', fontWeight: 700, cursor: 'not-allowed' }}>
+                                Sold Out
                               </button>
                             )}
                           </div>
@@ -1023,7 +1087,7 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
 
             <button
               onClick={handleCategorizedBookNow}
-              className="btn btn-primary"
+              className="btn btn-primary btn-mobile-block"
               style={{
                 padding: '0.85rem 2rem',
                 fontSize: '0.98rem',

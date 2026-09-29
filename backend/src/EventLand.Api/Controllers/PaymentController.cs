@@ -11,6 +11,7 @@ using EventLand.Domain.Entities;
 using EventLand.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 using EventLand.Application.Dtos;
@@ -114,6 +115,107 @@ public class PaymentController : ControllerBase
             isPaid = booking.PaymentStatus == PaymentStatus.Paid,
             ticketReady = booking.PaymentStatus == PaymentStatus.Paid
         });
+    }
+
+    /// <summary>
+    /// Public return & reconciliation route for users redirected back from PayPro Click2Pay.
+    /// Does not require JWT authentication since it's reached via external browser redirect.
+    /// Sanitizes response to avoid exposing sensitive PII.
+    /// </summary>
+    [HttpGet("paypro-return")]
+    [EnableRateLimiting("paypro-return")]
+    [AllowAnonymous]
+    public async Task<IActionResult> HandlePayProReturn(
+        [FromQuery] string? ordId,
+        [FromQuery] string? orderNumber,
+        [FromQuery] string? bookingRef,
+        System.Threading.CancellationToken cancellationToken)
+    {
+        var targetRef = (!string.IsNullOrWhiteSpace(bookingRef) ? bookingRef :
+                        !string.IsNullOrWhiteSpace(orderNumber) ? orderNumber :
+                        ordId)?.Trim();
+
+        if (string.IsNullOrWhiteSpace(targetRef))
+        {
+            return BadRequest(new { success = false, message = "Order reference identifier is required." });
+        }
+
+        // 1. Resolve booking by BookingRef or PaymentTransaction ProviderOrderId / ProviderTransactionId
+        var booking = await _context.Bookings
+            .Include(b => b.Event).ThenInclude(e => e!.Venue)
+            .Include(b => b.PaymentTransactions)
+            .FirstOrDefaultAsync(b => !b.IsDeleted && (
+                b.BookingRef == targetRef ||
+                b.PaymentTransactions.Any(pt => pt.ProviderOrderId == targetRef || pt.ProviderTransactionId == targetRef)
+            ), cancellationToken);
+
+        if (booking == null)
+        {
+            return NotFound(new { success = false, message = $"Booking or order reference '{targetRef}' not found." });
+        }
+
+        // 2. Authoritative check: If still pending, reconcile with PayPro V2
+        if (booking.PaymentStatus == PaymentStatus.Pending)
+        {
+            try
+            {
+                var payProStatus = await _payProService.GetPaymentStatusAsync(booking.BookingRef, null, cancellationToken);
+                if (payProStatus.IsPaid)
+                {
+                    // Reload booking state from database
+                    booking = await _context.Bookings
+                        .Include(b => b.Event).ThenInclude(e => e!.Venue)
+                        .Include(b => b.PaymentTransactions)
+                        .FirstOrDefaultAsync(b => b.Id == booking.Id, cancellationToken) ?? booking;
+                }
+            }
+            catch
+            {
+                // Non-blocking: proceed with local state if gateway check times out
+            }
+        }
+
+        var isPaid = booking.PaymentStatus == PaymentStatus.Paid;
+        var paidTx = booking.PaymentTransactions.OrderByDescending(pt => pt.CreatedAt).FirstOrDefault();
+
+        // Mask email: j***@example.com
+        string? maskedEmail = null;
+        if (!string.IsNullOrWhiteSpace(booking.CustomerEmail))
+        {
+            var parts = booking.CustomerEmail.Split('@');
+            if (parts.Length == 2 && parts[0].Length > 0)
+            {
+                var namePart = parts[0];
+                var maskedName = namePart.Length <= 2 ? namePart[0] + "*" : namePart.Substring(0, 2) + new string('*', Math.Max(1, namePart.Length - 2));
+                maskedEmail = $"{maskedName}@{parts[1]}";
+            }
+            else
+            {
+                maskedEmail = "***@***.***";
+            }
+        }
+
+        var receipt = new PayProReturnReceiptDto(
+            Success: true,
+            BookingRef: booking.BookingRef,
+            OrderNumber: paidTx?.ProviderOrderId ?? booking.BookingRef,
+            Status: booking.PaymentStatus.ToString(),
+            IsPaid: isPaid,
+            TicketReady: isPaid,
+            Amount: booking.TotalAmount,
+            Currency: "PKR",
+            EventTitle: booking.Event?.Title,
+            VenueName: booking.Event?.Venue?.Name,
+            EventDate: booking.Event?.StartDateUtc,
+            CustomerName: booking.CustomerName,
+            MaskedEmail: maskedEmail,
+            PayProId: paidTx?.ProviderTransactionId,
+            PaidAt: paidTx?.PaidAt,
+            ExpiresAt: booking.PaymentExpiresAt,
+            Message: isPaid ? "Payment confirmed successfully." : "Payment is pending or processing."
+        );
+
+        return Ok(receipt);
     }
 
     /// <summary>

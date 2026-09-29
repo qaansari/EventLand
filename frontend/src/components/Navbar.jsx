@@ -391,10 +391,13 @@ export default function Navbar({
       {isMobileMenuOpen && (
         <div className="mobile-only animate-slide-down" style={{
           flexDirection: 'column',
-          backgroundColor: '#0b1328',
-          borderBottom: '1px solid rgba(13, 148, 136, 0.3)',
+          backgroundColor: 'rgba(6, 16, 23, 0.98)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(13, 148, 136, 0.35)',
+          boxShadow: '0 12px 32px rgba(0, 0, 0, 0.5)',
           padding: '1.25rem 1rem',
-          gap: '1rem'
+          gap: '0.75rem'
         }}>
 
 
@@ -403,7 +406,7 @@ export default function Navbar({
             <button
               onClick={() => handleNavClick('explore')}
               className="btn btn-secondary"
-              style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem' }}
+              style={{ justifyContent: 'flex-start', padding: '0.75rem 1rem', minHeight: '44px' }}
             >
               <Calendar size={18} color="#0d9488" /> Explore Events
             </button>

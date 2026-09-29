@@ -32,6 +32,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
   const [selectedPayProMethod, setSelectedPayProMethod] = useState('easypaisa_jazzcash');
   const [payproResponse, setPayproResponse] = useState(null);
   const [isInitiatingPayPro, setIsInitiatingPayPro] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   // Authorization / Verified User check
@@ -338,20 +339,40 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         throw new Error('Could not generate booking reference for PayPro session.');
       }
 
+      const returnUrl = `${window.location.origin}/payments/return`;
       const response = await paymentsApi.createPayment(
         bookingRefToUse,
         selectedPayProMethod,
-        window.location.href
+        returnUrl
       );
 
       setPayproResponse(response);
-      setStep(3); // Go to Step 3: PayPro Invoice & Direct Connect Portal
-      const voucher = response.voucherCode || response.otcVoucherCode || response.invoiceId || bookingRefToUse;
-      showSuccess('PayPro Invoice Ready 💳', `PayPro Voucher #: ${voucher}`);
+      const paymentUrl = response?.paymentUrl || response?.click2PayUrl || response?.connectUrl;
+      const voucher = response?.voucherCode || response?.otcVoucherCode || response?.invoiceId || bookingRefToUse;
+
+      // Save order metadata to localStorage for cross-tab or recovery
+      try {
+        localStorage.setItem('last_order_number', voucher);
+        localStorage.setItem('last_booking_ref', bookingRefToUse);
+        localStorage.setItem('last_event_title', event?.title || '');
+      } catch { }
 
       if (onBookingSuccess) {
         onBookingSuccess(booking);
       }
+
+      // Seamless hosted redirect matching ACPKHI (acpkhi.com/events)
+      if (paymentUrl) {
+        setIsRedirecting(true);
+        showSuccess('Redirecting to PayPro 💳', 'Connecting to PayPro 1Link checkout portal...');
+        setTimeout(() => {
+          window.location.assign(paymentUrl);
+        }, 350);
+        return;
+      }
+
+      setStep(3); // Fallback: Show Voucher Code & Tracker
+      showSuccess('PayPro Invoice Ready 💳', `PayPro Voucher #: ${voucher}`);
     } catch (err) {
       console.error('PayPro Checkout error:', err);
       showError('PayPro Gateway Error', err.message || 'Failed to initiate PayPro Online Gateway session.');
@@ -410,7 +431,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         borderRadius: '24px',
         border: '1px solid rgba(13, 148, 136, 0.35)',
         boxShadow: '0 12px 36px rgba(0, 0, 0, 0.5)',
-        padding: '2rem'
+        padding: 'clamp(1rem, 3.5vw, 2rem)'
       }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
@@ -509,11 +530,35 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
           </div>
         )}
 
+        {/* --- REDIRECTING STATE (ACPKHI Hosted Checkout Redirect) --- */}
+        {isRedirecting && (
+          <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem' }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              margin: '0 auto 1.5rem',
+              borderRadius: '50%',
+              border: '3px solid rgba(45, 212, 191, 0.2)',
+              borderTopColor: '#2dd4bf',
+              animation: 'spin 0.8s linear infinite'
+            }} />
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#fff', marginBottom: '0.6rem' }}>
+              Redirecting to PayPro 1Link Portal...
+            </h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', maxWidth: '440px', margin: '0 auto 1.25rem', lineHeight: 1.5 }}>
+              Securing your reservation for <strong>{event.title}</strong>. Taking you directly to PayPro's official checkout page for cards, 1Link, and mobile wallets.
+            </p>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: '#64748b', fontSize: '0.8rem' }}>
+              <ShieldCheck size={14} color="#2dd4bf" /> 256-bit Bank Grade Encrypted Session
+            </div>
+          </div>
+        )}
+
         {/* --- STEP 1: BUYER INFORMATION --- */}
-        {step === 1 && (
+        {!isRedirecting && step === 1 && (
           <form onSubmit={handleCreateBookingAndProceedToBank}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
-              <div style={{ gridColumn: 'span 2' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div style={{ gridColumn: '1 / -1' }}>
                 <label style={{ display: 'block', fontSize: '0.8125rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '0.35rem' }}>
                   Full Name *
                 </label>
@@ -555,7 +600,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                 />
               </div>
 
-              <div style={{ gridColumn: 'span 2' }}>
+              <div style={{ gridColumn: '1 / -1' }}>
                 <label style={{ display: 'block', fontSize: '0.8125rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '0.35rem' }}>
                   CNIC Number (Optional)
                 </label>
@@ -625,7 +670,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         )}
 
         {/* --- STEP 2: PAYMENT METHOD SELECTION & DETAILS --- */}
-        {step === 2 && (
+        {!isRedirecting && step === 2 && (
           <div>
             {/* Amount Payable Banner */}
             <div style={{
@@ -1155,7 +1200,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         )}
 
         {/* --- STEP 3: INVOICE & CONFIRMATION CARD --- */}
-        {step === 3 && payproResponse ? (
+        {!isRedirecting && step === 3 && payproResponse ? (
           <div style={{ textAlign: 'center', padding: '1rem 0' }}>
             <div style={{
               width: '64px',
@@ -1328,7 +1373,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               </button>
             </div>
           </div>
-        ) : step === 3 && (
+        ) : !isRedirecting && step === 3 && (
           <div style={{ textAlign: 'center', padding: '1rem 0' }}>
             <div style={{
               width: '64px',

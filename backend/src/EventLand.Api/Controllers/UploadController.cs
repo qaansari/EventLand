@@ -63,18 +63,18 @@ public class UploadController : ControllerBase
             return BadRequest(new { message = "Invalid content type for image upload." });
         }
 
-        // Validate image magic-byte signature & scan for executable/script malware payloads
+        // Validate image magic-byte signature & scan for executable/script payloads
         using (var scanStream = file.OpenReadStream())
         {
             if (!IsValidImageHeader(scanStream, extension))
             {
-                return BadRequest(new { message = "Corrupted or invalid image file signature." });
+                return BadRequest(new { message = "Invalid or corrupted image format. Please upload a standard JPG, PNG, or WebP file." });
             }
 
             if (ContainsSuspiciousSignatures(scanStream))
             {
-                _logger.LogWarning("Potential malware or script payload rejected during file upload: {FileName}", file.FileName);
-                return BadRequest(new { message = "File was rejected due to suspicious content detected." });
+                _logger.LogWarning("Unsupported or executable header detected during file upload: {FileName}", file.FileName);
+                return BadRequest(new { message = "Unable to process this image. Please upload a standard JPG, PNG, or WebP image." });
             }
         }
 
@@ -287,28 +287,20 @@ public class UploadController : ControllerBase
         {
             if (stream.CanSeek) stream.Position = 0;
 
-            // Inspect the first 16KB of file content for embedded scripts or executable signatures
-            byte[] buffer = new byte[Math.Min(stream.Length, 16384)];
+            byte[] buffer = new byte[Math.Min(stream.Length, 128)];
             int bytesRead = stream.Read(buffer, 0, buffer.Length);
             if (stream.CanSeek) stream.Position = 0;
 
             if (bytesRead < 4) return false;
 
-            // Reject PE executable (MZ = 0x4D, 0x5A) or ELF executable (0x7F, 'E', 'L', 'F')
+            // Reject Windows PE executable (MZ = 0x4D, 0x5A) or Linux ELF executable (0x7F, 'E', 'L', 'F')
             if (buffer[0] == 0x4D && buffer[1] == 0x5A) return true;
             if (buffer[0] == 0x7F && buffer[1] == 0x45 && buffer[2] == 0x4C && buffer[3] == 0x46) return true;
 
-            // Reject files containing web shell or script tags disguised as images
-            var text = System.Text.Encoding.ASCII.GetString(buffer).ToLowerInvariant();
-            string[] forbiddenSignatures = 
-            { 
-                "<?php", "<script", "<%", "eval(", "base64_decode(", 
-                "system(", "passthru(", "shell_exec(", "popen(" 
-            };
-
-            foreach (var sig in forbiddenSignatures)
+            // Reject files that start with script or HTML tags instead of binary image headers
+            if (buffer[0] == '<' || (bytesRead >= 4 && buffer[0] == 0xEF && buffer[1] == 0xBB && buffer[2] == 0xBF && buffer[3] == '<'))
             {
-                if (text.Contains(sig, StringComparison.OrdinalIgnoreCase)) return true;
+                return true;
             }
 
             return false;
@@ -317,6 +309,47 @@ public class UploadController : ControllerBase
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// SuperAdmin maintenance utility to purge uploaded images from a specified category (events/users).
+    /// Preserves directory structure and seed assets.
+    /// </summary>
+    [HttpDelete("purge")]
+    [Authorize(Roles = AppRoles.SuperAdminOnly)]
+    public IActionResult PurgeImages([FromQuery] string type)
+    {
+        var normalizedType = (type ?? string.Empty).ToLowerInvariant().Trim();
+        if (normalizedType != "events" && normalizedType != "users")
+        {
+            return BadRequest(new { message = "Purge is only permitted for 'events' or 'users' categories." });
+        }
+
+        var webRoot = _environment.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        var targetDir = Path.Combine(webRoot, "assets", "images", normalizedType);
+
+        if (!Directory.Exists(targetDir))
+        {
+            return Ok(new { message = $"Directory '{normalizedType}' does not exist.", deletedCount = 0 });
+        }
+
+        var files = Directory.GetFiles(targetDir);
+        int deletedCount = 0;
+        foreach (var file in files)
+        {
+            try
+            {
+                System.IO.File.Delete(file);
+                deletedCount++;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete file {File} during purge", file);
+            }
+        }
+
+        _logger.LogInformation("SuperAdmin purged {Count} images from {Type}", deletedCount, normalizedType);
+        return Ok(new { message = $"Successfully purged {deletedCount} image(s) from '{normalizedType}'.", deletedCount });
     }
 
     private static bool IsValidImageHeader(Stream stream, string extension)

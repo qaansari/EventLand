@@ -64,11 +64,25 @@ export const payProApi = {
   },
 
   /**
+   * Public return receipt inquiry (matches GET /api/payments/paypro-return).
+   * @param {string} ordIdOrBookingRef 
+   */
+  getReturnReceipt: async (ordIdOrBookingRef) => {
+    const res = await fetch(`${BASE_URL}/api/payments/paypro-return?ordId=${encodeURIComponent(ordIdOrBookingRef || '')}&bookingRef=${encodeURIComponent(ordIdOrBookingRef || '')}`);
+    if (!res.ok) {
+      let err;
+      try { err = await res.json(); } catch { }
+      throw new Error(err?.message || `Failed to verify payment (${res.status})`);
+    }
+    return await res.json();
+  },
+
+  /**
    * Live status inquiry (ggos / ggosboi).
    * @param {string} orderNumber 
    */
   getOrderStatus: async (orderNumber) => {
-    return payProRequest(`/paypro/orders/${encodeURIComponent(orderNumber)}/status`);
+    return payProApi.getReturnReceipt(orderNumber);
   },
 
   /**

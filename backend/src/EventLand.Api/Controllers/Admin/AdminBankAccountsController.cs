@@ -85,4 +85,18 @@ public class AdminBankAccountsController : ControllerBase
             return NotFound(new { message = ex.Message });
         }
     }
+
+    [HttpPut("{id:int}/toggle-enabled")]
+    public async Task<ActionResult<BankAccountDto>> ToggleEnabled(int id)
+    {
+        try
+        {
+            var updated = await _bankAccountService.ToggleEnabledAsync(id);
+            return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
 }

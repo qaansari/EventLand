@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { adminApi, eventsApi, locationsApi, faqsApi, footerApi, paymentsApi, bankAccountsApi, bookingsApi, gateApi, getEventImageUrl, getOrganizerImageUrl, getUserImageUrl, getPaymentSlipUrl, getQrCodeImageUrl, formatPhoneNumberOnSubmit, splitPhoneNumberForEdit } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
 import SearchableSelect from './SearchableSelect';
 import MultiSearchableSelect from './MultiSearchableSelect';
 import EventCard from './EventCard';
@@ -50,6 +51,7 @@ import { exportAuditoriumChartPdf } from '../utils/pdfChartExporter';
 
 export default function AdminDashboard({ onSelectEvent, currentUser = null, onUpdateCurrentUser = null }) {
   const { showSuccess, showError, showWarning } = useToast();
+  const confirm = useConfirm();
   const [activeAdminTab, setActiveAdminTab] = useState('events'); // 'events', 'organizers', 'artists', 'bookings', 'users', 'roles', 'ticket-tiers', 'tags'
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -202,7 +204,8 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
     eventId: '',
     showTitle: '',
     startTimeUtc: '',
-    endTimeUtc: ''
+    endTimeUtc: '',
+    isClosed: false
   };
 
   const defaultAuditoriumForm = {
@@ -248,7 +251,9 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
     availableQuantity: 100,
     perks: 'Standard Entry, Access to Main Arena',
     description: '',
-    rowRange: ''
+    rowRange: '',
+    status: 'Available',
+    sortOrder: 1
   };
 
   const defaultUserForm = {
@@ -617,7 +622,16 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   };
 
   const handleDeleteEvent = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this event?')) return;
+    const ev = eventsList.find(e => e.id === id);
+    const confirmed = await confirm({
+      title: 'Delete Event',
+      message: `Are you sure you want to delete event "${ev?.title || 'this event'}"?`,
+      description: 'All show slots, ticket tiers, and allocations linked to this event will also be removed.',
+      confirmText: 'Delete Event',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await adminApi.events.delete(id);
       const msg = 'Event deleted successfully.';
@@ -628,6 +642,29 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       const msg = err.message || 'Delete failed.';
       setErrorMsg(msg);
       showError('Delete Failed', msg);
+    }
+  };
+
+  const handleToggleCloseEvent = async (ev) => {
+    const isCurrentlyClosed = (ev.status || '').toUpperCase() === 'CLOSED';
+    const actionLabel = isCurrentlyClosed ? 'reopen' : 'close';
+    const confirmed = await confirm({
+      title: `${isCurrentlyClosed ? 'Reopen' : 'Close'} Event`,
+      message: `Are you sure you want to ${actionLabel} event "${ev.title}"?`,
+      description: isCurrentlyClosed
+        ? 'This will allow new bookings and ticket purchases for this event.'
+        : 'This will immediately stop all new bookings and mark the event as closed.',
+      confirmText: isCurrentlyClosed ? 'Reopen Event' : 'Close Event',
+      cancelText: 'Cancel',
+      variant: isCurrentlyClosed ? 'primary' : 'danger',
+    });
+    if (!confirmed) return;
+    try {
+      await adminApi.events.toggleClose(ev.id, !isCurrentlyClosed);
+      showSuccess(`Event ${isCurrentlyClosed ? 'Reopened' : 'Closed'}`, `Event "${ev.title}" has been ${isCurrentlyClosed ? 'reopened' : 'closed'}.`);
+      fetchBackendData();
+    } catch (err) {
+      showError('Action Failed', err.message || `Failed to ${actionLabel} event.`);
     }
   };
 
@@ -698,7 +735,16 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   };
 
   const handleDeleteOrganizer = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this organizer?')) return;
+    const org = organizersList.find(o => o.id === id);
+    const confirmed = await confirm({
+      title: 'Delete Organizer',
+      message: `Are you sure you want to delete organizer "${org?.name || 'this organizer'}"?`,
+      description: 'This will remove the organizer profile from the platform.',
+      confirmText: 'Delete Organizer',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await adminApi.organizers.delete(id);
       const msg = 'Organizer deleted successfully.';
@@ -787,7 +833,16 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   };
 
   const handleDeleteArtist = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this artist?')) return;
+    const art = artistsList.find(a => a.id === id);
+    const confirmed = await confirm({
+      title: 'Delete Artist',
+      message: `Are you sure you want to delete artist "${art?.name || 'this artist'}"?`,
+      description: 'This will remove the artist profile from EventLand.',
+      confirmText: 'Delete Artist',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await adminApi.artists.delete(id);
       const msg = 'Artist deleted successfully.';
@@ -867,7 +922,8 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
         await adminApi.eventShows.update(showForm.id, {
           showTitle: title,
           startTimeUtc: startDate.toISOString(),
-          endTimeUtc: endDate.toISOString()
+          endTimeUtc: endDate.toISOString(),
+          isClosed: !!showForm.isClosed
         });
         showSuccess('Show Updated', `Show slot "${title}" updated successfully.`);
       } else {
@@ -875,7 +931,8 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
           eventId: parseInt(showForm.eventId, 10),
           showTitle: title,
           startTimeUtc: startDate.toISOString(),
-          endTimeUtc: endDate.toISOString()
+          endTimeUtc: endDate.toISOString(),
+          isClosed: !!showForm.isClosed
         });
         showSuccess('Show Created', `Show slot "${title}" created successfully.`);
       }
@@ -897,13 +954,45 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       eventId: String(show.eventId),
       showTitle: show.showTitle || '',
       startTimeUtc: show.startTimeUtc ? show.startTimeUtc.slice(0, 16) : '',
-      endTimeUtc: show.endTimeUtc ? show.endTimeUtc.slice(0, 16) : ''
+      endTimeUtc: show.endTimeUtc ? show.endTimeUtc.slice(0, 16) : '',
+      isClosed: !!show.isClosed
     });
     setShowShowModal(true);
   };
 
+  const handleToggleCloseShow = async (show) => {
+    const isCurrentlyClosed = !!show.isClosed;
+    const actionLabel = isCurrentlyClosed ? 'reopen' : 'close';
+    const confirmed = await confirm({
+      title: `${isCurrentlyClosed ? 'Reopen' : 'Close'} Show Slot`,
+      message: `Are you sure you want to ${actionLabel} show slot "${show.showTitle || 'Show'}"?`,
+      description: isCurrentlyClosed
+        ? 'This will allow bookings for this show slot.'
+        : 'This will prevent bookings for this show slot.',
+      confirmText: isCurrentlyClosed ? 'Reopen Show' : 'Close Show',
+      cancelText: 'Cancel',
+      variant: isCurrentlyClosed ? 'primary' : 'danger',
+    });
+    if (!confirmed) return;
+    try {
+      await adminApi.eventShows.toggleClose(show.id, !isCurrentlyClosed);
+      showSuccess(`Show Slot ${isCurrentlyClosed ? 'Reopened' : 'Closed'}`, `Show slot "${show.showTitle || 'Show'}" has been ${isCurrentlyClosed ? 'reopened' : 'closed'}.`);
+      fetchBackendData();
+    } catch (err) {
+      showError('Action Failed', err.message || `Failed to ${actionLabel} show slot.`);
+    }
+  };
+
   const handleDeleteShow = async (show) => {
-    if (!window.confirm(`Are you sure you want to delete show slot "${show.showTitle || 'this show'}"? Linked ticket tiers will also be deleted.`)) return;
+    const confirmed = await confirm({
+      title: 'Delete Show Slot',
+      message: `Are you sure you want to delete show slot "${show.showTitle || 'this show'}"?`,
+      description: 'Linked ticket tiers and allocations will also be deleted.',
+      confirmText: 'Delete Show',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await adminApi.eventShows.delete(show.id);
       showSuccess('Show Deleted', `Show slot "${show.showTitle || 'Show'}" has been deleted.`);
@@ -968,7 +1057,8 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
         rowRange: tierForm.rowRange || null,
         availableQuantity: !isNaN(parseInt(tierForm.availableQuantity, 10)) ? parseInt(tierForm.availableQuantity, 10) : 100,
         maxPerOrder: !isNaN(parseInt(tierForm.maxPerOrder, 10)) ? parseInt(tierForm.maxPerOrder, 10) : 5,
-        sortOrder: !isNaN(parseInt(tierForm.sortOrder, 10)) ? parseInt(tierForm.sortOrder, 10) : 1
+        status: tierForm.status || 'Available',
+        sortOrder: !isNaN(parseInt(tierForm.sortOrder, 10)) ? parseInt(tierForm.sortOrder, 10) : 0
       };
 
       if (tierForm.id) {
@@ -995,6 +1085,8 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   };
 
   const handleEditTicketTier = (tier) => {
+    const rawStatus = (tier.status || 'Available').replace(/\s+/g, '');
+    const normalizedStatus = (rawStatus.toLowerCase() === 'soldout') ? 'SoldOut' : (rawStatus.toLowerCase() === 'closed') ? 'Closed' : 'Available';
     setTierForm({
       id: tier.id,
       eventId: String(tier.eventId),
@@ -1005,13 +1097,55 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       rowRange: tier.rowRange || '',
       availableQuantity: tier.availableQuantity !== undefined ? tier.availableQuantity : 100,
       maxPerOrder: tier.maxPerOrder || 5,
+      status: normalizedStatus,
       sortOrder: tier.sortOrder || 1
     });
     setShowTierModal(true);
   };
 
+  const handleUpdateTierStatus = async (tierId, newStatus) => {
+    // Optimistic UI update
+    setTicketTiersList(prev => prev.map(t => t.id === tierId ? { ...t, status: newStatus } : t));
+    try {
+      try {
+        await adminApi.ticketTiers.updateStatus(tierId, newStatus);
+      } catch (patchErr) {
+        const currentTier = ticketTiersList.find(t => t.id === tierId);
+        if (currentTier) {
+          await adminApi.ticketTiers.update(tierId, {
+            eventShowId: currentTier.eventShowId,
+            name: currentTier.name,
+            description: currentTier.description,
+            price: currentTier.price,
+            availableQuantity: currentTier.availableQuantity,
+            maxPerOrder: currentTier.maxPerOrder || 5,
+            sortOrder: currentTier.sortOrder || 0,
+            rowRange: currentTier.rowRange,
+            status: newStatus
+          });
+        } else {
+          throw patchErr;
+        }
+      }
+      showSuccess('Tier Status Updated', `Ticket tier status changed to ${newStatus}.`);
+      fetchBackendData();
+    } catch (err) {
+      showError('Status Update Failed', err.message || 'Failed to update ticket tier status.');
+      fetchBackendData();
+    }
+  };
+
   const handleDeleteTicketTier = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this ticket tier?')) return;
+    const tier = ticketTiersList.find(t => t.id === id);
+    const confirmed = await confirm({
+      title: 'Delete Ticket Tier',
+      message: `Are you sure you want to delete ticket tier "${tier?.name || 'this tier'}"?`,
+      description: 'This will remove the pricing and seat allocation tier.',
+      confirmText: 'Delete Tier',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await adminApi.ticketTiers.delete(id);
       showSuccess('Deleted', 'Ticket tier deleted successfully.');
@@ -1089,7 +1223,15 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
 
   const handleResetGateTicket = async (ref) => {
     if (!ref || isResettingGateTicket) return;
-    if (!window.confirm(`Reset check-in status for ticket ${ref}?`)) return;
+    const confirmed = await confirm({
+      title: 'Reset Check-In Status',
+      message: `Reset check-in status for ticket ${ref}?`,
+      description: 'This will invalidate the previous scan and make the ticket valid for admission again.',
+      confirmText: 'Reset Check-In',
+      cancelText: 'Cancel',
+      variant: 'warning',
+    });
+    if (!confirmed) return;
 
     setIsResettingGateTicket(true);
     try {
@@ -1282,7 +1424,15 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       }
     }
 
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    const confirmed = await confirm({
+      title: 'Delete User Account',
+      message: `Are you sure you want to delete user "${target?.name || target?.email || 'this user'}"?`,
+      description: 'The user will lose platform access immediately.',
+      confirmText: 'Delete User',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await adminApi.users.delete(id);
       const msg = 'User account deleted.';
@@ -1344,7 +1494,15 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   };
 
   const handleDeleteRole = async (id) => {
-    if (!window.confirm('Delete role?')) return;
+    const role = rolesList.find(r => r.id === id);
+    const confirmed = await confirm({
+      title: 'Delete Role',
+      message: `Are you sure you want to delete role "${role?.name || 'this role'}"?`,
+      confirmText: 'Delete Role',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await adminApi.roles.delete(id);
       const msg = 'Role deleted.';
@@ -1422,7 +1580,15 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   };
 
   const handleDeleteTag = async (id) => {
-    if (!window.confirm('Delete tag?')) return;
+    const tag = tagsList.find(t => t.id === id);
+    const confirmed = await confirm({
+      title: 'Delete Tag',
+      message: `Are you sure you want to delete tag "${tag?.name || 'this tag'}"?`,
+      confirmText: 'Delete Tag',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await adminApi.tags.delete(id);
       const msg = 'Tag deleted.';
@@ -1438,7 +1604,15 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
 
   // --- CRUD: BOOKINGS ---
   const handleDeleteBooking = async (id) => {
-    if (!window.confirm('Delete booking?')) return;
+    const confirmed = await confirm({
+      title: 'Delete Booking Record',
+      message: 'Are you sure you want to delete this booking?',
+      description: 'The booking record and linked tickets will be permanently removed.',
+      confirmText: 'Delete Booking',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await adminApi.bookings.delete(id);
       const msg = 'Booking deleted successfully.';
@@ -1579,7 +1753,16 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   };
 
   const handleDeleteAuditorium = async (id) => {
-    if (!window.confirm('Are you sure you want to deactivate / delete this auditorium layout?')) return;
+    const layout = auditoriumList.find(a => a.id === id);
+    const confirmed = await confirm({
+      title: 'Delete Auditorium Layout',
+      message: `Are you sure you want to deactivate / delete layout "${layout?.name || 'this layout'}"?`,
+      description: 'Any future shows using this layout should be reassigned.',
+      confirmText: 'Delete Layout',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await adminApi.auditoriumLayouts.delete(id);
       setSuccessMsg('Auditorium layout deleted successfully.');
@@ -1653,7 +1836,16 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   };
 
   const handleDeleteCountry = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this country?')) return;
+    const country = countriesList.find(c => c.id === id);
+    const confirmed = await confirm({
+      title: 'Delete Country',
+      message: `Are you sure you want to delete country "${country?.name || 'this country'}"?`,
+      description: 'Linked cities and venues should be checked first.',
+      confirmText: 'Delete Country',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await locationsApi.deleteCountry(id);
       const msg = 'Country deleted successfully.';
@@ -1731,7 +1923,15 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   };
 
   const handleDeleteCity = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this city?')) return;
+    const city = citiesList.find(c => c.id === id);
+    const confirmed = await confirm({
+      title: 'Delete City',
+      message: `Are you sure you want to delete city "${city?.name || 'this city'}"?`,
+      confirmText: 'Delete City',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await locationsApi.deleteCity(id);
       const msg = 'City deleted successfully.';
@@ -1821,7 +2021,15 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   };
 
   const handleDeleteVenue = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this venue?')) return;
+    const venue = venuesList.find(v => v.id === id);
+    const confirmed = await confirm({
+      title: 'Delete Venue',
+      message: `Are you sure you want to delete venue "${venue?.name || 'this venue'}"?`,
+      confirmText: 'Delete Venue',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await locationsApi.deleteVenue(id);
       const msg = 'Venue deleted successfully.';
@@ -1973,7 +2181,15 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   };
 
   const handleDeleteFaq = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this FAQ?')) return;
+    const faq = faqsList.find(f => f.id === id);
+    const confirmed = await confirm({
+      title: 'Delete FAQ',
+      message: `Are you sure you want to delete FAQ "${faq?.q || faq?.question || 'this FAQ'}"?`,
+      confirmText: 'Delete FAQ',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await faqsApi.delete(id);
       const msg = 'FAQ deleted successfully.';
@@ -2080,7 +2296,16 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   };
 
   const handleDeleteBankAccount = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this bank account?')) return;
+    const acc = bankAccountsList.find(b => b.id === id);
+    const confirmed = await confirm({
+      title: 'Delete Bank Account',
+      message: `Are you sure you want to delete bank account "${acc?.bankName || acc?.accountTitle || 'this account'}"?`,
+      description: 'This bank account will no longer be available for customer direct bank transfers.',
+      confirmText: 'Delete Account',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
     try {
       await bankAccountsApi.adminDelete(id);
       showSuccess('Bank Account Deleted', 'Account removed successfully.');
@@ -2100,9 +2325,27 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
     }
   };
 
+  const handleToggleEnabledBankAccount = async (id) => {
+    try {
+      await bankAccountsApi.adminToggleEnabled(id);
+      showSuccess('Visibility Updated', 'Bank account checkout visibility toggled.');
+      fetchBackendData();
+    } catch (err) {
+      showError('Update Failed', err.message || 'Failed to toggle enabled status.');
+    }
+  };
+
   // --- BOOKING VERIFICATION & CONFIRMATION ---
   const handleConfirmBankPayment = async (bookingId, bookingRef) => {
-    if (!window.confirm(`Confirm payment for Booking #${bookingRef}? This will permanently reserve seats and issue the official E-Ticket with QR code.`)) {
+    const isConfirmed = await confirm({
+      title: 'Confirm Bank Payment',
+      message: `Confirm payment verification for Booking #${bookingRef}?`,
+      description: 'This will finalize the booking, mark it as Paid, and issue the official digital QR pass to the attendee.',
+      confirmText: 'Approve & Issue Ticket',
+      cancelText: 'Cancel',
+      variant: 'success',
+    });
+    if (!isConfirmed) {
       return;
     }
     try {
@@ -2115,7 +2358,17 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   };
 
   const handleRejectBankPayment = async (bookingId, bookingRef) => {
-    const reason = window.prompt(`Enter reason for rejecting payment for Booking #${bookingRef}:`, 'Transfer could not be verified in bank statement.');
+    const reason = await confirm.prompt({
+      title: 'Reject Bank Payment',
+      message: `Enter rejection reason for Booking #${bookingRef}:`,
+      defaultValue: 'Transfer could not be verified in bank statement.',
+      inputLabel: 'Rejection Reason',
+      placeholder: 'Explain why the transfer was rejected...',
+      confirmText: 'Reject Payment',
+      cancelText: 'Cancel',
+      variant: 'danger',
+      required: true,
+    });
     if (reason === null) return;
     try {
       await bookingsApi.rejectBankPayment(bookingId, { reason });
@@ -2161,8 +2414,47 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
 
 
 
+      {/* Mobile Quick-Jump Tab Dropdown (< 1024px) */}
+      <div className="mobile-only" style={{ marginBottom: '1.25rem', width: '100%', flexDirection: 'column' }}>
+        <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', fontWeight: 600, marginBottom: '0.4rem' }}>
+          Select Management Section:
+        </label>
+        <select
+          value={activeAdminTab}
+          onChange={(e) => setActiveAdminTab(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '0.75rem 1rem',
+            borderRadius: '12px',
+            backgroundColor: '#0d212e',
+            border: '1.5px solid #0d9488',
+            color: '#fff',
+            fontSize: '0.95rem',
+            fontWeight: 700,
+            cursor: 'pointer'
+          }}
+        >
+          <option value="events">📅 Events ({eventsList.length})</option>
+          <option value="shows">🕒 Shows ({showsList.length})</option>
+          <option value="ticket-tiers">🎫 Ticket Tiers ({ticketTiersList.length})</option>
+          <option value="bookings">🎟️ Bookings ({bookingsList.length})</option>
+          <option value="artists">🎵 Artists ({artistsList.length})</option>
+          <option value="auditoriums">🏛️ Auditorium Charts ({auditoriumsList.length})</option>
+          <option value="organizers">🏢 Organizers ({organizersList.length})</option>
+          <option value="venues">📍 Venues ({venuesList.length})</option>
+          <option value="cities">🌆 Cities ({citiesList.length})</option>
+          <option value="countries">🌍 Countries ({countriesList.length})</option>
+          <option value="faqs">❓ FAQs ({faqsList.length})</option>
+          <option value="tags">🏷️ Tags ({tagsList.length})</option>
+          <option value="users">👥 Users ({visibleUsersList.length})</option>
+          {isSuperAdmin && <option value="bank-accounts">🏦 Bank Accounts ({bankAccountsList.length})</option>}
+          {isSuperAdmin && <option value="paypro-admin">⚡ PayPro Admin Operations</option>}
+          {isSuperAdmin && <option value="footer">📄 Footer & Static Content</option>}
+        </select>
+      </div>
+
       {/* Navigation Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2rem', flexWrap: 'wrap', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '1rem' }}>
+      <div className="admin-tabs-scroll-container">
         <button
           onClick={() => setActiveAdminTab('artists')}
           style={{
@@ -2537,6 +2829,7 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
                   <th style={{ padding: '1rem' }}>Title</th>
                   <th style={{ padding: '1rem' }}>Organizer</th>
                   <th style={{ padding: '1rem' }}>City</th>
+                  <th style={{ padding: '1rem' }}>Status</th>
                   <th style={{ padding: '1rem' }}>Starting Price</th>
                   <th style={{ padding: '1rem' }}>Actions</th>
                 </tr>
@@ -2559,15 +2852,42 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
                     </td>
                     <td style={{ padding: '1rem', color: '#94a3b8' }}>{ev.organizerName || ev.organizer}</td>
                     <td style={{ padding: '1rem', color: '#94a3b8' }}>{ev.city}</td>
-                    <td style={{ padding: '1rem', color: '#4ade80', fontWeight: 600 }}>PKR {ev.startingPrice}</td>
                     <td style={{ padding: '1rem' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <span style={{
+                        padding: '0.25rem 0.6rem',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.02em',
+                        display: 'inline-block',
+                        background: (ev.status || '').toUpperCase() === 'CLOSED'
+                          ? 'rgba(239, 68, 68, 0.15)'
+                          : (ev.status || '').toUpperCase() === 'SOLD OUT' || (ev.status || '').toUpperCase() === 'SOLDOUT'
+                          ? 'rgba(234, 179, 8, 0.15)'
+                          : 'rgba(34, 197, 94, 0.15)',
+                        color: (ev.status || '').toUpperCase() === 'CLOSED'
+                          ? '#f87171'
+                          : (ev.status || '').toUpperCase() === 'SOLD OUT' || (ev.status || '').toUpperCase() === 'SOLDOUT'
+                          ? '#facc15'
+                          : '#4ade80',
+                        border: (ev.status || '').toUpperCase() === 'CLOSED'
+                          ? '1px solid rgba(239, 68, 68, 0.3)'
+                          : (ev.status || '').toUpperCase() === 'SOLD OUT' || (ev.status || '').toUpperCase() === 'SOLDOUT'
+                          ? '1px solid rgba(234, 179, 8, 0.3)'
+                          : '1px solid rgba(34, 197, 94, 0.3)'
+                      }}>
+                        {(ev.status || 'Live').toUpperCase()}
+                      </span>
+                    </td>
+                    <td style={{ padding: '1rem', color: '#4ade80', fontWeight: 600, whiteSpace: 'nowrap' }}>PKR {ev.startingPrice}</td>
+                    <td style={{ padding: '1rem', whiteSpace: 'nowrap', width: '1%', textAlign: 'right' }}>
+                      <div className="table-actions-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.45rem', flexWrap: 'nowrap' }}>
                         <button
                           onClick={() => {
                             setShowEventFilter(String(ev.id));
                             setActiveAdminTab('shows');
                           }}
-                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600 }}
+                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}
                           title="Manage show slots for this event"
                         >
                           <Calendar size={14} /> Shows
@@ -2577,20 +2897,41 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
                             setTierEventFilter(String(ev.id));
                             setActiveAdminTab('ticket-tiers');
                           }}
-                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(99, 102, 241, 0.2)', border: '1px solid rgba(99, 102, 241, 0.4)', borderRadius: '6px', color: '#c7d2fe', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600 }}
+                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(99, 102, 241, 0.2)', border: '1px solid rgba(99, 102, 241, 0.4)', borderRadius: '6px', color: '#c7d2fe', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}
                           title="View and update ticket tiers for this event"
                         >
                           <Layers size={14} /> Tiers
                         </button>
                         <button
+                          onClick={() => handleToggleCloseEvent(ev)}
+                          style={{
+                            padding: '0.4rem 0.75rem',
+                            background: (ev.status || '').toUpperCase() === 'CLOSED' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                            border: (ev.status || '').toUpperCase() === 'CLOSED' ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)',
+                            borderRadius: '6px',
+                            color: (ev.status || '').toUpperCase() === 'CLOSED' ? '#4ade80' : '#f87171',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            fontWeight: 600,
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0
+                          }}
+                          title={(ev.status || '').toUpperCase() === 'CLOSED' ? 'Reopen event for bookings' : 'Close event to stop bookings'}
+                        >
+                          {(ev.status || '').toUpperCase() === 'CLOSED' ? <CheckCircle size={14} /> : <XCircle size={14} />}
+                          {(ev.status || '').toUpperCase() === 'CLOSED' ? 'Reopen' : 'Close'}
+                        </button>
+                        <button
                           onClick={() => handleEditEvent(ev)}
-                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}
                         >
                           <Edit3 size={14} /> Edit
                         </button>
                         <button
                           onClick={() => handleDeleteEvent(ev.id)}
-                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                          style={{ padding: '0.4rem 0.75rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}
                         >
                           <Trash2 size={14} /> Delete
                         </button>
@@ -2672,17 +3013,18 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
               <table className="mature-data-table">
                 <thead>
                   <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                    <th style={{ padding: '1rem' }}>Show Slot Title</th>
-                    <th style={{ padding: '1rem' }}>Associated Event</th>
-                    <th style={{ padding: '1rem' }}>Show Timing (PKT)</th>
+                    <th style={{ padding: '1rem', whiteSpace: 'nowrap' }}>Show Slot Title</th>
+                    <th style={{ padding: '1rem', minWidth: '160px' }}>Associated Event</th>
+                    <th style={{ padding: '1rem', whiteSpace: 'nowrap' }}>Show Timing (PKT)</th>
+                    <th style={{ padding: '1rem', whiteSpace: 'nowrap' }}>Status</th>
                     <th style={{ padding: '1rem' }}>Linked Ticket Tiers</th>
-                    <th style={{ padding: '1rem' }}>Actions</th>
+                    <th style={{ padding: '1rem', textAlign: 'right', whiteSpace: 'nowrap', width: '1%' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredShows.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                      <td colSpan={6} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
                         No show slots found. Click "+ Add Show Slot" to define performance timings for an event.
                       </td>
                     </tr>
@@ -2732,6 +3074,19 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
                             </div>
                           </td>
                           <td style={{ padding: '1rem' }}>
+                            <span style={{
+                              padding: '0.25rem 0.55rem',
+                              borderRadius: '6px',
+                              fontSize: '0.725rem',
+                              fontWeight: 700,
+                              background: show.isClosed ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)',
+                              color: show.isClosed ? '#f87171' : '#4ade80',
+                              border: show.isClosed ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(34, 197, 94, 0.3)'
+                            }}>
+                              {show.isClosed ? 'CLOSED' : 'OPEN'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem' }}>
                             {linkedTiers.length > 0 ? (
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
                                 {linkedTiers.map(t => (
@@ -2746,18 +3101,68 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
                               </span>
                             )}
                           </td>
-                          <td style={{ padding: '1rem' }}>
-                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <td style={{ padding: '1rem', whiteSpace: 'nowrap', width: '1%', textAlign: 'right' }}>
+                            <div className="table-actions-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.45rem', flexWrap: 'nowrap' }}>
+                              <button
+                                onClick={() => handleToggleCloseShow(show)}
+                                style={{
+                                  padding: '0.4rem 0.75rem',
+                                  background: show.isClosed ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                                  border: show.isClosed ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)',
+                                  borderRadius: '6px',
+                                  color: show.isClosed ? '#4ade80' : '#f87171',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 600,
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0
+                                }}
+                                title={show.isClosed ? 'Reopen show slot' : 'Close show slot'}
+                              >
+                                {show.isClosed ? <CheckCircle size={14} /> : <XCircle size={14} />}
+                                {show.isClosed ? 'Reopen' : 'Close'}
+                              </button>
                               <button
                                 onClick={() => handleEditShow(show)}
-                                style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                                style={{
+                                  padding: '0.4rem 0.75rem',
+                                  background: 'rgba(13, 148, 136, 0.2)',
+                                  border: '1px solid rgba(13, 148, 136, 0.4)',
+                                  borderRadius: '6px',
+                                  color: '#2dd4bf',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 600,
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0
+                                }}
                                 title="Edit show timing"
                               >
                                 <Edit3 size={14} /> Edit
                               </button>
                               <button
                                 onClick={() => handleDeleteShow(show)}
-                                style={{ padding: '0.4rem 0.75rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                                style={{
+                                  padding: '0.4rem 0.75rem',
+                                  background: 'rgba(239, 68, 68, 0.2)',
+                                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                                  borderRadius: '6px',
+                                  color: '#f87171',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 600,
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0
+                                }}
                                 title="Delete show slot"
                               >
                                 <Trash2 size={14} /> Delete
@@ -2777,22 +3182,24 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
 
       {/* --- TAB: TICKET TIERS MANAGEMENT --- */}
       {activeAdminTab === 'ticket-tiers' && (() => {
-        const filteredTiers = ticketTiersList.filter(t => {
-          if (tierEventFilter !== 'All' && String(t.eventId) !== String(tierEventFilter)) {
-            return false;
-          }
-          if (tierSearch.trim()) {
-            const q = tierSearch.toLowerCase();
-            const matchedEv = eventsList.find(e => e.id === t.eventId);
-            const evTitle = (matchedEv?.title || '').toLowerCase();
-            const tName = (t.name || '').toLowerCase();
-            const tRow = (t.rowRange || '').toLowerCase();
-            if (!tName.includes(q) && !evTitle.includes(q) && !tRow.includes(q)) {
+        const filteredTiers = ticketTiersList
+          .filter(t => {
+            if (tierEventFilter !== 'All' && String(t.eventId) !== String(tierEventFilter)) {
               return false;
             }
-          }
-          return true;
-        });
+            if (tierSearch.trim()) {
+              const q = tierSearch.toLowerCase();
+              const matchedEv = eventsList.find(e => e.id === t.eventId);
+              const evTitle = (matchedEv?.title || '').toLowerCase();
+              const tName = (t.name || '').toLowerCase();
+              const tRow = (t.rowRange || '').toLowerCase();
+              if (!tName.includes(q) && !evTitle.includes(q) && !tRow.includes(q)) {
+                return false;
+              }
+            }
+            return true;
+          })
+          .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0) || (a.price || 0) - (b.price || 0));
 
         return (
           <div>
@@ -2844,6 +3251,7 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
               <table className="mature-data-table">
                 <thead>
                   <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                    <th style={{ padding: '1rem' }}>Sort #</th>
                     <th style={{ padding: '1rem' }}>Tier / Pass Name</th>
                     <th style={{ padding: '1rem' }}>Event</th>
                     <th style={{ padding: '1rem' }}>Show Slot</th>
@@ -2851,13 +3259,14 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
                     <th style={{ padding: '1rem' }}>Price</th>
                     <th style={{ padding: '1rem' }}>Capacity</th>
                     <th style={{ padding: '1rem' }}>Sold</th>
-                    <th style={{ padding: '1rem' }}>Actions</th>
+                    <th style={{ padding: '1rem' }}>Status</th>
+                    <th style={{ padding: '1rem', textAlign: 'right', whiteSpace: 'nowrap', width: '1%' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredTiers.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                      <td colSpan={10} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
                         No ticket tiers found. Click "+ Add Ticket Tier" to create one.
                       </td>
                     </tr>
@@ -2869,6 +3278,9 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
 
                       return (
                         <tr key={tier.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                          <td style={{ padding: '1rem', color: '#38bdf8', fontWeight: 700 }}>
+                            #{tier.sortOrder || 1}
+                          </td>
                           <td style={{ padding: '1rem', fontWeight: 600, color: '#f8fafc' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                               <Ticket size={16} color="#2dd4bf" />
@@ -2907,17 +3319,55 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
                             {tier.soldCount || 0}
                           </td>
                           <td style={{ padding: '1rem' }}>
-                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            {(() => {
+                              const rawStatus = (tier.status || 'Available').replace(/\s+/g, '');
+                              const normalizedStatus = (rawStatus.toLowerCase() === 'soldout') ? 'SoldOut' : (rawStatus.toLowerCase() === 'closed') ? 'Closed' : 'Available';
+                              return (
+                                <select
+                                  value={normalizedStatus}
+                                  onChange={(e) => handleUpdateTierStatus(tier.id, e.target.value)}
+                                  style={{
+                                    padding: '0.35rem 0.55rem',
+                                    borderRadius: '6px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    background: normalizedStatus === 'Closed'
+                                      ? 'rgba(239, 68, 68, 0.15)'
+                                      : normalizedStatus === 'SoldOut'
+                                      ? 'rgba(234, 179, 8, 0.15)'
+                                      : 'rgba(34, 197, 94, 0.15)',
+                                    color: normalizedStatus === 'Closed'
+                                      ? '#f87171'
+                                      : normalizedStatus === 'SoldOut'
+                                      ? '#facc15'
+                                      : '#4ade80',
+                                    border: normalizedStatus === 'Closed'
+                                      ? '1px solid rgba(239, 68, 68, 0.35)'
+                                      : normalizedStatus === 'SoldOut'
+                                      ? '1px solid rgba(234, 179, 8, 0.35)'
+                                      : '1px solid rgba(34, 197, 94, 0.35)',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  <option value="Available" style={{ background: '#0f172a', color: '#4ade80' }}>Available</option>
+                                  <option value="SoldOut" style={{ background: '#0f172a', color: '#facc15' }}>Sold Out</option>
+                                  <option value="Closed" style={{ background: '#0f172a', color: '#f87171' }}>Closed</option>
+                                </select>
+                              );
+                            })()}
+                          </td>
+                          <td style={{ padding: '1rem', whiteSpace: 'nowrap', width: '1%', textAlign: 'right' }}>
+                            <div className="table-actions-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.45rem', flexWrap: 'nowrap' }}>
                               <button
                                 onClick={() => handleEditTicketTier(tier)}
-                                style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600 }}
+                                style={{ padding: '0.4rem 0.75rem', background: 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}
                                 title="Update this ticket tier"
                               >
                                 <Edit3 size={14} /> Edit
                               </button>
                               <button
                                 onClick={() => handleDeleteTicketTier(tier.id)}
-                                style={{ padding: '0.4rem 0.75rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                                style={{ padding: '0.4rem 0.75rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '6px', color: '#f87171', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}
                                 title="Delete this ticket tier"
                               >
                                 <Trash2 size={14} /> Delete
@@ -4832,6 +5282,26 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
                       title="Click to toggle active receiving account"
                     >
                       {acc.isActive ? '✓ Active (Checkout)' : 'Inactive'}
+                    </button>
+                  </div>
+                  {/* IsEnabled — controls checkout page visibility */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleEnabledBankAccount(acc.id)}
+                      style={{
+                        background: acc.isEnabled ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.15)',
+                        color: acc.isEnabled ? '#10b981' : '#64748b',
+                        border: `1px solid ${acc.isEnabled ? 'rgba(16, 185, 129, 0.35)' : 'rgba(100, 116, 139, 0.35)'}`,
+                        borderRadius: '9999px',
+                        padding: '0.2rem 0.65rem',
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                      title={acc.isEnabled ? 'Visible on checkout page — click to hide' : 'Hidden from checkout page — click to show'}
+                    >
+                      {acc.isEnabled ? '👁 Visible on Checkout' : '🚫 Hidden from Checkout'}
                     </button>
                   </div>
 

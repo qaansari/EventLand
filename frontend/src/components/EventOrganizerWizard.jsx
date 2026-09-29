@@ -450,7 +450,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
 
               <div>
                 <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '0.35rem' }}>
-                  Event Banner Image <span style={{ color: '#2dd4bf', fontWeight: 600 }}>(Recommended: 1200x500px)</span> *
+                  Event Banner Image <span style={{ color: '#2dd4bf', fontWeight: 700 }}>(Strict: 1200×500px)</span> *
                 </label>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <input
@@ -564,13 +564,18 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
+            justifyContent: 'space-between',
             marginBottom: '1rem',
             color: '#0d9488',
             fontWeight: 700,
             fontSize: '0.9rem'
           }}>
-            <Sparkles size={18} /> LIVE CARD PREVIEW
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Sparkles size={18} /> LIVE CARD PREVIEW
+            </span>
+            <span style={{ fontSize: '0.75rem', color: '#2dd4bf', background: 'rgba(13, 148, 136, 0.15)', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid rgba(13, 148, 136, 0.3)' }}>
+              1200×500px Banner
+            </span>
           </div>
 
           <EventCard

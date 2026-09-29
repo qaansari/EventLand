@@ -15,6 +15,8 @@ public class EventShow : BaseEntity
     public DateTimeOffset StartTimeUtc  { get; set; }
     public DateTimeOffset EndTimeUtc    { get; set; }
 
+    public bool IsClosed                { get; set; } = false;
+
     // Navigation — Ticket Tiers available for this specific show
     public ICollection<TicketTier> TicketTiers { get; set; } = new List<TicketTier>();
 }

@@ -17,6 +17,7 @@ public class BankAccount : BaseEntity
     public string? QrCodeImageUrl   { get; set; }
     public string? Instructions     { get; set; }
     public bool    IsActive         { get; set; } = true;
+    public bool    IsEnabled        { get; set; } = true;
     public int     DisplayOrder     { get; set; } = 1;
 
     // Maintenance & Downtime Notification fields
