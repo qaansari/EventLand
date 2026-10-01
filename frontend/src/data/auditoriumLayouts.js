@@ -24,3 +24,11 @@ export function createBlankLayoutJson(rowCount = 10, seatsPerRow = 20) {
     })
   }, null, 2);
 }
+
+import openAirTheatreLayout from './openAirTheatreLayout.json';
+
+export { openAirTheatreLayout };
+
+export function getOpenAirTheatreLayoutJson() {
+  return JSON.stringify(openAirTheatreLayout, null, 2);
+}
