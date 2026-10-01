@@ -743,38 +743,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
                 </button>
               </div>
 
-              {/* Facebook Button */}
-              <button
-                type="button"
-                onClick={handleFacebookSignIn}
-                disabled={loading || !!socialLoading}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.75rem',
-                  padding: '0.75rem 1rem',
-                  background: 'rgba(24, 119, 242, 0.12)',
-                  border: '1px solid rgba(24, 119, 242, 0.3)',
-                  borderRadius: '10px',
-                  color: '#f8fafc',
-                  fontSize: '0.875rem',
-                  fontWeight: 500,
-                  cursor: (loading || !!socialLoading) ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.2s ease',
-                  outline: 'none'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(24, 119, 242, 0.2)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(24, 119, 242, 0.12)'}
-              >
-                {socialLoading === 'facebook' ? (
-                  <RefreshCw size={16} className="animate-spin" />
-                ) : (
-                  <FacebookIcon />
-                )}
-                <span>Continue with Facebook</span>
-              </button>
+
 
               {/* Or Divider */}
               <div style={{ display: 'flex', alignItems: 'center', margin: '0.5rem 0', gap: '0.75rem' }}>
