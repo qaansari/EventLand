@@ -1,39 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, 
-  Building2, 
   Copy, 
-  Check, 
   Clock, 
-  AlertCircle, 
   CheckCircle, 
   QrCode, 
   ShieldCheck, 
-  Send, 
-  UploadCloud, 
-  MessageSquare,
-  FileText,
   CreditCard,
   ExternalLink,
   Zap,
   RefreshCw
 } from 'lucide-react';
-import QRCode from 'qrcode';
-import { bookingsApi, bankAccountsApi, uploadApi, paymentsApi, getEventImageUrl, getQrCodeImageUrl, getPaymentSlipUrl } from '../services/api';
+import { bookingsApi, paymentsApi } from '../services/api';
 import PayProStatusTracker from './PayProStatusTracker';
 import { useToast } from '../context/ToastContext';
 
 export default function CheckoutModal({ event, selectedSeats, onClose, onBookingSuccess, onInvoiceCreated }) {
   const { showSuccess, showError, showWarning } = useToast();
-  const [step, setStep] = useState(1); // 1: Buyer Info, 2: Payment Method & Details, 3: Invoice & Confirmation
+  const [step, setStep] = useState(1); // 1: Buyer Info, 2: Payment Channel, 3: Invoice & Status, 4: Confirmed
 
-  // Payment Method Selection: 'paypro' (Instant Online Gateway) or 'bank_transfer' (Direct Bank Transfer)
-  const [paymentMethodType, setPaymentMethodType] = useState('paypro');
   const [selectedPayProMethod, setSelectedPayProMethod] = useState('easypaisa_jazzcash');
   const [payproResponse, setPayproResponse] = useState(null);
   const [isInitiatingPayPro, setIsInitiatingPayPro] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [createdBooking, setCreatedBooking] = useState(null);
 
   // Authorization / Verified User check
   const loggedUserRaw = localStorage.getItem('eventland_logged_user');
@@ -46,23 +37,8 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
     cnic: ''
   });
 
-  // Active Bank Account from DB
-  const [bankAccount, setBankAccount] = useState(null);
-  const [bankQrDataUrl, setBankQrDataUrl] = useState('');
-
-  // Copy Feedback states
+  // Copy Feedback state
   const [copiedField, setCopiedField] = useState(null);
-
-  // Bank Transfer Proof fields
-  const [transactionRef, setTransactionRef] = useState('');
-  const [proofUrl, setProofUrl] = useState('');
-  const [useAltVerification, setUseAltVerification] = useState(false);
-  const [senderAccountTitle, setSenderAccountTitle] = useState('');
-  const [senderBankName, setSenderBankName] = useState('');
-  const [senderAccountLast4, setSenderAccountLast4] = useState('');
-  const [isUploadingProof, setIsUploadingProof] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [createdBooking, setCreatedBooking] = useState(null);
 
   // 30-Minute Seat Reservation Hold Timer (30 mins = 1800s)
   const [timerSeconds, setTimerSeconds] = useState(1800);
@@ -71,58 +47,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
   const [promoCode, setPromoCode] = useState('');
   const [discount, setDiscount] = useState(0);
 
-  const generateDynamicPayloadQr = async (bank) => {
-    try {
-      const b = bank || bankAccount;
-      const payload = `EVENTLAND BANK PAYMENT\nBank: ${b.bankName}\nTitle: ${b.accountTitle}\nAcc: ${b.accountNumber}\nIBAN: ${b.iban}`;
-      const url = await QRCode.toDataURL(payload, {
-        width: 360,
-        margin: 1,
-        color: { dark: '#061017', light: '#ffffff' }
-      });
-      setBankQrDataUrl(url);
-    } catch (e) {
-      console.warn('QR code generation error:', e);
-    }
-  };
-
-  const generateBankQr = async (bank) => {
-    const targetBank = bank || bankAccount;
-    if (targetBank && targetBank.qrCodeImageUrl) {
-      setBankQrDataUrl(getQrCodeImageUrl(targetBank.qrCodeImageUrl));
-      return;
-    }
-    await generateDynamicPayloadQr(targetBank);
-  };
-
-  // 1. Fetch Active Bank Account from Database & generate QR
-  useEffect(() => {
-    async function loadActiveBank() {
-      try {
-        const active = await bankAccountsApi.getActive();
-        if (active && active.bankName) {
-          setBankAccount(active);
-          generateBankQr(active);
-        } else {
-          setBankAccount(null);
-          setBankQrDataUrl('');
-        }
-      } catch (err) {
-        console.warn('No active bank account found:', err);
-        setBankAccount(null);
-        setBankQrDataUrl('');
-      }
-    }
-    loadActiveBank();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (bankAccount) {
-      generateBankQr(bankAccount);
-    }
-  }, [bankAccount]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 2. 30-Minute Countdown Timer for seat reservation hold
+  // 30-Minute Countdown Timer for seat reservation hold
   useEffect(() => {
     const interval = setInterval(() => {
       setTimerSeconds(prev => {
@@ -149,7 +74,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
     setTimeout(() => setCopiedField(null), 2500);
   };
 
-  // Pricing calculations (Direct Bank Transfer has NO gateway fees)
+  // Pricing calculations
   const subtotal = selectedSeats.reduce((sum, s) => sum + (s.price || 1500), 0);
   const groupDiscount = selectedSeats.length >= 3 ? Math.round(subtotal * 0.1) : 0;
   const totalPayable = Math.max(0, subtotal - groupDiscount - discount);
@@ -159,44 +84,12 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
       const disc = Math.round(subtotal * 0.1);
       setDiscount(disc);
       showSuccess('Promo Applied! 🎉', `10% discount (-PKR ${disc.toLocaleString()}) applied.`);
-    } else if (promoCode.trim().toUpperCase() === 'BANK500') {
-      setDiscount(500);
-      showSuccess('Promo Applied! 🎉', 'Flat PKR 500 discount applied.');
     } else {
-      showError('Invalid Promo', 'Invalid promo code. Try "EVENTLAND10" or "BANK500"');
+      showError('Invalid Promo', 'Invalid promo code. Try "EVENTLAND10" for 10% discount.');
     }
   };
 
-  const handleProofFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Strict image format extension check: webp, jpg, jpeg, png ONLY
-    const allowedExtensions = ['.webp', '.jpg', '.jpeg', '.png'];
-    const ext = file.name.slice(((file.name.lastIndexOf(".") - 1) >>> 0) + 2).toLowerCase();
-    if (!allowedExtensions.includes('.' + ext)) {
-      showError('Invalid File Format', 'Only webp, jpg, jpeg, and png payment slips are supported.');
-      return;
-    }
-
-    if (file.size > 25 * 1024 * 1024) {
-      showError('File Too Large', 'Transaction slip image size must be under 25 MB.');
-      return;
-    }
-
-    setIsUploadingProof(true);
-    try {
-      const res = await uploadApi.uploadFile(file, 'slips');
-      setProofUrl(res.url);
-      showSuccess('Receipt Uploaded 📎', 'Transaction slip image compressed & saved in organized slips directory.');
-    } catch (err) {
-      showError('Upload Failed', err.message || 'Could not upload payment slip.');
-    } finally {
-      setIsUploadingProof(false);
-    }
-  };
-
-  const handleCreateBookingAndProceedToBank = (e) => {
+  const handleProceedToPayment = (e) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.phone) {
       showError('Validation Error', 'Please fill out Name, Email, and Mobile Number.');
@@ -214,8 +107,8 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
     setStep(2);
   };
 
-  // Common helper to create a backend booking record if not already created
-  const createBookingRecord = async (paymentMethod) => {
+  // Helper to create a backend booking record if not already created
+  const createBookingRecord = async (paymentMethod = 'PayPro') => {
     if (createdBooking) return createdBooking;
 
     const explicitTierId = selectedSeats.find(s => s.tierId)?.tierId;
@@ -250,69 +143,6 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
       return booking;
     }
     return null;
-  };
-
-  const handleSubmitBankTransfer = async (e) => {
-    e.preventDefault();
-    if (!useAltVerification && !transactionRef.trim()) {
-      showError('Transaction Ref Required', 'Please enter your Bank Transaction ID, Raast Reference # or Transfer TID.');
-      return;
-    }
-    if (useAltVerification && (!senderAccountTitle.trim() || !senderBankName.trim())) {
-      showError('Sender Info Required', 'Please fill out your Sender Account Title and Sender Bank Name for manual verification.');
-      return;
-    }
-    if (timerSeconds <= 0) {
-      showError('Hold Expired', 'Seat hold timer has expired. Please select your seats again.');
-      onClose();
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      let backendBooking = await createBookingRecord('BankTransfer');
-
-      if (backendBooking?.id) {
-        const defaultRef = transactionRef.trim() || `SENDER-${senderBankName.trim().toUpperCase().slice(0, 6)}`;
-        backendBooking = await bookingsApi.submitPaymentProof(backendBooking.id, {
-          bankTransactionRef: defaultRef,
-          paymentProofUrl: proofUrl || null,
-          senderAccountTitle: useAltVerification ? senderAccountTitle.trim() : null,
-          senderBankName: useAltVerification ? senderBankName.trim() : null,
-          senderAccountLast4: useAltVerification ? senderAccountLast4.trim() : null
-        });
-        setCreatedBooking(backendBooking);
-      }
-
-      setStep(3); // Show Invoice & Verification Details
-
-      if (onInvoiceCreated) {
-        onInvoiceCreated({
-          bookingRef: backendBooking?.bookingRef || (`EVL-` + Math.floor(100000 + Math.random() * 900000)),
-          bookingId: backendBooking?.id,
-          totalAmount: totalPayable,
-          bankTransactionRef: transactionRef.trim(),
-          eventTitle: event.title,
-          showTitle: event.selectedShow?.showTitle || null,
-          customerName: formData.name,
-          customerEmail: formData.email,
-          paymentStatus: 'PendingVerification',
-          expiresAt: new Date(Date.now() + 1800000).toISOString(),
-          createdAt: new Date().toISOString()
-        });
-      }
-
-      showSuccess('Order Placed! 🏦', 'Payment proof submitted. Super Admin will verify and issue your official E-Ticket.');
-      if (onBookingSuccess) {
-        onBookingSuccess(backendBooking);
-      }
-    } catch (err) {
-      console.error('Bank Transfer Checkout error:', err);
-      showError('Booking Error', err.message || 'Failed to submit bank transfer booking.');
-    } finally {
-      setIsProcessing(false);
-    }
   };
 
   const handleInitiatePayProCheckout = async (e) => {
@@ -361,6 +191,22 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         onBookingSuccess(booking);
       }
 
+      if (onInvoiceCreated) {
+        onInvoiceCreated({
+          bookingRef: bookingRefToUse,
+          bookingId: booking?.id,
+          totalAmount: totalPayable,
+          voucherCode: voucher,
+          eventTitle: event.title,
+          showTitle: event.selectedShow?.showTitle || null,
+          customerName: formData.name,
+          customerEmail: formData.email,
+          paymentStatus: 'Pending',
+          expiresAt: new Date(Date.now() + 1800000).toISOString(),
+          createdAt: new Date().toISOString()
+        });
+      }
+
       // Seamless hosted redirect matching ACPKHI (acpkhi.com/events)
       if (paymentUrl) {
         setIsRedirecting(true);
@@ -405,12 +251,6 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
     }
   };
 
-  const getWhatsAppSupportLink = () => {
-    const bookingRef = createdBooking?.bookingRef || 'EVL-100001';
-    const message = `Hello EventLand Support,\n\nI have transferred PKR ${totalPayable.toLocaleString()} for Booking Ref: *${bookingRef}* (${event.title}).\nTransaction Reference: *${transactionRef}*.\n\nPlease verify my payment and issue my official E-Ticket pass. Thank you!`;
-    return `https://api.whatsapp.com/send?phone=923079353185&text=${encodeURIComponent(message)}`;
-  };
-
   return (
     <div style={{
       position: 'fixed',
@@ -438,7 +278,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
               <span className="badge badge-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem' }}>
-                <ShieldCheck size={14} /> DIRECT BANK TRANSFER
+                <Zap size={14} /> PAYPRO ONLINE GATEWAY
               </span>
               <span className="checkout-timer" style={{
                 display: 'flex',
@@ -458,8 +298,9 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
             </div>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', margin: 0 }}>
               {step === 1 && 'Buyer Details'}
-              {step === 2 && 'Bank Transfer Details & Proof'}
-              {step === 3 && 'Invoice & Verification Slip'}
+              {step === 2 && 'PayPro Online Payment'}
+              {step === 3 && 'PayPro Invoice & Status'}
+              {step === 4 && 'Payment Confirmed'}
             </h2>
             <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.2rem' }}>
               {event.title} • {selectedSeats.length} {selectedSeats.length === 1 ? 'Seat' : 'Seats'}
@@ -467,6 +308,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
           </div>
           <button
             onClick={onClose}
+            aria-label="Close modal"
             style={{
               background: 'rgba(255, 255, 255, 0.06)',
               border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -489,8 +331,8 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         <div className="checkout-steps-bar" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.75rem' }}>
           {[
             { num: 1, label: '1. Buyer Info' },
-            { num: 2, label: '2. Bank Transfer' },
-            { num: 3, label: '3. Invoice' }
+            { num: 2, label: '2. Online Payment' },
+            { num: 3, label: '3. Confirmation' }
           ].map(s => (
             <div key={s.num} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               <div style={{
@@ -505,30 +347,6 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
             </div>
           ))}
         </div>
-
-        {/* Maintenance Notice Banner (if active) */}
-        {bankAccount?.maintenanceNotice && (
-          <div style={{
-            margin: '0 0 1.25rem 0',
-            padding: '0.75rem 1rem',
-            backgroundColor: bankAccount.isUnderMaintenance ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.12)',
-            border: `1px solid ${bankAccount.isUnderMaintenance ? 'rgba(239, 68, 68, 0.35)' : 'rgba(245, 158, 11, 0.35)'}`,
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.65rem',
-            color: bankAccount.isUnderMaintenance ? '#fca5a5' : '#fbbf24',
-            fontSize: '0.8rem'
-          }}>
-            <ShieldCheck size={18} style={{ flexShrink: 0 }} />
-            <div>
-              <strong style={{ color: '#fff', display: 'block', fontSize: '0.82rem' }}>
-                {bankAccount.isUnderMaintenance ? '⚠️ Bank Channel Maintenance Notice' : 'ℹ️ Scheduled Bank Maintenance Advisory'}
-              </strong>
-              {bankAccount.maintenanceNotice}
-            </div>
-          </div>
-        )}
 
         {/* --- REDIRECTING STATE (ACPKHI Hosted Checkout Redirect) --- */}
         {isRedirecting && (
@@ -556,7 +374,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
 
         {/* --- STEP 1: BUYER INFORMATION --- */}
         {!isRedirecting && step === 1 && (
-          <form onSubmit={handleCreateBookingAndProceedToBank}>
+          <form onSubmit={handleProceedToPayment}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={{ display: 'block', fontSize: '0.8125rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '0.35rem' }}>
@@ -664,7 +482,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               className="btn btn-primary"
               style={{ width: '100%', padding: '0.9rem', fontSize: '1rem', fontWeight: 700, borderRadius: '12px' }}
             >
-              Continue to Bank Account Details →
+              Continue to Payment Options →
             </button>
           </form>
         )}
@@ -694,513 +512,128 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               <div style={{ textAlign: 'right' }}>
                 <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Payment Method</span>
                 <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#2dd4bf' }}>
-                  {paymentMethodType === 'paypro' ? 'PayPro Online Gateway ⚡' : 'Direct Bank Transfer 🏛️'}
+                  PayPro Online Gateway ⚡
                 </div>
               </div>
             </div>
 
-            {/* Payment Method Switcher Tabs */}
+            {/* PAYPRO ONLINE GATEWAY DETAILS CARD */}
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '0.75rem',
-              marginBottom: '1.5rem',
-              background: 'rgba(15, 23, 42, 0.6)',
-              padding: '0.4rem',
-              borderRadius: '14px',
-              border: '1px solid rgba(255, 255, 255, 0.1)'
+              background: 'rgba(10, 18, 30, 0.7)',
+              border: '1px solid rgba(13, 148, 136, 0.35)',
+              borderRadius: '16px',
+              padding: '1.5rem',
+              marginBottom: '1.5rem'
             }}>
-              <button
-                type="button"
-                onClick={() => setPaymentMethodType('paypro')}
-                style={{
-                  padding: '0.75rem 1rem',
-                  borderRadius: '10px',
-                  border: paymentMethodType === 'paypro' ? '1px solid #2dd4bf' : '1px solid transparent',
-                  background: paymentMethodType === 'paypro' ? 'linear-gradient(135deg, rgba(13, 148, 136, 0.3), rgba(15, 23, 42, 0.8))' : 'transparent',
-                  color: paymentMethodType === 'paypro' ? '#2dd4bf' : '#94a3b8',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.4rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <Zap size={16} color={paymentMethodType === 'paypro' ? '#2dd4bf' : '#94a3b8'} />
-                PayPro Online Gateway ⚡
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
+                <CreditCard size={22} color="#2dd4bf" />
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', margin: 0 }}>
+                  PayPro 1Pay Instant Online Gateway
+                </h3>
+                <span className="badge badge-primary" style={{ marginLeft: 'auto', fontSize: '0.7rem' }}>
+                  AUTOMATED & INSTANT
+                </span>
+              </div>
 
-              <button
-                type="button"
-                onClick={() => setPaymentMethodType('bank_transfer')}
-                style={{
-                  padding: '0.75rem 1rem',
-                  borderRadius: '10px',
-                  border: paymentMethodType === 'bank_transfer' ? '1px solid #2dd4bf' : '1px solid transparent',
-                  background: paymentMethodType === 'bank_transfer' ? 'linear-gradient(135deg, rgba(13, 148, 136, 0.3), rgba(15, 23, 42, 0.8))' : 'transparent',
-                  color: paymentMethodType === 'bank_transfer' ? '#2dd4bf' : '#94a3b8',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.4rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <Building2 size={16} color={paymentMethodType === 'bank_transfer' ? '#2dd4bf' : '#94a3b8'} />
-                Direct Bank Transfer 🏛️
-              </button>
-            </div>
+              <p style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: 1.5, marginBottom: '1.25rem' }}>
+                Pay securely using <strong>EasyPaisa, JazzCash, Debit/Credit Card, 1Link ATMs, or Online Banking</strong> via PayPro's official 1Pay Gateway.
+              </p>
 
-            {/* --- OPTION A: PAYPRO ONLINE GATEWAY --- */}
-            {paymentMethodType === 'paypro' && (
-              <div style={{
-                background: 'rgba(10, 18, 30, 0.7)',
-                border: '1px solid rgba(13, 148, 136, 0.35)',
-                borderRadius: '16px',
-                padding: '1.5rem',
-                marginBottom: '1.5rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
-                  <CreditCard size={22} color="#2dd4bf" />
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', margin: 0 }}>
-                    PayPro 1Pay Instant Online Gateway
-                  </h3>
-                  <span className="badge badge-primary" style={{ marginLeft: 'auto', fontSize: '0.7rem' }}>
-                    AUTOMATED & INSTANT
-                  </span>
-                </div>
-
-                <p style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: 1.5, marginBottom: '1.25rem' }}>
-                  Pay securely using <strong>EasyPaisa, JazzCash, Debit/Credit Card, 1Link ATMs, or Online Banking</strong> via PayPro's official 1Pay Gateway.
-                </p>
-
-                {/* PayPro Channel Selector */}
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600, marginBottom: '0.5rem' }}>
-                    Select Preferred PayPro Payment Channel:
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                    <div
-                      onClick={() => setSelectedPayProMethod('easypaisa_jazzcash')}
-                      style={{
-                        padding: '0.85rem',
-                        background: selectedPayProMethod === 'easypaisa_jazzcash' ? 'rgba(13, 148, 136, 0.2)' : 'rgba(15, 23, 42, 0.6)',
-                        border: selectedPayProMethod === 'easypaisa_jazzcash' ? '1px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.6rem'
-                      }}
-                    >
-                      <CreditCard size={18} color="#2dd4bf" />
-                      <div>
-                        <div style={{ color: '#fff', fontWeight: 700, fontSize: '0.85rem' }}>EasyPaisa / JazzCash / Cards</div>
-                        <div style={{ color: '#94a3b8', fontSize: '0.72rem' }}>1Pay Online Portal + 1Link</div>
-                      </div>
-                    </div>
-
-                    <div
-                      onClick={() => setSelectedPayProMethod('qr_code')}
-                      style={{
-                        padding: '0.85rem',
-                        background: selectedPayProMethod === 'qr_code' ? 'rgba(13, 148, 136, 0.2)' : 'rgba(15, 23, 42, 0.6)',
-                        border: selectedPayProMethod === 'qr_code' ? '1px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.6rem'
-                      }}
-                    >
-                      <QrCode size={18} color="#2dd4bf" />
-                      <div>
-                        <div style={{ color: '#fff', fontWeight: 700, fontSize: '0.85rem' }}>PayPro Instant QR Code</div>
-                        <div style={{ color: '#94a3b8', fontSize: '0.72rem' }}>Direct Banking App Scan</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    className="btn btn-outline-secondary"
-                    style={{ padding: '0.85rem 1.25rem', borderRadius: '10px' }}
-                  >
-                    ← Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleInitiatePayProCheckout}
-                    disabled={isInitiatingPayPro}
-                    className="btn btn-primary"
+              {/* PayPro Channel Selector */}
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600, marginBottom: '0.5rem' }}>
+                  Select Preferred PayPro Payment Channel:
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '0.75rem' }}>
+                  <div
+                    onClick={() => setSelectedPayProMethod('easypaisa_jazzcash')}
                     style={{
-                      flex: 1,
                       padding: '0.85rem',
-                      fontSize: '0.98rem',
-                      fontWeight: 800,
-                      borderRadius: '10px',
-                      display: 'inline-flex',
+                      background: selectedPayProMethod === 'easypaisa_jazzcash' ? 'rgba(13, 148, 136, 0.2)' : 'rgba(15, 23, 42, 0.6)',
+                      border: selectedPayProMethod === 'easypaisa_jazzcash' ? '1px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.5rem',
-                      background: 'linear-gradient(135deg, #0d9488, #0f766e)',
-                      cursor: isInitiatingPayPro ? 'not-allowed' : 'pointer',
-                      opacity: isInitiatingPayPro ? 0.75 : 1
+                      gap: '0.6rem',
+                      transition: 'all 0.2s ease'
                     }}
                   >
-                    {isInitiatingPayPro ? (
-                      <>
-                        <RefreshCw size={18} className="animate-spin" />
-                        <span>Connecting to PayPro Gateway...</span>
-                      </>
-                    ) : (
-                      'Proceed to PayPro Online Gateway →'
-                    )}
-                  </button>
+                    <CreditCard size={18} color="#2dd4bf" />
+                    <div>
+                      <div style={{ color: '#fff', fontWeight: 700, fontSize: '0.85rem' }}>EasyPaisa / JazzCash / Cards</div>
+                      <div style={{ color: '#94a3b8', fontSize: '0.72rem' }}>1Pay Online Portal + 1Link</div>
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => setSelectedPayProMethod('qr_code')}
+                    style={{
+                      padding: '0.85rem',
+                      background: selectedPayProMethod === 'qr_code' ? 'rgba(13, 148, 136, 0.2)' : 'rgba(15, 23, 42, 0.6)',
+                      border: selectedPayProMethod === 'qr_code' ? '1px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.6rem',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <QrCode size={18} color="#2dd4bf" />
+                    <div>
+                      <div style={{ color: '#fff', fontWeight: 700, fontSize: '0.85rem' }}>PayPro Instant QR Code</div>
+                      <div style={{ color: '#94a3b8', fontSize: '0.72rem' }}>Direct Banking App Scan</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
 
-            {/* --- OPTION B: DIRECT BANK TRANSFER --- */}
-            {paymentMethodType === 'bank_transfer' && (
-              <div>
-                {/* Official Bank Account Card with 1-Click Copy Buttons */}
-                {bankAccount ? (
-                  <div style={{
-                    background: 'rgba(10, 18, 30, 0.7)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    borderRadius: '16px',
-                    padding: '1.5rem',
-                    marginBottom: '1.5rem'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem' }}>
-                      <Building2 size={20} color="#2dd4bf" />
-                      <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff', margin: 0 }}>
-                        {bankAccount.bankName}
-                      </h3>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      {/* Account Title */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                        <div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Account Title</span>
-                          <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff' }}>{bankAccount.accountTitle}</div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(bankAccount.accountTitle, 'Account Title')}
-                          style={{ background: copiedField === 'Account Title' ? '#059669' : 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', padding: '0.4rem 0.75rem', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
-                        >
-                          {copiedField === 'Account Title' ? <><Check size={13} color="#fff" /> Copied!</> : <><Copy size={13} /> Copy</>}
-                        </button>
-                      </div>
-
-                      {/* Account Number */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                        <div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>Account Number</span>
-                          <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#2dd4bf', letterSpacing: '0.05em' }}>{bankAccount.accountNumber}</div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(bankAccount.accountNumber, 'Account Number')}
-                          style={{ background: copiedField === 'Account Number' ? '#059669' : 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', padding: '0.4rem 0.75rem', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
-                        >
-                          {copiedField === 'Account Number' ? <><Check size={13} color="#fff" /> Copied!</> : <><Copy size={13} /> Copy</>}
-                        </button>
-                      </div>
-
-                      {/* IBAN */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                        <div>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>IBAN Number</span>
-                          <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fff', letterSpacing: '0.04em' }}>{bankAccount.iban}</div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(bankAccount.iban, 'IBAN Number')}
-                          style={{ background: copiedField === 'IBAN Number' ? '#059669' : 'rgba(13, 148, 136, 0.2)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '6px', color: '#2dd4bf', padding: '0.4rem 0.75rem', fontSize: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
-                        >
-                          {copiedField === 'IBAN Number' ? <><Check size={13} color="#fff" /> Copied!</> : <><Copy size={13} /> Copy</>}
-                        </button>
-                      </div>
-
-                      {/* Branch details if present */}
-                      {bankAccount.branchName && (
-                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                          Branch: <strong>{bankAccount.branchName}</strong> {bankAccount.branchCode ? `(Code: ${bankAccount.branchCode})` : ''}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Bank QR Code & Scan Option */}
-                    {(bankAccount.qrCodeImageUrl || bankQrDataUrl) && (
-                      <div style={{
-                        marginTop: '1.25rem',
-                        padding: '1.25rem',
-                        border: '1px solid rgba(13, 148, 136, 0.3)',
-                        borderRadius: '16px',
-                        background: 'rgba(13, 148, 136, 0.08)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '0.85rem',
-                        textAlign: 'center'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#2dd4bf', fontWeight: 800, fontSize: '0.95rem' }}>
-                          <QrCode size={20} /> Instant Banking App / Raast QR Scan
-                        </div>
-
-                        <div style={{
-                          background: '#ffffff',
-                          padding: '0.85rem',
-                          borderRadius: '16px',
-                          boxShadow: '0 0 25px rgba(13, 148, 136, 0.4), 0 10px 25px rgba(0, 0, 0, 0.5)',
-                          border: '2px solid rgba(45, 212, 191, 0.6)',
-                          display: 'inline-block'
-                        }}>
-                          <img
-                            src={bankAccount.qrCodeImageUrl ? getQrCodeImageUrl(bankAccount.qrCodeImageUrl) : bankQrDataUrl}
-                            alt="Bank QR Code"
-                            style={{
-                              width: '220px',
-                              height: '220px',
-                              display: 'block',
-                              objectFit: 'contain',
-                              borderRadius: '6px'
-                            }}
-                            onError={(e) => {
-                              if (bankQrDataUrl && e.target.src !== bankQrDataUrl) {
-                                e.target.src = bankQrDataUrl;
-                              }
-                            }}
-                          />
-                        </div>
-
-                        <p style={{ fontSize: '0.8rem', color: '#cbd5e1', margin: 0, maxWidth: '440px', lineHeight: 1.45 }}>
-                          Scan directly using your mobile banking app (Meezan / HBL / UBL / Raast / EasyPaisa / JazzCash / Any 1Link App) for instant transfer.
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Instructions */}
-                    {bankAccount.instructions && (
-                      <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'rgba(13, 148, 136, 0.1)', border: '1px solid rgba(13, 148, 136, 0.25)', borderRadius: '8px', fontSize: '0.78rem', color: '#cbd5e1' }}>
-                        💡 <strong>Instruction:</strong> {bankAccount.instructions}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{
-                    background: 'rgba(10, 18, 30, 0.7)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    borderRadius: '16px',
-                    padding: '1.5rem',
-                    marginBottom: '1.5rem',
-                    textAlign: 'center'
-                  }}>
-                    <Building2 size={28} color="#0d9488" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
-                    <h4 style={{ color: '#fff', fontSize: '1rem', margin: '0 0 0.5rem 0' }}>Bank Account Setup Pending</h4>
-                    <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0, lineHeight: 1.5 }}>
-                      The organizer or administrator has not yet configured active bank transfer details. You may still proceed with your booking reference.
-                    </p>
-                  </div>
-                )}
-
-                {/* Proof Submission Form */}
-                <form onSubmit={handleSubmitBankTransfer}>
-                  <div style={{ marginBottom: '1.25rem' }}>
-                    <label style={{ display: 'block', fontSize: '0.8125rem', color: '#cbd5e1', fontWeight: 700, marginBottom: '0.35rem' }}>
-                      Bank Transaction ID / Reference # / Raast TID *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. TXN-982314 or Raast TID / Ref #"
-                      value={transactionRef}
-                      onChange={e => setTransactionRef(e.target.value)}
-                      style={{ width: '100%', padding: '0.85rem 1rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(13, 148, 136, 0.4)', borderRadius: '10px', color: '#fff', fontSize: '0.95rem', fontWeight: 600 }}
-                    />
-                    <span style={{ fontSize: '0.73rem', color: '#94a3b8', marginTop: '0.3rem', display: 'block' }}>
-                      Enter the transaction ID shown on your mobile banking app / ATM receipt after transferring.
-                    </span>
-                  </div>
-
-                  {/* Payment Screenshot Slip Upload */}
-                  <div style={{ marginBottom: '1.5rem' }}>
-                    <label style={{ display: 'block', fontSize: '0.8125rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '0.35rem' }}>
-                      Upload Payment Screenshot / Transfer Slip (WEBP, JPG, PNG)
-                    </label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                        <input
-                          type="file"
-                          accept=".webp,.jpg,.jpeg,.png"
-                          id="proof-upload"
-                          style={{ display: 'none' }}
-                          onChange={handleProofFileUpload}
-                        />
-                        <label
-                          htmlFor="proof-upload"
-                          style={{
-                            padding: '0.65rem 1.1rem',
-                            background: 'rgba(255, 255, 255, 0.08)',
-                            border: '1px solid rgba(13, 148, 136, 0.35)',
-                            borderRadius: '10px',
-                            color: '#fff',
-                            fontSize: '0.85rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.4rem'
-                          }}
-                        >
-                          <UploadCloud size={16} color="#0d9488" /> {isUploadingProof ? 'Compressing & Uploading...' : (proofUrl ? 'Change Receipt Slip' : 'Choose Receipt Image')}
-                        </label>
-                        {proofUrl && (
-                          <button
-                            type="button"
-                            onClick={() => setProofUrl('')}
-                            style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', padding: '0.45rem 0.75rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                          >
-                            Remove Slip
-                          </button>
-                        )}
-                      </div>
-                      {proofUrl && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(15, 23, 42, 0.7)', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1px solid rgba(45, 212, 191, 0.35)', width: 'fit-content' }}>
-                          <img
-                            src={getPaymentSlipUrl(proofUrl)}
-                            alt="Attached Slip Preview"
-                            style={{ width: '56px', height: '42px', objectFit: 'cover', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.2)' }}
-                          />
-                          <div>
-                            <div style={{ fontSize: '0.78rem', color: '#2dd4bf', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                              <CheckCircle size={13} /> Transaction Slip Attached & Compressed!
-                            </div>
-                            <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Saved in /assets/images/slips/</div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Alternative Verification Option (e.g. Standard Chartered screenshot block) */}
-                  <div style={{ marginBottom: '1.5rem', paddingTop: '1rem', borderTop: '1px dashed rgba(255, 255, 255, 0.1)' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontSize: '0.85rem', color: '#2dd4bf', fontWeight: 600 }}>
-                      <input
-                        type="checkbox"
-                        checked={useAltVerification}
-                        onChange={e => setUseAltVerification(e.target.checked)}
-                        style={{ accentColor: '#0d9488', width: '17px', height: '17px', cursor: 'pointer' }}
-                      />
-                      No Screenshot or Transaction ID available? (e.g. Standard Chartered)
-                    </label>
-
-                    {useAltVerification && (
-                      <div style={{ marginTop: '0.85rem', padding: '1rem', background: 'rgba(13, 148, 136, 0.08)', borderRadius: '12px', border: '1px solid rgba(45, 212, 191, 0.25)', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                        <span style={{ fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.4 }}>
-                          Provide your sender account information so our finance team can manually cross-reference and verify your transfer on our bank statement:
-                        </span>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600, marginBottom: '0.25rem' }}>
-                            Sender Account Title / Full Name *
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. Qamar Ansari"
-                            value={senderAccountTitle}
-                            onChange={e => setSenderAccountTitle(e.target.value)}
-                            style={{ width: '100%', padding: '0.65rem 0.85rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
-                          />
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                          <div>
-                            <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600, marginBottom: '0.25rem' }}>
-                              Sender Bank Name *
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="e.g. Standard Chartered Bank"
-                              value={senderBankName}
-                              onChange={e => setSenderBankName(e.target.value)}
-                              style={{ width: '100%', padding: '0.65rem 0.85rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
-                            />
-                          </div>
-                          <div>
-                            <label style={{ display: 'block', fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600, marginBottom: '0.25rem' }}>
-                              Account Last 4 Digits (Optional)
-                            </label>
-                            <input
-                              type="text"
-                              maxLength={6}
-                              placeholder="e.g. 5432"
-                              value={senderAccountLast4}
-                              onChange={e => setSenderAccountLast4(e.target.value)}
-                              style={{ width: '100%', padding: '0.65rem 0.85rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.75rem' }}>
-                    <button
-                      type="button"
-                      onClick={() => setStep(1)}
-                      className="btn btn-outline-secondary"
-                      style={{ padding: '0.85rem 1.25rem', borderRadius: '10px' }}
-                    >
-                      ← Back
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isProcessing}
-                      className="btn btn-primary"
-                      style={{
-                        flex: 1,
-                        padding: '0.85rem',
-                        fontSize: '1rem',
-                        fontWeight: 700,
-                        borderRadius: '10px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem',
-                        cursor: isProcessing ? 'not-allowed' : 'pointer',
-                        opacity: isProcessing ? 0.75 : 1
-                      }}
-                    >
-                      {isProcessing ? (
-                        <>
-                          <RefreshCw size={18} className="animate-spin" />
-                          <span>Processing Order...</span>
-                        </>
-                      ) : (
-                        'Submit Payment & Place Booking ✓'
-                      )}
-                    </button>
-                  </div>
-                </form>
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="btn btn-outline-secondary"
+                  style={{ padding: '0.85rem 1.25rem', borderRadius: '10px' }}
+                >
+                  ← Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleInitiatePayProCheckout}
+                  disabled={isInitiatingPayPro}
+                  className="btn btn-primary"
+                  style={{
+                    flex: 1,
+                    padding: '0.85rem',
+                    fontSize: '0.98rem',
+                    fontWeight: 800,
+                    borderRadius: '10px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    background: 'linear-gradient(135deg, #0d9488, #0f766e)',
+                    cursor: isInitiatingPayPro ? 'not-allowed' : 'pointer',
+                    opacity: isInitiatingPayPro ? 0.75 : 1
+                  }}
+                >
+                  {isInitiatingPayPro ? (
+                    <>
+                      <RefreshCw size={18} className="animate-spin" />
+                      <span>Connecting to PayPro Gateway...</span>
+                    </>
+                  ) : (
+                    'Proceed to PayPro Online Gateway →'
+                  )}
+                </button>
               </div>
-            )}
+            </div>
           </div>
         )}
 
-        {/* --- STEP 3: INVOICE & CONFIRMATION CARD --- */}
-        {!isRedirecting && step === 3 && payproResponse ? (
+        {/* --- STEP 3: PAYPRO INVOICE & STATUS TRACKER --- */}
+        {!isRedirecting && step === 3 && payproResponse && (
           <div style={{ textAlign: 'center', padding: '1rem 0' }}>
             <div style={{
               width: '64px',
@@ -1373,11 +806,14 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               </button>
             </div>
           </div>
-        ) : !isRedirecting && step === 3 && (
-          <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+        )}
+
+        {/* --- STEP 4: PAYMENT CONFIRMED / E-TICKETS READY --- */}
+        {!isRedirecting && step === 4 && (
+          <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
             <div style={{
-              width: '64px',
-              height: '64px',
+              width: '72px',
+              height: '72px',
               borderRadius: '50%',
               background: 'rgba(13, 148, 136, 0.2)',
               border: '2px solid #2dd4bf',
@@ -1386,82 +822,32 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               justifyContent: 'center',
               margin: '0 auto 1.25rem'
             }}>
-              <CheckCircle size={36} color="#2dd4bf" />
+              <CheckCircle size={44} color="#2dd4bf" />
             </div>
 
-            <span className="badge badge-primary" style={{ marginBottom: '0.75rem' }}>
-              PAYMENT VERIFICATION PENDING
+            <span className="badge badge-primary" style={{ marginBottom: '0.75rem', fontSize: '0.8rem' }}>
+              PAYMENT VERIFIED & CONFIRMED
             </span>
 
-            <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', marginBottom: '0.5rem' }}>
-              Booking Invoice Generated!
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fff', marginBottom: '0.5rem' }}>
+              Your E-Tickets Are Ready!
             </h3>
-            <p style={{ fontSize: '0.88rem', color: '#94a3b8', maxWidth: '480px', margin: '0 auto 1.5rem', lineHeight: 1.5 }}>
-              Your seats are securely locked for 30 minutes. Super Admin will verify your bank transfer (Ref: <strong>{transactionRef}</strong>) and confirm your booking.
+            <p style={{ fontSize: '0.9rem', color: '#94a3b8', maxWidth: '480px', margin: '0 auto 1.5rem', lineHeight: 1.5 }}>
+              Your payment has been successfully confirmed via PayPro. Your official digital pass is ready for gate admission.
             </p>
 
-            {/* Invoice Summary Box */}
-            <div style={{
-              background: 'rgba(15, 23, 42, 0.7)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '16px',
-              padding: '1.25rem',
-              textAlign: 'left',
-              marginBottom: '1.5rem'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.85rem' }}>
-                <span style={{ color: '#64748b' }}>Booking Reference:</span>
-                <strong style={{ color: '#2dd4bf' }}>{createdBooking?.bookingRef || 'EVL-100001'}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.85rem' }}>
-                <span style={{ color: '#64748b' }}>Event:</span>
-                <span style={{ color: '#fff', fontWeight: 600 }}>{event.title}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.85rem' }}>
-                <span style={{ color: '#64748b' }}>Pass Holder:</span>
-                <span style={{ color: '#fff', fontWeight: 600 }}>{formData.name} ({formData.email})</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.85rem' }}>
-                <span style={{ color: '#64748b' }}>Bank Transaction TID:</span>
-                <span style={{ color: '#fff', fontWeight: 600 }}>{transactionRef}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: 800, borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '0.6rem' }}>
-                <span style={{ color: '#fff' }}>Amount Paid:</span>
-                <span style={{ color: '#2dd4bf' }}>PKR {totalPayable.toLocaleString()}</span>
-              </div>
-            </div>
-
-            {/* Official WhatsApp Support Dispatch Option */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <a
-                href={getWhatsAppSupportLink()}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  padding: '0.85rem 1.25rem',
-                  background: 'linear-gradient(135deg, #059669, #047857)',
-                  borderRadius: '12px',
-                  color: '#fff',
-                  fontWeight: 700,
-                  fontSize: '0.95rem',
-                  textDecoration: 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem'
-                }}
-              >
-                <MessageSquare size={18} /> Send Receipt via WhatsApp Support ↗
-              </a>
-
-              <button
-                onClick={onClose}
-                className="btn btn-outline-secondary"
-                style={{ padding: '0.75rem', borderRadius: '10px', fontSize: '0.9rem' }}
-              >
-                Close & View My Bookings
-              </button>
-            </div>
+            <button
+              onClick={onClose}
+              className="btn btn-primary"
+              style={{
+                padding: '0.85rem 2rem',
+                borderRadius: '12px',
+                fontWeight: 800,
+                fontSize: '0.95rem'
+              }}
+            >
+              View My E-Tickets 🎟️
+            </button>
           </div>
         )}
       </div>

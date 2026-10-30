@@ -1,7 +1,7 @@
 # EventLand Project Memory & Developer Documentation
 
 ## Overview
-**EventLand** is a modern, high-performance event ticketing and management application designed for Pakistan's event ecosystem. It enables customers to discover events, select interactive seats or categorized ticket tiers, place 30-minute holds on tickets/seats, and complete payments via direct manual bank transfer or online payment gateway (PayPro). Monitoring admins and super admins review bank transfer proofs, confirm bookings, and issue digital E-Tickets with QR codes.
+**EventLand** is a modern, high-performance event ticketing and management application designed for Pakistan's event ecosystem. It enables customers to discover events, select interactive seats or categorized ticket tiers, place 30-minute holds on tickets/seats, and complete payments via the automated PayPro 1Pay online payment gateway. Monitoring admins and super admins review bank transfer proofs, confirm bookings, and issue digital E-Tickets with QR codes.
 
 ---
 
@@ -548,8 +548,43 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
   - Browser `popstate` event listener synchronizing browser Back/Forward navigation with `activeView`.
   - Footer link wired with client-side view transition (`onNavigatePrivacyPolicy`).
 
+### Notification Alerts Deduplication & Toast Architecture Hardening (October 2026)
+- **Problem & Root Cause**:
+  - Notification alerts/toasts were rendering twice across multiple user workflows.
+  - *Dual Modal & Parent Component Invocations*: When logging in or registering, `AuthModal.jsx` dispatched `showSuccess('Welcome Back! 🎉' / 'Account Created! 🎉')` and then fired `onLoginSuccess`, which invoked `handleLoginSuccess` in `App.jsx` that redundantly triggered `showSuccess('Welcome Back! 🎉')`, stacking two simultaneous login alerts in the top right.
+  - *Redundant Booking Confirmation Alerts*: `CheckoutModal.jsx` already dispatched status alerts (`Order Placed! 🏦` or `Payment Confirmed! 🎉`), but `handleBookingSuccess` in `App.jsx` redundantly called `showSuccess('Booking Confirmed! 🎟️')`, causing two success toasts upon booking and prematurely firing before redirecting to PayPro hosted checkout.
+  - *Lack of Throttling in Toast Context*: `ToastContext.jsx` lacked a deduplication or debounce guard, creating distinct IDs and appending duplicate toast objects to state whenever rapid double-clicks, StrictMode effect runs, or cascade events occurred.
+- **Implemented Fixes**:
+  - `frontend/src/context/ToastContext.jsx`:
+    - Added `recentToastsRef` tracking recent notifications:
+      - Suppresses identical notification alerts (`type:title:message`) within a 1,000ms window.
+      - Suppresses rapid duplicate alerts with identical `type:title` within a 500ms window.
+      - Rejects any alert if an identical active alert is already displaying on-screen.
+    - Added `timersRef` to safely track and clean up active `setTimeout` handles when toasts are unmounted or removed.
+  - `frontend/src/App.jsx`:
+    - Removed redundant `showSuccess('Welcome Back! 🎉')` from `handleLoginSuccess`.
+    - Removed redundant `showSuccess('Booking Confirmed! 🎟️')` from `handleBookingSuccess`.
+    - Refactored `handleToggleFeature` to execute `showInfo` cleanly outside the `.map()` functional transform.
+- **Verification**:
+  - Added dedicated regression unit test suite in `tests/test_toast_dedup.mjs` verifying identical rapid toast suppression, cascade suppression, and distinct alert tolerance.
+  - Verified backend solution with all 98 unit tests passing (`dotnet test`).
+
+### Checkout Modal Streamlining: Direct Bank Transfer Option Removed (October 2026)
+- **Architecture & Workflow Modernization**:
+  - Customer-facing `CheckoutModal.jsx` previously supported dual payment methods (PayPro Online Gateway and Direct Bank Transfer).
+  - To deliver a fully automated, instant e-ticketing checkout experience matching the ACPKHI 1Link standard, the manual direct bank transfer option, bank account display card, dynamic payload QR generation, slip upload, and sender account verification forms were removed from `CheckoutModal.jsx`.
+- **Current Checkout Modal Flow**:
+  - **Step 1: Buyer Information**: Collects customer Full Name, Email (E-Ticket destination), Phone / WhatsApp, and optional CNIC. Applies discount promo codes (`EVENTLAND10`).
+  - **Step 2: PayPro Online Payment**: Displays PayPro 1Pay channel selection (`EasyPaisa / JazzCash / Debit/Credit Cards` or `PayPro Instant QR Code`). Submitting initiates the PayPro session and seamlessly redirects to PayPro's official hosted gateway.
+  - **Step 3: PayPro Invoice & Status Tracker**: Fallback view displaying PayPro Consumer Voucher / OTC Number, direct click-to-pay button, and live embedded `PayProStatusTracker`.
+  - **Step 4: Payment Confirmed**: Verified confirmation view with one-click access to issued digital QR passes.
+- **Cleaned Deprecated Code**:
+  - Removed unused dependencies and APIs from modal (`bankAccountsApi`, `uploadApi`, `getPaymentSlipUrl`, `QRCode` generator).
+  - Removed manual transaction reference state (`transactionRef`, `proofUrl`, `senderBankName`, `senderAccountTitle`, `senderAccountLast4`).
+  - Streamlined UI by removing payment method switcher tabs and legacy manual bank transfer forms.
+
 ---
-*Last Updated: September 2026 (Unified Social Authentication [Google + Facebook], Native HTTPS Local Dev, Complete Privacy Policy & Meta User Data Deletion Compliance, 98/98 Unit Tests Passing, Clean 0-Error Vite Production Build, Regenerated EventLand_Full_Role_Testing_Guide.docx)*
+*Last Updated: October 2026 (Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 98/98 Unit Tests Passing)*
 
 
 
