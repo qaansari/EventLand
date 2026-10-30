@@ -1180,14 +1180,7 @@ export default function App() {
               </div>
             ) : (
               <>
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '2rem',
-                  maxWidth: '1200px',
-                  width: '100%',
-                  margin: '0 auto'
-                }}>
+                <div className="events-grid">
                   {sortedEvents.map((ev) => (
                     <EventCard
                       key={ev.id}

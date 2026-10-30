@@ -6,6 +6,7 @@ import { getEventImageUrl } from '../services/api';
 /**
  * EventCard
  * Used across Explore Events, Catalog, and Live Preview Panels (Organizer Wizard & Admin).
+ * Arranged in a 3-column responsive grid on desktop (2 on tablet, 1 on mobile).
  * Strictly designed for 1200x500px organizer event banners (2.4 : 1 aspect ratio).
  * Strict rule: ZERO text, overlays, badges, or buttons on top of the banner image.
  * All metadata, status badges, tags, and actions are neatly arranged below the banner.
@@ -40,14 +41,15 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
       className="glass-card event-card"
       onClick={() => onSelect && onSelect(event)}
       style={{
-        maxWidth: '1200px',
+        maxWidth: '100%',
         width: '100%',
         margin: '0 auto',
         display: 'flex',
         flexDirection: 'column',
+        height: '100%',
         cursor: 'pointer',
         overflow: 'hidden',
-        borderRadius: '18px',
+        borderRadius: '16px',
         border: '1px solid rgba(13, 148, 136, 0.22)',
         background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.85) 0%, rgba(11, 17, 33, 0.95) 100%)',
         boxShadow: '0 10px 30px -10px rgba(0, 0, 0, 0.5)',
@@ -102,10 +104,10 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
       <div 
         className="event-card-body" 
         style={{ 
-          padding: 'clamp(1rem, 2.5vw, 1.75rem)', 
+          padding: 'clamp(1rem, 2vw, 1.35rem)', 
           display: 'flex', 
           flexDirection: 'column', 
-          gap: '1rem',
+          gap: '0.85rem',
           flex: 1
         }}
       >
@@ -115,19 +117,20 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '0.75rem'
+          gap: '0.5rem'
         }}>
           {/* Left Badges Group */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
             {/* Status Badge */}
             <span 
               className={`badge ${isLive ? 'badge-live' : isClosed ? 'badge-closed' : isSoldOut ? 'badge-soldout' : 'badge-fast'}`} 
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.35rem 0.75rem',
+                gap: '0.35rem',
+                padding: '0.28rem 0.65rem',
                 borderRadius: '8px',
+                fontSize: '0.72rem',
                 background: isClosed
                   ? 'rgba(239, 68, 68, 0.15)'
                   : isSoldOut
@@ -148,16 +151,16 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
               {!isClosed && !isSoldOut && <span className="pulse-dot"></span>} {event.status || 'Live'}
             </span>
 
-            {/* Tags / Categories */}
-            {tagsList.slice(0, 3).map((tag, idx) => (
+            {/* Tags / Categories (show top 2) */}
+            {tagsList.slice(0, 2).map((tag, idx) => (
               <span
                 key={idx}
                 style={{
                   backgroundColor: 'rgba(13, 148, 136, 0.14)',
                   color: '#2dd4bf',
-                  padding: '0.3rem 0.7rem',
+                  padding: '0.25rem 0.6rem',
                   borderRadius: '8px',
-                  fontSize: '0.78rem',
+                  fontSize: '0.74rem',
                   fontWeight: 700,
                   border: '1px solid rgba(13, 148, 136, 0.35)',
                   letterSpacing: '0.02em'
@@ -171,16 +174,16 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
             <span style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.35rem',
+              gap: '0.3rem',
               backgroundColor: 'rgba(255, 255, 255, 0.05)',
               color: '#94a3b8',
-              padding: '0.3rem 0.7rem',
+              padding: '0.25rem 0.55rem',
               borderRadius: '8px',
-              fontSize: '0.76rem',
+              fontSize: '0.72rem',
               fontWeight: 600,
               border: '1px solid rgba(255, 255, 255, 0.08)'
             }}>
-              {event.ticketingType === 'mapped' ? <Grid size={13} color="#2dd4bf" /> : <Layers size={13} color="#2dd4bf" />}
+              {event.ticketingType === 'mapped' ? <Grid size={12} color="#2dd4bf" /> : <Layers size={12} color="#2dd4bf" />}
               <span>{event.ticketingType === 'mapped' ? 'Mapped Seating' : 'Tiered Passes'}</span>
             </span>
           </div>
@@ -199,8 +202,8 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
                 background: isSaved ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.06)',
                 border: isSaved ? '1px solid rgba(239, 68, 68, 0.45)' : '1px solid rgba(255, 255, 255, 0.12)',
                 borderRadius: '50%',
-                width: '38px',
-                height: '38px',
+                width: '34px',
+                height: '34px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -216,34 +219,39 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
                 e.currentTarget.style.transform = 'scale(1)';
               }}
             >
-              <Heart size={18} fill={isSaved ? '#ef4444' : 'none'} />
+              <Heart size={16} fill={isSaved ? '#ef4444' : 'none'} />
             </button>
           )}
         </div>
 
         {/* Location Row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#94a3b8', fontSize: '0.88rem', fontWeight: 500 }}>
-          <MapPin size={16} color="#0d9488" />
-          <span>{cityName} • {venueName}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#94a3b8', fontSize: '0.84rem', fontWeight: 500, minWidth: 0 }}>
+          <MapPin size={15} color="#0d9488" style={{ flexShrink: 0 }} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cityName} • {venueName}</span>
         </div>
 
         {/* Title */}
         <h3 style={{
           fontFamily: 'var(--font-display)',
-          fontSize: '1.45rem',
+          fontSize: 'clamp(1.15rem, 1.25vw, 1.28rem)',
           fontWeight: 800,
           letterSpacing: '-0.02em',
           color: '#ffffff',
           margin: '0',
-          lineHeight: 1.3
+          lineHeight: 1.35,
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+          minHeight: '2.7em'
         }}>
           {event.title}
         </h3>
 
         {/* Date & Time Row */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: '#cbd5e1', fontSize: '0.88rem', fontWeight: 500 }}>
-            <Calendar size={16} color="#0d9488" />
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.65rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#cbd5e1', fontSize: '0.84rem', fontWeight: 500 }}>
+            <Calendar size={15} color="#0d9488" style={{ flexShrink: 0 }} />
             <span>{formattedDate}</span>
           </div>
 
@@ -253,13 +261,13 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
             gap: '0.35rem',
             backgroundColor: 'rgba(13, 148, 136, 0.15)',
             color: '#2dd4bf',
-            padding: '0.25rem 0.65rem',
+            padding: '0.22rem 0.55rem',
             borderRadius: '6px',
-            fontSize: '0.8rem',
+            fontSize: '0.78rem',
             fontWeight: 600,
             border: '1px solid rgba(13, 148, 136, 0.3)'
           }}>
-            <Clock size={13} color="#2dd4bf" />
+            <Clock size={12} color="#2dd4bf" style={{ flexShrink: 0 }} />
             <span>{formattedTime}</span>
           </div>
         </div>
@@ -269,20 +277,20 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
           className="event-card-footer" 
           style={{ 
             marginTop: 'auto',
-            paddingTop: '1rem', 
+            paddingTop: '0.85rem', 
             borderTop: '1px solid rgba(255, 255, 255, 0.08)', 
             display: 'flex', 
             alignItems: 'center', 
             justifyContent: 'space-between',
-            gap: '1rem',
+            gap: '0.75rem',
             flexWrap: 'wrap'
           }}
         >
           <div>
-            <span style={{ display: 'block', fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+            <span style={{ display: 'block', fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
               Starting From
             </span>
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, color: '#2dd4bf' }}>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 800, color: '#2dd4bf' }}>
               PKR {(event.startingPrice || 0).toLocaleString()}
             </span>
           </div>
@@ -295,15 +303,15 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
             }}
             className="btn btn-primary btn-mobile-block"
             style={{ 
-              padding: '0.7rem 1.5rem', 
-              fontSize: '0.92rem',
+              padding: '0.6rem 1.15rem', 
+              fontSize: '0.88rem',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: '0.5rem',
+              gap: '0.45rem',
               borderRadius: '10px'
             }}
           >
-            <Info size={16} /> View Details
+            <Info size={15} /> View Details
           </button>
         </div>
       </div>

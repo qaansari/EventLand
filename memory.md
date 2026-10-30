@@ -583,8 +583,22 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
   - Removed manual transaction reference state (`transactionRef`, `proofUrl`, `senderBankName`, `senderAccountTitle`, `senderAccountLast4`).
   - Streamlined UI by removing payment method switcher tabs and legacy manual bank transfer forms.
 
+### Three Events Per Row Catalog Grid Layout (Home & Explore Pages) (October 2026)
+- **Requirement & Design**:
+  - Configured the Home and Explore Events catalog view (`activeView === 'explore'` in `frontend/src/App.jsx`) to display **3 events in one row** on desktop screens.
+  - Implemented responsive degradation:
+    - **Desktop (`>= 1024px`)**: 3 event cards per row (`grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem;`).
+    - **Tablets (`641px - 1024px`)**: 2 event cards per row (`grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem;`).
+    - **Mobile Phones (`<= 640px`)**: 1 event card per row (`grid-template-columns: 1fr; gap: 1rem;`).
+- **Component & Card Refinements (`frontend/src/components/EventCard.jsx`)**:
+  - Removed fixed `maxWidth: '1200px'` and set `maxWidth: '100%'`, `height: '100%'`, `display: 'flex'`, `flexDirection: 'column'`.
+  - Preserved the strict **1200×500px (2.4 : 1)** organizer banner aspect ratio with zero overlays.
+  - Optimized title typography to `clamp(1.15rem, 1.25vw, 1.28rem)` with `-webkit-line-clamp: 2` and `minHeight: '2.7em'` to ensure even title height and aligned card baselines across each row.
+  - Compacted badge row to display up to 2 primary category tags alongside the live status and seating architecture badges.
+  - Ensured footer elements (`Starting From PKR` and `View Details` CTA) stay pinned at the bottom with `marginTop: 'auto'`.
+
 ---
-*Last Updated: October 2026 (Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 98/98 Unit Tests Passing)*
+*Last Updated: October 2026 (3 Events Per Row Catalog Grid Layout, Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 98/98 Unit Tests Passing)*
 
 
 

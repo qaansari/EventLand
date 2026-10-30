@@ -828,6 +828,28 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   cursor: not-allowed;
 }
 
+/* ── Events Grid Layout (3 items per row on desktop) ─────────────────── */
+.events-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.event-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.event-card .event-card-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════════
    COMPREHENSIVE RESPONSIVE BREAKPOINTS & MOBILE ENHANCEMENTS
    Breakpoints: 1280px · 1024px · 768px · 480px · 360px
@@ -863,6 +885,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 
 /* ── 1024px: Tablet Landscape ─────────────────────────────────────────────── */
 @media (max-width: 1024px) {
+  /* Events Grid (2 items per row on tablets) */
+  .events-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 1.25rem;
+  }
+
   /* Hero Slider */
   .hero-slider .hero-slide {
     min-height: 420px !important;
@@ -1027,7 +1055,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   }
 
   .event-card .event-card-body {
-    flex: none !important;
+    flex: 1 1 auto !important;
     padding: 1.15rem !important;
   }
 
@@ -1411,9 +1439,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
     flex-wrap: wrap !important;
   }
 
-  /* Cards Grid Mobile Stacking */
+  /* Cards Grid Tablet Breakpoint */
   .events-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 1.15rem;
   }
 
   /* Organizer Wizard */
@@ -2006,6 +2035,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 
 /* Mobile Phones (max-width: 640px) */
 @media (max-width: 640px) {
+  /* Events Grid 1 column on phones */
+  .events-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+  }
+
   .discovery-hub-card {
     padding: 1rem 0.85rem;
     margin-bottom: 1.5rem;
