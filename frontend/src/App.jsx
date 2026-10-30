@@ -394,10 +394,6 @@ export default function App() {
     setCurrentUser(userData);
     setIsAuthModalOpen(false);
 
-    showSuccess(
-      'Welcome Back! 🎉',
-      `Logged in as ${userData.name || userData.email} (${userData.role.toUpperCase()})`
-    );
 
     // Redirect to dashboard if logging into admin or organizer role
     if (userData.role === 'admin') {
@@ -835,7 +831,6 @@ export default function App() {
       localStorage.setItem(`eventland_purchased_tickets_${currentUser.email.toLowerCase()}`, JSON.stringify(updated));
     }
     setActiveTicketView(newTicket);
-    showSuccess('Booking Confirmed! 🎟️', `Pass #${newTicket.ticketId || newTicket.bookingRef} issued successfully for ${newTicket.eventTitle}.`);
   };
 
   const handleInvoiceCreated = (invoice) => {
@@ -872,14 +867,11 @@ export default function App() {
   };
 
   const handleToggleFeature = (eventId) => {
-    setEvents(events.map(ev => {
-      if (ev.id === eventId) {
-        const nextState = !ev.isFeatured;
-        showInfo('Event Updated', `Featured status set to ${nextState ? 'Featured' : 'Standard'}.`);
-        return { ...ev, isFeatured: nextState };
-      }
-      return ev;
-    }));
+    const target = events.find(ev => ev.id === eventId);
+    if (!target) return;
+    const nextState = !target.isFeatured;
+    setEvents(events.map(ev => ev.id === eventId ? { ...ev, isFeatured: nextState } : ev));
+    showInfo('Event Updated', `Featured status set to ${nextState ? 'Featured' : 'Standard'}.`);
   };
 
   const handleDeleteEvent = async (eventId) => {
