@@ -597,8 +597,28 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
   - Compacted badge row to display up to 2 primary category tags alongside the live status and seating architecture badges.
   - Ensured footer elements (`Starting From PKR` and `View Details` CTA) stay pinned at the bottom with `marginTop: 'auto'`.
 
+### Tunnel & Ngrok "View Site Warning" Elimination (`vite.config.js` & `api.js`) (October 2026)
+- **Problem & Root Cause**:
+  - When accessing the backend or static media via an ngrok / localtunnel reverse tunnel, images and API requests failed to load due to ngrok's free tier interstitial page ("View Site / Visit Site Warning").
+  - Browser `<img>` tags cannot send custom headers (like `ngrok-skip-browser-warning`), causing ngrok to return an HTML interstitial page instead of the binary image whenever images were fetched directly.
+  - Furthermore, in local development, `resolveBackendUrl()` previously returned the direct ngrok URL if `VITE_BACKEND_URL` was configured, causing the browser to bypass Vite's local dev-server proxy and hit ngrok directly.
+- **Implemented Fixes**:
+  - **Vite Configuration (`frontend/vite.config.js`)**:
+    - Created robust `createProxyRoute` helper for all backend routes (`/api`, `/hubs`, `/assets`, `/uploads`, `/images`, `/qr_codes`, `/slips`).
+    - Configured `followRedirects: true` to prevent ngrok 301/302 redirects from exposing raw tunnel URLs to the browser.
+    - Attached `proxy.on('proxyReq')` and `proxy.on('proxyReqWs')` hooks enforcing:
+      - `ngrok-skip-browser-warning: true`
+      - `bypass-tunnel-reminder: true`
+      - `User-Agent: EventLand-App/1.0` (non-browser user agent informs ngrok that the caller is an automated API client, permanently suppressing the HTML interstitial warning).
+    - Enabled `server.host: true` and `server.allowedHosts: true` (as well as on `preview`) to prevent Vite from blocking tunnel access with *"Blocked request: The server is being accessed from an unauthorized host"*.
+    - Updated environment loader to use `import.meta.dirname` for full Vite native configuration compliance.
+  - **Frontend API Helper Sanitization (`frontend/src/services/api.js`)**:
+    - Enforced that local development (`!isProductionDomain`) always returns empty string `''` (relative URLs) so all API and image calls route through Vite's dev-server proxy where anti-warning headers are injected.
+    - Sanitized all media helpers (`getEventImageUrl`, `getOrganizerImageUrl`, `getUserImageUrl`, `getPaymentSlipUrl`, `getQrCodeImageUrl`) to detect and strip hardcoded tunnel or localhost origins from stored database URLs, ensuring they always resolve via `SERVER_BASE` through the proxy.
+    - Added `bypass-tunnel-reminder: true` to the base `request()` fetch configuration.
+
 ---
-*Last Updated: October 2026 (3 Events Per Row Catalog Grid Layout, Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 98/98 Unit Tests Passing)*
+*Last Updated: October 2026 (Tunnel & Ngrok View Site Warning Elimination, 3 Events Per Row Catalog Grid Layout, Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 98/98 Unit Tests Passing)*
 
 
 

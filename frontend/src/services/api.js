@@ -15,7 +15,9 @@ const isProductionDomain =
 // fall back to a hardcoded ngrok URL that will be gone after the tunnel closes.
 const resolveBackendUrl = () => {
   if (!isProductionDomain) {
-    return rawBackend && !rawBackend.includes('localhost') ? rawBackend : '';
+    // In local dev, always use relative path '' so calls and static assets route through Vite's proxy,
+    // which injects anti-warning headers and bypasses ngrok/tunnel interstitial warnings.
+    return (import.meta.env.VITE_DISABLE_PROXY === 'true') ? rawBackend : '';
   }
   if (!rawBackend || rawBackend.includes('localhost')) {
     console.warn(
@@ -38,21 +40,22 @@ export const SERVER_BASE = BASE_URL.replace(/\/api\/?$/, '') || BACKEND_URL;
 
 export function getOrganizerImageUrl(logoUrl) {
   if (!logoUrl) return '';
-  if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) return logoUrl;
+  if ((logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) && !logoUrl.includes('localhost') && !logoUrl.includes('ngrok') && !logoUrl.includes('localtunnel')) return logoUrl;
   const fileName = logoUrl.split('/').pop().split('\\').pop();
   return `${SERVER_BASE}/assets/images/organizers/${fileName}`;
 }
 
 export function getEventImageUrl(bannerUrl) {
   if (!bannerUrl) return 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&h=500&fit=crop';
-  if (bannerUrl.startsWith('http://') || bannerUrl.startsWith('https://')) return bannerUrl;
+  if ((bannerUrl.startsWith('http://') || bannerUrl.startsWith('https://')) && !bannerUrl.includes('localhost') && !bannerUrl.includes('ngrok') && !bannerUrl.includes('localtunnel')) return bannerUrl;
   const fileName = bannerUrl.split('/').pop().split('\\').pop();
   return `${SERVER_BASE}/assets/images/events/${fileName}`;
 }
 
 export function getUserImageUrl(imageUrl) {
   if (!imageUrl) return '';
-  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) return imageUrl;
+  if (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) return imageUrl;
+  if ((imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) && !imageUrl.includes('localhost') && !imageUrl.includes('ngrok') && !imageUrl.includes('localtunnel')) return imageUrl;
   if (imageUrl.startsWith('/assets/')) return `${SERVER_BASE}${imageUrl}`;
   const fileName = imageUrl.split('/').pop().split('\\').pop();
   return `${SERVER_BASE}/assets/images/users/${fileName}`;
@@ -60,14 +63,15 @@ export function getUserImageUrl(imageUrl) {
 
 export function getPaymentSlipUrl(slipUrl) {
   if (!slipUrl) return '';
-  if (slipUrl.startsWith('http://') || slipUrl.startsWith('https://')) return slipUrl;
+  if ((slipUrl.startsWith('http://') || slipUrl.startsWith('https://')) && !slipUrl.includes('localhost') && !slipUrl.includes('ngrok') && !slipUrl.includes('localtunnel')) return slipUrl;
   const fileName = slipUrl.split('/').pop().split('\\').pop();
   return `${SERVER_BASE}/assets/images/slips/${fileName}`;
 }
 
 export function getQrCodeImageUrl(qrUrl) {
   if (!qrUrl) return '';
-  if (qrUrl.startsWith('http://') || qrUrl.startsWith('https://') || qrUrl.startsWith('data:image/') || qrUrl.startsWith('blob:')) return qrUrl;
+  if (qrUrl.startsWith('data:image/') || qrUrl.startsWith('blob:')) return qrUrl;
+  if ((qrUrl.startsWith('http://') || qrUrl.startsWith('https://')) && !qrUrl.includes('localhost') && !qrUrl.includes('ngrok') && !qrUrl.includes('localtunnel')) return qrUrl;
   if (qrUrl.startsWith('/assets/')) return `${SERVER_BASE}${qrUrl}`;
   const fileName = qrUrl.split('/').pop().split('\\').pop();
   return `${SERVER_BASE}/assets/images/qr_codes/${fileName}`;
@@ -80,6 +84,7 @@ async function request(endpoint, options = {}) {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
     'ngrok-skip-browser-warning': 'true',
+    'bypass-tunnel-reminder': 'true',
     ...(options.headers || {})
   };
 

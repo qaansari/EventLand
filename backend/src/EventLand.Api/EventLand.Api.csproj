@@ -17,6 +17,7 @@
     <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="2.88.8" />
     <!-- Linux/Docker runtime native asset — prevents DllNotFoundException in containers -->
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.8" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.14" />
   </ItemGroup>
 
   <ItemGroup>
