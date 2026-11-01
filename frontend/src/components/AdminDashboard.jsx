@@ -3832,9 +3832,9 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
                     <td style={{ padding: '1rem', fontWeight: 600, color: '#f8fafc' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                         {u.imageUrl ? (
-                          <img src={getUserImageUrl(u.imageUrl)} alt="" style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(236, 72, 153, 0.4)' }} />
+                          <img src={getUserImageUrl(u.imageUrl)} alt="" style={{ width: '46px', height: '46px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid rgba(236, 72, 153, 0.4)' }} />
                         ) : (
-                          <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.85rem' }}>
+                          <div style={{ width: '46px', height: '46px', borderRadius: '50%', background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '1rem' }}>
                             {u.fullName ? u.fullName.charAt(0).toUpperCase() : 'U'}
                           </div>
                         )}

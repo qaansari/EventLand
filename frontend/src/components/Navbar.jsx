@@ -301,8 +301,8 @@ export default function Navbar({
                     alt={currentUser.fullName || currentUser.name || 'User Profile'}
                     onError={() => setImgError(true)}
                     style={{
-                      width: '26px',
-                      height: '26px',
+                      width: '34px',
+                      height: '34px',
                       borderRadius: '50%',
                       objectFit: 'cover',
                       border: currentUser.role === 'admin' ? '1.5px solid #c084fc' : currentUser.role === 'organizer' ? '1.5px solid #2dd4bf' : '1.5px solid #34d399',
@@ -312,8 +312,8 @@ export default function Navbar({
                 ) : (
                   <div
                     style={{
-                      width: '26px',
-                      height: '26px',
+                      width: '34px',
+                      height: '34px',
                       borderRadius: '50%',
                       background: currentUser.role === 'admin' 
                         ? 'linear-gradient(135deg, #a855f7, #6366f1)' 
@@ -326,7 +326,7 @@ export default function Navbar({
                       justifyContent: 'center',
                       color: '#ffffff',
                       fontWeight: 800,
-                      fontSize: '0.72rem',
+                      fontSize: '0.82rem',
                       flexShrink: 0,
                       letterSpacing: '0.5px'
                     }}
@@ -478,8 +478,8 @@ export default function Navbar({
                       alt={currentUser.fullName || currentUser.name || 'User Profile'}
                       onError={() => setImgError(true)}
                       style={{
-                        width: '36px',
-                        height: '36px',
+                        width: '42px',
+                        height: '42px',
                         borderRadius: '50%',
                         objectFit: 'cover',
                         border: currentUser.role === 'admin' ? '2px solid #c084fc' : currentUser.role === 'organizer' ? '2px solid #2dd4bf' : '2px solid #34d399',
@@ -489,8 +489,8 @@ export default function Navbar({
                   ) : (
                     <div
                       style={{
-                        width: '36px',
-                        height: '36px',
+                        width: '42px',
+                        height: '42px',
                         borderRadius: '50%',
                         background: currentUser.role === 'admin' 
                           ? 'linear-gradient(135deg, #a855f7, #6366f1)' 
@@ -503,7 +503,7 @@ export default function Navbar({
                         justifyContent: 'center',
                         color: '#ffffff',
                         fontWeight: 800,
-                        fontSize: '0.85rem',
+                        fontSize: '1rem',
                         flexShrink: 0,
                         letterSpacing: '0.5px'
                       }}
@@ -513,7 +513,7 @@ export default function Navbar({
                   )}
                   <div>
                     <div style={{ color: '#fff', fontWeight: 700 }}>{currentUser?.name || currentUser?.fullName || 'User'}</div>
-                    <div style={{ fontSize: '0.72rem', color: currentUser.role === 'admin' ? '#c084fc' : '#2dd4bf', textTransform: 'capitalize' }}>
+                    <div style={{ fontSize: '0.82rem', color: currentUser.role === 'admin' ? '#c084fc' : '#2dd4bf', textTransform: 'capitalize' }}>
                       {currentUser?.role === 'admin' ? 'Super Admin' : currentUser?.role}
                     </div>
                   </div>
