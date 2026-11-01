@@ -583,18 +583,18 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
   - Removed manual transaction reference state (`transactionRef`, `proofUrl`, `senderBankName`, `senderAccountTitle`, `senderAccountLast4`).
   - Streamlined UI by removing payment method switcher tabs and legacy manual bank transfer forms.
 
-### Three Events Per Row Catalog Grid Layout (Home & Explore Pages) (October 2026)
+### Two Events Per Row Catalog Grid Layout (Home & Explore Pages) (November 2026)
 - **Requirement & Design**:
-  - Configured the Home and Explore Events catalog view (`activeView === 'explore'` in `frontend/src/App.jsx`) to display **3 events in one row** on desktop screens.
-  - Implemented responsive degradation:
-    - **Desktop (`>= 1024px`)**: 3 event cards per row (`grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem;`).
-    - **Tablets (`641px - 1024px`)**: 2 event cards per row (`grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem;`).
+  - Configured the Home and Explore Events catalog view (`activeView === 'explore'` in `frontend/src/App.jsx`) to display **2 event cards in one row** across desktop, laptops, and tablets down to mobile viewports.
+  - Responsive configuration:
+    - **Desktop & Large Displays (`>= 1024px`)**: 2 event cards per row (`grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 1.75rem; max-width: 1280px;`).
+    - **Laptops & Tablets (`641px - 1024px`)**: 2 event cards per row preserved (`grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 1.15rem - 1.35rem;`).
     - **Mobile Phones (`<= 640px`)**: 1 event card per row (`grid-template-columns: 1fr; gap: 1rem;`).
 - **Component & Card Refinements (`frontend/src/components/EventCard.jsx`)**:
-  - Removed fixed `maxWidth: '1200px'` and set `maxWidth: '100%'`, `height: '100%'`, `display: 'flex'`, `flexDirection: 'column'`.
+  - Maintained `maxWidth: '100%'`, `height: '100%'`, `display: 'flex'`, `flexDirection: 'column'`.
   - Preserved the strict **1200×500px (2.4 : 1)** organizer banner aspect ratio with zero overlays.
-  - Optimized title typography to `clamp(1.15rem, 1.25vw, 1.28rem)` with `-webkit-line-clamp: 2` and `minHeight: '2.7em'` to ensure even title height and aligned card baselines across each row.
-  - Compacted badge row to display up to 2 primary category tags alongside the live status and seating architecture badges.
+  - Optimized title typography to `clamp(1.18rem, 1.4vw, 1.35rem)` with `-webkit-line-clamp: 2` and `minHeight: '2.7em'`.
+  - Expanded card padding to `clamp(1rem, 1.8vw, 1.45rem)` giving the 2-column cards a spacious, showcase aesthetic.
   - Ensured footer elements (`Starting From PKR` and `View Details` CTA) stay pinned at the bottom with `marginTop: 'auto'`.
 
 ### Tunnel & Ngrok "View Site Warning" Elimination (`vite.config.js` & `api.js`) (October 2026)

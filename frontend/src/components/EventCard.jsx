@@ -104,7 +104,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
       <div 
         className="event-card-body" 
         style={{ 
-          padding: 'clamp(1rem, 2vw, 1.35rem)', 
+          padding: 'clamp(1rem, 1.8vw, 1.45rem)', 
           display: 'flex', 
           flexDirection: 'column', 
           gap: '0.85rem',

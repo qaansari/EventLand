@@ -828,11 +828,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   cursor: not-allowed;
 }
 
-/* ── Events Grid Layout (3 items per row on desktop) ─────────────────── */
+/* ── Events Grid Layout (2 items per row on Explore Page) ───────────── */
 .events-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 1.75rem;
   width: 100%;
   max-width: 1280px;
   margin: 0 auto;
@@ -885,10 +885,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 
 /* ── 1024px: Tablet Landscape ─────────────────────────────────────────────── */
 @media (max-width: 1024px) {
-  /* Events Grid (2 items per row on tablets) */
+  /* Events Grid (2 items per row preserved across laptops and tablets) */
   .events-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 1.25rem;
+    gap: 1.35rem !important;
   }
 
   /* Hero Slider */
@@ -1057,16 +1057,16 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   .event-card .event-card-body {
     flex: 1 1 auto !important;
     padding: 1.15rem !important;
+    gap: 0.75rem !important;
   }
 
   .event-card .event-card-body h3 {
-    font-size: 1.2rem !important;
+    font-size: 1.18rem !important;
+    min-height: 2.7em !important;
   }
 
   .event-card .event-card-footer {
-    flex-direction: column !important;
     gap: 0.75rem !important;
-    align-items: stretch !important;
   }
 
   .event-card .event-card-footer .btn {
@@ -1439,10 +1439,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
     flex-wrap: wrap !important;
   }
 
-  /* Cards Grid Tablet Breakpoint */
+  /* Cards Grid: 2 items per row on Explore Page */
   .events-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 1.15rem;
+    gap: 1.15rem !important;
   }
 
   /* Organizer Wizard */
