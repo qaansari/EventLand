@@ -137,6 +137,12 @@ async function request(endpoint, options = {}) {
   }
 
   if (response.status === 204) return true;
+
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('text/html')) {
+    throw new Error('API server returned HTML instead of JSON. Ensure VITE_BACKEND_URL is configured to point to your live backend domain in Vercel settings.');
+  }
+
   return await response.json();
 }
 

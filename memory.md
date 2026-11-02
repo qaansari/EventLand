@@ -617,8 +617,32 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
     - Sanitized all media helpers (`getEventImageUrl`, `getOrganizerImageUrl`, `getUserImageUrl`, `getPaymentSlipUrl`, `getQrCodeImageUrl`) to detect and strip hardcoded tunnel or localhost origins from stored database URLs, ensuring they always resolve via `SERVER_BASE` through the proxy.
     - Added `bypass-tunnel-reminder: true` to the base `request()` fetch configuration.
 
+### Google & Social Authentication Hardening on Vercel Deployment (November 2026)
+- **Problem & Root Cause**:
+  - Google Identity Services (GSI) failed when deployed on Vercel due to multiple factors:
+    1. *Missing COOP Headers on Vercel*: `vercel.json` lacked `Cross-Origin-Opener-Policy: same-origin-allow-popups` and `Cross-Origin-Resource-Policy: cross-origin`, preventing Google OAuth popups and One Tap from communicating with the parent window on Vercel.
+    2. *Missing Client ID in Production Build*: If `VITE_GOOGLE_CLIENT_ID` was not set in Vercel project environment variables, `googleClientId` evaluated to `""`, suppressing the Google GSI script loader completely.
+    3. *FedCM Deprecation Warning*: `use_fedcm_for_prompt: false` caused third-party cookie blocking issues in modern Chrome/Edge on Vercel.
+    4. *Missing CSP Origins in Backend Middleware*: `SecurityHeadersMiddleware.cs` lacked `https://accounts.google.com` in `script-src`, `frame-src`, and `connect-src`.
+    5. *HTML Response Guard in API Client*: If `VITE_BACKEND_URL` was missing in Vercel settings, requests to `/api/auth/google` returned `index.html` resulting in JSON syntax parse errors.
+- **Implemented Fixes**:
+  - **Vercel Headers Configuration (`frontend/vercel.json`)**:
+    - Added global headers for all routes:
+      - `Cross-Origin-Opener-Policy: same-origin-allow-popups` (permits Google & Facebook OAuth popups)
+      - `Cross-Origin-Resource-Policy: cross-origin`
+      - `Referrer-Policy: strict-origin-when-cross-origin`
+  - **Auth Modal Hardening (`frontend/src/components/AuthModal.jsx`)**:
+    - Added project fallback for Google Client ID (`338547104727-9rrd9g4dj1074cpafca6u81h71igj8o9.apps.googleusercontent.com`) and Facebook App ID (`1454476213413193`) matching `appsettings.json`.
+    - Set `use_fedcm_for_prompt: true` for Chrome FedCM compliance.
+    - Configured dynamic responsive button width in `renderButton` (`Math.min(380, Math.max(200, containerWidth))`).
+    - Added diagnostic reason logging to `window.google.accounts.id.prompt()` callback.
+  - **Backend Security Headers (`SecurityHeadersMiddleware.cs`)**:
+    - Whitelisted `https://accounts.google.com` across `script-src`, `frame-src`, and `connect-src`.
+  - **API Client HTML Guard (`frontend/src/services/api.js`)**:
+    - Added explicit check rejecting `text/html` responses with a descriptive message prompting configuration of `VITE_BACKEND_URL`.
+
 ---
-*Last Updated: October 2026 (Tunnel & Ngrok View Site Warning Elimination, 3 Events Per Row Catalog Grid Layout, Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 98/98 Unit Tests Passing)*
+*Last Updated: November 2026 (Google & Social Authentication Hardening on Vercel Deployment, Tunnel & Ngrok View Site Warning Elimination, 3 Events Per Row Catalog Grid Layout, Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 98/98 Unit Tests Passing)*
 
 
 
