@@ -17,8 +17,14 @@ public record FeeCalculationResult(
 public interface IPaymentFeeService
 {
     /// <summary>
-    /// Computes the Event Land platform fee tier based on raw ticket subtotal.
-    /// Exact boundary rules:
+    /// Computes the Event Land platform fee tier based on raw ticket subtotal asynchronously
+    /// querying active tiers from the database with automated fallback.
+    /// </summary>
+    Task<decimal> CalculatePlatformFeeAsync(decimal subtotal, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Computes the Event Land platform fee tier based on raw ticket subtotal synchronously.
+    /// Exact boundary rules fallback:
     ///   subtotal <= 5,000            => 49 PKR
     ///   5,000 < subtotal <= 10,000   => 99 PKR
     ///   10,000 < subtotal <= 15,000  => 149 PKR

@@ -298,7 +298,7 @@ public class PaymentController : ControllerBase
             .OrderBy(c => c.SortOrder)
             .ToListAsync();
 
-        var platformFee = _paymentFeeService.CalculatePlatformFee(subtotal);
+        var platformFee = await _paymentFeeService.CalculatePlatformFeeAsync(subtotal);
 
         var methods = configs.Select(c =>
         {

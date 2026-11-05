@@ -200,4 +200,89 @@ public class PaymentFeeServiceTests : IDisposable
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             feeService.CalculateTotalAsync(-100m, "easypaisa_jazzcash"));
     }
+
+    [Fact]
+    public async Task CalculatePlatformFeeAsync_FromDatabase_EvaluatesCustomTiersCorrectly()
+    {
+        using var context = CreateContext();
+        context.PlatformFeeConfigs.AddRange(
+            new EventLand.Domain.Entities.PlatformFeeConfig
+            {
+                Name = "Custom Low Tier",
+                MinSubtotal = 0m,
+                MaxSubtotal = 2000m,
+                FeeAmount = 25m,
+                SortOrder = 1,
+                IsActive = true
+            },
+            new EventLand.Domain.Entities.PlatformFeeConfig
+            {
+                Name = "Custom High Tier",
+                MinSubtotal = 2001m,
+                MaxSubtotal = null,
+                FeeAmount = 85m,
+                SortOrder = 2,
+                IsActive = true
+            }
+        );
+        await context.SaveChangesAsync();
+
+        var feeService = new PaymentFeeService(context);
+
+        var feeLow = await feeService.CalculatePlatformFeeAsync(1500m);
+        var feeHigh = await feeService.CalculatePlatformFeeAsync(5000m);
+
+        Assert.Equal(25m, feeLow);
+        Assert.Equal(85m, feeHigh);
+    }
+
+    [Fact]
+    public async Task CalculatePlatformFeeAsync_InactiveTierIgnored_UsesNextActiveTier()
+    {
+        using var context = CreateContext();
+        context.PlatformFeeConfigs.AddRange(
+            new EventLand.Domain.Entities.PlatformFeeConfig
+            {
+                Name = "Inactive Promo Tier",
+                MinSubtotal = 0m,
+                MaxSubtotal = 5000m,
+                FeeAmount = 10m,
+                SortOrder = 1,
+                IsActive = false
+            },
+            new EventLand.Domain.Entities.PlatformFeeConfig
+            {
+                Name = "Active Standard Tier",
+                MinSubtotal = 0m,
+                MaxSubtotal = 5000m,
+                FeeAmount = 49m,
+                SortOrder = 2,
+                IsActive = true
+            }
+        );
+        await context.SaveChangesAsync();
+
+        var feeService = new PaymentFeeService(context);
+        var fee = await feeService.CalculatePlatformFeeAsync(2500m);
+
+        Assert.Equal(49m, fee);
+    }
+
+    [Fact]
+    public async Task CalculatePlatformFeeAsync_EmptyTable_FallsBackToDefaultTiers()
+    {
+        using var context = CreateContext();
+        // Database contains no PlatformFeeConfig entries
+        var feeService = new PaymentFeeService(context);
+
+        var feeTier1 = await feeService.CalculatePlatformFeeAsync(3000m);
+        var feeTier2 = await feeService.CalculatePlatformFeeAsync(8000m);
+        var feeTier3 = await feeService.CalculatePlatformFeeAsync(12000m);
+        var feeTier4 = await feeService.CalculatePlatformFeeAsync(25000m);
+
+        Assert.Equal(49m, feeTier1);
+        Assert.Equal(99m, feeTier2);
+        Assert.Equal(149m, feeTier3);
+        Assert.Equal(199m, feeTier4);
+    }
 }

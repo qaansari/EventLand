@@ -37,6 +37,7 @@ public class TestDbContext : DbContext, IApplicationDbContext, IPayProDbContext
     public DbSet<RefundRecord> RefundRecords => Set<RefundRecord>();
     public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
     public DbSet<PaymentConfig> PaymentConfigs => Set<PaymentConfig>();
+    public DbSet<PlatformFeeConfig> PlatformFeeConfigs => Set<PlatformFeeConfig>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
 
     // IPayProDbContext implementation

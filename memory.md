@@ -86,8 +86,7 @@
 ## Database Schema & Migrations
 
 - **Database Migrations**:
-  - `20260923090046_InitialCreate`: Single unified baseline schema migration tracking the entire database schema in one pristine migration. Incorporates all core tables, relational foreign keys (including `User.OrganizerId`), gate check-in tracking (`IsCheckedIn`, `CheckedInAt`, `CheckedInBy`, `GateNotes`), and composite performance indexes.
-  - `20260929093014_AddSocialAuthFields`: Adds `GoogleId` (nvarchar 256), `FacebookId` (nvarchar 256), and `AuthProvider` (nvarchar 50, default 'Local') to `Users`, protected with filtered unique indexes.
+  - `20261105093504_InitialCreate`: Single unified baseline schema migration tracking the entire database schema in one pristine migration. Incorporates all core tables, relational foreign keys (including `User.OrganizerId`), gate check-in tracking (`IsCheckedIn`, `CheckedInAt`, `CheckedInBy`, `GateNotes`), social auth credentials (`GoogleId`, `FacebookId`, `AuthProvider` with filtered unique indexes), dynamic platform fee tiers table (`PlatformFeeConfigs` with 4 seeded default tiers and composite index `IX_PlatformFeeConfigs_IsActive_SortOrder`), and all composite performance indexes.
 - **Database Performance & Composite Indexing**:
   - `Bookings`:
     - `IX_Bookings_BookingRef`: Unique index on reference codes.
@@ -349,8 +348,8 @@
   - Added navigation collection `ICollection<User> Users` on `Organizer.cs`, supporting real-world multi-tenancy where multiple user accounts (e.g. event manager, marketing lead, finance officer) belong to the same organizer company (e.g. *EventLand Productions*).
   - High-performance database index added: `IX_Users_OrganizerId`.
 - **Single Consolidated Database Migration**:
-  - Successfully unified all database migrations into a single pristine baseline migration: [`backend/src/EventLand.Infrastructure/Migrations/20260923090046_InitialCreate.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Migrations/20260923090046_InitialCreate.cs).
-  - Verified via `dotnet ef migrations list` that exactly **one** migration tracks the entire database schema.
+  - Successfully unified all database migrations into a single pristine baseline migration: [`backend/src/EventLand.Infrastructure/Migrations/20261105093504_InitialCreate.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Migrations/20261105093504_InitialCreate.cs).
+  - Verified via `dotnet ef migrations list` that exactly **one** migration (`20261105093504_InitialCreate`) tracks the entire database schema including `PlatformFeeConfigs`.
 - **Admin User Management & Dynamic Company Assignment**:
   - In `AdminDashboard.jsx`, the User Create/Edit modal dynamically renders an **"Assign to Organizer Company *"** dropdown when the selected role is "Organizer", populated from `organizersList`.
   - The Users management table displays an **"Organizer Company"** column with an emerald badge showing the assigned company name (`u.organizerName`).
@@ -641,8 +640,48 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
   - **API Client HTML Guard (`frontend/src/services/api.js`)**:
     - Added explicit check rejecting `text/html` responses with a descriptive message prompting configuration of `VITE_BACKEND_URL`.
 
+### Checkout Modal Simplification & Pricing Normalization (November 2026)
+- **Problem & Root Cause**:
+  - In `CheckoutModal.jsx`, an automated client-side group discount (`selectedSeats.length >= 3 ? Math.round(subtotal * 0.1) : 0`) was automatically reducing the displayed total amount by 10% whenever 3 or more tickets were selected (e.g., 5 or more tickets).
+  - This created pricing discrepancies between frontend checkout displays and backend booking settlement (`BookingService.cs`), which charges actual ticket prices plus fees.
+  - In addition, an unverified mock client-side promo code ("EVENTLAND10") was hardcoded in the modal.
+- **Implemented Fixes**:
+  - **Removed Automated Group Discount**: Eliminated `groupDiscount` logic from `CheckoutModal.jsx`.
+  - **Removed Client-Side Promo Code Input**: Purged `promoCode`, `discount`, and `handleApplyPromo` state and UI inputs from the buyer details step.
+  - **Optimized & Scalable Pricing Engine**: Memoized `subtotal` and `totalPayable` using React's `useMemo` based on `selectedSeats`, ensuring high-efficiency rendering and zero calculation lag when handling large seating reservations.
+  - **Clean Order Summary**: Simplified the checkout order summary to display selected seats count, total subtotal, and total amount payable.
+
+### Dynamic Platform Fee Configuration (`PlatformFeeConfig`) & Admin UI (November 2026)
+- **Domain & Database Architecture**:
+  - Created entity [`PlatformFeeConfig`](file:///d:/Projects/EventLand/backend/src/EventLand.Domain/Entities/PlatformFeeConfig.cs) (`BaseEntity`) representing configurable fee tiers.
+  - Fields: `Name`, `MinSubtotal`, `MaxSubtotal` (nullable for open-ended top tier), `FeeAmount`, `IsActive`, `SortOrder`, `Description`.
+  - Configured with `HasPrecision(18, 2)` and composite index `IX_PlatformFeeConfigs_IsActive_SortOrder`.
+  - Consolidated all EF Core migrations into a single clean baseline: [`20261105093504_InitialCreate.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Migrations/20261105093504_InitialCreate.cs).
+  - Seeded 4 default tiers directly in EF Core migration and [`DataSeeder.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Persistence/DataSeeder.cs):
+    1. *Standard Tier (Up to PKR 5,000)*: Min = 0, Max = 5,000, Fee = PKR 49, SortOrder = 1, Active = true
+    2. *Medium Tier (PKR 5,001 - 10,000)*: Min = 5001, Max = 10,000, Fee = PKR 99, SortOrder = 2, Active = true
+    3. *High Tier (PKR 10,001 - 15,000)*: Min = 10001, Max = 15,000, Fee = PKR 149, SortOrder = 3, Active = true
+    4. *Premium Tier (Above PKR 15,000)*: Min = 15001, Max = null, Fee = PKR 199, SortOrder = 4, Active = true
+- **Dynamic Fee Evaluation Engine**:
+  - [`IPaymentFeeService`](file:///d:/Projects/EventLand/backend/src/EventLand.Application/Services/IPaymentFeeService.cs) & [`PaymentFeeService.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Application/Services/PaymentFeeService.cs):
+    - Added `CalculatePlatformFeeAsync(subtotal)` querying active tiers in database ordered by `SortOrder`.
+    - Matches `subtotal >= MinSubtotal && (!MaxSubtotal.HasValue || subtotal <= MaxSubtotal.Value)`.
+    - Automated fallback to default tiers if the table is empty.
+    - Synchronous `CalculatePlatformFee(subtotal)` preserved for backwards compatibility.
+    - Integrated with [`PaymentController.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Api/Controllers/PaymentController.cs) and [`BookingService.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Application/Services/BookingService.cs).
+- **Admin REST API**:
+  - Controller: [`AdminPlatformFeesController.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Api/Controllers/Admin/AdminPlatformFeesController.cs) at `/api/admin/platform-fees` under `[Authorize(Roles = AppRoles.AdminOrSuperAdmin)]`.
+  - Endpoints: `GET /`, `GET /{id}`, `POST /`, `PUT /{id}`, `PATCH /{id}/toggle`, `DELETE /{id}`, and `POST /preview` for real-time fee calculation simulations.
+- **Frontend Admin Dashboard Integration**:
+  - Client API: `platformFeeApi` in [`frontend/src/services/api.js`](file:///d:/Projects/EventLand/frontend/src/services/api.js).
+  - Component: [`AdminPlatformFeesTab.jsx`](file:///d:/Projects/EventLand/frontend/src/components/admin/AdminPlatformFeesTab.jsx) with KPI tiles, live calculator simulator widget, interactive tier table with instant status toggle, and modal form for adding/editing tiers with range validation.
+  - Wired into [`AdminDashboard.jsx`](file:///d:/Projects/EventLand/frontend/src/components/AdminDashboard.jsx) under the "Platform Fees" tab.
+- **Testing & Verification**:
+  - Expanded unit tests in [`PaymentFeeServiceTests.cs`](file:///d:/Projects/EventLand/backend/tests/EventLand.UnitTests/PaymentFeeServiceTests.cs): 101/101 unit tests passing.
+  - Production frontend build (`npm run build`) passing cleanly in 1.38s.
+
 ---
-*Last Updated: November 2026 (Google & Social Authentication Hardening on Vercel Deployment, Tunnel & Ngrok View Site Warning Elimination, 3 Events Per Row Catalog Grid Layout, Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 98/98 Unit Tests Passing)*
+*Last Updated: November 2026 (Dynamic Platform Fee Configuration [PlatformFeeConfig] & Admin Management UI, Single Baseline EF Core Migration Consolidation, Checkout Modal Simplification & Pricing Normalization, Google & Social Authentication Hardening on Vercel Deployment, Tunnel & Ngrok View Site Warning Elimination, 3 Events Per Row Catalog Grid Layout, Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 101/101 Unit Tests Passing)*
 
 
 

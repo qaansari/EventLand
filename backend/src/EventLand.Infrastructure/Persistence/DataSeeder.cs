@@ -199,5 +199,53 @@ public static class DataSeeder
             context.BankAccounts.Remove(legacyDefaultBank);
             await context.SaveChangesAsync();
         }
+
+        // 9. Default Platform Fee Configurations Seeding
+        if (!await context.PlatformFeeConfigs.AnyAsync())
+        {
+            context.PlatformFeeConfigs.AddRange(
+                new PlatformFeeConfig
+                {
+                    Name = "Standard Tier (Up to PKR 5,000)",
+                    MinSubtotal = 0m,
+                    MaxSubtotal = 5000m,
+                    FeeAmount = 49m,
+                    SortOrder = 1,
+                    IsActive = true,
+                    Description = "Base platform fee for ticket orders up to PKR 5,000"
+                },
+                new PlatformFeeConfig
+                {
+                    Name = "Medium Tier (PKR 5,001 - 10,000)",
+                    MinSubtotal = 5001m,
+                    MaxSubtotal = 10000m,
+                    FeeAmount = 99m,
+                    SortOrder = 2,
+                    IsActive = true,
+                    Description = "Mid-range platform fee for orders between PKR 5,001 and 10,000"
+                },
+                new PlatformFeeConfig
+                {
+                    Name = "High Tier (PKR 10,001 - 15,000)",
+                    MinSubtotal = 10001m,
+                    MaxSubtotal = 15000m,
+                    FeeAmount = 149m,
+                    SortOrder = 3,
+                    IsActive = true,
+                    Description = "High tier platform fee for orders between PKR 10,001 and 15,000"
+                },
+                new PlatformFeeConfig
+                {
+                    Name = "Premium Tier (Above PKR 15,000)",
+                    MinSubtotal = 15001m,
+                    MaxSubtotal = null,
+                    FeeAmount = 199m,
+                    SortOrder = 4,
+                    IsActive = true,
+                    Description = "Premium tier platform fee for orders above PKR 15,000"
+                }
+            );
+            await context.SaveChangesAsync();
+        }
     }
 }

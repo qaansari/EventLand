@@ -130,7 +130,7 @@ public class BookingService : IBookingService
         else
         {
             // Direct bank transfer / default
-            platformFee = _paymentFeeService.CalculatePlatformFee(subtotalAmount);
+            platformFee = await _paymentFeeService.CalculatePlatformFeeAsync(subtotalAmount);
         }
 
         decimal totalPayableAmount = subtotalAmount + platformFee + processingFee;

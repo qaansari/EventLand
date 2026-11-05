@@ -35,6 +35,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext, EventLand.
     public DbSet<RefundRecord> RefundRecords => Set<RefundRecord>();
     public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
     public DbSet<PaymentConfig> PaymentConfigs => Set<PaymentConfig>();
+    public DbSet<PlatformFeeConfig> PlatformFeeConfigs => Set<PlatformFeeConfig>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
 
     // ── PayPro Module DbSets ─────────────────────────────────────────────────

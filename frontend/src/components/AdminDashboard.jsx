@@ -28,7 +28,8 @@ import {
   HelpCircle,
   GripVertical,
   ScanLine,
-  AlertTriangle
+  AlertTriangle,
+  Coins
 } from 'lucide-react';
 import { adminApi, eventsApi, locationsApi, faqsApi, footerApi, paymentsApi, bankAccountsApi, bookingsApi, gateApi, getEventImageUrl, getOrganizerImageUrl, getUserImageUrl, getPaymentSlipUrl, getQrCodeImageUrl, formatPhoneNumberOnSubmit, splitPhoneNumberForEdit } from '../services/api';
 import { useToast } from '../context/ToastContext';
@@ -39,6 +40,7 @@ import EventCard from './EventCard';
 import InteractiveSeatPicker from './InteractiveSeatPicker';
 import DigitalTicketModal from './DigitalTicketModal';
 import PayProAdminPanel from './PayProAdminPanel';
+import AdminPlatformFeesTab from './admin/AdminPlatformFeesTab';
 import AdminBookingsTab from './admin/AdminBookingsTab';
 import FileUploadField from './admin/FileUploadField';
 import AdminEventModal from './admin/modals/AdminEventModal';
@@ -2447,6 +2449,7 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
           <option value="faqs">❓ FAQs ({faqsList.length})</option>
           <option value="tags">🏷️ Tags ({tagsList.length})</option>
           <option value="users">👥 Users ({visibleUsersList.length})</option>
+          <option value="platform-fees">🪙 Platform Fees</option>
           {isSuperAdmin && <option value="bank-accounts">🏦 Bank Accounts ({bankAccountsList.length})</option>}
           {isSuperAdmin && <option value="paypro-admin">⚡ PayPro Admin Operations</option>}
           {isSuperAdmin && <option value="footer">📄 Footer & Static Content</option>}
@@ -2677,6 +2680,24 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
             <ShieldCheck size={18} /> PayPro Gateway
           </button>
         )}
+
+        <button
+          onClick={() => setActiveAdminTab('platform-fees')}
+          style={{
+            padding: '0.75rem 1.25rem',
+            borderRadius: '10px',
+            border: 'none',
+            background: activeAdminTab === 'platform-fees' ? 'linear-gradient(135deg, #0d9488, #0f766e)' : 'rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Coins size={18} /> Platform Fees
+        </button>
 
         {isSuperAdmin && (
           <button
@@ -5427,6 +5448,11 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       {/* --- TAB: PAYPRO GATEWAY SWITCH (SUPER ADMIN) --- */}
       {activeAdminTab === 'paypro' && isSuperAdmin && (
         <PayProAdminPanel />
+      )}
+
+      {/* --- TAB: PLATFORM FEES CONFIGURATION --- */}
+      {activeAdminTab === 'platform-fees' && (
+        <AdminPlatformFeesTab />
       )}
 
       {/* --- MODAL: ADD / EDIT BANK ACCOUNT (STATIC MODAL) --- */}
