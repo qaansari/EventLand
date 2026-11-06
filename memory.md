@@ -680,8 +680,19 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
   - Expanded unit tests in [`PaymentFeeServiceTests.cs`](file:///d:/Projects/EventLand/backend/tests/EventLand.UnitTests/PaymentFeeServiceTests.cs): 101/101 unit tests passing.
   - Production frontend build (`npm run build`) passing cleanly in 1.38s.
 
+### Windows Server VPS Production Hosting Documentation & Automated Deployment (November 2026)
+- **Target Topologies**:
+  - Frontend SPA: Hosted on root domain `https://eventland.pk` (with `www.eventland.pk` binding) on IIS via static file handler and URL Rewrite 2.1 (`React SPA Routing`).
+  - Backend Web API: Hosted on subdomain `https://api.eventland.pk` on IIS via `AspNetCoreModuleV2` in-process hosting with WebSockets enabled for SignalR live seating reservations (`/hubs/seating`).
+- **Generated Production Documentation & Artifacts (`D:\Docx\`)**:
+  - [`D:\Docx\WINDOWS_VPS_HOSTING_GUIDE.md`](file:///D:/Docx/WINDOWS_VPS_HOSTING_GUIDE.md): Complete, step-by-step master guide covering DNS A-records, IIS role installation, .NET 10 Hosting Bundle, URL Rewrite 2.1, SQL Server local/remote setup, file upload permissions (`icacls`), free automated Let's Encrypt SSL via `win-acme`, PayPro return URL/IPN webhook alignment, and Google/Facebook OAuth redirect URI configuration.
+  - [`D:\Docx\WINDOWS_VPS_HOSTING_GUIDE.html`](file:///D:/Docx/WINDOWS_VPS_HOSTING_GUIDE.html): Fully styled, print-ready HTML document that can be opened in any browser or opened in Microsoft Word and saved as `.docx`.
+  - [`D:\Docx\eventland-frontend-web.config`](file:///D:/Docx/eventland-frontend-web.config): Ready-to-use IIS SPA `web.config` with client routing rules, MIME types for WOFF2/WebP, and COOP/CORP security headers for popup auth.
+  - [`D:\Docx\eventland-api-appsettings.Production.json`](file:///D:/Docx/eventland-api-appsettings.Production.json): Production appsettings configured for `api.eventland.pk` with CORS origins for `eventland.pk`, PayPro production switch, and 24-hour JWT tokens.
+  - [`D:\Docx\deploy.ps1`](file:///D:/Docx/deploy.ps1): Automated one-click deployment PowerShell script to stop IIS app pools, compile/publish .NET 10 API, build the Vite production bundle, sync assets, and restart pools with health checks.
+
 ---
-*Last Updated: November 2026 (Dynamic Platform Fee Configuration [PlatformFeeConfig] & Admin Management UI, Single Baseline EF Core Migration Consolidation, Checkout Modal Simplification & Pricing Normalization, Google & Social Authentication Hardening on Vercel Deployment, Tunnel & Ngrok View Site Warning Elimination, 3 Events Per Row Catalog Grid Layout, Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 101/101 Unit Tests Passing)*
+*Last Updated: November 2026 (Windows Server VPS Production Hosting Documentation & Automated Deployment in D:\Docx, Dynamic Platform Fee Configuration [PlatformFeeConfig] & Admin Management UI, Single Baseline EF Core Migration Consolidation, Checkout Modal Simplification & Pricing Normalization, Google & Social Authentication Hardening on Vercel Deployment, Tunnel & Ngrok View Site Warning Elimination, 3 Events Per Row Catalog Grid Layout, Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 101/101 Unit Tests Passing)*
 
 
 
