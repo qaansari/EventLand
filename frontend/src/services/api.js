@@ -137,6 +137,12 @@ async function request(endpoint, options = {}) {
   }
 
   if (response.status === 204) return true;
+
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('text/html')) {
+    throw new Error('API server returned HTML instead of JSON. Ensure VITE_BACKEND_URL is configured to point to your live backend domain in Vercel settings.');
+  }
+
   return await response.json();
 }
 
@@ -492,6 +498,17 @@ export const bankAccountsApi = {
   adminDelete: async (id) => request(`/admin/bank-accounts/${id}`, { method: 'DELETE' }),
   adminToggleActive: async (id) => request(`/admin/bank-accounts/${id}/toggle-active`, { method: 'PUT' }),
   adminToggleEnabled: async (id) => request(`/admin/bank-accounts/${id}/toggle-enabled`, { method: 'PUT' })
+};
+
+// --- Platform Fees API (Admin & SuperAdmin) ---
+export const platformFeeApi = {
+  getAll: async () => request('/admin/platform-fees'),
+  getById: async (id) => request(`/admin/platform-fees/${id}`),
+  create: async (dto) => request('/admin/platform-fees', { method: 'POST', body: JSON.stringify(dto) }),
+  update: async (id, dto) => request(`/admin/platform-fees/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+  toggle: async (id) => request(`/admin/platform-fees/${id}/toggle`, { method: 'PATCH' }),
+  delete: async (id) => request(`/admin/platform-fees/${id}`, { method: 'DELETE' }),
+  preview: async (subtotal) => request('/admin/platform-fees/preview', { method: 'POST', body: JSON.stringify({ subtotal }) })
 };
 
 // --- Venue Gate Ticket Validation & Check-In API (Admin & SuperAdmin only) ---

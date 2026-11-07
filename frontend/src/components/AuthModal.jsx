@@ -42,9 +42,11 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState(null); // 'google' | 'facebook' | null
 
-  // Social Auth Environment Configuration
-  const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
-  const facebookAppId = (import.meta.env.VITE_FACEBOOK_APP_ID || '').trim();
+  // Social Auth Environment Configuration with standard project fallbacks
+  const DEFAULT_GOOGLE_CLIENT_ID = '338547104727-9rrd9g4dj1074cpafca6u81h71igj8o9.apps.googleusercontent.com';
+  const DEFAULT_FACEBOOK_APP_ID = '1454476213413193';
+  const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID).trim();
+  const facebookAppId = (import.meta.env.VITE_FACEBOOK_APP_ID || DEFAULT_FACEBOOK_APP_ID).trim();
   const googleBtnContainerRef = useRef(null);
 
   // Forgot / Reset password state
@@ -128,10 +130,11 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
       if (!window.google?.accounts?.id || !googleBtnContainerRef.current) return;
       try {
         googleBtnContainerRef.current.innerHTML = '';
+        const containerWidth = googleBtnContainerRef.current.clientWidth || 360;
         window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
           theme: 'outline',
           size: 'large',
-          width: 376,
+          width: Math.min(380, Math.max(200, containerWidth)),
           text: 'continue_with',
           shape: 'rectangular',
           logo_alignment: 'left'
@@ -150,7 +153,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
             callback: function (response) {
               handleCredentialResponseRef.current?.(response);
             },
-            use_fedcm_for_prompt: false,
+            use_fedcm_for_prompt: true,
             auto_select: false,
             cancel_on_tap_outside: true
           });
@@ -207,15 +210,9 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
   // Social Auth Handlers
   const handleGoogleSignIn = () => {
     if (!googleClientId) {
-      const msg = 'Google authentication is not configured on this environment. Set VITE_GOOGLE_CLIENT_ID in your .env.local file.';
+      const msg = 'Google authentication is not configured on this environment. Set VITE_GOOGLE_CLIENT_ID in your environment variables.';
       setErrorMsg(msg);
       showError('Google Auth Not Configured', msg);
-      return;
-    }
-    const innerBtn = googleBtnContainerRef.current?.querySelector('div[role="button"]')
-      || googleBtnContainerRef.current?.querySelector('button');
-    if (innerBtn && innerBtn !== document.activeElement) {
-      innerBtn.click();
       return;
     }
     if (!window.google?.accounts?.id) {
@@ -223,7 +220,15 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
       return;
     }
     try {
-      window.google.accounts.id.prompt();
+      window.google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed()) {
+          console.warn('[EventLand Google Auth] One Tap prompt not displayed:', notification.getNotDisplayedReason());
+        } else if (notification.isSkippedMoment()) {
+          console.warn('[EventLand Google Auth] One Tap prompt skipped:', notification.getSkippedReason());
+        } else if (notification.isDismissedMoment()) {
+          console.warn('[EventLand Google Auth] One Tap prompt dismissed:', notification.getDismissedReason());
+        }
+      });
     } catch (err) {
       console.warn('Google prompt exception:', err);
     }

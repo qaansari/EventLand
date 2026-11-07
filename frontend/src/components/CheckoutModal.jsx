@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   X, 
   Copy, 
@@ -43,10 +43,6 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
   // 30-Minute Seat Reservation Hold Timer (30 mins = 1800s)
   const [timerSeconds, setTimerSeconds] = useState(1800);
 
-  // Promo Code
-  const [promoCode, setPromoCode] = useState('');
-  const [discount, setDiscount] = useState(0);
-
   // 30-Minute Countdown Timer for seat reservation hold
   useEffect(() => {
     const interval = setInterval(() => {
@@ -74,20 +70,11 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
     setTimeout(() => setCopiedField(null), 2500);
   };
 
-  // Pricing calculations
-  const subtotal = selectedSeats.reduce((sum, s) => sum + (s.price || 1500), 0);
-  const groupDiscount = selectedSeats.length >= 3 ? Math.round(subtotal * 0.1) : 0;
-  const totalPayable = Math.max(0, subtotal - groupDiscount - discount);
-
-  const handleApplyPromo = () => {
-    if (promoCode.trim().toUpperCase() === 'EVENTLAND10') {
-      const disc = Math.round(subtotal * 0.1);
-      setDiscount(disc);
-      showSuccess('Promo Applied! 🎉', `10% discount (-PKR ${disc.toLocaleString()}) applied.`);
-    } else {
-      showError('Invalid Promo', 'Invalid promo code. Try "EVENTLAND10" for 10% discount.');
-    }
-  };
+  // Pricing calculations (memoized for efficiency and reactivity)
+  const subtotal = useMemo(() => {
+    return (selectedSeats || []).reduce((sum, s) => sum + (Number(s.price) || 1500), 0);
+  }, [selectedSeats]);
+  const totalPayable = subtotal;
 
   const handleProceedToPayment = (e) => {
     e.preventDefault();
@@ -432,44 +419,12 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               </div>
             </div>
 
-            {/* Promo Code & Order Summary */}
+            {/* Order Summary */}
             <div style={{ background: 'rgba(15, 23, 42, 0.5)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem', marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-                <input
-                  type="text"
-                  placeholder="Promo Code (e.g. EVENTLAND10)"
-                  value={promoCode}
-                  onChange={e => setPromoCode(e.target.value)}
-                  style={{ flex: 1, padding: '0.65rem 0.85rem', background: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
-                />
-                <button
-                  type="button"
-                  onClick={handleApplyPromo}
-                  className="btn btn-outline-primary"
-                  style={{ padding: '0.65rem 1.25rem', fontSize: '0.85rem' }}
-                >
-                  Apply
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: '#94a3b8', marginBottom: '0.4rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: '#94a3b8', marginBottom: '0.6rem' }}>
                 <span>Selected Seats ({selectedSeats.length}):</span>
                 <span style={{ color: '#fff', fontWeight: 600 }}>PKR {subtotal.toLocaleString()}</span>
               </div>
-
-              {groupDiscount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: '#2dd4bf', marginBottom: '0.4rem' }}>
-                  <span>Group Discount (10%):</span>
-                  <span>-PKR {groupDiscount.toLocaleString()}</span>
-                </div>
-              )}
-
-              {discount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem', color: '#2dd4bf', marginBottom: '0.4rem' }}>
-                  <span>Promo Discount:</span>
-                  <span>-PKR {discount.toLocaleString()}</span>
-                </div>
-              )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 800, color: '#fff', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
                 <span>Total Amount Payable:</span>

@@ -349,6 +349,7 @@ public class FakeGateNotificationService : INotificationService
 
 public class FakeGatePaymentFeeService : IPaymentFeeService
 {
+    public Task<decimal> CalculatePlatformFeeAsync(decimal subtotal, CancellationToken cancellationToken = default) => Task.FromResult(49m);
     public decimal CalculatePlatformFee(decimal subtotal) => 49m;
     public decimal CalculateProcessingFee(decimal subtotal, decimal percentageFee, decimal fixedFee = 0) => 0m;
     public Task<FeeCalculationResult> CalculateTotalAsync(decimal subtotal, string paymentMethod, CancellationToken cancellationToken = default)

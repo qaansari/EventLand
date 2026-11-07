@@ -251,6 +251,31 @@ namespace EventLand.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PlatformFeeConfigs",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1000, 1"),
+                    Name = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
+                    MinSubtotal = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    MaxSubtotal = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: true),
+                    FeeAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    SortOrder = table.Column<int>(type: "int", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PlatformFeeConfigs", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Roles",
                 columns: table => new
                 {
@@ -369,6 +394,9 @@ namespace EventLand.Infrastructure.Migrations
                     LastLoginAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
                     AccessFailedCount = table.Column<int>(type: "int", nullable: false),
                     LockoutEndUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    GoogleId = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
+                    FacebookId = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
+                    AuthProvider = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false, defaultValue: "local"),
                     CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
@@ -894,6 +922,17 @@ namespace EventLand.Infrastructure.Migrations
                 });
 
             migrationBuilder.InsertData(
+                table: "PlatformFeeConfigs",
+                columns: new[] { "Id", "CreatedAt", "CreatedBy", "DeletedAt", "Description", "FeeAmount", "IsActive", "IsDeleted", "MaxSubtotal", "MinSubtotal", "Name", "SortOrder", "UpdatedAt", "UpdatedBy" },
+                values: new object[,]
+                {
+                    { 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "Base platform fee for ticket orders up to PKR 5,000", 49m, true, false, 5000m, 0m, "Standard Tier (Up to PKR 5,000)", 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null },
+                    { 2, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "Mid-range platform fee for orders between PKR 5,001 and 10,000", 99m, true, false, 10000m, 5001m, "Medium Tier (PKR 5,001 - 10,000)", 2, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null },
+                    { 3, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "High tier platform fee for orders between PKR 10,001 and 15,000", 149m, true, false, 15000m, 10001m, "High Tier (PKR 10,001 - 15,000)", 3, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null },
+                    { 4, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "Premium tier platform fee for VIP and large group orders above PKR 15,000", 199m, true, false, null, 15001m, "Premium Tier (Above PKR 15,000)", 4, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null }
+                });
+
+            migrationBuilder.InsertData(
                 table: "Roles",
                 columns: new[] { "Id", "CreatedAt", "CreatedBy", "DeletedAt", "Description", "IsDeleted", "Name", "UpdatedAt", "UpdatedBy" },
                 values: new object[,]
@@ -928,8 +967,8 @@ namespace EventLand.Infrastructure.Migrations
 
             migrationBuilder.InsertData(
                 table: "Users",
-                columns: new[] { "Id", "AccessFailedCount", "CountryId", "CreatedAt", "CreatedBy", "DeletedAt", "Email", "FullName", "ImageUrl", "IsActive", "IsDeleted", "LastLoginAt", "LockoutEndUtc", "OrganizerId", "PasswordHash", "PhoneNumber", "RoleId", "UpdatedAt", "UpdatedBy" },
-                values: new object[] { 1, 0, null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "admin@eventland.pk", "Super Admin", null, true, false, null, null, null, "AQAAAAIAAYagAAAAECVq9OMdNiKbNLWFM+qBlM3n55yPeW/1GJRpuh29tdlc8PmHVnkkUay6RnkC0+JOGg==", "+923312541767", 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null });
+                columns: new[] { "Id", "AccessFailedCount", "AuthProvider", "CountryId", "CreatedAt", "CreatedBy", "DeletedAt", "Email", "FacebookId", "FullName", "GoogleId", "ImageUrl", "IsActive", "IsDeleted", "LastLoginAt", "LockoutEndUtc", "OrganizerId", "PasswordHash", "PhoneNumber", "RoleId", "UpdatedAt", "UpdatedBy" },
+                values: new object[] { 1, 0, "local", null, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null, null, "admin@eventland.pk", null, "Super Admin", null, null, true, false, null, null, null, "AQAAAAIAAYagAAAAEHFJcnpn5a6JiXFJivaQ6fUDcqnBSEYz9bQm4n5fwcxaoMHROeWdtJJioz9LxgvhRA==", "+923312541767", 1, new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), null });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Artists_IsFeatured",
@@ -1177,6 +1216,11 @@ namespace EventLand.Infrastructure.Migrations
                 column: "ReceivedAtUtc");
 
             migrationBuilder.CreateIndex(
+                name: "IX_PlatformFeeConfigs_IsActive_SortOrder",
+                table: "PlatformFeeConfigs",
+                columns: new[] { "IsActive", "SortOrder" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_RefundRecords_BookingId",
                 table: "RefundRecords",
                 column: "BookingId");
@@ -1237,6 +1281,20 @@ namespace EventLand.Infrastructure.Migrations
                 column: "Email",
                 unique: true,
                 filter: "[IsDeleted] = 0");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_FacebookId",
+                table: "Users",
+                column: "FacebookId",
+                unique: true,
+                filter: "[IsDeleted] = 0 AND [FacebookId] IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_GoogleId",
+                table: "Users",
+                column: "GoogleId",
+                unique: true,
+                filter: "[IsDeleted] = 0 AND [GoogleId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_OrganizerId",
@@ -1302,6 +1360,9 @@ namespace EventLand.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "PayProCallbackLogs");
+
+            migrationBuilder.DropTable(
+                name: "PlatformFeeConfigs");
 
             migrationBuilder.DropTable(
                 name: "RefundRecords");
