@@ -19,6 +19,8 @@ services:
       Cors__AllowedOrigins__3: https://localhost:5174
       Cors__AllowedOrigins__4: http://localhost:4173
       Cors__AllowedOrigins__5: https://localhost:4173
+      Cors__AllowedOrigins__6: https://eventland.pk
+      Cors__AllowedOrigins__7: https://www.eventland.pk
     depends_on:
       mssql:
         condition: service_healthy

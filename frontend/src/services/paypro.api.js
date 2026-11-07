@@ -68,7 +68,7 @@ export const payProApi = {
    * @param {string} ordIdOrBookingRef 
    */
   getReturnReceipt: async (ordIdOrBookingRef) => {
-    const res = await fetch(`${BASE_URL}/api/payments/paypro-return?ordId=${encodeURIComponent(ordIdOrBookingRef || '')}&bookingRef=${encodeURIComponent(ordIdOrBookingRef || '')}`);
+    const res = await fetch(`${BASE_URL}/payments/paypro-return?ordId=${encodeURIComponent(ordIdOrBookingRef || '')}&bookingRef=${encodeURIComponent(ordIdOrBookingRef || '')}`);
     if (!res.ok) {
       let err;
       try { err = await res.json(); } catch { }

@@ -11,7 +11,7 @@ export async function generateTicketQrDataUrl(ticket) {
   const ticketId = ticket.ticketId || ticket.bookingRef || ticket.id || 'EVL-100001';
   const origin = (typeof window !== 'undefined' && window.location?.origin)
     ? window.location.origin
-    : 'https://eventlandpk.vercel.app';
+    : 'https://eventland.pk';
   const verifyUrl = `${origin}/verify/${encodeURIComponent(ticketId)}`;
 
   try {

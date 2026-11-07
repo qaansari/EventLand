@@ -255,11 +255,13 @@ builder.Services.AddCors(options =>
             // 1. Direct match with configured or dev origins
             if (effectiveOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase)) return true;
 
-            // 2. Allow all Vercel domains (*.vercel.app), localhost, and ngrok tunnels
+            // 2. Allow eventland.pk (*.eventland.pk), Vercel domains (*.vercel.app), localhost, and ngrok tunnels
             try
             {
                 var host = new Uri(origin).Host;
-                if (host.Equals("vercel.app", StringComparison.OrdinalIgnoreCase) ||
+                if (host.Equals("eventland.pk", StringComparison.OrdinalIgnoreCase) ||
+                    host.EndsWith(".eventland.pk", StringComparison.OrdinalIgnoreCase) ||
+                    host.Equals("vercel.app", StringComparison.OrdinalIgnoreCase) ||
                     host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase) ||
                     host.EndsWith("vercel.app", StringComparison.OrdinalIgnoreCase) ||
                     host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
