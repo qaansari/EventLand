@@ -83,8 +83,9 @@ async function request(endpoint, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'ngrok-skip-browser-warning': 'true',
-    'bypass-tunnel-reminder': 'true',
+    // Tunnel headers are only needed in local dev when routing through ngrok / localtunnel.
+    // In production (isProductionDomain) these are unnecessary noise — omit them.
+    ...(!isProductionDomain && { 'ngrok-skip-browser-warning': 'true', 'bypass-tunnel-reminder': 'true' }),
     ...(options.headers || {})
   };
 
@@ -446,7 +447,7 @@ export const uploadApi = {
     // Use canonical getStoredToken() so the storage key is managed in one place (utils/auth.js)
     const token = getStoredToken();
     const headers = {
-      'ngrok-skip-browser-warning': 'true'
+      ...(!isProductionDomain && { 'ngrok-skip-browser-warning': 'true' })
     };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 

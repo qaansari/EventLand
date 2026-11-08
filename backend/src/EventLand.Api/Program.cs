@@ -318,13 +318,24 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// Serve static files with aggressive client/CDN caching headers for high performance
+// Serve default index.html and static files from wwwroot
+app.UseDefaultFiles();
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
     {
-        // Static assets (images, logos, QR codes, avatars) are cached for 7 days
-        ctx.Context.Response.Headers.Append("Cache-Control", "public,max-age=604800,immutable");
+        // Never cache index.html so users always receive latest deployments immediately
+        if (ctx.File.Name.Equals("index.html", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Context.Response.Headers.Append("Cache-Control", "no-cache, no-store, must-revalidate");
+            ctx.Context.Response.Headers.Append("Pragma", "no-cache");
+            ctx.Context.Response.Headers.Append("Expires", "0");
+        }
+        else
+        {
+            // Static assets (hashed js/css bundles, images, QR codes) are cached for 1 year
+            ctx.Context.Response.Headers.Append("Cache-Control", "public,max-age=31536000,immutable");
+        }
         ctx.Context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
     }
 });
@@ -340,6 +351,9 @@ app.UseAuthorization();
 
 app.MapControllers().RequireCors("AllowFrontend");
 app.MapHub<SeatingHub>("/hubs/seating").RequireCors("AllowFrontend");
+
+// Single-Domain SPA Fallback: Any non-API route returns index.html for client-side routing
+app.MapFallbackToFile("index.html");
 
 // Auto-migrate database & seed Super Admin account on startup — wrapped so SQL
 // unavailability does not crash the host (e.g. during health probe cold start).
