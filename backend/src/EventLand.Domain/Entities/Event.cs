@@ -37,8 +37,32 @@ public class Event : BaseEntity
 
     // Media & display
     public string Banner { get; set; } = string.Empty;
+    public string? SeatChartUrl { get; set; }
     public string Description { get; set; } = string.Empty;
     public string? ScarcityText { get; set; }
+
+    // House Rules, Amenities & Specifications
+    public string EventType { get; set; } = "Event"; // Workshop, Event
+    public string AttractionsOrActivities { get; set; } = "X";
+    public string VenueEnvironment { get; set; } = "Indoor"; // Indoor, Outdoor, Both
+    public string? DressCode { get; set; }
+    public bool FoodDrinksAvailable { get; set; } = false;
+    public bool FoodDrinksIncluded { get; set; } = false;
+    public bool PetsAllowed { get; set; } = false;
+    public bool ParkingAvailable { get; set; } = false;
+    public bool ValetAvailable { get; set; } = false;
+    public string SeatingArrangement { get; set; } = "Seating"; // Seating, Standing, or custom
+    public bool WheelchairAccessible { get; set; } = false;
+
+    // Restrictions & Policies (JSON serialized array strings)
+    public string AudienceRestrictions { get; set; } = "[]";
+    public string FoodDrinksRestrictions { get; set; } = "[]";
+    public string SmokingRestrictions { get; set; } = "[]";
+
+    // Ticket Flexibility Policies
+    public string TicketNameChangeAllowed { get; set; } = "Yes"; // Yes, No, Other
+    public string TicketNamePolicy { get; set; } = "Only the person whose name is on the ticket can use the ticket";
+    public string TicketDaysInterchangeable { get; set; } = "No"; // Yes, No, Not Applicable, Other
 
     // Organizer (FK)
     public int OrganizerId { get; set; }

@@ -73,6 +73,25 @@ public static class FileUrlHelper
     }
 
     /// <summary>
+    /// Formats an event seat chart image URL for API responses.
+    /// </summary>
+    public static string? FormatSeatChartUrl(string? seatChartUrl)
+    {
+        if (string.IsNullOrWhiteSpace(seatChartUrl)) return null;
+
+        var trimmed = seatChartUrl.Trim();
+
+        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("/"))
+        {
+            return trimmed;
+        }
+
+        return $"/assets/images/events/{trimmed}";
+    }
+
+    /// <summary>
     /// Formats an artist image URL for API responses.
     /// </summary>
     public static string FormatArtistImageUrl(string? imageUrl)

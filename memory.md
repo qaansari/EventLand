@@ -691,8 +691,72 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
   - [`D:\Docx\eventland-api-appsettings.Production.json`](file:///D:/Docx/eventland-api-appsettings.Production.json): Production appsettings configured for `api.eventland.pk` with CORS origins for `eventland.pk`, PayPro production switch, and 24-hour JWT tokens.
   - [`D:\Docx\deploy.ps1`](file:///D:/Docx/deploy.ps1): Automated one-click deployment PowerShell script to stop IIS app pools, compile/publish .NET 10 API, build the Vite production bundle, sync assets, and restart pools with health checks.
 
+### Organizer & Event Entity Enhancements, Seat Chart Upload & House Rules Policies (November 2026)
+- **Context & Requirements**:
+  - Captured extended business specifications for organizers (brand identity, legal company type, tax NTN, address, social media links) and events (seat chart visual uploading, venue environment, attractions/activities, dress codes, food/drink amenities, accessibility, multi-select audience/food/smoking restrictions, and flexible ticket name/transfer/date policies).
+  - Maintained strict production database continuity: existing migrations were preserved untouched, and an additive EF Core migration was generated.
+  - No demo events seeded into `DataSeeder.cs`.
+- **Domain & Database Architecture**:
+  - **Organizer (`backend/src/EventLand.Domain/Entities/Organizer.cs`)**:
+    - `BrandName` (required string, max 200, default `""`)
+    - `CompanyType` (required string, max 50: `"Individual"`, `"Pvt. Ltd"`, `"Sole Proprietor"`, default `"Individual"`)
+    - `RegisteredAddress` (required string, max 500, default `""`)
+    - `CompanyNtn` (optional string, max 50)
+    - `Description` (optional string, max 2000)
+    - `InstagramUrl` (required string, max 500, default `""`)
+    - `FacebookUrl` (optional string, max 500)
+    - Updated `OrganizerConfiguration.cs` with maximum lengths and SQL Server defaults (`HasDefaultValue(...)`) to ensure seamless schema upgrade on non-empty production tables.
+  - **Event (`backend/src/EventLand.Domain/Entities/Event.cs`)**:
+    - `SeatChartUrl` (optional string, max 500)
+    - `EventType` (required string, max 50: `"Event"`, `"Workshop"`, default `"Event"`, indexed via `IX_Events_EventType`)
+    - `AttractionsOrActivities` (required string, max 1000, default `"X"`)
+    - `VenueEnvironment` (required string, max 50: `"Indoor"`, `"Outdoor"`, `"Both"`, default `"Indoor"`)
+    - `DressCode` (optional string, max 200)
+    - `FoodDrinksAvailable` (bool, default `false`)
+    - `FoodDrinksIncluded` (bool, default `false`)
+    - `PetsAllowed` (bool, default `false`)
+    - `ParkingAvailable` (bool, default `false`)
+    - `ValetAvailable` (bool, default `false`)
+    - `SeatingArrangement` (required string, max 100: `"Seating"`, `"Standing"`, or custom, default `"Seating"`)
+    - `WheelchairAccessible` (bool, default `false`)
+    - `AudienceRestrictions` (optional JSON array string, max 2000, e.g. `["Open For All", "18+ Only"]`)
+    - `FoodDrinksRestrictions` (optional JSON array string, max 2000, e.g. `["Outside Drinks Allowed"]`)
+    - `SmokingRestrictions` (optional JSON array string, max 2000, e.g. `["Cigarettes Not Allowed", "Vapes Allowed"]`)
+    - `TicketNameChangeAllowed` (required string, max 100: `"Yes"`, `"No"`, or custom, default `"Yes"`)
+    - `TicketNamePolicy` (required string, max 500: `"Only the person whose name is on the ticket can use the ticket"` / `"The ticket can be used by anyone (changing the name is not mandatory)"` / custom, default `"The ticket can be used by anyone (changing the name is not mandatory)"`)
+    - `TicketDaysInterchangeable` (required string, max 100: `"Yes"`, `"No"`, `"Not Applicable"`, or custom, default `"Not Applicable"`)
+    - Updated `EventConfiguration.cs` with column limits, index on `EventType`, and explicit SQL defaults.
+- **Additive EF Core Migration**:
+  - Preserved `20261105093504_InitialCreate.cs` baseline.
+  - Generated additive migration: [`20261112090751_AddOrganizerAndEventEnhancements.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Migrations/20261112090751_AddOrganizerAndEventEnhancements.cs).
+  - Verified pending status via `dotnet ef migrations list`.
+  - Updated `DataSeeder.cs` ensuring the default system organizer ("Event Land") includes all new required fields while adding **zero demo events**.
+- **Backend Application & Infrastructure Layer**:
+  - `FileUrlHelper.cs`: Added `FormatSeatChartUrl` helper for seat chart asset URL resolution.
+  - `EventDtos.cs` & `AdminDtos.cs`: Extended `EventDetailDto`, `EventSummaryDto`, `OrganizerDto`, `CreateAdminEventDto`, `UpdateAdminEventDto`, `CreateOrganizerDto`, and `UpdateOrganizerDto` with all new properties.
+  - `EventService.cs` & `AdminService.cs`: Implemented mapping, validation, persistence, and querying for all new organizer and event fields across CRUD operations.
+- **Frontend UI & Components**:
+  - **Admin Dashboard (`AdminDashboard.jsx`)**:
+    - Organizers directory: added Brand Name, Company Type badge, Contact info, Registered Address, NTN, and direct Social links.
+    - Organizer Modal: complete management with Brand Name, Company Type dropdown (`Individual`, `Pvt. Ltd`, `Sole Proprietor`), Address, NTN, Instagram, Facebook, Bio, Website, and Logo.
+    - Events management: wired default state, save, and edit flows for all 18 event fields.
+  - **Admin Event Modal (`AdminEventModal.jsx`)**:
+    - Conditional Seat Chart upload field using existing `FileUploadField` whenever `ticketingType === 'mapped'`.
+    - Section 6: House Rules, Amenities, Restrictions & Flexibility Policies with interactive pill selectors and custom "+ Add custom" badges for audience, food, and smoking restrictions.
+  - **Event Organizer Wizard (`EventOrganizerWizard.jsx`)**:
+    - Added conditional seat chart upload for mapped ticketing.
+    - Added House Rules, Amenities & Ticket Policies section with full pill toggle interfaces and custom text inputs.
+  - **Public Event Detail Page (`EventDetailPage.jsx`)**:
+    - Tab 2 ("Event Details & Rules"): Key specs badges, attractions card, responsive seat chart preview card with full-screen zoom lightbox modal, dynamic amenities cards (Food/Drinks, Pets, Parking, Valet, Wheelchair), audience / food / smoking policy badges, and ticket flexibility policy cards.
+    - Enhanced Organizer Profile: renders Brand Name, Company Type badge, registered address, NTN, bio, and direct outbound links for Instagram, Facebook, and Website.
+- **Testing & Verification**:
+  - Added unit tests in [`AdminServiceEventAndTierTests.cs`](file:///d:/Projects/EventLand/backend/tests/EventLand.UnitTests/AdminServiceEventAndTierTests.cs) covering organizer and event creation and updates.
+  - Verified `dotnet test backend/tests/EventLand.UnitTests/`: **103 passed, 0 failed**.
+  - Verified `npm --prefix frontend run build`: **0 errors** (built in 2.65s).
+
 ---
-*Last Updated: November 2026 (Windows Server VPS Production Hosting Documentation & Automated Deployment in D:\Docx, Dynamic Platform Fee Configuration [PlatformFeeConfig] & Admin Management UI, Single Baseline EF Core Migration Consolidation, Checkout Modal Simplification & Pricing Normalization, Google & Social Authentication Hardening on Vercel Deployment, Tunnel & Ngrok View Site Warning Elimination, 3 Events Per Row Catalog Grid Layout, Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 101/101 Unit Tests Passing)*
+*Last Updated: November 2026 (Organizer & Event Entity Enhancements, Seat Chart Upload & House Rules Policies, Additive EF Core Migration [AddOrganizerAndEventEnhancements], Windows Server VPS Production Hosting Documentation & Automated Deployment in D:\Docx, Dynamic Platform Fee Configuration [PlatformFeeConfig] & Admin Management UI, Single Baseline EF Core Migration Consolidation, Checkout Modal Simplification & Pricing Normalization, Google & Social Authentication Hardening on Vercel Deployment, Tunnel & Ngrok View Site Warning Elimination, 3 Events Per Row Catalog Grid Layout, Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 103/103 Unit Tests Passing)*
+
 
 
 

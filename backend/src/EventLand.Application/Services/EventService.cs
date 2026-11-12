@@ -229,7 +229,21 @@ public class EventService : IEventService
         e.Description,
         e.ScarcityText,
         e.Organizer == null ? new OrganizerDto(0, "", "", "", null, null, false) : new OrganizerDto(
-            e.Organizer.Id, e.Organizer.Name, e.Organizer.Email, e.Organizer.Phone, FileUrlHelper.FormatOrganizerLogoUrl(e.Organizer.LogoUrl), e.Organizer.WebsiteUrl, e.Organizer.IsVerified),
+            e.Organizer.Id,
+            e.Organizer.Name,
+            e.Organizer.Email,
+            e.Organizer.Phone,
+            FileUrlHelper.FormatOrganizerLogoUrl(e.Organizer.LogoUrl),
+            e.Organizer.WebsiteUrl,
+            e.Organizer.IsVerified,
+            e.Organizer.BrandName,
+            e.Organizer.CompanyType,
+            e.Organizer.RegisteredAddress,
+            e.Organizer.CompanyNtn,
+            e.Organizer.Description,
+            e.Organizer.InstagramUrl,
+            e.Organizer.FacebookUrl
+        ),
         e.Shows.Select(s => new EventShowDto(
             s.Id,
             s.EventId,
@@ -241,7 +255,25 @@ public class EventService : IEventService
         )).ToList(),
         e.TicketTiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder).ThenBy(t => t.Price).Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.EffectiveStatus.ToString())).ToList(),
         e.SeatingZones.Select(z => new SeatingZoneDto(z.Id, z.EventId, z.Zone, z.Rows, z.Cols, z.Price, z.TotalCapacity, z.SortOrder, z.LayoutJson, z.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString())).ToList())).ToList(),
-        e.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList()
+        e.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList(),
+        FileUrlHelper.FormatSeatChartUrl(e.SeatChartUrl),
+        e.EventType,
+        e.AttractionsOrActivities,
+        e.VenueEnvironment,
+        e.DressCode,
+        e.FoodDrinksAvailable,
+        e.FoodDrinksIncluded,
+        e.PetsAllowed,
+        e.ParkingAvailable,
+        e.ValetAvailable,
+        e.SeatingArrangement,
+        e.WheelchairAccessible,
+        e.AudienceRestrictions,
+        e.FoodDrinksRestrictions,
+        e.SmokingRestrictions,
+        e.TicketNameChangeAllowed,
+        e.TicketNamePolicy,
+        e.TicketDaysInterchangeable
     );
 
     private static string StatusLabel(EventStatus s) => s switch

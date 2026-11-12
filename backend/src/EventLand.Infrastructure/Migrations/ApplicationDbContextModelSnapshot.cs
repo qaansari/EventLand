@@ -745,6 +745,20 @@ namespace EventLand.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
 
+                    b.Property<string>("AttractionsOrActivities")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasDefaultValue("X");
+
+                    b.Property<string>("AudienceRestrictions")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasDefaultValue("[]");
+
                     b.Property<int?>("AuditoriumId")
                         .HasColumnType("int");
 
@@ -772,8 +786,36 @@ namespace EventLand.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("DressCode")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<DateTimeOffset>("EndDateUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasDefaultValue("Event");
+
+                    b.Property<bool>("FoodDrinksAvailable")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("FoodDrinksIncluded")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("FoodDrinksRestrictions")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasDefaultValue("[]");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -787,6 +829,16 @@ namespace EventLand.Infrastructure.Migrations
                     b.Property<int>("OrganizerId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("ParkingAvailable")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("PetsAllowed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("PriceRange")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -795,6 +847,24 @@ namespace EventLand.Infrastructure.Migrations
                     b.Property<string>("ScarcityText")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("SeatChartUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("SeatingArrangement")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasDefaultValue("Seating");
+
+                    b.Property<string>("SmokingRestrictions")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasDefaultValue("[]");
 
                     b.Property<DateTimeOffset>("StartDateUtc")
                         .HasColumnType("datetimeoffset");
@@ -805,6 +875,27 @@ namespace EventLand.Infrastructure.Migrations
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
+
+                    b.Property<string>("TicketDaysInterchangeable")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasDefaultValue("No");
+
+                    b.Property<string>("TicketNameChangeAllowed")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasDefaultValue("Yes");
+
+                    b.Property<string>("TicketNamePolicy")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasDefaultValue("Only the person whose name is on the ticket can use the ticket");
 
                     b.Property<int>("TicketingType")
                         .HasColumnType("int");
@@ -820,8 +911,25 @@ namespace EventLand.Infrastructure.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("ValetAvailable")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("VenueEnvironment")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasDefaultValue("Indoor");
+
                     b.Property<int>("VenueId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("WheelchairAccessible")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
 
                     b.HasKey("Id");
 
@@ -831,6 +939,9 @@ namespace EventLand.Infrastructure.Migrations
                         .HasDatabaseName("IX_Events_CityId");
 
                     b.HasIndex("CountryId");
+
+                    b.HasIndex("EventType")
+                        .HasDatabaseName("IX_Events_EventType");
 
                     b.HasIndex("IsFeatured")
                         .HasDatabaseName("IX_Events_IsFeatured");
@@ -1094,6 +1205,24 @@ namespace EventLand.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
 
+                    b.Property<string>("BrandName")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)")
+                        .HasDefaultValue("");
+
+                    b.Property<string>("CompanyNtn")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("CompanyType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasDefaultValue("Individual");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -1103,10 +1232,25 @@ namespace EventLand.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(320)
                         .HasColumnType("nvarchar(320)");
+
+                    b.Property<string>("FacebookUrl")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("InstagramUrl")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasDefaultValue("");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -1127,6 +1271,13 @@ namespace EventLand.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("RegisteredAddress")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasDefaultValue("");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
@@ -1151,13 +1302,17 @@ namespace EventLand.Infrastructure.Migrations
                         new
                         {
                             Id = 1,
+                            BrandName = "",
+                            CompanyType = "Individual",
                             CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             Email = "support@eventland.pk",
+                            InstagramUrl = "",
                             IsDeleted = false,
                             IsVerified = true,
                             LogoUrl = "org_eventland_01.png",
                             Name = "Event Land",
                             Phone = "+92 307 9353185",
+                            RegisteredAddress = "",
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             WebsiteUrl = "https://www.eventland.pk"
                         });
@@ -2069,7 +2224,7 @@ namespace EventLand.Infrastructure.Migrations
                             FullName = "Super Admin",
                             IsActive = true,
                             IsDeleted = false,
-                            PasswordHash = "AQAAAAIAAYagAAAAEHFJcnpn5a6JiXFJivaQ6fUDcqnBSEYz9bQm4n5fwcxaoMHROeWdtJJioz9LxgvhRA==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEPUGI4O0ECtZ1OqFvYP+T3BNeaViWCNehQE0vShI7Pvy4XKRZW84KKuYXqBhSm4xWQ==",
                             PhoneNumber = "+923312541767",
                             RoleId = 1,
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))

@@ -23,7 +23,9 @@ public record EventSummaryDto(
     int OrganizerId,
     string OrganizerName,
     List<TagDto> Tags,
-    List<EventShowDto>? Shows = null
+    List<EventShowDto>? Shows = null,
+    string EventType = "Event",
+    string VenueEnvironment = "Indoor"
 );
 
 public record EventShowDto(
@@ -61,7 +63,25 @@ public record EventDetailDto(
     List<EventShowDto> Shows,
     List<TicketTierDto> TicketTiers,
     List<SeatingZoneDto> SeatingZones,
-    List<TagDto> Tags
+    List<TagDto> Tags,
+    string? SeatChartUrl = null,
+    string EventType = "Event",
+    string AttractionsOrActivities = "X",
+    string VenueEnvironment = "Indoor",
+    string? DressCode = null,
+    bool FoodDrinksAvailable = false,
+    bool FoodDrinksIncluded = false,
+    bool PetsAllowed = false,
+    bool ParkingAvailable = false,
+    bool ValetAvailable = false,
+    string SeatingArrangement = "Seating",
+    bool WheelchairAccessible = false,
+    string AudienceRestrictions = "[]",
+    string FoodDrinksRestrictions = "[]",
+    string SmokingRestrictions = "[]",
+    string TicketNameChangeAllowed = "Yes",
+    string TicketNamePolicy = "Only the person whose name is on the ticket can use the ticket",
+    string TicketDaysInterchangeable = "No"
 );
 
 public record TicketTierDto(
@@ -115,5 +135,12 @@ public record OrganizerDto(
     string Phone,
     string? LogoUrl,
     string? WebsiteUrl,
-    bool IsVerified
+    bool IsVerified,
+    string BrandName = "",
+    string CompanyType = "Individual",
+    string RegisteredAddress = "",
+    string? CompanyNtn = null,
+    string? Description = null,
+    string InstagramUrl = "",
+    string? FacebookUrl = null
 );

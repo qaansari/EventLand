@@ -1,10 +1,24 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  ArrowLeft, Calendar, MapPin, Sparkles, ShieldCheck, Ticket, Layers, Grid, 
+  ArrowLeft, Calendar, MapPin, Sparkles, ShieldCheck, Ticket, Layers, Grid, Tag,
   Globe, Clock, Eye, Copy, Check, Share2, Info, AlertCircle, Compass, 
   ChevronRight, ExternalLink, ShieldAlert, Heart, Users, FileText, CheckCircle2,
-  Navigation, Award
+  Navigation, Award, Coffee, Cigarette, Car, Shirt, Maximize2, X
 } from 'lucide-react';
+
+const InstagramIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect width="20" height="20" x="2" y="2" rx="5" ry="5"/>
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+    <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
+  </svg>
+);
+
+const FacebookIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
+  </svg>
+);
 import { useToast } from '../context/ToastContext';
 import { formatEventDateRange, formatEventStartTime } from '../utils/dateUtils';
 import { getEventImageUrl, getOrganizerImageUrl, eventsApi } from '../services/api';
@@ -265,16 +279,36 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
     onProceedToBooking(updatedEvent, 'seat-picker', []);
   };
 
-  const organizerWebsiteUrl = (typeof event.organizer === 'object' 
-    ? event.organizer?.websiteUrl 
-    : (event.organizerWebsite || event.websiteUrl)) || 'https://www.eventland.pk';
+  const [showSeatChartModal, setShowSeatChartModal] = useState(false);
 
-  const organizerDisplayName = (typeof event.organizer === 'object'
-    ? event.organizer?.name
-    : event.organizer) || 'Event Land';
+  const orgObj = typeof event.organizer === 'object' && event.organizer !== null ? event.organizer : {};
+  const organizerDisplayName = orgObj.brandName || orgObj.name || (typeof event.organizer === 'string' ? event.organizer : '') || 'Event Land';
+  const organizerLegalName = orgObj.name || organizerDisplayName;
+  const organizerCompanyType = orgObj.companyType || 'Individual';
+  const organizerAddress = orgObj.registeredAddress || '';
+  const organizerNtn = orgObj.companyNtn || '';
+  const organizerInstagram = orgObj.instagramUrl || '';
+  const organizerFacebook = orgObj.facebookUrl || '';
+  const organizerWebsiteUrl = orgObj.websiteUrl || event.websiteUrl || 'https://www.eventland.pk';
+  const organizerBio = orgObj.description || '';
 
-  const rawLogo = typeof event.organizer === 'object' ? event.organizer?.logoUrl : null;
+  const rawLogo = orgObj.logoUrl || null;
   const organizerLogoUrl = getOrganizerImageUrl(rawLogo) || '/assets/images/organizers/org_eventland_01.png';
+
+  const parseList = (raw) => {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [raw];
+    }
+  };
+
+  const audienceRestrictions = parseList(event.audienceRestrictions);
+  const foodRestrictions = parseList(event.foodDrinksRestrictions);
+  const smokingRestrictions = parseList(event.smokingRestrictions);
 
   const fullLocation = formatLocationString(event);
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullLocation)}`;
@@ -860,15 +894,34 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
           )}
 
           {/* ========================================================
-              TAB 2: EVENT DETAILS & RULES (Ticketwala Inspired)
+              TAB 2: EVENT DETAILS & RULES (Dynamically Rendered)
              ======================================================== */}
           {activeTab === 'details' && (
             <div>
-              {/* Event Description */}
+              {/* Event Description & Highlights */}
               <div style={{ marginBottom: '2.5rem' }}>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Info size={20} color="#0d9488" /> About The Event
                 </h3>
+                
+                {/* Key Spec Badges */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1rem' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', background: 'rgba(13, 148, 136, 0.15)', border: '1px solid rgba(13, 148, 136, 0.35)', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 600, color: '#2dd4bf' }}>
+                    <Tag size={13} /> {event.eventType || 'Event'}
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.35)', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 600, color: '#60a5fa' }}>
+                    <Compass size={13} /> {event.venueEnvironment || 'Indoor'}
+                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', background: 'rgba(168, 85, 247, 0.15)', border: '1px solid rgba(168, 85, 247, 0.35)', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 600, color: '#c084fc' }}>
+                    <Grid size={13} /> {event.seatingArrangement || 'Seating'}
+                  </span>
+                  {event.dressCode && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.35)', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 600, color: '#fbbf24' }}>
+                      <Shirt size={13} /> Dress Code: {event.dressCode}
+                    </span>
+                  )}
+                </div>
+
                 <div style={{
                   color: '#cbd5e1',
                   fontSize: '0.98rem',
@@ -883,80 +936,204 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
                 </div>
               </div>
 
-              {/* Event House Rules & Guidelines (Ticketwala Style) */}
+              {/* Attractions & Special Activities (if specified) */}
+              {event.attractionsOrActivities && event.attractionsOrActivities !== 'X' && event.attractionsOrActivities !== 'x' && (
+                <div style={{ marginBottom: '2.5rem' }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Sparkles size={20} color="#fbbf24" /> Attractions & Key Activities
+                  </h3>
+                  <div style={{
+                    background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(13, 148, 136, 0.08))',
+                    border: '1px solid rgba(245, 158, 11, 0.25)',
+                    padding: '1.25rem 1.5rem',
+                    borderRadius: '16px',
+                    color: '#f8fafc',
+                    fontSize: '0.95rem',
+                    lineHeight: 1.6
+                  }}>
+                    {event.attractionsOrActivities}
+                  </div>
+                </div>
+              )}
+
+              {/* Uploaded Seat Chart Reference Map (if available) */}
+              {event.seatChartUrl && (
+                <div style={{ marginBottom: '2.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Grid size={20} color="#2dd4bf" /> Seating Blueprint & Layout
+                    </h3>
+                    <button
+                      onClick={() => setShowSeatChartModal(true)}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <Maximize2 size={13} /> View Full Map
+                    </button>
+                  </div>
+                  <div 
+                    onClick={() => setShowSeatChartModal(true)}
+                    style={{
+                      cursor: 'pointer',
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      border: '1px solid rgba(13, 148, 136, 0.3)',
+                      background: 'rgba(11, 23, 37, 0.8)',
+                      maxHeight: '380px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative'
+                    }}
+                  >
+                    <img
+                      src={getEventImageUrl(event.seatChartUrl)}
+                      alt="Event Seating Chart"
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', maxHeight: '380px' }}
+                    />
+                    <div style={{ position: 'absolute', bottom: '0.75rem', right: '0.75rem', background: 'rgba(15, 23, 42, 0.85)', padding: '0.35rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem', color: '#2dd4bf', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Maximize2 size={12} /> Click to enlarge
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Amenities & Facilities */}
               <div style={{ marginBottom: '2.5rem' }}>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <ShieldAlert size={20} color="#0d9488" /> House Rules & Important Guidelines
+                  <Award size={20} color="#0d9488" /> Amenities & Venue Facilities
                 </h3>
                 
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
                   gap: '1rem'
                 }}>
                   <div className="rule-card">
-                    <Ticket size={22} color="#f59e0b" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <Compass size={22} color={event.wheelchairAccessible ? '#10b981' : '#64748b'} style={{ flexShrink: 0, marginTop: '2px' }} />
                     <div>
-                      <strong style={{ color: '#fff', fontSize: '0.92rem', display: 'block', marginBottom: '0.2rem' }}>Strictly Non-Refundable</strong>
+                      <strong style={{ color: '#fff', fontSize: '0.92rem', display: 'block', marginBottom: '0.2rem' }}>Wheelchair Accessibility</strong>
                       <span style={{ color: '#94a3b8', fontSize: '0.84rem', lineHeight: 1.4, display: 'block' }}>
-                        Tickets are date and slot specific. No exchange or refunds permitted once issued.
+                        {event.wheelchairAccessible ? 'Venue is fully wheelchair accessible with designated ramps and access.' : 'Standard venue access; please contact organizers for special assistance.'}
                       </span>
                     </div>
                   </div>
 
                   <div className="rule-card">
-                    <Clock size={22} color="#2dd4bf" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <Car size={22} color={event.parkingAvailable ? '#10b981' : '#64748b'} style={{ flexShrink: 0, marginTop: '2px' }} />
                     <div>
-                      <strong style={{ color: '#fff', fontSize: '0.92rem', display: 'block', marginBottom: '0.2rem' }}>Gate Closure Timings</strong>
+                      <strong style={{ color: '#fff', fontSize: '0.92rem', display: 'block', marginBottom: '0.2rem' }}>Parking & Valet</strong>
                       <span style={{ color: '#94a3b8', fontSize: '0.84rem', lineHeight: 1.4, display: 'block' }}>
-                        Auditorium doors close 15 minutes before the performance begins. Latecomers will not be admitted.
+                        {event.valetAvailable 
+                          ? 'Dedicated on-site parking and valet service available.'
+                          : (event.parkingAvailable ? 'On-site vehicle parking available on first-come basis.' : 'Limited street parking available nearby.')}
                       </span>
                     </div>
                   </div>
 
                   <div className="rule-card">
-                    <ShieldCheck size={22} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <Coffee size={22} color={event.foodDrinksAvailable ? '#10b981' : '#64748b'} style={{ flexShrink: 0, marginTop: '2px' }} />
                     <div>
-                      <strong style={{ color: '#fff', fontSize: '0.92rem', display: 'block', marginBottom: '0.2rem' }}>Age Restrictions</strong>
+                      <strong style={{ color: '#fff', fontSize: '0.92rem', display: 'block', marginBottom: '0.2rem' }}>Food & Beverages</strong>
                       <span style={{ color: '#94a3b8', fontSize: '0.84rem', lineHeight: 1.4, display: 'block' }}>
-                        Family-friendly theatrical play. Children under 12 must be accompanied by a ticket-holding guardian.
+                        {event.foodDrinksAvailable 
+                          ? (event.foodDrinksIncluded ? 'Complimentary food & drinks included with your ticket!' : 'Food and beverage stalls available for purchase on-site.')
+                          : 'No refreshments served on-site.'}
                       </span>
                     </div>
                   </div>
 
                   <div className="rule-card">
-                    <AlertCircle size={22} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <Heart size={22} color={event.petsAllowed ? '#10b981' : '#64748b'} style={{ flexShrink: 0, marginTop: '2px' }} />
                     <div>
-                      <strong style={{ color: '#fff', fontSize: '0.92rem', display: 'block', marginBottom: '0.2rem' }}>No Flash Photography</strong>
+                      <strong style={{ color: '#fff', fontSize: '0.92rem', display: 'block', marginBottom: '0.2rem' }}>Pet Policy</strong>
                       <span style={{ color: '#94a3b8', fontSize: '0.84rem', lineHeight: 1.4, display: 'block' }}>
-                        Flash photography and unauthorized audio/video recording are strictly prohibited inside the auditorium.
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="rule-card">
-                    <Sparkles size={22} color="#8b5cf6" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <div>
-                      <strong style={{ color: '#fff', fontSize: '0.92rem', display: 'block', marginBottom: '0.2rem' }}>Food & Beverage Policy</strong>
-                      <span style={{ color: '#94a3b8', fontSize: '0.84rem', lineHeight: 1.4, display: 'block' }}>
-                        Outside food and beverages are not permitted inside the hall. Refreshments available in the lobby.
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="rule-card">
-                    <Compass size={22} color="#0d9488" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <div>
-                      <strong style={{ color: '#fff', fontSize: '0.92rem', display: 'block', marginBottom: '0.2rem' }}>Accessibility</strong>
-                      <span style={{ color: '#94a3b8', fontSize: '0.84rem', lineHeight: 1.4, display: 'block' }}>
-                        Auditorium is wheelchair accessible. Our ground staff is available to assist special guests.
+                        {event.petsAllowed ? 'Pets are warmly welcomed at this event!' : 'Pets are strictly not allowed on venue premises.'}
                       </span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Organizer Spotlight */}
+              {/* House Rules & Policies (Restrictions & Flexibility) */}
+              <div style={{ marginBottom: '2.5rem' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <ShieldAlert size={20} color="#0d9488" /> House Rules, Restrictions & Policies
+                </h3>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {/* Audience Restrictions */}
+                  {audienceRestrictions.length > 0 && (
+                    <div style={{ background: 'rgba(11, 23, 37, 0.65)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', color: '#38bdf8', fontWeight: 700, fontSize: '0.9rem' }}>
+                        <Users size={17} /> Audience Restrictions & Entry Criteria
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        {audienceRestrictions.map((item, idx) => (
+                          <span key={idx} style={{ padding: '0.35rem 0.75rem', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(56, 189, 248, 0.15)', border: '1px solid rgba(56, 189, 248, 0.3)', color: '#38bdf8' }}>
+                            • {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Food & Beverage Policy */}
+                  {foodRestrictions.length > 0 && (
+                    <div style={{ background: 'rgba(11, 23, 37, 0.65)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', color: '#fbbf24', fontWeight: 700, fontSize: '0.9rem' }}>
+                        <Coffee size={17} /> Food & Drink Policies
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        {foodRestrictions.map((item, idx) => (
+                          <span key={idx} style={{ padding: '0.35rem 0.75rem', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(251, 191, 36, 0.15)', border: '1px solid rgba(251, 191, 36, 0.3)', color: '#fbbf24' }}>
+                            • {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Smoking & Vape Policy */}
+                  {smokingRestrictions.length > 0 && (
+                    <div style={{ background: 'rgba(11, 23, 37, 0.65)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', color: '#f87171', fontWeight: 700, fontSize: '0.9rem' }}>
+                        <Cigarette size={17} /> Smoking & Vape Regulations
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        {smokingRestrictions.map((item, idx) => (
+                          <span key={idx} style={{ padding: '0.35rem 0.75rem', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(248, 113, 113, 0.15)', border: '1px solid rgba(248, 113, 113, 0.3)', color: '#f87171' }}>
+                            • {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Ticket Flexibility & Transfer Policy */}
+                  <div style={{ background: 'rgba(11, 23, 37, 0.65)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', padding: '1.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', color: '#a78bfa', fontWeight: 700, fontSize: '0.9rem' }}>
+                      <Ticket size={17} /> Ticket Policies & Name Changes
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem', fontSize: '0.85rem', color: '#cbd5e1' }}>
+                      <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.75rem' }}>Ticket Holder Name Change</span>
+                        <strong style={{ color: '#fff' }}>{event.ticketNameChangeAllowed || 'Yes'}</strong>
+                      </div>
+                      <div style={{ background: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.75rem' }}>Interchangeable Dates/Days</span>
+                        <strong style={{ color: '#fff' }}>{event.ticketDaysInterchangeable || 'No'}</strong>
+                      </div>
+                      <div style={{ gridColumn: '1 / -1', background: 'rgba(15, 23, 42, 0.6)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <span style={{ color: '#94a3b8', display: 'block', fontSize: '0.75rem' }}>Ticket Name Usage Policy</span>
+                        <strong style={{ color: '#fff' }}>{event.ticketNamePolicy || 'Only the person whose name is on the ticket can use the ticket'}</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Enhanced Organizer Profile */}
               <div>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fff', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Users size={20} color="#0d9488" /> Organizer Profile
@@ -965,39 +1142,115 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
                   backgroundColor: 'rgba(11, 23, 37, 0.75)',
                   border: '1px solid rgba(13, 148, 136, 0.3)',
                   borderRadius: '18px',
-                  padding: '1.35rem 1.5rem',
+                  padding: '1.75rem',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '1rem'
+                  flexDirection: 'column',
+                  gap: '1.25rem'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <img
-                      src={organizerLogoUrl}
-                      alt={organizerDisplayName}
-                      style={{ width: '48px', height: '48px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #0d9488' }}
-                    />
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <h4 style={{ color: '#fff', fontSize: '1.05rem', fontWeight: 800, margin: 0 }}>{organizerDisplayName}</h4>
-                        <Award size={15} color="#10b981" />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <img
+                        src={organizerLogoUrl}
+                        alt={organizerDisplayName}
+                        style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #0d9488' }}
+                      />
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <h4 style={{ color: '#fff', fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>{organizerDisplayName}</h4>
+                          <span style={{
+                            padding: '0.2rem 0.55rem',
+                            borderRadius: '9999px',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            background: 'rgba(13, 148, 136, 0.2)',
+                            color: '#2dd4bf',
+                            border: '1px solid rgba(13, 148, 136, 0.4)'
+                          }}>
+                            {organizerCompanyType}
+                          </span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', color: '#10b981', fontSize: '0.75rem', fontWeight: 700 }}>
+                            <Award size={14} /> Verified
+                          </span>
+                        </div>
+                        {organizerLegalName !== organizerDisplayName && (
+                          <div style={{ color: '#94a3b8', fontSize: '0.8rem' }}>Legal: {organizerLegalName}</div>
+                        )}
+                        {organizerAddress && (
+                          <div style={{ color: '#94a3b8', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.2rem' }}>
+                            <MapPin size={12} color="#0d9488" /> {organizerAddress}
+                            {organizerNtn && <span style={{ color: '#64748b' }}>• NTN: {organizerNtn}</span>}
+                          </div>
+                        )}
                       </div>
-                      <span style={{ color: '#94a3b8', fontSize: '0.82rem' }}>Official Event Organizer on Event Land</span>
+                    </div>
+
+                    {/* Social & Web Action Buttons */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      {organizerInstagram && (
+                        <a
+                          href={organizerInstagram.startsWith('http') ? organizerInstagram : `https://${organizerInstagram}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-secondary"
+                          style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: '#e879f9' }}
+                        >
+                          <InstagramIcon /> Instagram ↗
+                        </a>
+                      )}
+                      {organizerFacebook && (
+                        <a
+                          href={organizerFacebook.startsWith('http') ? organizerFacebook : `https://${organizerFacebook}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-secondary"
+                          style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: '#60a5fa' }}
+                        >
+                          <FacebookIcon /> Facebook ↗
+                        </a>
+                      )}
+                      {organizerWebsiteUrl && (
+                        <a
+                          href={organizerWebsiteUrl.startsWith('http') ? organizerWebsiteUrl : `https://${organizerWebsiteUrl}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-secondary"
+                          style={{ padding: '0.45rem 0.85rem', fontSize: '0.82rem', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                        >
+                          <Globe size={14} /> Website ↗
+                        </a>
+                      )}
                     </div>
                   </div>
 
-                  {organizerWebsiteUrl && (
-                    <a
-                      href={organizerWebsiteUrl.startsWith('http') ? organizerWebsiteUrl : `https://${organizerWebsiteUrl}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-secondary"
-                      style={{ padding: '0.55rem 1.1rem', fontSize: '0.85rem', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}
-                    >
-                      <Globe size={15} /> Official Website ↗
-                    </a>
+                  {organizerBio && (
+                    <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '1rem', color: '#cbd5e1', fontSize: '0.88rem', lineHeight: 1.6 }}>
+                      {organizerBio}
+                    </div>
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Seat Chart Lightbox Modal */}
+          {showSeatChartModal && event.seatChartUrl && (
+            <div className="modal-overlay" onClick={() => setShowSeatChartModal(false)} style={{ zIndex: 1100, background: 'rgba(3, 7, 18, 0.88)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '90vw', maxHeight: '90vh', padding: '1.5rem', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <button
+                  onClick={() => setShowSeatChartModal(false)}
+                  style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'rgba(255, 255, 255, 0.1)', border: 'none', color: '#fff', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10 }}
+                >
+                  <X size={20} />
+                </button>
+                <h4 style={{ color: '#fff', fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', alignSelf: 'flex-start' }}>
+                  {event.title} — Seating Blueprint
+                </h4>
+                <div style={{ overflow: 'auto', maxWidth: '100%', maxHeight: '75vh', display: 'flex', justifyContent: 'center' }}>
+                  <img
+                    src={getEventImageUrl(event.seatChartUrl)}
+                    alt="Seating Blueprint Map"
+                    style={{ maxWidth: '100%', height: 'auto', borderRadius: '10px', objectFit: 'contain' }}
+                  />
                 </div>
               </div>
             </div>

@@ -650,7 +650,9 @@ public class AdminService : IAdminService
                     s.StartTimeUtc,
                     s.EndTimeUtc,
                     s.TicketTiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder).ThenBy(t => t.Price).Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.EffectiveStatus.ToString())).ToList()
-                )).ToList()
+                )).ToList(),
+                e.EventType,
+                e.VenueEnvironment
             ))
             .ToListAsync();
 
@@ -752,12 +754,30 @@ public class AdminService : IAdminService
             StartingPrice = dto.StartingPrice,
             TicketingType = ticketingType,
             Banner = FileUrlHelper.ExtractFileName(dto.Banner) ?? dto.Banner,
+            SeatChartUrl = FileUrlHelper.ExtractFileName(dto.SeatChartUrl) ?? dto.SeatChartUrl,
             Description = dto.Description,
             ScarcityText = dto.ScarcityText,
             OrganizerId = organizerId,
             IsFeatured = dto.IsFeatured,
             IsPublished = dto.IsPublished,
-            Status = status
+            Status = status,
+            EventType = string.IsNullOrWhiteSpace(dto.EventType) ? "Event" : dto.EventType.Trim(),
+            AttractionsOrActivities = string.IsNullOrWhiteSpace(dto.AttractionsOrActivities) ? "X" : dto.AttractionsOrActivities.Trim(),
+            VenueEnvironment = string.IsNullOrWhiteSpace(dto.VenueEnvironment) ? "Indoor" : dto.VenueEnvironment.Trim(),
+            DressCode = dto.DressCode,
+            FoodDrinksAvailable = dto.FoodDrinksAvailable,
+            FoodDrinksIncluded = dto.FoodDrinksIncluded,
+            PetsAllowed = dto.PetsAllowed,
+            ParkingAvailable = dto.ParkingAvailable,
+            ValetAvailable = dto.ValetAvailable,
+            SeatingArrangement = string.IsNullOrWhiteSpace(dto.SeatingArrangement) ? "Seating" : dto.SeatingArrangement.Trim(),
+            WheelchairAccessible = dto.WheelchairAccessible,
+            AudienceRestrictions = string.IsNullOrWhiteSpace(dto.AudienceRestrictions) ? "[]" : dto.AudienceRestrictions,
+            FoodDrinksRestrictions = string.IsNullOrWhiteSpace(dto.FoodDrinksRestrictions) ? "[]" : dto.FoodDrinksRestrictions,
+            SmokingRestrictions = string.IsNullOrWhiteSpace(dto.SmokingRestrictions) ? "[]" : dto.SmokingRestrictions,
+            TicketNameChangeAllowed = string.IsNullOrWhiteSpace(dto.TicketNameChangeAllowed) ? "Yes" : dto.TicketNameChangeAllowed.Trim(),
+            TicketNamePolicy = string.IsNullOrWhiteSpace(dto.TicketNamePolicy) ? "Only the person whose name is on the ticket can use the ticket" : dto.TicketNamePolicy.Trim(),
+            TicketDaysInterchangeable = string.IsNullOrWhiteSpace(dto.TicketDaysInterchangeable) ? "No" : dto.TicketDaysInterchangeable.Trim()
         };
 
         _context.Events.Add(ev);
@@ -906,10 +926,30 @@ public class AdminService : IAdminService
         ev.TicketingType = ticketingType;
         if (!string.IsNullOrWhiteSpace(dto.Banner))
             ev.Banner = FileUrlHelper.ExtractFileName(dto.Banner) ?? dto.Banner;
+        if (dto.SeatChartUrl != null)
+            ev.SeatChartUrl = FileUrlHelper.ExtractFileName(dto.SeatChartUrl) ?? dto.SeatChartUrl;
         ev.Description = dto.Description;
         ev.ScarcityText = dto.ScarcityText;
         if (dto.OrganizerId > 0 && (!organizerId.HasValue || organizerId.Value == dto.OrganizerId))
             ev.OrganizerId = dto.OrganizerId;
+
+        if (!string.IsNullOrWhiteSpace(dto.EventType)) ev.EventType = dto.EventType.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.AttractionsOrActivities)) ev.AttractionsOrActivities = dto.AttractionsOrActivities.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.VenueEnvironment)) ev.VenueEnvironment = dto.VenueEnvironment.Trim();
+        ev.DressCode = dto.DressCode;
+        ev.FoodDrinksAvailable = dto.FoodDrinksAvailable;
+        ev.FoodDrinksIncluded = dto.FoodDrinksIncluded;
+        ev.PetsAllowed = dto.PetsAllowed;
+        ev.ParkingAvailable = dto.ParkingAvailable;
+        ev.ValetAvailable = dto.ValetAvailable;
+        if (!string.IsNullOrWhiteSpace(dto.SeatingArrangement)) ev.SeatingArrangement = dto.SeatingArrangement.Trim();
+        ev.WheelchairAccessible = dto.WheelchairAccessible;
+        if (dto.AudienceRestrictions != null) ev.AudienceRestrictions = dto.AudienceRestrictions;
+        if (dto.FoodDrinksRestrictions != null) ev.FoodDrinksRestrictions = dto.FoodDrinksRestrictions;
+        if (dto.SmokingRestrictions != null) ev.SmokingRestrictions = dto.SmokingRestrictions;
+        if (!string.IsNullOrWhiteSpace(dto.TicketNameChangeAllowed)) ev.TicketNameChangeAllowed = dto.TicketNameChangeAllowed.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.TicketNamePolicy)) ev.TicketNamePolicy = dto.TicketNamePolicy.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.TicketDaysInterchangeable)) ev.TicketDaysInterchangeable = dto.TicketDaysInterchangeable.Trim();
 
         // Update tags safely (diff-based to avoid EF Core key tracking collisions)
         var existingTagIds = ev.EventTags.Select(et => et.TagId).ToHashSet();
@@ -1257,14 +1297,42 @@ public class AdminService : IAdminService
     public async Task<List<OrganizerDto>> GetOrganizersAsync()
     {
         var list = await _context.Organizers.AsNoTracking().Where(o => !o.IsDeleted).OrderBy(o => o.Name).ToListAsync();
-        return list.Select(o => new OrganizerDto(o.Id, o.Name, o.Email, o.Phone, FileUrlHelper.FormatOrganizerLogoUrl(o.LogoUrl), o.WebsiteUrl, o.IsVerified)).ToList();
+        return list.Select(o => new OrganizerDto(
+            o.Id,
+            o.Name,
+            o.Email,
+            o.Phone,
+            FileUrlHelper.FormatOrganizerLogoUrl(o.LogoUrl),
+            o.WebsiteUrl,
+            o.IsVerified,
+            o.BrandName,
+            o.CompanyType,
+            o.RegisteredAddress,
+            o.CompanyNtn,
+            o.Description,
+            o.InstagramUrl,
+            o.FacebookUrl)).ToList();
     }
 
     public async Task<OrganizerDto?> GetOrganizerByIdAsync(int id)
     {
         var o = await _context.Organizers.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
         if (o is null) return null;
-        return new OrganizerDto(o.Id, o.Name, o.Email, o.Phone, FileUrlHelper.FormatOrganizerLogoUrl(o.LogoUrl), o.WebsiteUrl, o.IsVerified);
+        return new OrganizerDto(
+            o.Id,
+            o.Name,
+            o.Email,
+            o.Phone,
+            FileUrlHelper.FormatOrganizerLogoUrl(o.LogoUrl),
+            o.WebsiteUrl,
+            o.IsVerified,
+            o.BrandName,
+            o.CompanyType,
+            o.RegisteredAddress,
+            o.CompanyNtn,
+            o.Description,
+            o.InstagramUrl,
+            o.FacebookUrl);
     }
 
     public async Task<OrganizerDto> CreateOrganizerAsync(CreateOrganizerDto dto)
@@ -1278,9 +1346,17 @@ public class AdminService : IAdminService
             if (exists)
                 throw new InvalidOperationException($"Organizer '{nameClean}' or email '{emailClean}' already exists.");
 
+            var brandNameClean = !string.IsNullOrWhiteSpace(dto.BrandName) ? dto.BrandName.Trim() : nameClean;
             var organizer = new Organizer
             {
                 Name = nameClean,
+                BrandName = brandNameClean,
+                CompanyType = !string.IsNullOrWhiteSpace(dto.CompanyType) ? dto.CompanyType.Trim() : "Individual",
+                RegisteredAddress = dto.RegisteredAddress?.Trim() ?? string.Empty,
+                CompanyNtn = dto.CompanyNtn?.Trim(),
+                Description = dto.Description?.Trim(),
+                InstagramUrl = dto.InstagramUrl?.Trim() ?? string.Empty,
+                FacebookUrl = dto.FacebookUrl?.Trim(),
                 Email = emailClean,
                 Phone = dto.Phone,
                 LogoUrl = FileUrlHelper.ExtractFileName(dto.LogoUrl) ?? dto.LogoUrl ?? "",
@@ -1291,7 +1367,21 @@ public class AdminService : IAdminService
             _context.Organizers.Add(organizer);
             await _context.SaveChangesAsync();
 
-            return new OrganizerDto(organizer.Id, organizer.Name, organizer.Email, organizer.Phone, FileUrlHelper.FormatOrganizerLogoUrl(organizer.LogoUrl), organizer.WebsiteUrl, organizer.IsVerified);
+            return new OrganizerDto(
+                organizer.Id,
+                organizer.Name,
+                organizer.Email,
+                organizer.Phone,
+                FileUrlHelper.FormatOrganizerLogoUrl(organizer.LogoUrl),
+                organizer.WebsiteUrl,
+                organizer.IsVerified,
+                organizer.BrandName,
+                organizer.CompanyType,
+                organizer.RegisteredAddress,
+                organizer.CompanyNtn,
+                organizer.Description,
+                organizer.InstagramUrl,
+                organizer.FacebookUrl);
         }
         catch (Exception ex)
         {
@@ -1307,6 +1397,13 @@ public class AdminService : IAdminService
             throw new KeyNotFoundException($"Organizer '{id}' not found.");
 
         org.Name = dto.Name.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.BrandName)) org.BrandName = dto.BrandName.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.CompanyType)) org.CompanyType = dto.CompanyType.Trim();
+        if (dto.RegisteredAddress != null) org.RegisteredAddress = dto.RegisteredAddress.Trim();
+        org.CompanyNtn = dto.CompanyNtn?.Trim();
+        org.Description = dto.Description?.Trim();
+        if (dto.InstagramUrl != null) org.InstagramUrl = dto.InstagramUrl.Trim();
+        org.FacebookUrl = dto.FacebookUrl?.Trim();
         org.Email = dto.Email.Trim();
         org.Phone = dto.Phone;
         if (!string.IsNullOrWhiteSpace(dto.LogoUrl)) org.LogoUrl = FileUrlHelper.ExtractFileName(dto.LogoUrl) ?? dto.LogoUrl;
@@ -1314,7 +1411,21 @@ public class AdminService : IAdminService
         org.IsVerified = dto.IsVerified;
 
         await _context.SaveChangesAsync();
-        return new OrganizerDto(org.Id, org.Name, org.Email, org.Phone, FileUrlHelper.FormatOrganizerLogoUrl(org.LogoUrl), org.WebsiteUrl, org.IsVerified);
+        return new OrganizerDto(
+            org.Id,
+            org.Name,
+            org.Email,
+            org.Phone,
+            FileUrlHelper.FormatOrganizerLogoUrl(org.LogoUrl),
+            org.WebsiteUrl,
+            org.IsVerified,
+            org.BrandName,
+            org.CompanyType,
+            org.RegisteredAddress,
+            org.CompanyNtn,
+            org.Description,
+            org.InstagramUrl,
+            org.FacebookUrl);
     }
 
     public async Task<bool> DeleteOrganizerAsync(int id)
@@ -1891,7 +2002,21 @@ public class AdminService : IAdminService
             ev.ScarcityText,
             // Null-guard: Organizer FK is optional; return an empty placeholder if not loaded
             ev.Organizer != null
-                ? new OrganizerDto(ev.Organizer.Id, ev.Organizer.Name, ev.Organizer.Email, ev.Organizer.Phone, FileUrlHelper.FormatOrganizerLogoUrl(ev.Organizer.LogoUrl), ev.Organizer.WebsiteUrl, ev.Organizer.IsVerified)
+                ? new OrganizerDto(
+                    ev.Organizer.Id,
+                    ev.Organizer.Name,
+                    ev.Organizer.Email,
+                    ev.Organizer.Phone,
+                    FileUrlHelper.FormatOrganizerLogoUrl(ev.Organizer.LogoUrl),
+                    ev.Organizer.WebsiteUrl,
+                    ev.Organizer.IsVerified,
+                    ev.Organizer.BrandName,
+                    ev.Organizer.CompanyType,
+                    ev.Organizer.RegisteredAddress,
+                    ev.Organizer.CompanyNtn,
+                    ev.Organizer.Description,
+                    ev.Organizer.InstagramUrl,
+                    ev.Organizer.FacebookUrl)
                 : new OrganizerDto(0, "", "", "", null, null, false),
             ev.Shows.Where(s => !s.IsDeleted).OrderBy(s => s.StartTimeUtc).Select(s => new EventShowDto(
                 s.Id,
@@ -1903,7 +2028,25 @@ public class AdminService : IAdminService
             )).ToList(),
             ev.TicketTiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder).ThenBy(t => t.Price).Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.EffectiveStatus.ToString())).ToList(),
             ev.SeatingZones.Select(z => new SeatingZoneDto(z.Id, z.EventId, z.Zone, z.Rows, z.Cols, z.Price, z.TotalCapacity, z.SortOrder, z.LayoutJson, z.Seats.Select(s => new SeatDto(s.Id, s.ZoneId, s.Row, s.Col, s.Label, s.Status.ToString(), s.Price)).ToList())).ToList(),
-            ev.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList()
+            ev.EventTags.Select(et => new TagDto(et.Tag.Id, et.Tag.Name, et.Tag.Slug)).ToList(),
+            FileUrlHelper.FormatSeatChartUrl(ev.SeatChartUrl),
+            ev.EventType,
+            ev.AttractionsOrActivities,
+            ev.VenueEnvironment,
+            ev.DressCode,
+            ev.FoodDrinksAvailable,
+            ev.FoodDrinksIncluded,
+            ev.PetsAllowed,
+            ev.ParkingAvailable,
+            ev.ValetAvailable,
+            ev.SeatingArrangement,
+            ev.WheelchairAccessible,
+            ev.AudienceRestrictions,
+            ev.FoodDrinksRestrictions,
+            ev.SmokingRestrictions,
+            ev.TicketNameChangeAllowed,
+            ev.TicketNamePolicy,
+            ev.TicketDaysInterchangeable
         );
     }
 

@@ -105,6 +105,13 @@ public static class DataSeeder
             defaultOrg = new Organizer
             {
                 Name = "Event Land",
+                BrandName = "Event Land",
+                CompanyType = "Pvt. Ltd",
+                RegisteredAddress = "Karachi, Pakistan",
+                CompanyNtn = "9012345-7",
+                Description = "Official Event Land Pakistan ticketing and event management operations.",
+                InstagramUrl = "https://instagram.com/eventland.pk",
+                FacebookUrl = "https://facebook.com/eventland.pk",
                 Email = "support@eventland.pk",
                 Phone = "+92 307 9353185",
                 LogoUrl = "org_eventland_01.png",
@@ -116,6 +123,12 @@ public static class DataSeeder
         }
         else
         {
+            defaultOrg.BrandName = string.IsNullOrWhiteSpace(defaultOrg.BrandName) ? "Event Land" : defaultOrg.BrandName;
+            defaultOrg.CompanyType = string.IsNullOrWhiteSpace(defaultOrg.CompanyType) ? "Pvt. Ltd" : defaultOrg.CompanyType;
+            defaultOrg.RegisteredAddress = string.IsNullOrWhiteSpace(defaultOrg.RegisteredAddress) ? "Karachi, Pakistan" : defaultOrg.RegisteredAddress;
+            defaultOrg.InstagramUrl = string.IsNullOrWhiteSpace(defaultOrg.InstagramUrl) ? "https://instagram.com/eventland.pk" : defaultOrg.InstagramUrl;
+            defaultOrg.FacebookUrl = defaultOrg.FacebookUrl ?? "https://facebook.com/eventland.pk";
+            defaultOrg.Description = defaultOrg.Description ?? "Official Event Land Pakistan ticketing and event management operations.";
             defaultOrg.Email = "support@eventland.pk";
             defaultOrg.Phone = "+92 307 9353185";
             defaultOrg.WebsiteUrl = "https://www.eventland.pk";

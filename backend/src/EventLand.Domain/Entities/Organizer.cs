@@ -9,6 +9,13 @@ using EventLand.Domain.Common;
 public class Organizer : BaseEntity
 {
     public string  Name        { get; set; } = string.Empty;
+    public string  BrandName   { get; set; } = string.Empty;
+    public string  CompanyType { get; set; } = "Individual"; // Individual, Pvt. Ltd, Sole Proprietor
+    public string  RegisteredAddress { get; set; } = string.Empty;
+    public string? CompanyNtn  { get; set; }
+    public string? Description { get; set; }
+    public string  InstagramUrl { get; set; } = string.Empty;
+    public string? FacebookUrl  { get; set; }
     public string  Email       { get; set; } = string.Empty;
     public string  Phone       { get; set; } = string.Empty;
     public string? LogoUrl     { get; set; }

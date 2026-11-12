@@ -43,7 +43,25 @@ public record CreateAdminEventDto(
     List<int>? TagIds,
     List<CreateEventShowInputDto>? Shows = null,
     string? AuditoriumLayout = null,
-    string? PriceRange = null
+    string? PriceRange = null,
+    string? SeatChartUrl = null,
+    string EventType = "Event",
+    string AttractionsOrActivities = "X",
+    string VenueEnvironment = "Indoor",
+    string? DressCode = null,
+    bool FoodDrinksAvailable = false,
+    bool FoodDrinksIncluded = false,
+    bool PetsAllowed = false,
+    bool ParkingAvailable = false,
+    bool ValetAvailable = false,
+    string SeatingArrangement = "Seating",
+    bool WheelchairAccessible = false,
+    string AudienceRestrictions = "[]",
+    string FoodDrinksRestrictions = "[]",
+    string SmokingRestrictions = "[]",
+    string TicketNameChangeAllowed = "Yes",
+    string TicketNamePolicy = "Only the person whose name is on the ticket can use the ticket",
+    string TicketDaysInterchangeable = "No"
 );
 
 public record UpdateAdminEventDto(
@@ -68,7 +86,25 @@ public record UpdateAdminEventDto(
     List<int>? TagIds,
     List<CreateEventShowInputDto>? Shows = null,
     string? AuditoriumLayout = null,
-    string? PriceRange = null
+    string? PriceRange = null,
+    string? SeatChartUrl = null,
+    string EventType = "Event",
+    string AttractionsOrActivities = "X",
+    string VenueEnvironment = "Indoor",
+    string? DressCode = null,
+    bool FoodDrinksAvailable = false,
+    bool FoodDrinksIncluded = false,
+    bool PetsAllowed = false,
+    bool ParkingAvailable = false,
+    bool ValetAvailable = false,
+    string SeatingArrangement = "Seating",
+    bool WheelchairAccessible = false,
+    string AudienceRestrictions = "[]",
+    string FoodDrinksRestrictions = "[]",
+    string SmokingRestrictions = "[]",
+    string TicketNameChangeAllowed = "Yes",
+    string TicketNamePolicy = "Only the person whose name is on the ticket can use the ticket",
+    string TicketDaysInterchangeable = "No"
 );
 
 public record CreateOrganizerDto(
@@ -77,7 +113,14 @@ public record CreateOrganizerDto(
     string Phone,
     string? LogoUrl,
     string? WebsiteUrl,
-    bool IsVerified
+    bool IsVerified,
+    string BrandName = "",
+    string CompanyType = "Individual",
+    string RegisteredAddress = "",
+    string? CompanyNtn = null,
+    string? Description = null,
+    string InstagramUrl = "",
+    string? FacebookUrl = null
 );
 
 public record UpdateOrganizerDto(
@@ -86,7 +129,14 @@ public record UpdateOrganizerDto(
     string Phone,
     string? LogoUrl,
     string? WebsiteUrl,
-    bool IsVerified
+    bool IsVerified,
+    string BrandName = "",
+    string CompanyType = "Individual",
+    string RegisteredAddress = "",
+    string? CompanyNtn = null,
+    string? Description = null,
+    string InstagramUrl = "",
+    string? FacebookUrl = null
 );
 
 public record CreateArtistDto(

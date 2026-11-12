@@ -15,6 +15,35 @@ public sealed class OrganizerConfiguration : IEntityTypeConfiguration<Organizer>
                .IsRequired()
                .HasMaxLength(200);
 
+        builder.Property(o => o.BrandName)
+               .IsRequired()
+               .HasMaxLength(150)
+               .HasDefaultValue(string.Empty);
+
+        builder.Property(o => o.CompanyType)
+               .IsRequired()
+               .HasMaxLength(50)
+               .HasDefaultValue("Individual");
+
+        builder.Property(o => o.RegisteredAddress)
+               .IsRequired()
+               .HasMaxLength(300)
+               .HasDefaultValue(string.Empty);
+
+        builder.Property(o => o.CompanyNtn)
+               .HasMaxLength(50);
+
+        builder.Property(o => o.Description)
+               .HasMaxLength(1000);
+
+        builder.Property(o => o.InstagramUrl)
+               .IsRequired()
+               .HasMaxLength(255)
+               .HasDefaultValue(string.Empty);
+
+        builder.Property(o => o.FacebookUrl)
+               .HasMaxLength(255);
+
         builder.Property(o => o.Email)
                .IsRequired()
                .HasMaxLength(320);

@@ -198,7 +198,25 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
     banner: '',
     description: 'Join us for an extraordinary live event experience featuring Pakistan top performers.',
     scarcityText: 'Selling Fast',
-    organizerId: ''
+    organizerId: '',
+    seatChartUrl: '',
+    eventType: 'Event',
+    attractionsOrActivities: 'X',
+    venueEnvironment: 'Indoor',
+    dressCode: '',
+    foodDrinksAvailable: false,
+    foodDrinksIncluded: false,
+    petsAllowed: false,
+    parkingAvailable: false,
+    valetAvailable: false,
+    seatingArrangement: 'Seating',
+    wheelchairAccessible: false,
+    audienceRestrictions: '[]',
+    foodDrinksRestrictions: '[]',
+    smokingRestrictions: '[]',
+    ticketNameChangeAllowed: 'Yes',
+    ticketNamePolicy: 'Only the person whose name is on the ticket can use the ticket',
+    ticketDaysInterchangeable: 'No'
   };
 
   const defaultShowForm = {
@@ -228,6 +246,13 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   const defaultOrgForm = {
     id: null,
     name: '',
+    brandName: '',
+    companyType: 'Individual',
+    registeredAddress: '',
+    companyNtn: '',
+    description: '',
+    instagramUrl: '',
+    facebookUrl: '',
     email: '',
     phone: '+92 300 0000000',
     logoUrl: '',
@@ -360,7 +385,15 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
         phone: o.phone ?? o.Phone ?? '',
         logoUrl: o.logoUrl ?? o.LogoUrl ?? '',
         websiteUrl: o.websiteUrl ?? o.WebsiteUrl ?? o.website ?? o.Website ?? '',
-        isVerified: o.isVerified ?? o.IsVerified ?? true
+        isVerified: o.isVerified ?? o.IsVerified ?? true,
+        // New enhancement fields
+        brandName: o.brandName ?? o.BrandName ?? '',
+        companyType: o.companyType ?? o.CompanyType ?? 'Individual',
+        registeredAddress: o.registeredAddress ?? o.RegisteredAddress ?? '',
+        companyNtn: o.companyNtn ?? o.CompanyNtn ?? '',
+        description: o.description ?? o.Description ?? '',
+        instagramUrl: o.instagramUrl ?? o.InstagramUrl ?? '',
+        facebookUrl: o.facebookUrl ?? o.FacebookUrl ?? '',
       }));
 
       setOrganizersList(normalizedOrgs);
@@ -544,7 +577,25 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
         description: eventForm.description || title,
         scarcityText: eventForm.scarcityText || 'Selling Fast',
         organizerId: orgId,
-        tagIds: tagIds
+        tagIds: tagIds,
+        seatChartUrl: eventForm.seatChartUrl || null,
+        eventType: eventForm.eventType || 'Event',
+        attractionsOrActivities: eventForm.attractionsOrActivities || 'X',
+        venueEnvironment: eventForm.venueEnvironment || 'Indoor',
+        dressCode: eventForm.dressCode || null,
+        foodDrinksAvailable: Boolean(eventForm.foodDrinksAvailable),
+        foodDrinksIncluded: Boolean(eventForm.foodDrinksIncluded),
+        petsAllowed: Boolean(eventForm.petsAllowed),
+        parkingAvailable: Boolean(eventForm.parkingAvailable),
+        valetAvailable: Boolean(eventForm.valetAvailable),
+        seatingArrangement: eventForm.seatingArrangement || 'Seating',
+        wheelchairAccessible: Boolean(eventForm.wheelchairAccessible),
+        audienceRestrictions: typeof eventForm.audienceRestrictions === 'string' ? eventForm.audienceRestrictions : JSON.stringify(eventForm.audienceRestrictions || []),
+        foodDrinksRestrictions: typeof eventForm.foodDrinksRestrictions === 'string' ? eventForm.foodDrinksRestrictions : JSON.stringify(eventForm.foodDrinksRestrictions || []),
+        smokingRestrictions: typeof eventForm.smokingRestrictions === 'string' ? eventForm.smokingRestrictions : JSON.stringify(eventForm.smokingRestrictions || []),
+        ticketNameChangeAllowed: eventForm.ticketNameChangeAllowed || 'Yes',
+        ticketNamePolicy: eventForm.ticketNamePolicy || 'Only the person whose name is on the ticket can use the ticket',
+        ticketDaysInterchangeable: eventForm.ticketDaysInterchangeable || 'No'
       };
 
       if (eventForm.id) {
@@ -618,7 +669,25 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       banner: fullEv.banner || '',
       description: fullEv.description || '',
       scarcityText: fullEv.scarcityText || 'Selling Fast',
-      organizerId: fullEv.organizerId || fullEv.organizer?.id || (organizersList[0]?.id || '')
+      organizerId: fullEv.organizerId || fullEv.organizer?.id || (organizersList[0]?.id || ''),
+      seatChartUrl: fullEv.seatChartUrl || '',
+      eventType: fullEv.eventType || 'Event',
+      attractionsOrActivities: fullEv.attractionsOrActivities || 'X',
+      venueEnvironment: fullEv.venueEnvironment || 'Indoor',
+      dressCode: fullEv.dressCode || '',
+      foodDrinksAvailable: Boolean(fullEv.foodDrinksAvailable),
+      foodDrinksIncluded: Boolean(fullEv.foodDrinksIncluded),
+      petsAllowed: Boolean(fullEv.petsAllowed),
+      parkingAvailable: Boolean(fullEv.parkingAvailable),
+      valetAvailable: Boolean(fullEv.valetAvailable),
+      seatingArrangement: fullEv.seatingArrangement || 'Seating',
+      wheelchairAccessible: Boolean(fullEv.wheelchairAccessible),
+      audienceRestrictions: typeof fullEv.audienceRestrictions === 'string' ? fullEv.audienceRestrictions : JSON.stringify(fullEv.audienceRestrictions || []),
+      foodDrinksRestrictions: typeof fullEv.foodDrinksRestrictions === 'string' ? fullEv.foodDrinksRestrictions : JSON.stringify(fullEv.foodDrinksRestrictions || []),
+      smokingRestrictions: typeof fullEv.smokingRestrictions === 'string' ? fullEv.smokingRestrictions : JSON.stringify(fullEv.smokingRestrictions || []),
+      ticketNameChangeAllowed: fullEv.ticketNameChangeAllowed || 'Yes',
+      ticketNamePolicy: fullEv.ticketNamePolicy || 'Only the person whose name is on the ticket can use the ticket',
+      ticketDaysInterchangeable: fullEv.ticketDaysInterchangeable || 'No'
     });
     setShowEventModal(true);
   };
@@ -692,6 +761,13 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
     try {
       const payload = {
         name: orgForm.name,
+        brandName: orgForm.brandName || orgForm.name,
+        companyType: orgForm.companyType || 'Individual',
+        registeredAddress: orgForm.registeredAddress || '',
+        companyNtn: orgForm.companyNtn || null,
+        description: orgForm.description || null,
+        instagramUrl: orgForm.instagramUrl || '',
+        facebookUrl: orgForm.facebookUrl || null,
         email: orgForm.email,
         phone: orgForm.phone,
         logoUrl: orgForm.logoUrl,
@@ -727,6 +803,13 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
     setOrgForm({
       id: org.id ?? org.Id,
       name: org.name ?? org.Name ?? '',
+      brandName: org.brandName ?? org.BrandName ?? '',
+      companyType: org.companyType ?? org.CompanyType ?? 'Individual',
+      registeredAddress: org.registeredAddress ?? org.RegisteredAddress ?? '',
+      companyNtn: org.companyNtn ?? org.CompanyNtn ?? '',
+      description: org.description ?? org.Description ?? '',
+      instagramUrl: org.instagramUrl ?? org.InstagramUrl ?? '',
+      facebookUrl: org.facebookUrl ?? org.FacebookUrl ?? '',
       email: org.email ?? org.Email ?? '',
       phone: org.phone ?? org.Phone ?? '',
       logoUrl: org.logoUrl ?? org.LogoUrl ?? '',
@@ -3423,10 +3506,11 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
             <table className="mature-data-table">
               <thead>
                 <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                  <th style={{ padding: '1rem' }}>Name</th>
-                  <th style={{ padding: '1rem' }}>Email</th>
-                  <th style={{ padding: '1rem' }}>Phone</th>
-                  <th style={{ padding: '1rem' }}>Website</th>
+                  <th style={{ padding: '1rem' }}>Organizer & Brand</th>
+                  <th style={{ padding: '1rem' }}>Company Type</th>
+                  <th style={{ padding: '1rem' }}>Contact</th>
+                  <th style={{ padding: '1rem' }}>Address / NTN</th>
+                  <th style={{ padding: '1rem' }}>Socials / Web</th>
                   <th style={{ padding: '1rem' }}>Actions</th>
                 </tr>
               </thead>
@@ -3439,27 +3523,58 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
                           <img 
                             src={getOrganizerImageUrl(org.logoUrl)} 
                             alt="" 
-                            style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} 
+                            style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} 
                           />
                         )}
-                        <div>{org.name}</div>
+                        <div>
+                          <div>{org.name}</div>
+                          {org.brandName && org.brandName !== org.name && (
+                            <div style={{ fontSize: '0.75rem', color: '#2dd4bf', fontWeight: 500 }}>Brand: {org.brandName}</div>
+                          )}
+                        </div>
                       </div>
                     </td>
-                    <td style={{ padding: '1rem', color: '#94a3b8' }}>{org.email}</td>
-                    <td style={{ padding: '1rem', color: '#94a3b8' }}>{org.phone}</td>
-                    <td style={{ padding: '1rem', color: '#2dd4bf' }}>
-                      {(org.websiteUrl || org.WebsiteUrl) ? (
-                        <a 
-                          href={(org.websiteUrl || org.WebsiteUrl).startsWith('http') ? (org.websiteUrl || org.WebsiteUrl) : `https://${org.websiteUrl || org.WebsiteUrl}`} 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          style={{ color: '#2dd4bf', textDecoration: 'underline', fontWeight: 500 }}
-                        >
-                          {(org.websiteUrl || org.WebsiteUrl).replace(/^https?:\/\//, '')} ↗
-                        </a>
-                      ) : (
-                        <span style={{ color: '#64748b' }}>—</span>
-                      )}
+                    <td style={{ padding: '1rem' }}>
+                      <span style={{ 
+                        display: 'inline-block',
+                        padding: '0.25rem 0.6rem', 
+                        borderRadius: '9999px', 
+                        fontSize: '0.75rem', 
+                        fontWeight: 600,
+                        background: org.companyType === 'Pvt. Ltd' ? 'rgba(59, 130, 246, 0.15)' : org.companyType === 'Sole Proprietor' ? 'rgba(168, 85, 247, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                        color: org.companyType === 'Pvt. Ltd' ? '#60a5fa' : org.companyType === 'Sole Proprietor' ? '#c084fc' : '#34d399',
+                        border: '1px solid rgba(255, 255, 255, 0.08)'
+                      }}>
+                        {org.companyType || 'Individual'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.85rem' }}>
+                      <div>{org.email}</div>
+                      <div style={{ color: '#64748b' }}>{org.phone}</div>
+                    </td>
+                    <td style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.8125rem', maxWidth: '200px' }}>
+                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={org.registeredAddress}>{org.registeredAddress || '—'}</div>
+                      {org.companyNtn && <div style={{ color: '#64748b', fontSize: '0.75rem' }}>NTN: {org.companyNtn}</div>}
+                    </td>
+                    <td style={{ padding: '1rem', color: '#2dd4bf', fontSize: '0.85rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        {org.instagramUrl && (
+                          <a href={org.instagramUrl.startsWith('http') ? org.instagramUrl : `https://${org.instagramUrl}`} target="_blank" rel="noreferrer" style={{ color: '#e879f9', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            Instagram ↗
+                          </a>
+                        )}
+                        {(org.websiteUrl || org.WebsiteUrl) && (
+                          <a href={(org.websiteUrl || org.WebsiteUrl).startsWith('http') ? (org.websiteUrl || org.WebsiteUrl) : `https://${org.websiteUrl || org.WebsiteUrl}`} target="_blank" rel="noreferrer" style={{ color: '#2dd4bf', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            Website ↗
+                          </a>
+                        )}
+                        {org.facebookUrl && (
+                          <a href={org.facebookUrl.startsWith('http') ? org.facebookUrl : `https://${org.facebookUrl}`} target="_blank" rel="noreferrer" style={{ color: '#60a5fa', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            Facebook ↗
+                          </a>
+                        )}
+                        {!org.instagramUrl && !org.websiteUrl && !org.facebookUrl && <span style={{ color: '#64748b' }}>—</span>}
+                      </div>
                     </td>
                     <td style={{ padding: '1rem' }}>
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -4606,32 +4721,83 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       {/* --- MODAL 2: CREATE / EDIT ORGANIZER --- */}
       {showOrgModal && (
         <div className="modal-overlay">
-          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px', padding: '2rem', position: 'relative' }}>
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', position: 'relative' }}>
             <button
               onClick={() => setShowOrgModal(false)}
               style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255, 255, 255, 0.08)', border: 'none', color: '#94a3b8', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
             >
               <X size={18} />
             </button>
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '1.25rem' }}>
               {orgForm.id ? 'Edit Organizer' : 'Add New Organizer'}
             </h3>
             <form onSubmit={handleSaveOrganizer} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Organizer Name *</label>
-                <input type="text" required value={orgForm.name} onChange={e => setOrgForm({ ...orgForm, name: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Organizer / Legal Name *</label>
+                  <input type="text" required value={orgForm.name} onChange={e => setOrgForm({ ...orgForm, name: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} placeholder="e.g. Acme Productions Pvt Ltd" />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Brand Name *</label>
+                  <input type="text" required value={orgForm.brandName} onChange={e => setOrgForm({ ...orgForm, brandName: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} placeholder="Public Brand Name" />
+                </div>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Email *</label>
-                <input type="email" required value={orgForm.email} onChange={e => setOrgForm({ ...orgForm, email: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Company Type *</label>
+                  <select 
+                    required 
+                    value={orgForm.companyType} 
+                    onChange={e => setOrgForm({ ...orgForm, companyType: e.target.value })} 
+                    style={{ width: '100%', padding: '0.75rem', background: '#0f172a', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
+                  >
+                    <option value="Individual">Individual</option>
+                    <option value="Pvt. Ltd">Pvt. Ltd</option>
+                    <option value="Sole Proprietor">Sole Proprietor</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Company NTN (Optional)</label>
+                  <input type="text" value={orgForm.companyNtn} onChange={e => setOrgForm({ ...orgForm, companyNtn: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} placeholder="e.g. 1234567-8" />
+                </div>
               </div>
+
               <div>
-                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Phone *</label>
-                <input type="text" required value={orgForm.phone} onChange={e => setOrgForm({ ...orgForm, phone: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Registered Address *</label>
+                <textarea required rows={2} value={orgForm.registeredAddress} onChange={e => setOrgForm({ ...orgForm, registeredAddress: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', resize: 'vertical' }} placeholder="Official business or registered address" />
               </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Instagram URL *</label>
+                  <input type="text" required value={orgForm.instagramUrl} onChange={e => setOrgForm({ ...orgForm, instagramUrl: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} placeholder="https://instagram.com/yourhandle" />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Facebook URL (Optional)</label>
+                  <input type="text" value={orgForm.facebookUrl} onChange={e => setOrgForm({ ...orgForm, facebookUrl: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} placeholder="https://facebook.com/yourpage" />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Official Email *</label>
+                  <input type="email" required value={orgForm.email} onChange={e => setOrgForm({ ...orgForm, email: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Official Phone *</label>
+                  <input type="text" required value={orgForm.phone} onChange={e => setOrgForm({ ...orgForm, phone: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+                </div>
+              </div>
+
               <div>
                 <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Website URL</label>
                 <input type="url" value={orgForm.websiteUrl} onChange={e => setOrgForm({ ...orgForm, websiteUrl: e.target.value })} placeholder="https://organizer.com" style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }} />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Description / Bio (Optional)</label>
+                <textarea rows={2} value={orgForm.description} onChange={e => setOrgForm({ ...orgForm, description: e.target.value })} style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff', resize: 'vertical' }} placeholder="Brief company summary..." />
               </div>
               
               <FileUploadField

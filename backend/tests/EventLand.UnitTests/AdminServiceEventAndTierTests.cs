@@ -837,6 +837,192 @@ public class AdminServiceEventAndTierTests : IDisposable
         Assert.Equal(EventLand.Domain.Enums.TicketTierStatus.Available, dbTier.EffectiveStatus);
     }
 
+    [Fact]
+    public async Task CreateAndUpdateOrganizer_PersistsEnhancedFields()
+    {
+        var createOrgDto = new CreateOrganizerDto(
+            Name: "Alpha Entertainment",
+            Email: "contact@alphaent.pk",
+            Phone: "+923001234567",
+            LogoUrl: "alpha.png",
+            WebsiteUrl: "https://alphaent.pk",
+            IsVerified: true,
+            BrandName: "Alpha Presents",
+            CompanyType: "Pvt. Ltd",
+            RegisteredAddress: "Suite 404, Business Plaza, Karachi",
+            CompanyNtn: "1234567-8",
+            Description: "Premier live events producer in Pakistan",
+            InstagramUrl: "https://instagram.com/alphapresents",
+            FacebookUrl: "https://facebook.com/alphapresents"
+        );
+
+        var created = await _adminService.CreateOrganizerAsync(createOrgDto);
+        Assert.NotNull(created);
+        Assert.Equal("Alpha Presents", created.BrandName);
+        Assert.Equal("Pvt. Ltd", created.CompanyType);
+        Assert.Equal("Suite 404, Business Plaza, Karachi", created.RegisteredAddress);
+        Assert.Equal("1234567-8", created.CompanyNtn);
+        Assert.Equal("Premier live events producer in Pakistan", created.Description);
+        Assert.Equal("https://instagram.com/alphapresents", created.InstagramUrl);
+        Assert.Equal("https://facebook.com/alphapresents", created.FacebookUrl);
+
+        var updateOrgDto = new UpdateOrganizerDto(
+            Name: "Alpha Entertainment Group",
+            Email: "contact@alphaent.pk",
+            Phone: "+923001234567",
+            LogoUrl: "alpha_new.png",
+            WebsiteUrl: "https://alphaent.pk",
+            IsVerified: true,
+            BrandName: "Alpha Global",
+            CompanyType: "Sole Proprietor",
+            RegisteredAddress: "Updated Address, Lahore",
+            CompanyNtn: "9999999-9",
+            Description: "Updated description",
+            InstagramUrl: "https://instagram.com/alphaglobal",
+            FacebookUrl: "https://facebook.com/alphaglobal"
+        );
+
+        var updated = await _adminService.UpdateOrganizerAsync(created.Id, updateOrgDto);
+        Assert.NotNull(updated);
+        Assert.Equal("Alpha Global", updated.BrandName);
+        Assert.Equal("Sole Proprietor", updated.CompanyType);
+        Assert.Equal("Updated Address, Lahore", updated.RegisteredAddress);
+        Assert.Equal("9999999-9", updated.CompanyNtn);
+        Assert.Equal("https://instagram.com/alphaglobal", updated.InstagramUrl);
+    }
+
+    [Fact]
+    public async Task CreateAndUpdateEvent_PersistsHouseRulesAndPolicies()
+    {
+        var country = new Country { Id = 10, Name = "Pakistan", Code = "PK" };
+        var city = new City { Id = 10, CountryId = 10, Name = "Islamabad" };
+        var venue = new Venue { Id = 10, CityId = 10, Name = "Convention Center", Address = "Islamabad" };
+        _context.Countries.Add(country);
+        _context.Cities.Add(city);
+        _context.Venues.Add(venue);
+
+        var org = new Organizer
+        {
+            Name = "Festival Pro",
+            BrandName = "Festival Pro",
+            CompanyType = "Pvt. Ltd",
+            RegisteredAddress = "Karachi",
+            InstagramUrl = "https://instagram.com/festpro",
+            Email = "info@festpro.pk",
+            Phone = "+923000000000"
+        };
+        _context.Organizers.Add(org);
+        await _context.SaveChangesAsync();
+
+        var createEventDto = new CreateAdminEventDto(
+            Title: "Grand Tech Workshop & Fest",
+            Status: "Live",
+            IsFeatured: true,
+            IsPublished: true,
+            CountryId: country.Id,
+            CityId: city.Id,
+            VenueId: venue.Id,
+            AuditoriumId: null,
+            City: "Islamabad",
+            Venue: "Convention Center",
+            StartDateUtc: DateTimeOffset.UtcNow.AddDays(10),
+            EndDateUtc: DateTimeOffset.UtcNow.AddDays(11),
+            StartingPrice: 3500,
+            TicketingType: "Categorized",
+            Banner: "fest_banner.jpg",
+            Description: "Annual technology fest and hands-on workshops",
+            ScarcityText: "Few seats left",
+            OrganizerId: org.Id,
+            TagIds: new List<int>(),
+            SeatChartUrl: "seatchart.png",
+            EventType: "Workshop",
+            AttractionsOrActivities: "Live coding battle and AI demo stage",
+            VenueEnvironment: "Both",
+            DressCode: "Smart Casual",
+            FoodDrinksAvailable: true,
+            FoodDrinksIncluded: true,
+            PetsAllowed: false,
+            ParkingAvailable: true,
+            ValetAvailable: true,
+            SeatingArrangement: "Seating",
+            WheelchairAccessible: true,
+            AudienceRestrictions: "[\"18+ Only\", \"Students Only\"]",
+            FoodDrinksRestrictions: "[\"Outside Food Not Allowed\"]",
+            SmokingRestrictions: "[\"Cigarettes Not Allowed\", \"Vapes Not Allowed\"]",
+            TicketNameChangeAllowed: "Yes",
+            TicketNamePolicy: "The ticket can be used by anyone (changing the name is not mandatory)",
+            TicketDaysInterchangeable: "Not Applicable"
+        );
+
+        var created = await _adminService.CreateEventAsync(createEventDto);
+        Assert.NotNull(created);
+        Assert.Equal("Workshop", created.EventType);
+        Assert.Equal("Live coding battle and AI demo stage", created.AttractionsOrActivities);
+        Assert.Equal("Both", created.VenueEnvironment);
+        Assert.Equal("Smart Casual", created.DressCode);
+        Assert.True(created.FoodDrinksAvailable);
+        Assert.True(created.FoodDrinksIncluded);
+        Assert.False(created.PetsAllowed);
+        Assert.True(created.ParkingAvailable);
+        Assert.True(created.ValetAvailable);
+        Assert.True(created.WheelchairAccessible);
+        Assert.Contains("18+ Only", created.AudienceRestrictions);
+        Assert.Equal("The ticket can be used by anyone (changing the name is not mandatory)", created.TicketNamePolicy);
+        Assert.Equal("Not Applicable", created.TicketDaysInterchangeable);
+
+        var updateEventDto = new UpdateAdminEventDto(
+            Title: "Grand Tech Workshop & Fest (Updated)",
+            Status: "Live",
+            IsFeatured: false,
+            IsPublished: true,
+            CountryId: created.CountryId,
+            CityId: created.CityId,
+            VenueId: created.VenueId,
+            AuditoriumId: created.AuditoriumId,
+            City: "Islamabad",
+            Venue: "Convention Center",
+            StartDateUtc: created.StartDateUtc,
+            EndDateUtc: created.EndDateUtc,
+            StartingPrice: 4000,
+            TicketingType: "Categorized",
+            Banner: "fest_banner_v2.jpg",
+            Description: "Updated Description",
+            ScarcityText: null,
+            OrganizerId: org.Id,
+            TagIds: new List<int>(),
+            SeatChartUrl: "new_chart.png",
+            EventType: "Event",
+            AttractionsOrActivities: "X",
+            VenueEnvironment: "Outdoor",
+            DressCode: null,
+            FoodDrinksAvailable: false,
+            FoodDrinksIncluded: false,
+            PetsAllowed: true,
+            ParkingAvailable: true,
+            ValetAvailable: false,
+            SeatingArrangement: "Standing",
+            WheelchairAccessible: false,
+            AudienceRestrictions: "[\"Open For All\"]",
+            FoodDrinksRestrictions: "[\"Outside Drinks Allowed\"]",
+            SmokingRestrictions: "[\"Cigarettes Allowed\"]",
+            TicketNameChangeAllowed: "No",
+            TicketNamePolicy: "Only the person whose name is on the ticket can use the ticket",
+            TicketDaysInterchangeable: "Yes"
+        );
+
+        var updated = await _adminService.UpdateEventAsync(created.Id, updateEventDto);
+        Assert.NotNull(updated);
+        Assert.Equal("Event", updated.EventType);
+        Assert.Equal("X", updated.AttractionsOrActivities);
+        Assert.Equal("Outdoor", updated.VenueEnvironment);
+        Assert.True(updated.PetsAllowed);
+        Assert.False(updated.ValetAvailable);
+        Assert.Equal("Standing", updated.SeatingArrangement);
+        Assert.Contains("Open For All", updated.AudienceRestrictions);
+        Assert.Equal("No", updated.TicketNameChangeAllowed);
+        Assert.Equal("Yes", updated.TicketDaysInterchangeable);
+    }
+
 }
 
 

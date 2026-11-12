@@ -26,8 +26,88 @@ public sealed class EventConfiguration : IEntityTypeConfiguration<Event>
         builder.Property(e => e.Banner)
                .HasMaxLength(500);
 
+        builder.Property(e => e.SeatChartUrl)
+               .HasMaxLength(500);
+
         builder.Property(e => e.ScarcityText)
                .HasMaxLength(200);
+
+        builder.Property(e => e.EventType)
+               .IsRequired()
+               .HasMaxLength(50)
+               .HasDefaultValue("Event");
+
+        builder.Property(e => e.AttractionsOrActivities)
+               .IsRequired()
+               .HasMaxLength(500)
+               .HasDefaultValue("X");
+
+        builder.Property(e => e.VenueEnvironment)
+               .IsRequired()
+               .HasMaxLength(30)
+               .HasDefaultValue("Indoor");
+
+        builder.Property(e => e.DressCode)
+               .HasMaxLength(200);
+
+        builder.Property(e => e.FoodDrinksAvailable)
+               .IsRequired()
+               .HasDefaultValue(false);
+
+        builder.Property(e => e.FoodDrinksIncluded)
+               .IsRequired()
+               .HasDefaultValue(false);
+
+        builder.Property(e => e.PetsAllowed)
+               .IsRequired()
+               .HasDefaultValue(false);
+
+        builder.Property(e => e.ParkingAvailable)
+               .IsRequired()
+               .HasDefaultValue(false);
+
+        builder.Property(e => e.ValetAvailable)
+               .IsRequired()
+               .HasDefaultValue(false);
+
+        builder.Property(e => e.SeatingArrangement)
+               .IsRequired()
+               .HasMaxLength(100)
+               .HasDefaultValue("Seating");
+
+        builder.Property(e => e.WheelchairAccessible)
+               .IsRequired()
+               .HasDefaultValue(false);
+
+        builder.Property(e => e.AudienceRestrictions)
+               .IsRequired()
+               .HasMaxLength(1000)
+               .HasDefaultValue("[]");
+
+        builder.Property(e => e.FoodDrinksRestrictions)
+               .IsRequired()
+               .HasMaxLength(1000)
+               .HasDefaultValue("[]");
+
+        builder.Property(e => e.SmokingRestrictions)
+               .IsRequired()
+               .HasMaxLength(1000)
+               .HasDefaultValue("[]");
+
+        builder.Property(e => e.TicketNameChangeAllowed)
+               .IsRequired()
+               .HasMaxLength(100)
+               .HasDefaultValue("Yes");
+
+        builder.Property(e => e.TicketNamePolicy)
+               .IsRequired()
+               .HasMaxLength(300)
+               .HasDefaultValue("Only the person whose name is on the ticket can use the ticket");
+
+        builder.Property(e => e.TicketDaysInterchangeable)
+               .IsRequired()
+               .HasMaxLength(100)
+               .HasDefaultValue("No");
 
         builder.Property(e => e.Status)
                .HasConversion<int>();
@@ -94,6 +174,9 @@ public sealed class EventConfiguration : IEntityTypeConfiguration<Event>
 
         builder.HasIndex(e => e.OrganizerId)
                .HasDatabaseName("IX_Events_OrganizerId");
+
+        builder.HasIndex(e => e.EventType)
+               .HasDatabaseName("IX_Events_EventType");
 
         builder.HasIndex(e => new { e.IsPublished, e.CityId, e.StartDateUtc })
                .HasDatabaseName("IX_Events_Published_City_Date");
