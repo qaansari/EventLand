@@ -754,10 +754,33 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
   - Verified `dotnet test backend/tests/EventLand.UnitTests/`: **103 passed, 0 failed**.
   - Verified `npm --prefix frontend run build`: **0 errors** (built in 2.65s).
 
+### Single Environment File Architecture & Runtime Backend/API URL Synchronization (November 2026)
+- **Problem & Root Cause**:
+  - Previously, multiple environment files (`.env`, `.env.local`) caused shadowing and conflicting values at runtime.
+  - In `src/services/api.js`, arbitrary hostname and substring checks (`isProductionDomain` and `includes('localhost')`) overrode manually configured environment variables:
+    - In local development, `resolveBackendUrl()` returned `""`, forcing `BACKEND_URL` to be an empty string for SignalR and relative routing, whereas `BASE_URL` returned the full external URL if it did not include `'localhost'`. This caused a split where REST API calls bypassed the dev proxy while SignalR connected to localhost.
+    - Conversely, if `isProductionDomain` was true, any URL containing `'localhost'` was dropped and emitted a warning, preventing testing against local containers or on custom IP addresses.
+    - In `vite.config.js`, proxy configuration only looked at `VITE_BACKEND_URL`, ignoring `VITE_API_URL` if `VITE_BACKEND_URL` was absent.
+- **Implemented Fixes**:
+  - **Single Environment Configuration File (`frontend/.env`)**:
+    - Purged `.env.local` to permanently eliminate precedence collisions and shadowing.
+    - Centralized all runtime environment variables in `frontend/.env`:
+      - `VITE_BACKEND_URL=https://eventland.pk`: Backend root origin without `/api` (used for SignalR hubs at `/hubs/seating`, static media assets, and Vite proxy targets).
+      - `VITE_API_URL=https://eventland.pk/api`: REST API endpoint base URL.
+      - `VITE_APP_ENV=production`
+      - Documented inline examples for switching between production (`https://eventland.pk`) and local development (`http://localhost:4257`).
+  - **Harmonized URL Resolution (`frontend/src/services/api.js`)**:
+    - Strips trailing slashes automatically (`.replace(/\/+$/, '')`).
+    - `BACKEND_URL`: Directly uses `rawBackend` (`VITE_BACKEND_URL`); if omitted, extracts backend root from `rawApiUrl` (`VITE_API_URL.replace(/\/api\/?$/, '')`); fallback to `""`.
+    - `BASE_URL`: Directly uses `rawApiUrl` (`VITE_API_URL`); if omitted, appends `/api` to `BACKEND_URL`; fallback to `'/api'`.
+    - `SERVER_BASE`: Seamlessly resolves to `BACKEND_URL || BASE_URL.replace(/\/api\/?$/, '')`.
+    - Preserves anti-warning headers (`ngrok-skip-browser-warning`, `bypass-tunnel-reminder`) conditionally only when tunnel domains (`ngrok` / `localtunnel`) are detected.
+  - **Synchronized Vite Dev Proxy (`frontend/vite.config.js`)**:
+    - `backendTarget` dynamically derives from `VITE_BACKEND_URL` or extracts from `VITE_API_URL` before falling back to `http://localhost:4257`.
+  - **Auth Modal Warning Update (`frontend/src/components/AuthModal.jsx`)**:
+    - Updated Facebook auth configuration prompt to point to `.env` instead of `.env.local`.
+- **Testing & Verification**:
+  - Verified `npm --prefix frontend run build`: **0 errors** (built cleanly in ~1.3s).
+
 ---
-*Last Updated: November 2026 (Organizer & Event Entity Enhancements, Seat Chart Upload & House Rules Policies, Additive EF Core Migration [AddOrganizerAndEventEnhancements], Windows Server VPS Production Hosting Documentation & Automated Deployment in D:\Docx, Dynamic Platform Fee Configuration [PlatformFeeConfig] & Admin Management UI, Single Baseline EF Core Migration Consolidation, Checkout Modal Simplification & Pricing Normalization, Google & Social Authentication Hardening on Vercel Deployment, Tunnel & Ngrok View Site Warning Elimination, 3 Events Per Row Catalog Grid Layout, Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 103/103 Unit Tests Passing)*
-
-
-
-
-
+*Last Updated: November 2026 (Single Environment File Configuration [.env] & Runtime Backend/API URL Synchronization [https://eventland.pk & https://eventland.pk/api], Organizer & Event Entity Enhancements, Seat Chart Upload & House Rules Policies, Additive EF Core Migration [AddOrganizerAndEventEnhancements], Windows Server VPS Production Hosting Documentation & Automated Deployment in D:\Docx, Dynamic Platform Fee Configuration [PlatformFeeConfig] & Admin Management UI, Single Baseline EF Core Migration Consolidation, Checkout Modal Simplification & Pricing Normalization, Google & Social Authentication Hardening on Vercel Deployment, Tunnel & Ngrok View Site Warning Elimination, 2 Events Per Row Catalog Grid Layout, Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 103/103 Unit Tests Passing)*
