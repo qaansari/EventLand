@@ -261,14 +261,7 @@ builder.Services.AddCors(options =>
                 var host = new Uri(origin).Host;
                 if (host.Equals("eventland.pk", StringComparison.OrdinalIgnoreCase) ||
                     host.EndsWith(".eventland.pk", StringComparison.OrdinalIgnoreCase) ||
-                    host.Equals("vercel.app", StringComparison.OrdinalIgnoreCase) ||
-                    host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase) ||
-                    host.EndsWith("vercel.app", StringComparison.OrdinalIgnoreCase) ||
-                    host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
-                    host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
-                    host.EndsWith("ngrok-free.dev", StringComparison.OrdinalIgnoreCase) ||
-                    host.EndsWith("ngrok-free.app", StringComparison.OrdinalIgnoreCase) ||
-                    host.EndsWith("ngrok.io", StringComparison.OrdinalIgnoreCase))
+                    host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
                 }

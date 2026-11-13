@@ -236,7 +236,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
 
   const handleFacebookSignIn = () => {
     if (!facebookAppId) {
-      const msg = 'Facebook authentication is not configured on this environment. Set VITE_FACEBOOK_APP_ID in your .env.local file.';
+      const msg = 'Facebook authentication is not configured on this environment. Set VITE_FACEBOOK_APP_ID in your .env file.';
       setErrorMsg(msg);
       showError('Facebook Auth Not Configured', msg);
       return;

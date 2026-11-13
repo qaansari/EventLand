@@ -11,10 +11,11 @@ export default defineConfig(({ mode }) => {
     ...loadEnv(mode, import.meta.dirname, '')
   };
 
-  // Prefer env-configured backend; fall back to localhost for local development.
-  let backendTarget = (env.VITE_BACKEND_URL && env.VITE_BACKEND_URL.trim())
-    ? env.VITE_BACKEND_URL.trim()
-    : 'http://localhost:4257';
+  const rawBackend = (env.VITE_BACKEND_URL || '').trim().replace(/\/+$/, '');
+  const rawApi = (env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+
+  // Prefer env-configured backend; fall back to extracting root from VITE_API_URL, then localhost
+  let backendTarget = rawBackend || (rawApi ? rawApi.replace(/\/api\/?$/, '') : '') || 'http://localhost:4257';
 
   // Automatically upgrade ngrok or tunnel URLs to HTTPS to prevent redirect loops and warnings
   if ((backendTarget.includes('ngrok') || backendTarget.includes('localtunnel')) && backendTarget.startsWith('http://')) {

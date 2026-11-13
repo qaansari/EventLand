@@ -1,42 +1,29 @@
 import { getStoredToken, setStoredSession, clearStoredSession } from '../utils/auth';
 
-const rawBackend = (import.meta.env.VITE_BACKEND_URL || '').trim();
-const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim();
+const rawBackend = (import.meta.env.VITE_BACKEND_URL || '').trim().replace(/\/+$/, '');
+const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
 
-// True when deployed to a remote host (e.g. Vercel) — NOT localhost / 127.0.0.1
-const isProductionDomain =
-  typeof window !== 'undefined' &&
-  !window.location.hostname.includes('localhost') &&
-  window.location.hostname !== '127.0.0.1';
-
-// In local dev: use empty string so every call uses a relative path (/api/...) and
-// Vite's dev-server proxy forwards it to the backend.
-// In production: use the configured env var. If not set, emit a warning — do NOT
-// fall back to a hardcoded ngrok URL that will be gone after the tunnel closes.
-const resolveBackendUrl = () => {
-  if (!isProductionDomain) {
-    // In local dev, always use relative path '' so calls and static assets route through Vite's proxy,
-    // which injects anti-warning headers and bypasses ngrok/tunnel interstitial warnings.
-    return (import.meta.env.VITE_DISABLE_PROXY === 'true') ? rawBackend : '';
-  }
-  if (!rawBackend || rawBackend.includes('localhost')) {
-    console.warn(
-      '[EventLand] VITE_BACKEND_URL is not configured for production. ' +
-      'Set VITE_BACKEND_URL to your backend domain in the deployment environment.'
-    );
-    return '';
-  }
-  return rawBackend;
-};
-
-export const BACKEND_URL = resolveBackendUrl();
-
-export const BASE_URL = (() => {
-  if (rawApiUrl && !rawApiUrl.includes('localhost')) return rawApiUrl;
-  return `${BACKEND_URL}/api`;
+// Resolved backend URL (root without trailing slash or /api)
+// Used for SignalR hub connections, static asset URLs, etc.
+export const BACKEND_URL = (() => {
+  if (rawBackend) return rawBackend;
+  if (rawApiUrl) return rawApiUrl.replace(/\/api\/?$/, '');
+  return '';
 })();
 
-export const SERVER_BASE = BASE_URL.replace(/\/api\/?$/, '') || BACKEND_URL;
+// Resolved API base URL (with /api)
+// Used for all REST API endpoints
+export const BASE_URL = (() => {
+  if (rawApiUrl) return rawApiUrl;
+  if (BACKEND_URL) return `${BACKEND_URL}/api`;
+  return '/api';
+})();
+
+export const SERVER_BASE = BACKEND_URL || BASE_URL.replace(/\/api\/?$/, '');
+
+const isTunnelBackend =
+  (BACKEND_URL && (BACKEND_URL.includes('ngrok') || BACKEND_URL.includes('localtunnel'))) ||
+  (BASE_URL && (BASE_URL.includes('ngrok') || BASE_URL.includes('localtunnel')));
 
 export function getOrganizerImageUrl(logoUrl) {
   if (!logoUrl) return '';
@@ -85,7 +72,7 @@ async function request(endpoint, options = {}) {
     'Accept': 'application/json',
     // Tunnel headers are only needed in local dev when routing through ngrok / localtunnel.
     // In production (isProductionDomain) these are unnecessary noise — omit them.
-    ...(!isProductionDomain && { 'ngrok-skip-browser-warning': 'true', 'bypass-tunnel-reminder': 'true' }),
+    ...(isTunnelBackend ? { 'ngrok-skip-browser-warning': 'true', 'bypass-tunnel-reminder': 'true' } : {}),
     ...(options.headers || {})
   };
 
@@ -141,7 +128,7 @@ async function request(endpoint, options = {}) {
 
   const contentType = response.headers.get('content-type') || '';
   if (contentType.includes('text/html')) {
-    throw new Error('API server returned HTML instead of JSON. Ensure VITE_BACKEND_URL is configured to point to your live backend domain in Vercel settings.');
+    throw new Error('API server returned HTML instead of JSON. Ensure VITE_BACKEND_URL and VITE_API_URL in .env point to your active backend.');
   }
 
   return await response.json();
