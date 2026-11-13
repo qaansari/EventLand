@@ -31,7 +31,10 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
 
   const cityName = event?.cityName || event?.city || 'Karachi';
 
-  const statusUpper = (event.status || 'Live').toUpperCase();
+  const rawStatus = typeof event?.status === 'string' 
+    ? event.status 
+    : (event?.status === 1 ? 'Live' : event?.status === 2 ? 'Completed' : event?.status === 3 ? 'Cancelled' : String(event?.status || 'Live'));
+  const statusUpper = rawStatus.toUpperCase();
   const isClosed = statusUpper === 'CLOSED';
   const isSoldOut = statusUpper === 'SOLD OUT' || statusUpper === 'SOLDOUT';
   const isLive = statusUpper === 'LIVE';
@@ -148,7 +151,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
                   : undefined
               }}
             >
-              {!isClosed && !isSoldOut && <span className="pulse-dot"></span>} {event.status || 'Live'}
+              {!isClosed && !isSoldOut && <span className="pulse-dot"></span>} {rawStatus}
             </span>
 
             {/* Tags / Categories (show top 2) */}

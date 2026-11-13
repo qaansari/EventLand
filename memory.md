@@ -782,5 +782,44 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
 - **Testing & Verification**:
   - Verified `npm --prefix frontend run build`: **0 errors** (built cleanly in ~1.3s).
 
+### Runtime Bug Fixes & Frontend Hardening (November 2026)
+- **1. Missing `Tag` Icon Import in `EventDetailPage.jsx`**:
+  - **Issue**: Opening the "Event Details & Rules" tab on the event details page crashed the component with a runtime ReferenceError (`Tag is not defined`).
+  - **Root Cause**: `<Tag size={13} />` was used for the event type badge in the newly added key specs section, but `Tag` was omitted from the `lucide-react` import statement.
+  - **Fix**: Added `Tag` to `lucide-react` named imports in [`frontend/src/components/EventDetailPage.jsx`](file:///d:/Projects/EventLand/frontend/src/components/EventDetailPage.jsx).
+- **2. Organizer Update Form State Pre-filling Bug in `AdminDashboard.jsx`**:
+  - **Issue**: Clicking "Edit" on an organizer in the Admin Dashboard opened the modal with empty fields for all 7 new organizer attributes (`brandName`, `companyType`, `registeredAddress`, `companyNtn`, `description`, `instagramUrl`, `facebookUrl`).
+  - **Root Cause**: The `normalizedOrgs` mapping inside `fetchBackendData()` explicitly mapped only 7 legacy fields, discarding all new enhancement properties before they could reach `handleEditOrganizer`.
+  - **Fix**: Added all 7 new attributes with dual camelCase/PascalCase fallback (`o.brandName ?? o.BrandName ?? ''`) to the `normalizedOrgs` transformer in [`frontend/src/components/AdminDashboard.jsx`](file:///d:/Projects/EventLand/frontend/src/components/AdminDashboard.jsx#L380-L395).
+- **3. Undefined `isProductionDomain` in Upload API Handler**:
+  - **Issue**: Uploading files crashed at runtime with `ReferenceError: isProductionDomain is not defined`.
+  - **Root Cause**: `isProductionDomain` had been refactored out in favor of `isTunnelBackend`, but an orphan reference remained in `uploadApi.uploadFile` in `api.js`.
+  - **Fix**: Replaced the orphan reference with `isTunnelBackend` in [`frontend/src/services/api.js`](file:///d:/Projects/EventLand/frontend/src/services/api.js).
+- **4. Type Guard Crash in `EventCard.jsx` on "List Event" Wizard**:
+  - **Issue**: Clicking "List Event" triggered the error boundary: `(event.status || "Live").toUpperCase is not a function`.
+  - **Root Cause**: `EventOrganizerWizard.jsx` initialized its live preview object with `status: 1` (integer). `EventCard.jsx` performed `(event.status || 'Live').toUpperCase()`; since `1` is truthy, the string fallback was skipped and JavaScript attempted `(1).toUpperCase()`.
+  - **Fix**:
+    - Hardened `EventCard.jsx` with a defensive type check: resolves integers (`1` -> `'Live'`, `2` -> `'Completed'`, `3` -> `'Cancelled'`), strings, and falsy values before invoking `.toUpperCase()`.
+    - Updated `status: 'Live'` in `EventOrganizerWizard.jsx`.
+
+### Frontend Environment File Architecture: `.env` vs `.env.development` (November 2026)
+- **Target Requirement**:
+  - Maintain a dedicated local environment file for development (`npm run dev`) with local backend URLs (e.g. `https://localhost:7257`).
+  - Upon building the app (`npm run build`), the build must directly switch to `.env` alone (production URLs like `https://eventland.pk`), with **no `.env.local`** involved.
+- **Vite Native Cascade Implementation**:
+  - Created [`frontend/.env.development`](file:///d:/Projects/EventLand/frontend/.env.development):
+    - Loaded exclusively in development mode (`npm run dev`).
+    - Points to local backend: `VITE_BACKEND_URL=https://localhost:7257` and `VITE_API_URL=https://localhost:7257/api`.
+  - Configured [`frontend/.env`](file:///d:/Projects/EventLand/frontend/.env):
+    - Base production environment.
+    - Loaded in production mode (`npm run build` defaults to mode `'production'`). Because `.env.development` is only read in development mode, `npm run build` reads directly from `.env`.
+    - Points to live production backend: `VITE_BACKEND_URL=https://eventland.pk` and `VITE_API_URL=https://eventland.pk/api`.
+  - Permanently avoided `.env.local` to prevent local file shadowing during production builds.
+- **Verification**:
+  - Verified Vite's `loadEnv`:
+    - `npm run dev` resolves `https://localhost:7257`.
+    - `npm run build` resolves `https://eventland.pk`.
+  - Verified compiled production bundle in `dist/assets/`: baked URLs cleanly match `https://eventland.pk`.
+
 ---
-*Last Updated: November 2026 (Single Environment File Configuration [.env] & Runtime Backend/API URL Synchronization [https://eventland.pk & https://eventland.pk/api], Organizer & Event Entity Enhancements, Seat Chart Upload & House Rules Policies, Additive EF Core Migration [AddOrganizerAndEventEnhancements], Windows Server VPS Production Hosting Documentation & Automated Deployment in D:\Docx, Dynamic Platform Fee Configuration [PlatformFeeConfig] & Admin Management UI, Single Baseline EF Core Migration Consolidation, Checkout Modal Simplification & Pricing Normalization, Google & Social Authentication Hardening on Vercel Deployment, Tunnel & Ngrok View Site Warning Elimination, 2 Events Per Row Catalog Grid Layout, Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 103/103 Unit Tests Passing)*
+*Last Updated: November 2026 (Environment Files Architecture [.env for build, .env.development for dev], Frontend Runtime Hardening [EventCard status type guard, Tag icon import, AdminDashboard organizer form normalization, api.js upload handler], Single Environment File Configuration [.env] & Runtime Backend/API URL Synchronization [https://eventland.pk & https://eventland.pk/api], Organizer & Event Entity Enhancements, Seat Chart Upload & House Rules Policies, Additive EF Core Migration [AddOrganizerAndEventEnhancements], Windows Server VPS Production Hosting Documentation & Automated Deployment in D:\Docx, Dynamic Platform Fee Configuration [PlatformFeeConfig] & Admin Management UI, Single Baseline EF Core Migration Consolidation, Checkout Modal Simplification & Pricing Normalization, Google & Social Authentication Hardening on Vercel Deployment, Tunnel & Ngrok View Site Warning Elimination, 2 Events Per Row Catalog Grid Layout, Direct Bank Transfer Retired from Checkout Modal [PayPro Exclusive Checkout], Notification Alerts Deduplication & Toast Context Throttling, Unified Social Authentication [Google + Facebook], Complete Privacy Policy & Meta Compliance, 103/103 Unit Tests Passing)*

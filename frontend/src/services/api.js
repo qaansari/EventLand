@@ -434,7 +434,7 @@ export const uploadApi = {
     // Use canonical getStoredToken() so the storage key is managed in one place (utils/auth.js)
     const token = getStoredToken();
     const headers = {
-      ...(!isProductionDomain && { 'ngrok-skip-browser-warning': 'true' })
+      ...(isTunnelBackend ? { 'ngrok-skip-browser-warning': 'true' } : {})
     };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 

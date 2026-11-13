@@ -164,7 +164,7 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
     id: makePreviewId(),
     title: eventForm.title || 'Your Event Title Here',
     category: eventForm.category,
-    status: 1, // 0: Draft, 1: Live, 2: Completed, 3: Cancelled
+    status: 'Live', // 'Draft', 'Live', 'Completed', 'Cancelled'
     isFeatured: true,
     isPublished: true,
     city: eventForm.city,
