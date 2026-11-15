@@ -103,7 +103,7 @@ export default defineConfig(({ mode }) => {
               if (id.includes('lucide-react')) {
                 return 'vendor-lucide';
               }
-              if (id.includes('html2pdf')) {
+              if (id.includes('html2pdf') || id.includes('jspdf') || id.includes('html2canvas')) {
                 return 'vendor-pdf';
               }
               if (id.includes('qrcode')) {
@@ -114,7 +114,7 @@ export default defineConfig(({ mode }) => {
           }
         }
       },
-      chunkSizeWarningLimit: 600
+      chunkSizeWarningLimit: 1000
     }
   };
 });

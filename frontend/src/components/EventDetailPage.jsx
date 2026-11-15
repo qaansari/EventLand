@@ -57,6 +57,7 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
   const [selectedShowId, setSelectedShowId] = useState(initialEvent?.shows?.[0]?.id || null);
   const [selectedTiers, setSelectedTiers] = useState({});
   const [showLayoutPreview, setShowLayoutPreview] = useState(false);
+  const [showSeatChartModal, setShowSeatChartModal] = useState(false);
 
   // Fetch full details if eventId passed or to ensure fresh data
   useEffect(() => {
@@ -278,8 +279,6 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
     const updatedEvent = activeShow ? { ...event, selectedShow: activeShow } : event;
     onProceedToBooking(updatedEvent, 'seat-picker', []);
   };
-
-  const [showSeatChartModal, setShowSeatChartModal] = useState(false);
 
   const orgObj = typeof event.organizer === 'object' && event.organizer !== null ? event.organizer : {};
   const organizerDisplayName = orgObj.brandName || orgObj.name || (typeof event.organizer === 'string' ? event.organizer : '') || 'Event Land';

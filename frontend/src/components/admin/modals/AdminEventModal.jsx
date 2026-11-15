@@ -38,11 +38,11 @@ export default function AdminEventModal({
   auditoriumsList = [],
   onNavigateAuditoriums
 }) {
-  if (!isOpen) return null;
-
   const [customAudienceText, setCustomAudienceText] = useState('');
   const [customFoodText, setCustomFoodText] = useState('');
   const [customSmokingText, setCustomSmokingText] = useState('');
+
+  if (!isOpen) return null;
 
   const parseJsonArray = (val) => {
     if (!val) return [];

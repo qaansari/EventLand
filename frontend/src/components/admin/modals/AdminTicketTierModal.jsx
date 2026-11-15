@@ -1,6 +1,7 @@
 import React from 'react';
-import { X, RefreshCw } from 'lucide-react';
+import { X, RefreshCw, Layers } from 'lucide-react';
 import SearchableSelect from '../../SearchableSelect';
+import MultiSearchableSelect from '../../MultiSearchableSelect';
 
 export default function AdminTicketTierModal({
   isOpen,
@@ -37,7 +38,7 @@ export default function AdminTicketTierModal({
             <SearchableSelect
               required
               value={tierForm.eventId}
-              onChange={e => setTierForm({ ...tierForm, eventId: e.target.value, eventShowId: '' })}
+              onChange={e => setTierForm({ ...tierForm, eventId: e.target.value, eventShowId: '', eventShowIds: [] })}
               options={eventsList.map(ev => ({ value: ev.id, label: ev.title }))}
               placeholder="Select Event..."
             />
@@ -45,13 +46,40 @@ export default function AdminTicketTierModal({
 
           {showsForEv.length > 0 && (
             <div>
-              <label style={{ display: 'block', fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '0.25rem' }}>Select Show Slot (Optional)</label>
-              <SearchableSelect
-                value={tierForm.eventShowId || ''}
-                onChange={e => setTierForm({ ...tierForm, eventShowId: e.target.value })}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                <label style={{ fontSize: '0.8125rem', color: '#94a3b8', margin: 0 }}>
+                  Select Show Slots ({tierForm.eventShowIds?.length || 0} selected)
+                </label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setTierForm({ ...tierForm, eventShowIds: showsForEv.map(s => s.id) })}
+                    style={{ background: 'none', border: 'none', color: '#2dd4bf', fontSize: '0.75rem', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                  >
+                    Select All
+                  </button>
+                  <span style={{ color: '#475569', fontSize: '0.75rem' }}>•</span>
+                  <button
+                    type="button"
+                    onClick={() => setTierForm({ ...tierForm, eventShowIds: [] })}
+                    style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.75rem', cursor: 'pointer', padding: 0 }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <MultiSearchableSelect
+                value={tierForm.eventShowIds || []}
+                onChange={e => setTierForm({ ...tierForm, eventShowIds: e.target.value })}
                 options={showsForEv.map(s => ({ value: s.id, label: s.showTitle }))}
-                placeholder="All Shows (General)"
+                placeholder="Choose show slots (or leave blank for all shows)..."
+                searchPlaceholder="Search shows..."
               />
+              <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginTop: '0.35rem' }}>
+                {tierForm.eventShowIds && tierForm.eventShowIds.length > 0
+                  ? `This tier and price will apply to ${tierForm.eventShowIds.length} selected show(s).`
+                  : 'Leaving blank applies this tier & price across all shows for this event.'}
+              </span>
             </div>
           )}
 

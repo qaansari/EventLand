@@ -266,6 +266,12 @@ export default function App() {
   // Derived from currentUser — no separate state needed
   const userRole = currentUser?.role || 'customer';
 
+  // Active Modals & Dedicated Detail View
+  const [activeDetailEvent, setActiveDetailEvent] = useState(null);
+  const [activeSeatPickerEvent, setActiveSeatPickerEvent] = useState(null);
+  const [checkoutData, setCheckoutData] = useState(null); // { event, seats }
+  const [activeTicketView, setActiveTicketView] = useState(null);
+
   // Synchronize browser history (back/forward navigation) with activeView
   useEffect(() => {
     const handlePopState = () => {
@@ -611,12 +617,6 @@ export default function App() {
       setIsLookingUpTicket(false);
     }
   };
-
-  // Active Modals & Dedicated Detail View
-  const [activeDetailEvent, setActiveDetailEvent] = useState(null);
-  const [activeSeatPickerEvent, setActiveSeatPickerEvent] = useState(null);
-  const [checkoutData, setCheckoutData] = useState(null); // { event, seats }
-  const [activeTicketView, setActiveTicketView] = useState(null);
 
   // Handle URL deep-linking and browser Back/Forward (popstate)
   useEffect(() => {

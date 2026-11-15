@@ -1668,6 +1668,130 @@ public class AdminService : IAdminService
         return new TicketTierDto(tier.Id, tier.EventId, tier.EventShowId, tier.Name, tier.Description, tier.Price, tier.AvailableQuantity, tier.SoldCount, tier.MaxPerOrder, tier.SortOrder, tier.RowRange, tier.EffectiveStatus.ToString());
     }
 
+    public async Task<List<TicketTierDto>> SaveTicketTiersBatchAsync(BatchSaveTicketTierDto dto, int? organizerId = null)
+    {
+        var ev = await _context.Events.FirstOrDefaultAsync(e => e.Id == dto.EventId && !e.IsDeleted);
+        if (ev is null)
+            throw new KeyNotFoundException($"Event '{dto.EventId}' not found.");
+
+        if (organizerId.HasValue && ev.OrganizerId != organizerId.Value)
+            throw new UnauthorizedAccessException("Access denied to this event.");
+
+        var nameClean = (dto.Name ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(nameClean))
+            throw new InvalidOperationException("Ticket tier name is required.");
+
+        var cleanStatus = (dto.Status ?? "Available").Replace(" ", "");
+        Enum.TryParse<TicketTierStatus>(cleanStatus, true, out var parsedStatus);
+
+        // Determine target show IDs
+        var targetShowIds = (dto.EventShowIds != null && dto.EventShowIds.Any(id => id > 0))
+            ? dto.EventShowIds.Where(id => id > 0).Distinct().ToList()
+            : await _context.EventShows.Where(s => s.EventId == dto.EventId && !s.IsDeleted).Select(s => s.Id).ToListAsync();
+
+        var resultTiers = new List<TicketTier>();
+
+        if (targetShowIds.Any())
+        {
+            foreach (var showId in targetShowIds)
+            {
+                var existingTier = await _context.TicketTiers
+                    .FirstOrDefaultAsync(t => t.EventId == dto.EventId && t.EventShowId == showId && !t.IsDeleted && t.Name.ToLower() == nameClean.ToLower());
+
+                if (existingTier != null)
+                {
+                    existingTier.Price = dto.Price;
+                    existingTier.Description = dto.Description ?? "";
+                    if (dto.RowRange != null) existingTier.RowRange = dto.RowRange;
+                    existingTier.AvailableQuantity = dto.AvailableQuantity;
+                    existingTier.MaxPerOrder = dto.MaxPerOrder > 0 ? dto.MaxPerOrder : 5;
+                    if (dto.SortOrder > 0) existingTier.SortOrder = dto.SortOrder;
+                    existingTier.Status = parsedStatus;
+                    resultTiers.Add(existingTier);
+                }
+                else
+                {
+                    int sortOrder = dto.SortOrder > 0
+                        ? dto.SortOrder
+                        : ((await _context.TicketTiers
+                            .Where(t => t.EventId == dto.EventId && t.EventShowId == showId && !t.IsDeleted)
+                            .Select(t => (int?)t.SortOrder)
+                            .MaxAsync()) ?? 0) + 1;
+
+                    var newTier = new TicketTier
+                    {
+                        EventId = dto.EventId,
+                        EventShowId = showId,
+                        Name = nameClean,
+                        Description = dto.Description ?? "",
+                        Price = dto.Price,
+                        RowRange = dto.RowRange,
+                        AvailableQuantity = dto.AvailableQuantity,
+                        MaxPerOrder = dto.MaxPerOrder > 0 ? dto.MaxPerOrder : 5,
+                        SortOrder = sortOrder,
+                        Status = parsedStatus
+                    };
+                    _context.TicketTiers.Add(newTier);
+                    resultTiers.Add(newTier);
+                }
+            }
+        }
+        else
+        {
+            // Event has no shows: create/update general tier with null show ID
+            var existingTier = await _context.TicketTiers
+                .FirstOrDefaultAsync(t => t.EventId == dto.EventId && t.EventShowId == null && !t.IsDeleted && t.Name.ToLower() == nameClean.ToLower());
+
+            if (existingTier != null)
+            {
+                existingTier.Price = dto.Price;
+                existingTier.Description = dto.Description ?? "";
+                if (dto.RowRange != null) existingTier.RowRange = dto.RowRange;
+                existingTier.AvailableQuantity = dto.AvailableQuantity;
+                existingTier.MaxPerOrder = dto.MaxPerOrder > 0 ? dto.MaxPerOrder : 5;
+                if (dto.SortOrder > 0) existingTier.SortOrder = dto.SortOrder;
+                existingTier.Status = parsedStatus;
+                resultTiers.Add(existingTier);
+            }
+            else
+            {
+                int sortOrder = dto.SortOrder > 0
+                    ? dto.SortOrder
+                    : ((await _context.TicketTiers
+                        .Where(t => t.EventId == dto.EventId && t.EventShowId == null && !t.IsDeleted)
+                        .Select(t => (int?)t.SortOrder)
+                        .MaxAsync()) ?? 0) + 1;
+
+                var newTier = new TicketTier
+                {
+                    EventId = dto.EventId,
+                    EventShowId = null,
+                    Name = nameClean,
+                    Description = dto.Description ?? "",
+                    Price = dto.Price,
+                    RowRange = dto.RowRange,
+                    AvailableQuantity = dto.AvailableQuantity,
+                    MaxPerOrder = dto.MaxPerOrder > 0 ? dto.MaxPerOrder : 5,
+                    SortOrder = sortOrder,
+                    Status = parsedStatus
+                };
+                _context.TicketTiers.Add(newTier);
+                resultTiers.Add(newTier);
+            }
+        }
+
+        await _context.SaveChangesAsync();
+
+        await SyncEventPricingAsync(dto.EventId);
+        await _cacheService.ClearEventCacheAsync(dto.EventId);
+
+        return resultTiers.Select(t => new TicketTierDto(
+            t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price,
+            t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder,
+            t.RowRange, t.EffectiveStatus.ToString()
+        )).ToList();
+    }
+
     public async Task<bool> DeleteTicketTierAsync(int id, int? organizerId = null)
     {
         var tier = await _context.TicketTiers.Include(t => t.Event).FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted);

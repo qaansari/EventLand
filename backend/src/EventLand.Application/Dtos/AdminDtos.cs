@@ -207,6 +207,19 @@ public record UpdateTicketTierDto(
     string Status = "Available"
 );
 
+public record BatchSaveTicketTierDto(
+    int EventId,
+    List<int> EventShowIds,
+    string Name,
+    string Description,
+    decimal Price,
+    int AvailableQuantity,
+    int MaxPerOrder,
+    int SortOrder,
+    string? RowRange = null,
+    string Status = "Available"
+);
+
 public record CreateSeatingZoneDto(
     int EventId,
     string Zone,

@@ -317,6 +317,7 @@ export const adminApi = {
     },
     create: async (dto) => request('/admin/ticket-tiers', { method: 'POST', body: JSON.stringify(dto) }),
     update: async (id, dto) => request(`/admin/ticket-tiers/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
+    batchSave: async (dto) => request('/admin/ticket-tiers/batch', { method: 'POST', body: JSON.stringify(dto) }),
     delete: async (id) => request(`/admin/ticket-tiers/${id}`, { method: 'DELETE' }),
     updateStatus: async (id, status) => request(`/admin/ticket-tiers/${id}/status?status=${encodeURIComponent(status)}`, { method: 'PATCH' })
   },

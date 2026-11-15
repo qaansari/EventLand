@@ -80,6 +80,31 @@ public class AdminTicketTiersController : ControllerBase
         }
     }
 
+    [HttpPost("batch")]
+    public async Task<ActionResult<List<TicketTierDto>>> SaveTicketTiersBatch([FromBody] BatchSaveTicketTierDto dto)
+    {
+        int? scopedOrgId = User.IsAdmin() ? null : User.GetOrganizerId();
+        if (!User.IsAdmin() && !scopedOrgId.HasValue) return Forbid();
+
+        try
+        {
+            var saved = await _adminService.SaveTicketTiersBatchAsync(dto, scopedOrgId);
+            return Ok(saved);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
+
     [HttpDelete("{id:int}")]
     public async Task<ActionResult> DeleteTicketTier(int id)
     {

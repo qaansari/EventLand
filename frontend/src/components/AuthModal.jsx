@@ -104,23 +104,25 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
   const initializedGsiRef = useRef(false);
   const handleCredentialResponseRef = useRef();
 
-  handleCredentialResponseRef.current = (response) => {
-    if (!response?.credential) return;
-    setSocialLoading('google');
-    setErrorMsg('');
-    authApi.googleAuth(response.credential)
-      .then((authData) => {
-        handleAuthSuccess(authData);
-      })
-      .catch((err) => {
-        const msg = err.message || 'Google sign-in failed. Please try again.';
-        setErrorMsg(msg);
-        showError('Google Sign-In Failed', msg);
-      })
-      .finally(() => {
-        setSocialLoading(null);
-      });
-  };
+  useEffect(() => {
+    handleCredentialResponseRef.current = (response) => {
+      if (!response?.credential) return;
+      setSocialLoading('google');
+      setErrorMsg('');
+      authApi.googleAuth(response.credential)
+        .then((authData) => {
+          handleAuthSuccess(authData);
+        })
+        .catch((err) => {
+          const msg = err.message || 'Google sign-in failed. Please try again.';
+          setErrorMsg(msg);
+          showError('Google Sign-In Failed', msg);
+        })
+        .finally(() => {
+          setSocialLoading(null);
+        });
+    };
+  });
 
   // Google Identity Services (GSI) loader & initialization
   useEffect(() => {

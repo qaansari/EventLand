@@ -76,6 +76,7 @@ public interface IAdminService
     Task<List<TicketTierDto>> GetTicketTiersAsync(int? eventId = null, int? eventShowId = null, int? organizerId = null);
     Task<TicketTierDto> CreateTicketTierAsync(CreateTicketTierDto dto, int? organizerId = null);
     Task<TicketTierDto> UpdateTicketTierAsync(int id, UpdateTicketTierDto dto, int? organizerId = null);
+    Task<List<TicketTierDto>> SaveTicketTiersBatchAsync(BatchSaveTicketTierDto dto, int? organizerId = null);
     Task<TicketTierDto> UpdateTicketTierStatusAsync(int id, string status, int? organizerId = null);
     Task<bool> DeleteTicketTierAsync(int id, int? organizerId = null);
 

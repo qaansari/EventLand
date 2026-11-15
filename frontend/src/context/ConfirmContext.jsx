@@ -7,13 +7,12 @@ export function ConfirmProvider({ children }) {
   const [modalState, setModalState] = useState({
     isOpen: false,
     options: {},
+    resolver: null,
   });
-
-  const resolverRef = useRef(null);
 
   const confirm = useCallback((optionsOrMessage) => {
     return new Promise((resolve) => {
-      let options = {};
+      let options;
       if (typeof optionsOrMessage === 'string') {
         const isDeleteAction = /delete|remove|deactivate|cancel|reject|close/i.test(optionsOrMessage);
         options = {
@@ -40,18 +39,17 @@ export function ConfirmProvider({ children }) {
         };
       }
 
-      resolverRef.current = (result) => resolve(Boolean(result));
-
       setModalState({
         isOpen: true,
         options,
+        resolver: (result) => resolve(Boolean(result)),
       });
     });
   }, []);
 
   const prompt = useCallback((optionsOrMessage, defaultVal = '') => {
     return new Promise((resolve) => {
-      let options = {};
+      let options;
       if (typeof optionsOrMessage === 'string') {
         options = {
           message: optionsOrMessage,
@@ -80,25 +78,23 @@ export function ConfirmProvider({ children }) {
       options.isPrompt = true;
       options.isAlert = false;
 
-      // On confirm returns string value, on cancel returns null
-      resolverRef.current = (result) => {
-        if (result === false || result === null) {
-          resolve(null);
-        } else {
-          resolve(typeof result === 'string' ? result : '');
-        }
-      };
-
       setModalState({
         isOpen: true,
         options,
+        resolver: (result) => {
+          if (result === false || result === null) {
+            resolve(null);
+          } else {
+            resolve(typeof result === 'string' ? result : '');
+          }
+        },
       });
     });
   }, []);
 
   const alert = useCallback((optionsOrMessage) => {
     return new Promise((resolve) => {
-      let options = {};
+      let options;
       if (typeof optionsOrMessage === 'string') {
         options = {
           message: optionsOrMessage,
@@ -120,39 +116,32 @@ export function ConfirmProvider({ children }) {
       options.isPrompt = false;
       options.isAlert = true;
 
-      resolverRef.current = () => resolve();
-
       setModalState({
         isOpen: true,
         options,
+        resolver: () => resolve(),
       });
     });
   }, []);
 
   const handleConfirm = useCallback((value) => {
-    setModalState((prev) => ({ ...prev, isOpen: false }));
-    if (resolverRef.current) {
-      resolverRef.current(value);
-      resolverRef.current = null;
-    }
+    setModalState((prev) => {
+      if (prev.resolver) prev.resolver(value);
+      return { ...prev, isOpen: false, resolver: null };
+    });
   }, []);
 
   const handleCancel = useCallback(() => {
-    setModalState((prev) => ({ ...prev, isOpen: false }));
-    if (resolverRef.current) {
-      resolverRef.current(false);
-      resolverRef.current = null;
-    }
+    setModalState((prev) => {
+      if (prev.resolver) prev.resolver(false);
+      return { ...prev, isOpen: false, resolver: null };
+    });
   }, []);
 
-  // Expose callable confirm function with attached prompt & alert helpers for maximum usability
-  const confirmApi = useCallback((optionsOrMessage) => {
-    return confirm(optionsOrMessage);
-  }, [confirm]);
-
-  confirmApi.confirm = confirm;
-  confirmApi.prompt = prompt;
-  confirmApi.alert = alert;
+  const confirmApi = Object.assign(
+    (optionsOrMessage) => confirm(optionsOrMessage),
+    { confirm, prompt, alert }
+  );
 
   return (
     <ConfirmContext.Provider value={confirmApi}>
