@@ -1033,6 +1033,7 @@ public class FakeCacheService : ICacheService
     public Task RemoveAsync(string key) => Task.CompletedTask;
     public Task RemoveByPrefixAsync(string prefixKey) => Task.CompletedTask;
     public Task ClearEventCacheAsync(int? eventId = null) => Task.CompletedTask;
+    public Task<SeatHoldResult> TryHoldSeatsGranularAsync(int eventId, List<int> seatIds, string ownerToken, TimeSpan holdDuration, int? eventShowId = null) => Task.FromResult(new SeatHoldResult(true, new List<int>(), DateTimeOffset.UtcNow.Add(holdDuration)));
     public Task<bool> HoldSeatsAsync(int eventId, List<int> seatIds, string email, TimeSpan holdDuration, int? eventShowId = null) => Task.FromResult(true);
     public Task ReleaseSeatsAsync(int eventId, List<int> seatIds, int? eventShowId = null, string? expectedOwnerEmail = null) => Task.CompletedTask;
     public Task<List<int>> GetHeldSeatIdsAsync(int eventId, int? eventShowId = null) => Task.FromResult(new List<int>());

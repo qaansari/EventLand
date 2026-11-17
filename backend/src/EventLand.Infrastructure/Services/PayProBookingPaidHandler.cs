@@ -65,11 +65,12 @@ public class PayProBookingPaidHandler : IPayProOrderPaidHandler
 
         var now = DateTimeOffset.UtcNow;
 
-        booking.PaymentStatus = PaymentStatus.Paid;
-        booking.Status = BookingStatus.Confirmed;
-        booking.PaidAt = order.DatePaid.HasValue ? new DateTimeOffset(order.DatePaid.Value, TimeSpan.Zero) : now;
+        booking.PayProSuccess(now, "PayProWebhook", order.PayProId ?? order.OrderNumber);
+        if (order.DatePaid.HasValue)
+        {
+            booking.PaidAt = new DateTimeOffset(order.DatePaid.Value, TimeSpan.Zero);
+        }
         booking.VerifiedAt = now;
-        booking.BankTransactionRef = order.PayProId ?? order.OrderNumber;
 
         // Permanently confirm reserved seats
         foreach (var bs in booking.BookingSeats)

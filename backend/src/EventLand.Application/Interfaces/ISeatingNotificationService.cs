@@ -1,4 +1,4 @@
-﻿namespace EventLand.Application.Interfaces;
+namespace EventLand.Application.Interfaces;
 
 /// <summary>
 /// Abstraction over the SignalR SeatingHub that Infrastructure services can inject
@@ -6,6 +6,8 @@
 /// </summary>
 public interface ISeatingNotificationService
 {
-    /// <summary>Broadcast that the given seats have been released for an event.</summary>
+    Task BroadcastSeatsHeldAsync(int eventId, List<int> seatIds, string email, CancellationToken cancellationToken = default);
     Task BroadcastSeatsReleasedAsync(int eventId, List<int> seatIds, CancellationToken cancellationToken = default);
+    Task BroadcastSeatStatusChangedAsync(int eventId, int seatId, string status, CancellationToken cancellationToken = default);
+    Task BroadcastBatchDeltasAsync(int eventId, List<SeatStateDelta> deltas, CancellationToken cancellationToken = default);
 }

@@ -27,12 +27,18 @@ public sealed class SeatConfiguration : IEntityTypeConfiguration<Seat>
         builder.Property(s => s.Status)
                .HasConversion<int>();
 
+        builder.Property(s => s.State)
+               .HasDefaultValue(EventLand.Domain.Enums.SeatState.Available);
+
         builder.HasIndex(s => new { s.ZoneId, s.Row, s.Col })
                .IsUnique()
                .HasDatabaseName("IX_Seats_Zone_Row_Col");
 
         builder.HasIndex(s => new { s.ZoneId, s.Status })
                .HasDatabaseName("IX_Seats_ZoneId_Status");
+
+        builder.HasIndex(s => new { s.ZoneId, s.State })
+               .HasDatabaseName("IX_Seats_ZoneId_State");
 
     }
 }

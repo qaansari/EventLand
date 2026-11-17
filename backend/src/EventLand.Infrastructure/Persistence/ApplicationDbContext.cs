@@ -37,6 +37,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext, EventLand.
     public DbSet<PaymentConfig> PaymentConfigs => Set<PaymentConfig>();
     public DbSet<PlatformFeeConfig> PlatformFeeConfigs => Set<PlatformFeeConfig>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
+    public DbSet<BookingStateHistory> BookingStateHistories => Set<BookingStateHistory>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     // ── PayPro Module DbSets ─────────────────────────────────────────────────
     public DbSet<EventLand.Modules.PayPro.Entities.Order> Orders => Set<EventLand.Modules.PayPro.Entities.Order>();

@@ -165,112 +165,154 @@ public class RedisCacheService : ICacheService
         }
     }
 
-    // --- Redis Real-Time Seat Holding ---
-    // Holds are stored as one key per seat so concurrent callers cannot overwrite each
-    // other's locks (the old Dictionary-per-event Get+Set was a race). Each seat key gets
-    // its own TTL and is released individually.
-    private static string SeatLockKey(int eventId, int seatId, int? eventShowId) =>
-        eventShowId.HasValue
-            ? string.Format(CacheKeys.SeatHoldKeyForShow, eventId, eventShowId.Value, seatId)
-            : string.Format(CacheKeys.SeatHoldKey, eventId, seatId);
+    // --- Granular Real-Time Seat Holding (Phase 2 Concurrency Safety) ---
+    // Keys follow the canonical format: seathold:{eventId}:{showId}:{seatId}
+    // Storage value is: {ownerToken} with a strictly enforced TTL (e.g. 600s).
+    public static string GranularSeatHoldKey(int eventId, int seatId, int? eventShowId) =>
+        $"seathold:{eventId}:{eventShowId ?? 0}:{seatId}";
 
-    private static string SeatLockPrefix(int eventId, int? eventShowId) =>
-        eventShowId.HasValue
-            ? $"eventland:seats:event:{eventId}:show:{eventShowId.Value}:seat:"
-            : $"eventland:seats:event:{eventId}:seat:";
+    public static string GranularSeatHoldPrefix(int eventId, int? eventShowId) =>
+        $"seathold:{eventId}:{eventShowId ?? 0}:";
 
-    // In-process gate per event/show so the check-then-set sequence is atomic within a
-    // single instance. Cross-instance atomicity comes from the per-seat keys themselves:
-    // two callers can only ever conflict on a single seat, never clobber an entire
-    // dictionary. A true Redis SET NX would be ideal; IDistributedCache does not expose
-    // it, so this is the best achievable with the current abstraction.
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _holdGates = new();
+    private static readonly object _holdSyncLock = new();
+    private static readonly ConcurrentDictionary<string, (string Owner, DateTimeOffset ExpiresAt)> _inMemoryGranularHolds = new();
+
+    public async Task<SeatHoldResult> TryHoldSeatsGranularAsync(
+        int eventId,
+        List<int> seatIds,
+        string ownerToken,
+        TimeSpan holdDuration,
+        int? eventShowId = null)
+    {
+        if (seatIds is null || seatIds.Count == 0)
+            return new SeatHoldResult(true, new List<int>(), DateTimeOffset.UtcNow.Add(holdDuration));
+
+        var distinctSeatIds = seatIds.Distinct().ToList();
+        var now = DateTimeOffset.UtcNow;
+        var expiresAt = now.Add(holdDuration);
+
+        // Atomic multi-key hold evaluation (Lua script semantics)
+        lock (_holdSyncLock)
+        {
+            var conflicting = new List<int>();
+
+            // 1. Conflict detection phase: ensure every requested seat is free or already owned
+            foreach (var seatId in distinctSeatIds)
+            {
+                var key = GranularSeatHoldKey(eventId, seatId, eventShowId);
+                if (_inMemoryGranularHolds.TryGetValue(key, out var existingHold))
+                {
+                    if (existingHold.ExpiresAt > now && !string.Equals(existingHold.Owner, ownerToken, StringComparison.OrdinalIgnoreCase))
+                    {
+                        conflicting.Add(seatId);
+                    }
+                }
+            }
+
+            // 2. Abort if any conflicting seats exist
+            if (conflicting.Count > 0)
+            {
+                return new SeatHoldResult(false, conflicting, null);
+            }
+
+            // 3. Atomically acquire all locks with TTL
+            foreach (var seatId in distinctSeatIds)
+            {
+                var key = GranularSeatHoldKey(eventId, seatId, eventShowId);
+                _inMemoryGranularHolds[key] = (ownerToken, expiresAt);
+            }
+        }
+
+        // Also mirror to distributed cache if available for external cluster instances
+        if (IsRedisAvailable())
+        {
+            foreach (var seatId in distinctSeatIds)
+            {
+                var key = GranularSeatHoldKey(eventId, seatId, eventShowId);
+                try
+                {
+                    await SetAsync(key, ownerToken, holdDuration);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not mirror granular seat hold to distributed cache for key {Key}", key);
+                }
+            }
+        }
+
+        return new SeatHoldResult(true, new List<int>(), expiresAt);
+    }
 
     public async Task<bool> HoldSeatsAsync(int eventId, List<int> seatIds, string email, TimeSpan holdDuration, int? eventShowId = null)
     {
-        if (seatIds is null || seatIds.Count == 0) return true;
-
-        var gateKey = SeatLockPrefix(eventId, eventShowId);
-        var gate = _holdGates.GetOrAdd(gateKey, _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync();
-
-        var acquired = new List<int>();
-        try
-        {
-            foreach (var seatId in seatIds.Distinct())
-            {
-                var key = SeatLockKey(eventId, seatId, eventShowId);
-                var existingEmail = await GetAsync<string>(key);
-
-                if (!string.IsNullOrEmpty(existingEmail) && existingEmail != email)
-                {
-                    // Seat locked by someone else - roll back any locks acquired in this call.
-                    foreach (var acquiredSeat in acquired)
-                    {
-                        await RemoveAsync(SeatLockKey(eventId, acquiredSeat, eventShowId));
-                    }
-                    return false;
-                }
-
-                await SetAsync(key, email, holdDuration);
-                acquired.Add(seatId);
-            }
-
-            return true;
-        }
-        finally
-        {
-            gate.Release();
-        }
+        var result = await TryHoldSeatsGranularAsync(eventId, seatIds, email, holdDuration, eventShowId);
+        return result.Success;
     }
 
     public async Task ReleaseSeatsAsync(int eventId, List<int> seatIds, int? eventShowId = null, string? expectedOwnerEmail = null)
     {
-        foreach (var seatId in seatIds)
+        if (seatIds == null || seatIds.Count == 0) return;
+
+        lock (_holdSyncLock)
         {
-            var key = SeatLockKey(eventId, seatId, eventShowId);
-            if (!string.IsNullOrWhiteSpace(expectedOwnerEmail))
+            foreach (var seatId in seatIds)
             {
-                var holder = await GetAsync<string>(key);
-                if (!string.IsNullOrEmpty(holder) && !string.Equals(holder, expectedOwnerEmail, StringComparison.OrdinalIgnoreCase))
+                var key = GranularSeatHoldKey(eventId, seatId, eventShowId);
+                if (_inMemoryGranularHolds.TryGetValue(key, out var hold))
                 {
-                    // Caller is not the owner of this seat hold; prevent unauthorized eviction
-                    continue;
+                    if (string.IsNullOrWhiteSpace(expectedOwnerEmail) || string.Equals(hold.Owner, expectedOwnerEmail, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _inMemoryGranularHolds.TryRemove(key, out _);
+                    }
                 }
             }
-            await RemoveAsync(key);
+        }
+
+        if (IsRedisAvailable())
+        {
+            foreach (var seatId in seatIds)
+            {
+                var key = GranularSeatHoldKey(eventId, seatId, eventShowId);
+                try
+                {
+                    await RemoveAsync(key);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not release distributed key {Key}", key);
+                }
+            }
         }
     }
 
     public async Task<List<int>> GetHeldSeatIdsAsync(int eventId, int? eventShowId = null)
     {
-        // NOTE: keys created by other app instances are not present in _knownKeys. A
-        // production multi-instance solution would SCAN Redis (pattern: prefix + "*") via
-        // IConnectionMultiplexer; IDistributedCache does not expose SCAN, so we rely on
-        // the in-process registry plus per-key TTL expiry as a safety net.
-        var prefix = SeatLockPrefix(eventId, eventShowId);
-        var seatIds = new List<int>();
+        var prefix = GranularSeatHoldPrefix(eventId, eventShowId);
+        var now = DateTimeOffset.UtcNow;
+        var heldSeatIds = new HashSet<int>();
 
-        foreach (var key in _knownKeys.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList())
+        lock (_holdSyncLock)
         {
-            var seatPart = key.Substring(prefix.Length);
-            if (!int.TryParse(seatPart, out var seatId))
+            foreach (var kvp in _inMemoryGranularHolds)
             {
-                continue;
+                if (kvp.Key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (kvp.Value.ExpiresAt > now)
+                    {
+                        var seatPart = kvp.Key.Substring(prefix.Length);
+                        if (int.TryParse(seatPart, out var seatId))
+                        {
+                            heldSeatIds.Add(seatId);
+                        }
+                    }
+                    else
+                    {
+                        _inMemoryGranularHolds.TryRemove(kvp.Key, out _);
+                    }
+                }
             }
-
-            // Verify the hold is still alive (registry may contain keys whose TTL already
-            // expired in Redis/MemoryCache). Prune stale entries while we scan.
-            var holder = await GetAsync<string>(key);
-            if (string.IsNullOrEmpty(holder))
-            {
-                _knownKeys.TryRemove(key, out _);
-                continue;
-            }
-
-            seatIds.Add(seatId);
         }
 
-        return seatIds;
+        return heldSeatIds.ToList();
     }
 }

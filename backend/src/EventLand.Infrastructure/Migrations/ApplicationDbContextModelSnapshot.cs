@@ -442,6 +442,12 @@ namespace EventLand.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("RefundedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("SenderAccountLast4")
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
@@ -453,6 +459,11 @@ namespace EventLand.Infrastructure.Migrations
                     b.Property<string>("SenderBankName")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("State")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
@@ -513,11 +524,17 @@ namespace EventLand.Infrastructure.Migrations
                     b.HasIndex("EventId", "IsCheckedIn")
                         .HasDatabaseName("IX_Bookings_EventId_IsCheckedIn");
 
+                    b.HasIndex("EventId", "State")
+                        .HasDatabaseName("IX_Bookings_EventId_State");
+
                     b.HasIndex("EventId", "Status")
                         .HasDatabaseName("IX_Bookings_EventId_Status");
 
                     b.HasIndex("PaymentStatus", "PaymentExpiresAt")
                         .HasDatabaseName("IX_Bookings_PaymentStatus_PaymentExpiresAt");
+
+                    b.HasIndex("State", "PaymentExpiresAt")
+                        .HasDatabaseName("IX_Bookings_State_PaymentExpiresAt");
 
                     b.ToTable("Bookings");
                 });
@@ -540,6 +557,68 @@ namespace EventLand.Infrastructure.Migrations
                     b.HasIndex("SeatId");
 
                     b.ToTable("BookingSeats");
+                });
+
+            modelBuilder.Entity("EventLand.Domain.Entities.BookingStateHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1000L);
+
+                    b.Property<int>("BookingId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ChangedBy")
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("FromState")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("ToState")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookingId")
+                        .HasDatabaseName("IX_BookingStateHistories_BookingId");
+
+                    b.HasIndex("BookingId", "CreatedAt")
+                        .HasDatabaseName("IX_BookingStateHistories_BookingId_CreatedAt");
+
+                    b.ToTable("BookingStateHistories");
                 });
 
             modelBuilder.Entity("EventLand.Domain.Entities.City", b =>
@@ -1318,6 +1397,60 @@ namespace EventLand.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EventLand.Domain.Entities.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("ProcessedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessedAtUtc")
+                        .HasDatabaseName("IX_OutboxMessages_ProcessedAtUtc");
+
+                    b.HasIndex("ProcessedAtUtc", "CreatedAt")
+                        .HasDatabaseName("IX_OutboxMessages_Unprocessed_CreatedAt");
+
+                    b.ToTable("OutboxMessages");
+                });
+
             modelBuilder.Entity("EventLand.Domain.Entities.PaymentConfig", b =>
                 {
                     b.Property<int>("Id")
@@ -1834,6 +1967,11 @@ namespace EventLand.Infrastructure.Migrations
                     b.Property<int>("Row")
                         .HasColumnType("int");
 
+                    b.Property<int>("State")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
@@ -1847,6 +1985,9 @@ namespace EventLand.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ZoneId", "State")
+                        .HasDatabaseName("IX_Seats_ZoneId_State");
 
                     b.HasIndex("ZoneId", "Status")
                         .HasDatabaseName("IX_Seats_ZoneId_Status");
@@ -2224,7 +2365,7 @@ namespace EventLand.Infrastructure.Migrations
                             FullName = "Super Admin",
                             IsActive = true,
                             IsDeleted = false,
-                            PasswordHash = "AQAAAAIAAYagAAAAEPUGI4O0ECtZ1OqFvYP+T3BNeaViWCNehQE0vShI7Pvy4XKRZW84KKuYXqBhSm4xWQ==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEG8a9kxcaFDI5KDVmGzG9jyNVZzLYj/zSmvIY9bAeR/Ya4XMZBppJqKa5GBpUZM2gA==",
                             PhoneNumber = "+923312541767",
                             RoleId = 1,
                             UpdatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
@@ -2521,6 +2662,17 @@ namespace EventLand.Infrastructure.Migrations
                     b.Navigation("Seat");
                 });
 
+            modelBuilder.Entity("EventLand.Domain.Entities.BookingStateHistory", b =>
+                {
+                    b.HasOne("EventLand.Domain.Entities.Booking", "Booking")
+                        .WithMany("StateHistories")
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Booking");
+                });
+
             modelBuilder.Entity("EventLand.Domain.Entities.City", b =>
                 {
                     b.HasOne("EventLand.Domain.Entities.Country", "Country")
@@ -2722,6 +2874,8 @@ namespace EventLand.Infrastructure.Migrations
                     b.Navigation("BookingSeats");
 
                     b.Navigation("PaymentTransactions");
+
+                    b.Navigation("StateHistories");
                 });
 
             modelBuilder.Entity("EventLand.Domain.Entities.City", b =>

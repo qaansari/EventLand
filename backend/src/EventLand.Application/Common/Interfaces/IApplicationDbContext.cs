@@ -30,6 +30,8 @@ public interface IApplicationDbContext
     DbSet<PaymentConfig> PaymentConfigs { get; }
     DbSet<PlatformFeeConfig> PlatformFeeConfigs { get; }
     DbSet<PaymentTransaction> PaymentTransactions { get; }
+    DbSet<BookingStateHistory> BookingStateHistories { get; }
+    DbSet<OutboxMessage> OutboxMessages { get; }
 
     DatabaseFacade Database { get; }
 

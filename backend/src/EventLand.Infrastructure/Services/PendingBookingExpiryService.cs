@@ -3,6 +3,7 @@ namespace EventLand.Infrastructure.Services;
 using EventLand.Application.Interfaces;
 using EventLand.Domain.Entities;
 using EventLand.Domain.Enums;
+using EventLand.Domain.StateMachines;
 using EventLand.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,8 +11,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
-/// Periodically expires pending bookings whose 30-minute direct bank transfer payment window has elapsed.
-/// Runs every 60 seconds, returns held seats to the pool, and updates booking status to Cancelled/Expired.
+/// Periodically expires pending bookings whose direct payment hold window has elapsed.
+/// Uses atomic Compare-And-Set (CAS) ExecuteUpdateAsync to prevent race conditions with concurrent payment confirmations.
 /// </summary>
 public sealed class PendingBookingExpiryService : BackgroundService
 {
@@ -20,15 +21,18 @@ public sealed class PendingBookingExpiryService : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<PendingBookingExpiryService> _logger;
     private readonly ISeatingNotificationService _seatingNotifications;
+    private readonly TimeProvider _timeProvider;
 
     public PendingBookingExpiryService(
         IServiceScopeFactory scopeFactory,
         ILogger<PendingBookingExpiryService> logger,
-        ISeatingNotificationService seatingNotifications)
+        ISeatingNotificationService seatingNotifications,
+        TimeProvider? timeProvider = null)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
         _seatingNotifications = seatingNotifications;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -74,84 +78,129 @@ public sealed class PendingBookingExpiryService : BackgroundService
         _logger.LogInformation("PendingBookingExpiryService stopping.");
     }
 
-    private async Task RunOnceAsync(CancellationToken cancellationToken)
+    public async Task<int> RunOnceAsync(CancellationToken cancellationToken = default)
     {
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var cacheService = scope.ServiceProvider.GetService<ICacheService>();
 
-        var cutoff = DateTimeOffset.UtcNow;
+        var cutoff = _timeProvider.GetUtcNow();
 
-        // Batch limit: process at most 200 expired bookings per tick to bound memory usage.
-        // Remaining expired bookings will be picked up on subsequent ticks.
-        var expiredBookings = await context.Bookings
-            .Include(b => b.TicketTier)
-            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
-            .Where(b => b.PaymentStatus == PaymentStatus.Pending && b.PaymentExpiresAt != null && b.PaymentExpiresAt <= cutoff && !b.IsDeleted)
-            .OrderBy(b => b.PaymentExpiresAt) // Process oldest expired first
+        var allowedHoldStates = new[] { BookingState.PendingHold, BookingState.PaymentProcessing };
+
+        // Find candidate bookings where hold window has elapsed
+        var candidates = await context.Bookings
+            .AsNoTracking()
+            .Where(b => allowedHoldStates.Contains(b.State)
+                     && b.PaymentExpiresAt != null
+                     && b.PaymentExpiresAt <= cutoff
+                     && !b.IsDeleted)
+            .OrderBy(b => b.PaymentExpiresAt)
             .Take(200)
+            .Select(b => new
+            {
+                b.Id,
+                b.EventId,
+                b.TicketTierId,
+                b.Quantity,
+                b.State
+            })
             .ToListAsync(cancellationToken);
 
-        if (expiredBookings.Count == 0) return;
+        if (candidates.Count == 0) return 0;
 
-        // Collect seat IDs grouped by eventId for batched cache release
+        int successfullyExpiredCount = 0;
         var seatsByEvent = new Dictionary<int, List<int>>();
 
-        foreach (var booking in expiredBookings)
+        foreach (var candidate in candidates)
         {
-            booking.PaymentStatus = PaymentStatus.Expired;
-            booking.Status = BookingStatus.Cancelled;
+            // Atomic Compare-And-Set (CAS): Update state only if still PendingHold or PaymentProcessing
+            var rowsAffected = await context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE Bookings SET State = {(int)BookingState.Expired}, Status = {(int)BookingStatus.Cancelled}, PaymentStatus = {(int)PaymentStatus.Expired}, UpdatedAt = {cutoff}, UpdatedBy = 'System:ExpiryService' WHERE Id = {candidate.Id} AND (State = {(int)BookingState.PendingHold} OR State = {(int)BookingState.PaymentProcessing}) AND PaymentExpiresAt <= {cutoff}",
+                cancellationToken);
 
-            if (booking.TicketTier != null)
+            // If rowsAffected == 0, another concurrent transaction (e.g. admin confirmation or payment webhook) won the race
+            if (rowsAffected == 0)
+                continue;
+
+            successfullyExpiredCount++;
+
+            // Record state audit history and enqueue outbox notification
+            context.BookingStateHistories.Add(new BookingStateHistory
             {
-                booking.TicketTier.SoldCount = Math.Max(0, booking.TicketTier.SoldCount - booking.Quantity);
-            }
+                BookingId = candidate.Id,
+                FromState = candidate.State,
+                ToState = BookingState.Expired,
+                Trigger = BookingStateMachine.TriggerExpireHold,
+                ChangedBy = "System:ExpiryService",
+                Reason = "Hold window lapsed without payment",
+                CreatedAt = cutoff,
+                UpdatedAt = cutoff
+            });
 
-            foreach (var bs in booking.BookingSeats)
+            context.OutboxMessages.Add(new OutboxMessage
             {
-                if (bs.Seat != null)
-                {
-                    bs.Seat.Status = SeatStatus.Available;
-                }
-            }
+                Id = Guid.NewGuid(),
+                EventType = "BookingExpiredEvent",
+                PayloadJson = $"{{\"BookingId\":{candidate.Id},\"EventId\":{candidate.EventId},\"Quantity\":{candidate.Quantity}}}",
+                CreatedAt = cutoff,
+                UpdatedAt = cutoff
+            });
 
-            // Group seat IDs by eventId for batched Redis release below
-            var seatIds = booking.BookingSeats.Select(bs => bs.SeatId).ToList();
+            // Revert inventory atomically checking bounds
+            await context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE TicketTiers SET SoldCount = CASE WHEN SoldCount >= {candidate.Quantity} THEN SoldCount - {candidate.Quantity} ELSE 0 END WHERE Id = {candidate.TicketTierId}",
+                cancellationToken);
+
+            // Release seats if assigned
+            var seatIds = await context.BookingSeats
+                .Where(bs => bs.BookingId == candidate.Id)
+                .Select(bs => bs.SeatId)
+                .ToListAsync(cancellationToken);
+
             if (seatIds.Count > 0)
             {
-                if (!seatsByEvent.TryGetValue(booking.EventId, out var eventSeats))
+                await context.Seats
+                    .Where(s => seatIds.Contains(s.Id))
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(seat => seat.Status, SeatStatus.Available)
+                        .SetProperty(seat => seat.UpdatedAt, cutoff),
+                        cancellationToken);
+
+                if (!seatsByEvent.TryGetValue(candidate.EventId, out var eventSeats))
                 {
                     eventSeats = new List<int>();
-                    seatsByEvent[booking.EventId] = eventSeats;
+                    seatsByEvent[candidate.EventId] = eventSeats;
                 }
                 eventSeats.AddRange(seatIds);
             }
         }
 
-        // Flush all DB changes in a single round-trip
-        await context.SaveChangesAsync(cancellationToken);
-
-        // Batch release: one ReleaseSeatsAsync + one ClearEventCacheAsync + one SignalR broadcast per unique event
-        if (cacheService != null)
+        if (successfullyExpiredCount > 0)
         {
-            var cacheTasks = seatsByEvent.Select(async kvp =>
-            {
-                try
-                {
-                    await cacheService.ReleaseSeatsAsync(kvp.Key, kvp.Value, null);
-                    await cacheService.ClearEventCacheAsync(kvp.Key);
+            await context.SaveChangesAsync(cancellationToken);
 
-                    // Notify all open browser clients so expired seats turn green immediately
-                    await _seatingNotifications.BroadcastSeatsReleasedAsync(kvp.Key, kvp.Value, cancellationToken);
-                }
-                catch (Exception ex)
+            if (cacheService != null)
+            {
+                var cacheTasks = seatsByEvent.Select(async kvp =>
                 {
-                    _logger.LogWarning(ex, "Could not release cache locks for EventId {EventId}", kvp.Key);
-                }
-            });
-            await Task.WhenAll(cacheTasks);
+                    try
+                    {
+                        await cacheService.ReleaseSeatsAsync(kvp.Key, kvp.Value, null);
+                        await cacheService.ClearEventCacheAsync(kvp.Key);
+                        await _seatingNotifications.BroadcastSeatsReleasedAsync(kvp.Key, kvp.Value, cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Could not release cache locks for EventId {EventId}", kvp.Key);
+                    }
+                });
+                await Task.WhenAll(cacheTasks);
+            }
+
+            _logger.LogInformation("Expired {Count} pending bookings atomically exceeding hold window. Seats returned to pool.", successfullyExpiredCount);
         }
 
-        _logger.LogInformation("Expired {Count} pending bookings exceeding 30-minute hold window. Seats returned to pool.", expiredBookings.Count);
+        return successfullyExpiredCount;
     }
 }

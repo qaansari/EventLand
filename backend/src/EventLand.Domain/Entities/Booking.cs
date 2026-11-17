@@ -2,10 +2,11 @@ namespace EventLand.Domain.Entities;
 
 using EventLand.Domain.Common;
 using EventLand.Domain.Enums;
+using EventLand.Domain.StateMachines;
 
 /// <summary>
 /// A ticket booking placed by a customer for a specific event and ticket tier.
-/// Uses direct manual bank transfer workflow without external gateway fees.
+/// Encapsulates explicit lifecycle state machine transitions, audit history, and optimistic concurrency.
 /// </summary>
 public class Booking : BaseEntity
 {
@@ -37,9 +38,48 @@ public class Booking : BaseEntity
     public decimal      FeePercentageAtPurchase  { get; set; } // Snapshot of % fee at checkout (e.g. 2.80% or 0.80%)
     public decimal      TotalAmount              { get; set; } // Final total payable: Subtotal + PlatformFee + ProcessingFee
 
-    // Status & payment
-    public BookingStatus  Status          { get; set; } = BookingStatus.Pending;
-    public PaymentStatus  PaymentStatus   { get; set; } = PaymentStatus.Pending;
+    // Explicit State Machine Lifecycle (Single Source of Truth)
+    public BookingState State { get; set; } = BookingState.PendingHold;
+
+    // Backward-compatible computed accessors with dual-way sync
+    private BookingStatus _status = BookingStatus.Pending;
+    public BookingStatus Status
+    {
+        get => _status;
+        set
+        {
+            _status = value;
+            SyncStateFromLegacy();
+        }
+    }
+
+    private PaymentStatus _paymentStatus = PaymentStatus.Pending;
+    public PaymentStatus PaymentStatus
+    {
+        get => _paymentStatus;
+        set
+        {
+            _paymentStatus = value;
+            SyncStateFromLegacy();
+        }
+    }
+
+    private void SyncStateFromLegacy()
+    {
+        if (_status == BookingStatus.Confirmed && _paymentStatus == PaymentStatus.Paid)
+            State = BookingState.Confirmed;
+        else if (_paymentStatus == PaymentStatus.Refunded)
+            State = BookingState.Refunded;
+        else if (_paymentStatus == PaymentStatus.Expired)
+            State = BookingState.Expired;
+        else if (_paymentStatus == PaymentStatus.PendingVerification)
+            State = BookingState.AwaitingBankVerification;
+        else if (_status == BookingStatus.Cancelled)
+            State = BookingState.Cancelled;
+        else if (_status == BookingStatus.Pending && _paymentStatus == PaymentStatus.Pending)
+            State = BookingState.PendingHold;
+    }
+
     public PaymentMethod  PaymentMethod   { get; set; } = PaymentMethod.None;
     public DateTimeOffset? PaidAt         { get; set; }
 
@@ -66,7 +106,208 @@ public class Booking : BaseEntity
     public string?        CheckedInBy          { get; set; }
     public string?        GateNotes            { get; set; }
 
+    // Optimistic Concurrency Token
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+
+    // Audit State History
+    public ICollection<BookingStateHistory> StateHistories { get; set; } = new List<BookingStateHistory>();
+
     // Navigation
     public ICollection<BookingSeat>        BookingSeats        { get; set; } = new List<BookingSeat>();
     public ICollection<PaymentTransaction> PaymentTransactions { get; set; } = new List<PaymentTransaction>();
+
+    // ── Rich Aggregate Behavior Methods ───────────────────────────────────────
+
+    public void SubmitBankProof(
+        string transactionRef,
+        string proofUrl,
+        string? accountTitle,
+        string? bankName,
+        string? last4,
+        DateTimeOffset now,
+        string? actor = null)
+    {
+        if (State == BookingState.AwaitingBankVerification && BankTransactionRef == transactionRef)
+            return; // Idempotent re-submission of identical proof
+
+        BookingStateMachine.ValidateTransition(State, BookingState.AwaitingBankVerification, BookingStateMachine.TriggerSubmitBankProof);
+
+        var fromState = State;
+        State = BookingState.AwaitingBankVerification;
+        _status = BookingStatus.Pending;
+        _paymentStatus = PaymentStatus.PendingVerification;
+
+        BankTransactionRef = transactionRef;
+        PaymentProofUrl = proofUrl;
+        SenderAccountTitle = accountTitle;
+        SenderBankName = bankName;
+        SenderAccountLast4 = last4;
+        UpdatedAt = now;
+        UpdatedBy = actor;
+
+        RecordTransition(fromState, State, BookingStateMachine.TriggerSubmitBankProof, actor, "Customer uploaded payment proof");
+    }
+
+    public void BeginPayProPayment(DateTimeOffset now, string? actor = null)
+    {
+        if (State == BookingState.PaymentProcessing)
+            return; // Idempotent
+
+        BookingStateMachine.ValidateTransition(State, BookingState.PaymentProcessing, BookingStateMachine.TriggerBeginPayProPayment);
+
+        var fromState = State;
+        State = BookingState.PaymentProcessing;
+        _status = BookingStatus.Pending;
+        _paymentStatus = PaymentStatus.Pending;
+        UpdatedAt = now;
+        UpdatedBy = actor;
+
+        RecordTransition(fromState, State, BookingStateMachine.TriggerBeginPayProPayment, actor, "Customer initiated PayPro checkout");
+    }
+
+    public void PayProSuccess(DateTimeOffset now, string? actor = null, string? transactionRef = null)
+    {
+        if (State == BookingState.Confirmed)
+            return; // Idempotent
+
+        BookingStateMachine.ValidateTransition(State, BookingState.Confirmed, BookingStateMachine.TriggerPayProSuccess);
+
+        var fromState = State;
+        State = BookingState.Confirmed;
+        _status = BookingStatus.Confirmed;
+        _paymentStatus = PaymentStatus.Paid;
+        PaidAt = now;
+        if (!string.IsNullOrEmpty(transactionRef))
+            BankTransactionRef = transactionRef;
+        UpdatedAt = now;
+        UpdatedBy = actor;
+
+        RecordTransition(fromState, State, BookingStateMachine.TriggerPayProSuccess, actor, "PayPro payment completed successfully");
+    }
+
+    public void PayProFailedOrCancelled(DateTimeOffset now, string? actor = null, string? reason = null)
+    {
+        if (State == BookingState.PendingHold)
+            return; // Idempotent return to hold
+
+        BookingStateMachine.ValidateTransition(State, BookingState.PendingHold, BookingStateMachine.TriggerPayProFailedOrCancelled);
+
+        var fromState = State;
+        State = BookingState.PendingHold;
+        _status = BookingStatus.Pending;
+        _paymentStatus = PaymentStatus.Pending;
+        UpdatedAt = now;
+        UpdatedBy = actor;
+
+        RecordTransition(fromState, State, BookingStateMachine.TriggerPayProFailedOrCancelled, actor, reason ?? "PayPro checkout failed or was cancelled by user");
+    }
+
+    public void ConfirmPayment(int? adminId, string? adminEmail, DateTimeOffset now, string? actor = null)
+    {
+        if (State == BookingState.Confirmed)
+            return; // Idempotent confirmation
+
+        BookingStateMachine.ValidateTransition(State, BookingState.Confirmed, BookingStateMachine.TriggerConfirmPayment);
+
+        var fromState = State;
+        State = BookingState.Confirmed;
+        _status = BookingStatus.Confirmed;
+        _paymentStatus = PaymentStatus.Paid;
+        VerifiedByAdminId = adminId;
+        VerifiedByAdminEmail = adminEmail;
+        VerifiedAt = now;
+        PaidAt ??= now;
+        UpdatedAt = now;
+        UpdatedBy = actor ?? adminEmail;
+
+        RecordTransition(fromState, State, BookingStateMachine.TriggerConfirmPayment, actor ?? adminEmail, "Payment confirmed by administrator");
+    }
+
+    public void RejectPayment(int? adminId, string? adminEmail, string reason, DateTimeOffset now, string? actor = null)
+    {
+        if (State == BookingState.Rejected)
+            return; // Idempotent rejection
+
+        BookingStateMachine.ValidateTransition(State, BookingState.Rejected, BookingStateMachine.TriggerRejectPayment);
+
+        var fromState = State;
+        State = BookingState.Rejected;
+        _status = BookingStatus.Cancelled;
+        _paymentStatus = PaymentStatus.Failed;
+        VerifiedByAdminId = adminId;
+        VerifiedByAdminEmail = adminEmail;
+        VerifiedAt = now;
+        UpdatedAt = now;
+        UpdatedBy = actor ?? adminEmail;
+
+        RecordTransition(fromState, State, BookingStateMachine.TriggerRejectPayment, actor ?? adminEmail, reason);
+    }
+
+    public void ExpireHold(DateTimeOffset now, string? actor = null, string reason = "30-minute hold lapsed without payment")
+    {
+        if (State == BookingState.Expired)
+            return; // Idempotent
+
+        BookingStateMachine.ValidateTransition(State, BookingState.Expired, BookingStateMachine.TriggerExpireHold);
+
+        var fromState = State;
+        State = BookingState.Expired;
+        _status = BookingStatus.Cancelled;
+        _paymentStatus = PaymentStatus.Expired;
+        UpdatedAt = now;
+        UpdatedBy = actor ?? "System:ExpiryService";
+
+        RecordTransition(fromState, State, BookingStateMachine.TriggerExpireHold, actor ?? "System:ExpiryService", reason);
+    }
+
+    public void CancelBooking(DateTimeOffset now, string? actor = null, string reason = "Cancelled by customer/organizer")
+    {
+        if (State == BookingState.Cancelled)
+            return; // Idempotent
+
+        BookingStateMachine.ValidateTransition(State, BookingState.Cancelled, BookingStateMachine.TriggerCancelBooking);
+
+        var fromState = State;
+        State = BookingState.Cancelled;
+        _status = BookingStatus.Cancelled;
+        _paymentStatus = PaymentStatus.Failed;
+        UpdatedAt = now;
+        UpdatedBy = actor;
+
+        RecordTransition(fromState, State, BookingStateMachine.TriggerCancelBooking, actor, reason);
+    }
+
+    public void ProcessRefund(DateTimeOffset now, string reason, string? actor = null)
+    {
+        if (State == BookingState.Refunded)
+            return; // Idempotent
+
+        BookingStateMachine.ValidateTransition(State, BookingState.Refunded, BookingStateMachine.TriggerProcessRefund);
+
+        var fromState = State;
+        State = BookingState.Refunded;
+        _status = BookingStatus.Cancelled;
+        _paymentStatus = PaymentStatus.Refunded;
+        RefundedAt = now;
+        RefundReason = reason;
+        UpdatedAt = now;
+        UpdatedBy = actor;
+
+        RecordTransition(fromState, State, BookingStateMachine.TriggerProcessRefund, actor, reason);
+    }
+
+    private void RecordTransition(BookingState from, BookingState to, string trigger, string? changedBy, string? reason)
+    {
+        StateHistories.Add(new BookingStateHistory
+        {
+            BookingId = Id,
+            FromState = from,
+            ToState = to,
+            Trigger = trigger,
+            ChangedBy = changedBy,
+            Reason = reason,
+            CreatedAt = UpdatedAt,
+            UpdatedAt = UpdatedAt
+        });
+    }
 }

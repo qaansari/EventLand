@@ -53,7 +53,15 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
 builder.Services.AddControllers()
     .AddApplicationPart(typeof(EventLand.Modules.PayPro.Webhooks.PayProCallbackController).Assembly);
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSignalR();
+var signalRBuilder = builder.Services.AddSignalR();
+var redisConn = builder.Configuration.GetConnectionString("Redis");
+if (!string.IsNullOrWhiteSpace(redisConn))
+{
+    signalRBuilder.AddStackExchangeRedis(redisConn, options =>
+    {
+        options.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("EventLand_SignalR");
+    });
+}
 
 // Health checks: database connectivity and Redis/distributed cache reachability
 builder.Services.AddHealthChecks()
@@ -344,6 +352,7 @@ app.UseAuthorization();
 
 app.MapControllers().RequireCors("AllowFrontend");
 app.MapHub<SeatingHub>("/hubs/seating").RequireCors("AllowFrontend");
+app.MapHub<SeatingHub>("/hubs/seatstate").RequireCors("AllowFrontend");
 
 // Single-Domain SPA Fallback: Any non-API route returns index.html for client-side routing
 app.MapFallbackToFile("index.html");

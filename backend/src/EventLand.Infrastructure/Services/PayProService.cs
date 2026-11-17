@@ -418,9 +418,7 @@ public class PayProService : IPayProService
             return;
         }
 
-        booking.PaymentStatus = PaymentStatus.Paid;
-        booking.Status = BookingStatus.Confirmed;
-        booking.PaidAt = paidAt;
+        booking.PayProSuccess(paidAt, "PayProService");
 
         // Permanently lock seats to Booked
         foreach (var bs in booking.BookingSeats)

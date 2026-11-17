@@ -6,6 +6,7 @@ using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using EventLand.Domain.Entities;
 using EventLand.Domain.Enums;
+using EventLand.Domain.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -16,19 +17,22 @@ public class BookingService : IBookingService
     private readonly INotificationService _notificationService;
     private readonly IPaymentFeeService _paymentFeeService;
     private readonly ILogger<BookingService> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public BookingService(
         IApplicationDbContext context, 
         ICacheService cacheService,
         INotificationService notificationService,
         IPaymentFeeService paymentFeeService,
-        ILogger<BookingService> logger)
+        ILogger<BookingService> logger,
+        TimeProvider? timeProvider = null)
     {
         _context = context;
         _cacheService = cacheService;
         _notificationService = notificationService;
         _paymentFeeService = paymentFeeService;
         _logger = logger;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public async Task<BookingDto> CreateBookingAsync(CreateBookingDto dto, int? userId = null, string? userEmail = null)
@@ -186,6 +190,7 @@ public class BookingService : IBookingService
             .ToList();
 
         // ── Atomic reservation ───────────────────────────────────────────────
+        var now = _timeProvider.GetUtcNow();
         var strategy = _context.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
         {
@@ -204,10 +209,13 @@ public class BookingService : IBookingService
                              && s.Status == SeatStatus.Available
                              && !s.IsDeleted
                              && _context.SeatingZones.Any(z => z.Id == s.ZoneId && z.EventId == dto.EventId && !z.IsDeleted))
-                    .ExecuteUpdateAsync(s => s.SetProperty(seat => seat.Status, SeatStatus.Reserved));
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(seat => seat.Status, SeatStatus.Reserved)
+                        .SetProperty(seat => seat.State, SeatState.TemporarilyHeld)
+                        .SetProperty(seat => seat.UpdatedAt, now));
 
                 if (flipped != seatIds.Count)
-                    throw new InvalidOperationException("One or more selected seats are no longer available. Please choose different seats.");
+                    throw new SeatAlreadyBookedException(dto.EventId, seatIds, "One or more selected seats are no longer available. Please choose different seats.");
             }
 
             _context.Bookings.Add(booking);
@@ -240,12 +248,15 @@ public class BookingService : IBookingService
             throw new InvalidOperationException("The 30-minute payment hold window for this booking has expired. Please place a new booking.");
         }
 
-        booking.BankTransactionRef = dto.BankTransactionRef?.Trim();
-        booking.PaymentProofUrl = dto.PaymentProofUrl?.Trim();
-        booking.SenderAccountTitle = dto.SenderAccountTitle?.Trim();
-        booking.SenderBankName = dto.SenderBankName?.Trim();
-        booking.SenderAccountLast4 = dto.SenderAccountLast4?.Trim();
-        booking.PaymentStatus = PaymentStatus.PendingVerification;
+        var now = _timeProvider.GetUtcNow();
+        booking.SubmitBankProof(
+            dto.BankTransactionRef?.Trim() ?? string.Empty,
+            dto.PaymentProofUrl?.Trim() ?? string.Empty,
+            dto.SenderAccountTitle?.Trim(),
+            dto.SenderBankName?.Trim(),
+            dto.SenderAccountLast4?.Trim(),
+            now,
+            booking.CustomerEmail);
 
         await _context.SaveChangesAsync();
 
@@ -262,26 +273,34 @@ public class BookingService : IBookingService
         if (booking.PaymentStatus == PaymentStatus.Paid)
             return MapToDto(booking);
 
-        var now = DateTimeOffset.UtcNow;
-        booking.PaymentStatus = PaymentStatus.Paid;
-        booking.Status = BookingStatus.Confirmed;
-        booking.PaidAt = now;
-        booking.VerifiedByAdminId = adminId;
-        booking.VerifiedByAdminEmail = adminEmail ?? "admin@eventland.pk";
-        booking.VerifiedAt = now;
+        var now = _timeProvider.GetUtcNow();
+        booking.ConfirmPayment(adminId, adminEmail, now, adminEmail ?? "admin@eventland.pk");
 
-        // Permanently book reserved seats
-        foreach (var bs in booking.BookingSeats)
-        {
-            if (bs.Seat != null)
-            {
-                bs.Seat.Status = SeatStatus.Booked;
-            }
-        }
-
+        // Permanently book reserved seats with authoritative concurrency verification
         var seatIds = booking.BookingSeats.Select(bs => bs.SeatId).ToList();
-        if (seatIds.Any())
+        if (seatIds.Count > 0)
         {
+            var bookedRows = await _context.Seats
+                .Where(s => seatIds.Contains(s.Id) && (s.Status == SeatStatus.Available || s.Status == SeatStatus.Reserved) && !s.IsDeleted)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(seat => seat.Status, SeatStatus.Booked)
+                    .SetProperty(seat => seat.State, SeatState.Booked)
+                    .SetProperty(seat => seat.UpdatedAt, now));
+
+            if (bookedRows != seatIds.Count)
+            {
+                throw new SeatAlreadyBookedException(booking.EventId, seatIds, $"One or more seats for booking '{booking.BookingRef}' were already booked by another transaction.");
+            }
+
+            foreach (var bs in booking.BookingSeats)
+            {
+                if (bs.Seat != null)
+                {
+                    bs.Seat.Status = SeatStatus.Booked;
+                    bs.Seat.State = SeatState.Booked;
+                }
+            }
+
             await _cacheService.ReleaseSeatsAsync(booking.EventId, seatIds, null);
         }
 
@@ -313,12 +332,9 @@ public class BookingService : IBookingService
     {
         var booking = await GetBookingForMutationAsync(id);
 
-        booking.PaymentStatus = PaymentStatus.Failed;
-        booking.Status = BookingStatus.Cancelled;
+        var now = _timeProvider.GetUtcNow();
+        booking.RejectPayment(adminId, adminEmail, dto.Reason ?? "Payment transfer could not be verified by Admin.", now, adminEmail ?? "admin@eventland.pk");
         booking.RefundReason = dto.Reason ?? "Payment transfer could not be verified by Admin.";
-        booking.VerifiedByAdminId = adminId;
-        booking.VerifiedByAdminEmail = adminEmail ?? "admin@eventland.pk";
-        booking.VerifiedAt = DateTimeOffset.UtcNow;
 
         if (booking.TicketTier != null)
         {

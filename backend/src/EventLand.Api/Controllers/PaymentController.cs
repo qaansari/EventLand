@@ -239,10 +239,7 @@ public class PaymentController : ControllerBase
         if (booking.PaymentStatus == PaymentStatus.Refunded)
             return BadRequest(new { message = $"Booking '{booking.BookingRef}' is already refunded." });
 
-        booking.PaymentStatus = PaymentStatus.Refunded;
-        booking.Status = BookingStatus.Cancelled;
-        booking.RefundedAt = DateTimeOffset.UtcNow;
-        booking.RefundReason = dto.Reason;
+        booking.ProcessRefund(DateTimeOffset.UtcNow, dto.Reason ?? "Direct Bank Transfer Refund", "Admin");
 
         if (booking.TicketTier != null)
         {

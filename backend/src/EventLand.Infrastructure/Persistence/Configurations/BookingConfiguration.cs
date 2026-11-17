@@ -73,6 +73,12 @@ public sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(b => b.PaymentStatus)
                .HasConversion<int>();
 
+        builder.Property(b => b.State)
+               .HasDefaultValue(EventLand.Domain.Enums.BookingState.PendingHold);
+
+        builder.Property(b => b.RowVersion)
+               .IsRowVersion();
+
         builder.Property(b => b.PaymentMethod)
                .HasConversion<int>();
 
@@ -100,15 +106,26 @@ public sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
                .HasForeignKey(bs => bs.BookingId)
                .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasMany(b => b.StateHistories)
+               .WithOne(h => h.Booking)
+               .HasForeignKey(h => h.BookingId)
+               .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasIndex(b => b.EventId)
                .HasDatabaseName("IX_Bookings_EventId");
 
         builder.HasIndex(b => new { b.EventId, b.Status })
                .HasDatabaseName("IX_Bookings_EventId_Status");
 
+        builder.HasIndex(b => new { b.EventId, b.State })
+               .HasDatabaseName("IX_Bookings_EventId_State");
+
         // Composite index for PendingBookingExpiryService — queried every 60 seconds
         builder.HasIndex(b => new { b.PaymentStatus, b.PaymentExpiresAt })
                .HasDatabaseName("IX_Bookings_PaymentStatus_PaymentExpiresAt");
+
+        builder.HasIndex(b => new { b.State, b.PaymentExpiresAt })
+               .HasDatabaseName("IX_Bookings_State_PaymentExpiresAt");
 
         // Index for admin booking queries sorted by CreatedAt
         builder.HasIndex(b => b.CreatedAt)

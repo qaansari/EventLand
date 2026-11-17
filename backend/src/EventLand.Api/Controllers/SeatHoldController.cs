@@ -1,12 +1,14 @@
 namespace EventLand.Api.Controllers;
 
 using EventLand.Api.Extensions;
+using EventLand.Application.Common.Interfaces;
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 [ApiController]
 [Route("api/seatHold")]
@@ -15,13 +17,16 @@ public class SeatHoldController : ControllerBase
 {
     private readonly ICacheService _cacheService;
     private readonly IHubContext<Hubs.SeatingHub, ISeatingHubClient> _hubContext;
+    private readonly IApplicationDbContext _context;
 
     public SeatHoldController(
         ICacheService cacheService,
-        IHubContext<Hubs.SeatingHub, ISeatingHubClient> hubContext)
+        IHubContext<Hubs.SeatingHub, ISeatingHubClient> hubContext,
+        IApplicationDbContext context)
     {
         _cacheService = cacheService;
         _hubContext = hubContext;
+        _context = context;
     }
 
     /// <summary>Hold seats for 10 minutes in Redis for checkout. Requires authentication.</summary>
@@ -39,14 +44,16 @@ public class SeatHoldController : ControllerBase
             return Unauthorized();
 
         var holdDuration = TimeSpan.FromMinutes(10);
-        var success = await _cacheService.HoldSeatsAsync(dto.EventId, dto.SeatIds, authenticatedEmail, holdDuration, dto.EventShowId);
+        var holdResult = await _cacheService.TryHoldSeatsGranularAsync(dto.EventId, dto.SeatIds, authenticatedEmail, holdDuration, dto.EventShowId);
 
-        if (!success)
+        if (!holdResult.Success)
         {
             return Conflict(new HoldSeatsResponseDto(
                 false,
-                "One or more selected seats are currently locked by another customer.",
-                new List<int>(),
+                holdResult.ConflictingSeatIds.Count > 0 
+                    ? $"The following seat(s) are currently locked by another customer: {string.Join(", ", holdResult.ConflictingSeatIds)}"
+                    : "One or more selected seats are currently locked by another customer.",
+                holdResult.ConflictingSeatIds,
                 null
             ));
         }
@@ -59,7 +66,7 @@ public class SeatHoldController : ControllerBase
             true,
             "Seats held successfully for 10 minutes.",
             dto.SeatIds,
-            DateTimeOffset.UtcNow.Add(holdDuration)
+            holdResult.ExpiresAt ?? DateTimeOffset.UtcNow.Add(holdDuration)
         ));
     }
 
@@ -87,5 +94,53 @@ public class SeatHoldController : ControllerBase
     {
         var heldSeats = await _cacheService.GetHeldSeatIdsAsync(eventId, showId);
         return Ok(heldSeats);
+    }
+
+    /// <summary>Reconcile seat status snapshot with ETag / If-None-Match support (Audit #2).</summary>
+    [HttpGet("/api/events/{id:int}/shows/{showId:int}/seats")]
+    [ResponseCache(NoStore = true)]
+    public async Task<IActionResult> GetSeatSnapshot(int id, int showId)
+    {
+        var seats = await _context.Seats
+            .AsNoTracking()
+            .Where(s => s.Zone.EventId == id && !s.IsDeleted)
+            .Select(s => new
+            {
+                s.Id,
+                s.ZoneId,
+                s.Row,
+                s.Col,
+                s.Label,
+                s.Price,
+                Status = s.Status.ToString(),
+                State = s.State.ToString(),
+                s.UpdatedAt
+            })
+            .ToListAsync();
+
+        var heldSeatIds = (await _cacheService.GetHeldSeatIdsAsync(id, showId)).ToHashSet();
+
+        var snapshot = seats.Select(s => new
+        {
+            s.Id,
+            s.ZoneId,
+            s.Row,
+            s.Col,
+            s.Label,
+            s.Price,
+            Status = heldSeatIds.Contains(s.Id) ? "Reserved" : s.Status,
+            State = heldSeatIds.Contains(s.Id) ? "TemporarilyHeld" : s.State,
+            IsHeld = heldSeatIds.Contains(s.Id)
+        }).ToList();
+
+        var versionTag = $"W/\"ver-{id}-{showId}-{seats.Count}-{heldSeatIds.Count}-{seats.Max(s => (DateTimeOffset?)s.UpdatedAt)?.ToUnixTimeSeconds() ?? 0}\"";
+
+        if (Request.Headers.TryGetValue("If-None-Match", out var ifNoneMatch) && ifNoneMatch == versionTag)
+        {
+            return StatusCode(StatusCodes.Status304NotModified);
+        }
+
+        Response.Headers.ETag = versionTag;
+        return Ok(snapshot);
     }
 }

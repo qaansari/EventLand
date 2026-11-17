@@ -39,6 +39,8 @@ public class TestDbContext : DbContext, IApplicationDbContext, IPayProDbContext
     public DbSet<PaymentConfig> PaymentConfigs => Set<PaymentConfig>();
     public DbSet<PlatformFeeConfig> PlatformFeeConfigs => Set<PlatformFeeConfig>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
+    public DbSet<BookingStateHistory> BookingStateHistories => Set<BookingStateHistory>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     // IPayProDbContext implementation
     public DbSet<Order> Orders => Set<Order>();
