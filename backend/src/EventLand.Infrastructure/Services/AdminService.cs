@@ -311,11 +311,11 @@ public class AdminService : IAdminService
         try
         {
             var nameClean = dto.Name.Trim();
-            var layoutCodeClean = string.IsNullOrWhiteSpace(dto.LayoutCode) 
-                ? $"AUD_{Guid.NewGuid().ToString("N")[..6].ToUpper()}" 
+            var layoutCodeClean = string.IsNullOrWhiteSpace(dto.LayoutCode)
+                ? $"AUD_{Guid.NewGuid().ToString("N")[..6].ToUpper()}"
                 : dto.LayoutCode.Trim();
 
-            var exists = await _context.Auditoriums.AnyAsync(a => !a.IsDeleted && a.VenueId == dto.VenueId && 
+            var exists = await _context.Auditoriums.AnyAsync(a => !a.IsDeleted && a.VenueId == dto.VenueId &&
                 (a.Name.ToLower() == nameClean.ToLower() || a.LayoutCode.ToLower() == layoutCodeClean.ToLower()));
             if (exists)
                 throw new InvalidOperationException($"Auditorium '{nameClean}' or LayoutCode '{layoutCodeClean}' already exists for this venue.");
@@ -666,24 +666,24 @@ public class AdminService : IAdminService
 
     public async Task<EventDetailDto> CreateEventAsync(CreateAdminEventDto dto)
     {
-            var titleClean = dto.Title.Trim();
-            var exists = await _context.Events.AnyAsync(e => !e.IsDeleted && 
-                e.Title.ToLower() == titleClean.ToLower() && 
-                e.StartDateUtc == dto.StartDateUtc);
-            if (exists)
-                throw new InvalidOperationException($"An event titled '{titleClean}' starting at the same time already exists.");
+        var titleClean = dto.Title.Trim();
+        var exists = await _context.Events.AnyAsync(e => !e.IsDeleted &&
+            e.Title.ToLower() == titleClean.ToLower() &&
+            e.StartDateUtc == dto.StartDateUtc);
+        if (exists)
+            throw new InvalidOperationException($"An event titled '{titleClean}' starting at the same time already exists.");
 
-            Enum.TryParse<TicketingType>(dto.TicketingType, true, out var ticketingType);
-            var statusStr = string.IsNullOrWhiteSpace(dto.Status) ? "Live" : dto.Status;
-            Enum.TryParse<EventStatus>(statusStr, true, out var status);
+        Enum.TryParse<TicketingType>(dto.TicketingType, true, out var ticketingType);
+        var statusStr = string.IsNullOrWhiteSpace(dto.Status) ? "Live" : dto.Status;
+        Enum.TryParse<EventStatus>(statusStr, true, out var status);
 
-            var organizerId = dto.OrganizerId;
-            if (organizerId <= 0)
-            {
-                var defaultOrg = await _context.Organizers.FirstOrDefaultAsync(o => o.Name == "Event Land" && !o.IsDeleted)
-                    ?? await _context.Organizers.FirstOrDefaultAsync(o => !o.IsDeleted);
-                organizerId = defaultOrg?.Id ?? 1000;
-            }
+        var organizerId = dto.OrganizerId;
+        if (organizerId <= 0)
+        {
+            var defaultOrg = await _context.Organizers.FirstOrDefaultAsync(o => o.Name == "Event Land" && !o.IsDeleted)
+                ?? await _context.Organizers.FirstOrDefaultAsync(o => !o.IsDeleted);
+            organizerId = defaultOrg?.Id ?? 1000;
+        }
 
         // Country selection (Default: Pakistan)
         var countryId = dto.CountryId ?? (await _context.Countries.FirstOrDefaultAsync(c => c.Name == "Pakistan"))?.Id ?? 1000;
@@ -1099,7 +1099,7 @@ public class AdminService : IAdminService
                         }
                     }
                 }
-                
+
             }
         }
 

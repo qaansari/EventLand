@@ -8,19 +8,19 @@ using EventLand.Domain.Common;
 /// </summary>
 public class Organizer : BaseEntity
 {
-    public string  Name        { get; set; } = string.Empty;
-    public string  BrandName   { get; set; } = string.Empty;
-    public string  CompanyType { get; set; } = "Individual"; // Individual, Pvt. Ltd, Sole Proprietor
-    public string  RegisteredAddress { get; set; } = string.Empty;
-    public string? CompanyNtn  { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string BrandName { get; set; } = string.Empty;
+    public string CompanyType { get; set; } = "Individual"; // Individual, Pvt. Ltd, Sole Proprietor
+    public string RegisteredAddress { get; set; } = string.Empty;
+    public string? CompanyNtn { get; set; }
     public string? Description { get; set; }
-    public string  InstagramUrl { get; set; } = string.Empty;
-    public string? FacebookUrl  { get; set; }
-    public string  Email       { get; set; } = string.Empty;
-    public string  Phone       { get; set; } = string.Empty;
-    public string? LogoUrl     { get; set; }
-    public string? WebsiteUrl  { get; set; }
-    public bool    IsVerified  { get; set; } = false;
+    public string InstagramUrl { get; set; } = string.Empty;
+    public string? FacebookUrl { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public string Phone { get; set; } = string.Empty;
+    public string? LogoUrl { get; set; }
+    public string? WebsiteUrl { get; set; }
+    public bool IsVerified { get; set; } = false;
 
     // Navigation — Events organized by this company
     public ICollection<Event> Events { get; set; } = new List<Event>();

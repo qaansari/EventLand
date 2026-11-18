@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/admin/ticket-tiers")]
-[Authorize(Roles = AppRoles.OrganizerOrAdmin)]
+[Authorize(Policy = AppPolicies.RequireOrganizerOrAdmin)]
 [Produces("application/json")]
 public class AdminTicketTiersController : ControllerBase
 {

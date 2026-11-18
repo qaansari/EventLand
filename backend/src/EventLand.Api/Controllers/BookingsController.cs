@@ -15,10 +15,12 @@ using Microsoft.AspNetCore.RateLimiting;
 public class BookingsController : ControllerBase
 {
     private readonly IBookingService _bookingService;
+    private readonly ICaptchaService _captchaService;
 
-    public BookingsController(IBookingService bookingService)
+    public BookingsController(IBookingService bookingService, ICaptchaService captchaService)
     {
         _bookingService = bookingService;
+        _captchaService = captchaService;
     }
 
     /// <summary>Create a booking (supports both categorized and mapped-seat events). Requires authentication.</summary>
@@ -26,6 +28,10 @@ public class BookingsController : ControllerBase
     [Authorize]
     public async Task<ActionResult<BookingDto>> CreateBooking([FromBody] CreateBookingDto dto)
     {
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var captchaToken = dto.CaptchaToken ?? Request.Headers["X-Captcha-Token"].FirstOrDefault();
+        await _captchaService.ValidateActionTokenAsync(captchaToken, "booking_create", clientIp);
+
         var email = User.GetEmail();
         if (string.IsNullOrWhiteSpace(email))
             return Unauthorized();

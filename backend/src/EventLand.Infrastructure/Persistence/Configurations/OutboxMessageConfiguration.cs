@@ -15,8 +15,7 @@ public sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outbox
                .HasMaxLength(150);
 
         builder.Property(m => m.PayloadJson)
-               .IsRequired()
-               .HasColumnType("nvarchar(max)");
+               .IsRequired();
 
         builder.Property(m => m.Error)
                .HasMaxLength(2000);

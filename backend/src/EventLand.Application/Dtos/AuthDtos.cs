@@ -1,13 +1,14 @@
 namespace EventLand.Application.Dtos;
 
-public record LoginRequestDto(string Email, string Password);
+public record LoginRequestDto(string Email, string Password, string? CaptchaToken = null);
 
 public record RegisterRequestDto(
     string FullName,
     string Email,
     string Password,
     string? PhoneNumber = null,
-    int? CountryId = null
+    int? CountryId = null,
+    string? CaptchaToken = null
 );
 
 public record LoginResponseDto(
@@ -36,7 +37,7 @@ public record ChangePasswordDto(
     string NewPassword
 );
 
-public record ForgotPasswordRequestDto(string Email);
+public record ForgotPasswordRequestDto(string Email, string? CaptchaToken = null);
 
 public record ResetPasswordRequestDto(
     string Email,

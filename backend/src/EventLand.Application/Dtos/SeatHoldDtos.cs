@@ -4,7 +4,8 @@ public record HoldSeatsRequestDto(
     int EventId,
     List<int> SeatIds,
     string CustomerEmail,
-    int? EventShowId = null
+    int? EventShowId = null,
+    string? PaymentMethod = null
 );
 
 public record HoldSeatsResponseDto(

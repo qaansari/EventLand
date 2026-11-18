@@ -1,6 +1,7 @@
 namespace EventLand.Infrastructure.Persistence.Configurations;
 
 using EventLand.Domain.Entities;
+using EventLand.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -18,7 +19,12 @@ public sealed class RefundRecordConfiguration : IEntityTypeConfiguration<RefundR
                .HasMaxLength(500);
 
         builder.Property(r => r.Status)
-               .HasMaxLength(50);
+               .HasConversion<string>()
+               .HasMaxLength(50)
+               .IsRequired();
+
+        builder.Property(r => r.ProviderRefundRef)
+               .HasMaxLength(100);
 
         builder.Property(r => r.ProcessedByEmail)
                .HasMaxLength(320);
@@ -28,7 +34,14 @@ public sealed class RefundRecordConfiguration : IEntityTypeConfiguration<RefundR
                .HasForeignKey(r => r.BookingId)
                .OnDelete(DeleteBehavior.Cascade);
 
+        // Filtered unique index: at most one active refund (Requested, Approved, Processed) per booking
         builder.HasIndex(r => r.BookingId)
-               .HasDatabaseName("IX_RefundRecords_BookingId");
+               .IsUnique()
+               .HasFilter("Status IN ('Requested', 'Approved', 'Processed')")
+               .HasDatabaseName("IX_RefundRecords_BookingId_Active");
+
+        builder.ToTable(t => t.HasCheckConstraint(
+            "CK_RefundRecords_Status",
+            "Status IN ('Requested', 'Approved', 'Processed', 'Rejected', 'Failed')"));
     }
 }

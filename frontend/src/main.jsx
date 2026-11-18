@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { ToastProvider } from './context/ToastContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ConfirmProvider } from './context/ConfirmContext'
+import { CaptchaProvider } from './context/CaptchaContext'
 import ToastContainer from './components/ToastContainer'
 
 createRoot(document.getElementById('root')).render(
@@ -14,8 +15,10 @@ createRoot(document.getElementById('root')).render(
       <ThemeProvider>
         <ToastProvider>
           <ConfirmProvider>
-            <App />
-            <ToastContainer />
+            <CaptchaProvider>
+              <App />
+              <ToastContainer />
+            </CaptchaProvider>
           </ConfirmProvider>
         </ToastProvider>
       </ThemeProvider>

@@ -278,11 +278,11 @@ public class EventService : IEventService
 
     private static string StatusLabel(EventStatus s) => s switch
     {
-        EventStatus.Live        => "LIVE",
+        EventStatus.Live => "LIVE",
         EventStatus.SellingFast => "SELLING FAST",
-        EventStatus.SoldOut     => "SOLD OUT",
-        EventStatus.Upcoming    => "UPCOMING",
-        EventStatus.Closed      => "CLOSED",
-        _                       => s.ToString().ToUpper()
+        EventStatus.SoldOut => "SOLD OUT",
+        EventStatus.Upcoming => "UPCOMING",
+        EventStatus.Closed => "CLOSED",
+        _ => s.ToString().ToUpper()
     };
 }

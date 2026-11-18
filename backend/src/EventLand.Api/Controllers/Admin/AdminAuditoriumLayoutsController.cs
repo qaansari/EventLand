@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/admin/auditorium-layouts")]
-[Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
+[Authorize(Policy = AppPolicies.RequireAdmin)]
 [Produces("application/json")]
 public class AdminAuditoriumLayoutsController : ControllerBase
 {

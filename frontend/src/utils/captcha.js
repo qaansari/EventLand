@@ -1,28 +1,19 @@
-// Reusable captcha verification state management across EventLand
-const STORAGE_KEY_VERIFIED = 'eventland_captcha_verified';
-const STORAGE_KEY_TOKEN = 'eventland_captcha_token';
+// Safe helper utilities for Cloudflare Turnstile bot verification
+// Note: Client-side sessionStorage persistence was removed in Phase 4 (Audit #12)
+// to prevent trivial spoofing. Captcha tokens are now single-use and authoritative on the server.
 
 export const isCaptchaVerified = () => {
-  if (typeof window === 'undefined') return false;
-  return sessionStorage.getItem(STORAGE_KEY_VERIFIED) === 'true';
+  return false;
 };
 
 export const getStoredCaptchaToken = () => {
-  if (typeof window === 'undefined') return '';
-  return sessionStorage.getItem(STORAGE_KEY_TOKEN) || '';
+  return '';
 };
 
-export const setCaptchaVerified = (token) => {
-  if (typeof window === 'undefined') return;
-  const validToken = token || `verified-${Date.now()}`;
-  sessionStorage.setItem(STORAGE_KEY_VERIFIED, 'true');
-  sessionStorage.setItem(STORAGE_KEY_TOKEN, validToken);
-  window.dispatchEvent(new CustomEvent('eventland:captcha-verified', { detail: { token: validToken } }));
+export const setCaptchaVerified = () => {
+  // Deprecated in Phase 4 - handled through CaptchaContext
 };
 
 export const clearCaptchaVerified = () => {
-  if (typeof window === 'undefined') return;
-  sessionStorage.removeItem(STORAGE_KEY_VERIFIED);
-  sessionStorage.removeItem(STORAGE_KEY_TOKEN);
-  window.dispatchEvent(new CustomEvent('eventland:captcha-reset'));
+  // Deprecated in Phase 4 - handled through CaptchaContext
 };

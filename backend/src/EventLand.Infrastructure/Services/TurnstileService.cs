@@ -1,9 +1,12 @@
 namespace EventLand.Infrastructure.Services;
 
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Serialization;
 using EventLand.Application.Common.Models;
 using EventLand.Application.Interfaces;
+using EventLand.Domain.Exceptions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -11,16 +14,19 @@ public class TurnstileService : ICaptchaService
 {
     private readonly HttpClient _httpClient;
     private readonly CaptchaOptions _options;
+    private readonly ICacheService? _cacheService;
     private readonly ILogger<TurnstileService> _logger;
 
     public TurnstileService(
         HttpClient httpClient,
         IOptions<CaptchaOptions> options,
-        ILogger<TurnstileService> logger)
+        ILogger<TurnstileService> logger,
+        ICacheService? cacheService = null)
     {
         _httpClient = httpClient;
         _options = options.Value;
         _logger = logger;
+        _cacheService = cacheService;
     }
 
     public CaptchaConfigDto GetConfig()
@@ -33,7 +39,12 @@ public class TurnstileService : ICaptchaService
         };
     }
 
-    public async Task<bool> VerifyTokenAsync(string token, string? remoteIp = null)
+    public Task<bool> VerifyTokenAsync(string token, string? remoteIp = null)
+    {
+        return VerifyActionTokenAsync(token, expectedAction: null, remoteIp: remoteIp);
+    }
+
+    public async Task<bool> VerifyActionTokenAsync(string token, string? expectedAction = null, string? remoteIp = null)
     {
         if (!_options.Enabled)
         {
@@ -47,10 +58,29 @@ public class TurnstileService : ICaptchaService
             return false;
         }
 
-        // Pass-through for official test token
-        if (token == "XXXX.DUMMY.TOKEN.XXXX" || token.StartsWith("test-pass-"))
+        var trimmedToken = token.Trim();
+        var tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(trimmedToken))).ToLowerInvariant();
+        var cacheKey = $"captcha:consumed:{tokenHash}";
+
+        // Replay Protection: ensure token has not already been consumed
+        if (_cacheService != null)
+        {
+            var isConsumed = await _cacheService.GetAsync<bool>(cacheKey);
+            if (isConsumed)
+            {
+                _logger.LogWarning("Turnstile token replay attempt blocked for token hash {Hash}.", tokenHash);
+                return false;
+            }
+        }
+
+        // Pass-through for official Cloudflare test token and testing suite prefixes
+        if (trimmedToken == "XXXX.DUMMY.TOKEN.XXXX" || trimmedToken.StartsWith("test-pass-", StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogInformation("Test captcha token accepted.");
+            if (_cacheService != null)
+            {
+                await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromMinutes(5));
+            }
             return true;
         }
 
@@ -59,7 +89,7 @@ public class TurnstileService : ICaptchaService
             var content = new FormUrlEncodedContent(new[]
             {
                 new KeyValuePair<string, string>("secret", _options.SecretKey),
-                new KeyValuePair<string, string>("response", token),
+                new KeyValuePair<string, string>("response", trimmedToken),
                 new KeyValuePair<string, string>("remoteip", remoteIp ?? string.Empty)
             });
 
@@ -69,7 +99,25 @@ public class TurnstileService : ICaptchaService
             var result = await response.Content.ReadFromJsonAsync<TurnstileVerifyResponse>();
             if (result != null && result.Success)
             {
+                // Action verification if specified
+                if (!string.IsNullOrWhiteSpace(expectedAction) && !string.IsNullOrWhiteSpace(result.Action))
+                {
+                    if (!string.Equals(result.Action, expectedAction, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _logger.LogWarning("Turnstile action mismatch: expected '{Expected}', received '{Actual}'.",
+                            expectedAction, result.Action);
+                        return false;
+                    }
+                }
+
                 _logger.LogInformation("Cloudflare Turnstile token successfully verified for hostname {Hostname}.", result.Hostname);
+
+                // Consume token into single-use cache for 5 minutes
+                if (_cacheService != null)
+                {
+                    await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromMinutes(5));
+                }
+
                 return true;
             }
 
@@ -81,6 +129,23 @@ public class TurnstileService : ICaptchaService
         {
             _logger.LogError(ex, "Exception encountered while verifying Cloudflare Turnstile token.");
             return false;
+        }
+    }
+
+    public async Task ValidateActionTokenAsync(string? token, string? expectedAction = null, string? remoteIp = null)
+    {
+        if (!_options.Enabled)
+            return;
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            throw new CaptchaVerificationException("Security verification failed: Captcha challenge token is required.");
+        }
+
+        var isValid = await VerifyActionTokenAsync(token, expectedAction, remoteIp);
+        if (!isValid)
+        {
+            throw new CaptchaVerificationException("Security verification failed: Invalid, expired, or replayed captcha token.");
         }
     }
 
@@ -97,5 +162,11 @@ public class TurnstileService : ICaptchaService
 
         [JsonPropertyName("hostname")]
         public string? Hostname { get; set; }
+
+        [JsonPropertyName("action")]
+        public string? Action { get; set; }
+
+        [JsonPropertyName("cdata")]
+        public string? CData { get; set; }
     }
 }

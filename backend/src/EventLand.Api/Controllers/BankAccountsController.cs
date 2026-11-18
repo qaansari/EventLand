@@ -55,4 +55,17 @@ public class BankAccountsController : ControllerBase
             account.CreatedAt
         });
     }
+
+    /// <summary>
+    /// Lightweight cached operational status endpoint for UI maintenance banners and checkout guards.
+    /// Short TTL cache avoids heavy database hits on high-traffic pages.
+    /// </summary>
+    [HttpGet("status")]
+    [HttpGet("/api/banks/status")]
+    [AllowAnonymous]
+    public async Task<ActionResult<BankStatusDto>> GetBankStatus()
+    {
+        var status = await _bankAccountService.GetCachedBankStatusAsync();
+        return Ok(status);
+    }
 }

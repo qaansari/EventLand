@@ -15,7 +15,7 @@ public record UpdateFaqDto(string Question, string Answer, int DisplayOrder = 0,
 
 [ApiController]
 [Route("api/admin/faqs")]
-[Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
+[Authorize(Policy = AppPolicies.RequireAdmin)]
 public class AdminFaqsController : ControllerBase
 {
     private readonly IApplicationDbContext _context;

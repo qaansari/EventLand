@@ -38,6 +38,6 @@ public class PayProApiException : Exception
         "01" => "Invalid Data (e.g. empty or invalid username/password/fields)",
         "02" => "Service Failed / Unauthorized",
         "03" => "No data available / Record not found",
-        _    => $"PayPro status code '{code}'"
+        _ => $"PayPro status code '{code}'"
     };
 }

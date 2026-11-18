@@ -7,6 +7,8 @@ using EventLand.Application.Interfaces;
 using EventLand.Domain.Entities;
 using EventLand.Domain.Enums;
 using EventLand.Domain.Exceptions;
+using EventLand.Domain.Services;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -17,22 +19,28 @@ public class BookingService : IBookingService
     private readonly INotificationService _notificationService;
     private readonly IPaymentFeeService _paymentFeeService;
     private readonly ILogger<BookingService> _logger;
+    private readonly IGateQrSignatureService? _gateQrSignatureService;
     private readonly TimeProvider _timeProvider;
+    private readonly EventLand.Application.Common.EventLandTelemetry? _telemetry;
 
     public BookingService(
-        IApplicationDbContext context, 
+        IApplicationDbContext context,
         ICacheService cacheService,
         INotificationService notificationService,
         IPaymentFeeService paymentFeeService,
         ILogger<BookingService> logger,
-        TimeProvider? timeProvider = null)
+        IGateQrSignatureService? gateQrSignatureService = null,
+        TimeProvider? timeProvider = null,
+        EventLand.Application.Common.EventLandTelemetry? telemetry = null)
     {
         _context = context;
         _cacheService = cacheService;
         _notificationService = notificationService;
         _paymentFeeService = paymentFeeService;
         _logger = logger;
+        _gateQrSignatureService = gateQrSignatureService;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _telemetry = telemetry;
     }
 
     public async Task<BookingDto> CreateBookingAsync(CreateBookingDto dto, int? userId = null, string? userEmail = null)
@@ -44,16 +52,12 @@ public class BookingService : IBookingService
         if (ev is null)
             throw new KeyNotFoundException($"Event with ID '{dto.EventId}' not found.");
 
-        if (ev.Status == EventStatus.Closed)
-            throw new InvalidOperationException($"Event '{ev.Title}' is closed and no longer accepting bookings.");
-
+        EventShow? show = null;
         if (dto.EventShowId.HasValue && dto.EventShowId.Value > 0)
         {
-            var show = await _context.EventShows
+            show = await _context.EventShows
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.Id == dto.EventShowId.Value && s.EventId == dto.EventId && !s.IsDeleted);
-            if (show != null && show.IsClosed)
-                throw new InvalidOperationException($"The show '{show.ShowTitle}' is closed.");
         }
 
         var tier = await _context.TicketTiers
@@ -64,14 +68,10 @@ public class BookingService : IBookingService
         if (tier is null)
             throw new KeyNotFoundException($"Ticket tier '{dto.TicketTierId}' not found for event '{dto.EventId}'.");
 
-        if (tier.EventShow != null && (tier.EventShow.IsClosed || tier.EventShow.IsDeleted))
-            throw new InvalidOperationException($"The show '{tier.EventShow.ShowTitle}' for this ticket tier is closed.");
-
-        if (tier.EffectiveStatus == TicketTierStatus.Closed)
-            throw new InvalidOperationException($"Ticket tier '{tier.Name}' is closed.");
-
-        if (tier.EffectiveStatus == TicketTierStatus.SoldOut)
-            throw new InvalidOperationException($"Ticket tier '{tier.Name}' is sold out.");
+        var now = _timeProvider.GetUtcNow();
+        var availability = AvailabilityPolicy.Evaluate(ev, show ?? tier.EventShow, tier, now);
+        if (!availability.IsBookable)
+            throw new InvalidOperationException(availability.Reason);
 
         // Deduplicate any repeated seat ids the client may have sent.
         var seatIds = dto.SelectedSeatIds?.Where(id => id > 0).Distinct().ToList() ?? new List<int>();
@@ -115,6 +115,26 @@ public class BookingService : IBookingService
         if (paymentMethod == PaymentMethod.None)
         {
             paymentMethod = PaymentMethod.BankTransfer;
+        }
+
+        // Server-side Bank Maintenance Check: Reject if direct bank transfer is selected during maintenance window
+        if (paymentMethod == PaymentMethod.BankTransfer)
+        {
+            var activeBank = await _context.BankAccounts
+                .AsNoTracking()
+                .Where(b => b.IsActive && b.IsEnabled && !b.IsDeleted)
+                .FirstOrDefaultAsync();
+
+            if (activeBank != null)
+            {
+                var opStatus = activeBank.GetOperationalStatus(now);
+                if (!opStatus.IsOperational && opStatus.State == BankOperationalState.UnderMaintenance)
+                {
+                    throw new BankMaintenanceException(
+                        opStatus.Reason ?? "Direct bank transfers are currently paused for maintenance.",
+                        opStatus.UntilUtc);
+                }
+            }
         }
 
         // Authoritative pricing breakdown via IPaymentFeeService
@@ -190,7 +210,7 @@ public class BookingService : IBookingService
             .ToList();
 
         // ── Atomic reservation ───────────────────────────────────────────────
-        var now = _timeProvider.GetUtcNow();
+        now = _timeProvider.GetUtcNow();
         var strategy = _context.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
         {
@@ -201,6 +221,13 @@ public class BookingService : IBookingService
 
             if (reserved == 0)
                 throw new InvalidOperationException($"Not enough tickets available in tier '{tier.Name}'.");
+
+            var trackedTier = _context.ChangeTracker.Entries<TicketTier>().FirstOrDefault(e => e.Entity.Id == tier.Id);
+            if (trackedTier != null)
+            {
+                trackedTier.Entity.SoldCount += effectiveQuantity;
+                trackedTier.Property(t => t.SoldCount).IsModified = false;
+            }
 
             if (seatIds.Count > 0)
             {
@@ -222,6 +249,18 @@ public class BookingService : IBookingService
             foreach (var bs in bookingSeats)
                 _context.BookingSeats.Add(bs);
 
+            // Dynamically recompute event status based on fresh tier inventory
+            var eventForStatus = await _context.Events
+                .FirstOrDefaultAsync(e => e.Id == dto.EventId);
+            if (eventForStatus != null)
+            {
+                var activeTiers = await _context.TicketTiers
+                    .AsNoTracking()
+                    .Where(t => t.EventId == dto.EventId && !t.IsDeleted)
+                    .ToListAsync();
+                eventForStatus.RecomputeDynamicStatus(activeTiers);
+            }
+
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
         });
@@ -234,6 +273,8 @@ public class BookingService : IBookingService
 
         _logger.LogInformation("Created Booking {BookingRef} for {CustomerEmail}. 30-min hold expires at {HoldExpiresAt:O}",
             booking.BookingRef, booking.CustomerEmail, holdExpiresAt);
+
+        _telemetry?.RecordBookingTransition("None", booking.State.ToString(), true);
 
         return await GetBookingByIdAsync(booking.Id)
             ?? throw new InvalidOperationException("Failed to load created booking.");
@@ -260,7 +301,7 @@ public class BookingService : IBookingService
 
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Customer submitted Bank Transfer Proof for Booking {BookingRef} (Ref: {BankTxRef})", 
+        _logger.LogInformation("Customer submitted Bank Transfer Proof for Booking {BookingRef} (Ref: {BankTxRef})",
             booking.BookingRef, booking.BankTransactionRef);
 
         return MapToDto(booking);
@@ -325,6 +366,8 @@ public class BookingService : IBookingService
         _logger.LogInformation("Admin {AdminEmail} verified & confirmed Bank Transfer for Booking {BookingRef}. E-Ticket generated!",
             adminEmail, booking.BookingRef);
 
+        _telemetry?.RecordBookingTransition("PendingHold", "Confirmed", true);
+
         return resultDto;
     }
 
@@ -336,9 +379,16 @@ public class BookingService : IBookingService
         booking.RejectPayment(adminId, adminEmail, dto.Reason ?? "Payment transfer could not be verified by Admin.", now, adminEmail ?? "admin@eventland.pk");
         booking.RefundReason = dto.Reason ?? "Payment transfer could not be verified by Admin.";
 
+        if (booking.TicketTierId > 0)
+        {
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE TicketTiers SET SoldCount = CASE WHEN SoldCount >= {booking.Quantity} THEN SoldCount - {booking.Quantity} ELSE 0 END WHERE Id = {booking.TicketTierId}");
+        }
+
         if (booking.TicketTier != null)
         {
             booking.TicketTier.SoldCount = Math.Max(0, booking.TicketTier.SoldCount - booking.Quantity);
+            _context.Entry(booking.TicketTier).Property(t => t.SoldCount).IsModified = false;
         }
 
         foreach (var bs in booking.BookingSeats)
@@ -355,13 +405,185 @@ public class BookingService : IBookingService
             await _cacheService.ReleaseSeatsAsync(booking.EventId, seatIds, null);
         }
 
+        var eventForStatus = await _context.Events
+            .FirstOrDefaultAsync(e => e.Id == booking.EventId);
+        if (eventForStatus != null)
+        {
+            var activeTiers = await _context.TicketTiers
+                .AsNoTracking()
+                .Where(t => t.EventId == booking.EventId && !t.IsDeleted)
+                .ToListAsync();
+            eventForStatus.RecomputeDynamicStatus(activeTiers);
+        }
+
         await _context.SaveChangesAsync();
         await _cacheService.ClearEventCacheAsync(booking.EventId);
 
         _logger.LogInformation("Admin {AdminEmail} rejected Bank Transfer for Booking {BookingRef}. Seats unlocked.",
             adminEmail, booking.BookingRef);
 
+        _telemetry?.RecordBookingTransition("PendingHold", "Cancelled", true);
+
         return MapToDto(booking);
+    }
+
+    public async Task<ProcessBankRefundResponseDto> ProcessBankRefundAsync(ProcessBankRefundRequestDto dto, int? adminId = null, string? adminEmail = null)
+    {
+        var now = _timeProvider.GetUtcNow();
+        var effectiveAdminEmail = adminEmail ?? "admin@eventland.pk";
+
+        var booking = await _context.Bookings
+            .Include(b => b.TicketTier)
+            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+            .FirstOrDefaultAsync(b => b.Id == dto.BookingId && !b.IsDeleted);
+
+        if (booking is null)
+            throw new KeyNotFoundException($"Booking ID '{dto.BookingId}' not found.");
+
+        // Idempotency: If already refunded, return existing active refund record
+        if (booking.State == BookingState.Refunded || booking.PaymentStatus == PaymentStatus.Refunded)
+        {
+            var existingRefund = await _context.RefundRecords
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.BookingId == booking.Id && r.Status == RefundStatus.Processed);
+
+            return new ProcessBankRefundResponseDto(
+                Success: true,
+                Message: $"Booking '{booking.BookingRef}' has already been refunded.",
+                RefundId: existingRefund?.Id,
+                Amount: existingRefund?.Amount ?? booking.TotalAmount,
+                Status: existingRefund?.Status.ToString() ?? RefundStatus.Processed.ToString()
+            );
+        }
+
+        // State validation: only confirmed bookings can be refunded
+        if (booking.State != BookingState.Confirmed)
+        {
+            throw new InvalidOperationException($"Cannot refund booking '{booking.BookingRef}' in state '{booking.State}'. Only confirmed bookings can be refunded.");
+        }
+
+        var refundAmount = dto.Amount > 0 ? dto.Amount : booking.TotalAmount;
+        if (refundAmount > booking.TotalAmount)
+        {
+            throw new InvalidOperationException($"Refund amount ({refundAmount:N2}) cannot exceed the booking total amount ({booking.TotalAmount:N2}).");
+        }
+
+        var reason = string.IsNullOrWhiteSpace(dto.Reason) ? "Direct Bank Transfer Refund" : dto.Reason.Trim();
+
+        RefundRecord refundRecord = null!;
+        var strategy = _context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            var existingInTx = await _context.RefundRecords
+                .FirstOrDefaultAsync(r => r.BookingId == booking.Id && (r.Status == RefundStatus.Requested || r.Status == RefundStatus.Approved || r.Status == RefundStatus.Processed));
+
+            if (existingInTx != null && existingInTx.Status == RefundStatus.Processed)
+            {
+                refundRecord = existingInTx;
+                return;
+            }
+
+            // Transition booking Confirmed -> Refunded
+            booking.ProcessRefund(now, reason, effectiveAdminEmail);
+
+            // Void tickets / gate pass so scanners reject them
+            booking.ScanState = TicketScanState.Revoked;
+
+            // Create or advance refund record
+            if (existingInTx != null)
+            {
+                existingInTx.Process(adminId, effectiveAdminEmail, now, dto.ProviderRefundRef);
+                refundRecord = existingInTx;
+            }
+            else
+            {
+                refundRecord = RefundRecord.CreateProcessed(
+                    booking.Id, refundAmount, reason, adminId, effectiveAdminEmail, now, dto.ProviderRefundRef);
+                _context.RefundRecords.Add(refundRecord);
+            }
+
+            // Restore tier inventory via bounded atomic SQL
+            if (booking.TicketTierId > 0)
+            {
+                await _context.Database.ExecuteSqlInterpolatedAsync(
+                    $"UPDATE TicketTiers SET SoldCount = CASE WHEN SoldCount >= {booking.Quantity} THEN SoldCount - {booking.Quantity} ELSE 0 END WHERE Id = {booking.TicketTierId}");
+            }
+
+            if (booking.TicketTier != null)
+            {
+                booking.TicketTier.SoldCount = Math.Max(0, booking.TicketTier.SoldCount - booking.Quantity);
+                _context.Entry(booking.TicketTier).Property(t => t.SoldCount).IsModified = false;
+            }
+
+            // Release seats in database
+            var seatIds = booking.BookingSeats.Select(bs => bs.SeatId).ToList();
+            if (seatIds.Count > 0)
+            {
+                await _context.Seats
+                    .Where(s => seatIds.Contains(s.Id))
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(seat => seat.Status, SeatStatus.Available)
+                        .SetProperty(seat => seat.State, SeatState.Available)
+                        .SetProperty(seat => seat.UpdatedAt, now));
+
+                foreach (var bs in booking.BookingSeats)
+                {
+                    if (bs.Seat != null)
+                    {
+                        bs.Seat.Status = SeatStatus.Available;
+                        bs.Seat.State = SeatState.Available;
+                    }
+                }
+            }
+
+            // Enqueue transactional outbox message for refund
+            var seatIdsJson = JsonSerializer.Serialize(seatIds);
+            _context.OutboxMessages.Add(new OutboxMessage
+            {
+                Id = Guid.NewGuid(),
+                EventType = "BookingRefundedEvent",
+                PayloadJson = $"{{\"BookingId\":{booking.Id},\"BookingRef\":\"{booking.BookingRef}\",\"EventId\":{booking.EventId},\"Amount\":{refundAmount},\"SeatIds\":{seatIdsJson}}}",
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+
+            // Recompute dynamic event status
+            var eventForStatus = await _context.Events.FirstOrDefaultAsync(e => e.Id == booking.EventId);
+            if (eventForStatus != null)
+            {
+                var activeTiers = await _context.TicketTiers
+                    .AsNoTracking()
+                    .Where(t => t.EventId == booking.EventId && !t.IsDeleted)
+                    .ToListAsync();
+                eventForStatus.RecomputeDynamicStatus(activeTiers);
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        });
+
+        var postSeatIds = booking.BookingSeats.Select(bs => bs.SeatId).ToList();
+        if (postSeatIds.Count > 0)
+        {
+            await _cacheService.ReleaseSeatsAsync(booking.EventId, postSeatIds, null);
+        }
+        await _cacheService.ClearEventCacheAsync(booking.EventId);
+
+        _logger.LogInformation("Admin {AdminEmail} processed Bank Refund for Booking {BookingRef} (Amount: PKR {Amount:N0}). Seats released and tickets revoked.",
+            effectiveAdminEmail, booking.BookingRef, refundAmount);
+
+        _telemetry?.RecordRefundTransition("Approved", "Processed", true);
+        _telemetry?.RecordBookingTransition("Confirmed", "Refunded", true);
+
+        return new ProcessBankRefundResponseDto(
+            Success: true,
+            Message: $"Direct bank refund of PKR {refundAmount:N0} recorded successfully. Booking cancelled and seats returned to available pool.",
+            RefundId: refundRecord?.Id,
+            Amount: refundRecord?.Amount ?? refundAmount,
+            Status: refundRecord?.Status.ToString() ?? RefundStatus.Processed.ToString()
+        );
     }
 
     private async Task<Booking> GetBookingForMutationAsync(int id)
@@ -472,28 +694,64 @@ public class BookingService : IBookingService
         );
     }
 
-    // ── Gate Check-In & Ticket Validation ────────────────────────────────────
+    // ── Gate Check-In & Ticket Validation (Audit #7) ────────────────────────
     public async Task<TicketValidationResultDto> ValidateGateTicketAsync(ValidateGateTicketRequestDto request, int? validatorUserId = null, string? validatorEmail = null)
     {
-        var validatedAt = DateTimeOffset.UtcNow;
+        var validatedAt = _timeProvider.GetUtcNow();
         if (string.IsNullOrWhiteSpace(request.TicketCode))
         {
             return new TicketValidationResultDto(
                 IsValid: false,
                 Status: "INVALID",
                 Message: "Ticket code or QR payload cannot be empty.",
-                ValidatedAt: validatedAt
+                ValidatedAt: validatedAt,
+                TicketState: TicketScanState.Revoked
             );
         }
 
-        var parsedRef = ExtractBookingRef(request.TicketCode);
+        string parsedRef;
+        int? qrEventId = null;
+        int? qrShowId = null;
+        int? qrSeatId = null;
+
+        var trimmedCode = request.TicketCode.Trim();
+        if (trimmedCode.StartsWith("EVL-QR:", StringComparison.OrdinalIgnoreCase))
+        {
+            if (_gateQrSignatureService != null)
+            {
+                var parseResult = _gateQrSignatureService.ParseAndVerifyPayload(trimmedCode);
+                if (!parseResult.IsValid)
+                {
+                    return new TicketValidationResultDto(
+                        IsValid: false,
+                        Status: "INVALID_SIGNATURE",
+                        Message: "TAMPER DETECTED: Ticket QR code digital signature is invalid or modified.",
+                        ValidatedAt: validatedAt,
+                        TicketState: TicketScanState.Revoked
+                    );
+                }
+                parsedRef = parseResult.BookingRef;
+                qrEventId = parseResult.EventId > 0 ? parseResult.EventId : null;
+                qrShowId = parseResult.ShowId;
+                qrSeatId = parseResult.SeatId;
+            }
+            else
+            {
+                parsedRef = ExtractBookingRef(trimmedCode);
+            }
+        }
+        else
+        {
+            parsedRef = ExtractBookingRef(trimmedCode);
+        }
+
         int.TryParse(parsedRef, out var numericId);
 
         var booking = await _context.Bookings
             .Include(b => b.Event)
             .Include(b => b.TicketTier)
             .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
-            .FirstOrDefaultAsync(b => (!string.IsNullOrEmpty(b.BookingRef) && b.BookingRef.ToLower() == parsedRef.ToLower()) 
+            .FirstOrDefaultAsync(b => (!string.IsNullOrEmpty(b.BookingRef) && b.BookingRef.ToLower() == parsedRef.ToLower())
                                    || (numericId > 0 && b.Id == numericId));
 
         if (booking is null || booking.IsDeleted)
@@ -502,7 +760,8 @@ public class BookingService : IBookingService
                 IsValid: false,
                 Status: "NOT_FOUND",
                 Message: $"Ticket pass '{parsedRef}' was not found in the system.",
-                ValidatedAt: validatedAt
+                ValidatedAt: validatedAt,
+                TicketState: TicketScanState.Revoked
             );
         }
 
@@ -511,12 +770,12 @@ public class BookingService : IBookingService
             .Select(bs => bs.Seat!.Label)
             .ToList();
 
-        // 1. Payment status check
-        if (booking.PaymentStatus != PaymentStatus.Paid || booking.Status != BookingStatus.Confirmed)
+        // 1. Payment status & lifecycle check
+        if (booking.PaymentStatus != PaymentStatus.Paid || booking.Status != BookingStatus.Confirmed || booking.State != BookingState.Confirmed)
         {
-            var reason = booking.Status == BookingStatus.Cancelled ? "CANCELLED"
-                : booking.PaymentStatus == PaymentStatus.Expired ? "EXPIRED"
-                : booking.PaymentStatus == PaymentStatus.Refunded ? "REFUNDED"
+            var reason = booking.State == BookingState.Cancelled ? "CANCELLED"
+                : booking.State == BookingState.Expired ? "EXPIRED"
+                : booking.State == BookingState.Refunded ? "REFUNDED"
                 : "UNPAID";
 
             var msg = reason switch
@@ -541,12 +800,14 @@ public class BookingService : IBookingService
                 TicketTierName: booking.TicketTier?.Name,
                 Quantity: booking.Quantity,
                 SeatLabels: seatLabels,
-                ValidatedAt: validatedAt
+                ValidatedAt: validatedAt,
+                TicketState: TicketScanState.Revoked
             );
         }
 
-        // 2. Event constraint check (if specified by scanner)
-        if (request.EventId.HasValue && booking.EventId != request.EventId.Value)
+        // 2. Event constraint check (scanner requested or embedded in QR)
+        var targetEventId = request.EventId ?? qrEventId;
+        if (targetEventId.HasValue && booking.EventId != targetEventId.Value)
         {
             return new TicketValidationResultDto(
                 IsValid: false,
@@ -562,12 +823,14 @@ public class BookingService : IBookingService
                 TicketTierName: booking.TicketTier?.Name,
                 Quantity: booking.Quantity,
                 SeatLabels: seatLabels,
-                ValidatedAt: validatedAt
+                ValidatedAt: validatedAt,
+                TicketState: TicketScanState.Revoked
             );
         }
 
         // 3. Show constraint check (if specified)
-        if (request.EventShowId.HasValue && booking.TicketTier?.EventShowId != null && booking.TicketTier.EventShowId != request.EventShowId.Value)
+        var targetShowId = request.EventShowId ?? qrShowId;
+        if (targetShowId.HasValue && booking.TicketTier?.EventShowId != null && booking.TicketTier.EventShowId != targetShowId.Value)
         {
             return new TicketValidationResultDto(
                 IsValid: false,
@@ -583,7 +846,8 @@ public class BookingService : IBookingService
                 TicketTierName: booking.TicketTier?.Name,
                 Quantity: booking.Quantity,
                 SeatLabels: seatLabels,
-                ValidatedAt: validatedAt
+                ValidatedAt: validatedAt,
+                TicketState: TicketScanState.InvalidShowSlot
             );
         }
 
@@ -609,26 +873,19 @@ public class BookingService : IBookingService
                 CheckedInAt: booking.CheckedInAt,
                 CheckedInBy: booking.CheckedInBy,
                 GateName: booking.GateNotes,
-                ValidatedAt: validatedAt
+                ValidatedAt: validatedAt,
+                TicketState: TicketScanState.ScannedAndAdmitted,
+                DeviceId: booking.CheckedInDeviceId
             );
         }
 
-        // 5. Check-In admission execution
-        if (request.CheckIn)
+        // 5. Validate / preview only mode
+        if (!request.CheckIn)
         {
-            booking.IsCheckedIn = true;
-            booking.CheckedInAt = validatedAt;
-            booking.CheckedInBy = validatorEmail ?? "Gatekeeper";
-            booking.GateNotes = request.GateName;
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("Ticket {BookingRef} successfully checked in at gate {GateName} by {Validator}.", 
-                booking.BookingRef, request.GateName, validatorEmail);
-
             return new TicketValidationResultDto(
                 IsValid: true,
-                Status: "APPROVED",
-                Message: $"ENTRY APPROVED! Welcome, {booking.CustomerName}.",
+                Status: "VALID_NOT_CHECKED_IN",
+                Message: $"Ticket is valid for {booking.CustomerName} ({booking.Quantity} pass{(booking.Quantity > 1 ? "es" : "")}). Ready for check-in.",
                 BookingId: booking.Id,
                 BookingRef: booking.BookingRef,
                 CustomerName: booking.CustomerName,
@@ -639,18 +896,56 @@ public class BookingService : IBookingService
                 TicketTierName: booking.TicketTier?.Name,
                 Quantity: booking.Quantity,
                 SeatLabels: seatLabels,
-                CheckedInAt: booking.CheckedInAt,
-                CheckedInBy: booking.CheckedInBy,
-                GateName: booking.GateNotes,
-                ValidatedAt: validatedAt
+                ValidatedAt: validatedAt,
+                TicketState: TicketScanState.Issued
             );
         }
 
-        // Validate/preview only mode
+        // 6. Atomic admission Compare-And-Set (CAS) to prevent turnstile race conditions
+        var gateNotes = request.GateName ?? booking.GateNotes;
+        var rowsUpdated = await _context.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE Bookings SET IsCheckedIn = 1, ScanState = {(int)TicketScanState.ScannedAndAdmitted}, CheckedInAt = {validatedAt}, CheckedInBy = {validatorEmail ?? "Gatekeeper"}, CheckedInDeviceId = {request.DeviceId}, GateScanSequence = {request.SequenceNumber}, GateNotes = {gateNotes}, UpdatedAt = {validatedAt}, UpdatedBy = {validatorEmail} WHERE Id = {booking.Id} AND IsCheckedIn = 0 AND State = {(int)BookingState.Confirmed} AND IsDeleted = 0");
+
+        if (rowsUpdated == 0)
+        {
+            // Another concurrent gate scan won the admission race
+            var refreshed = await _context.Bookings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == booking.Id);
+            var alreadyCheckInTime = refreshed?.CheckedInAt?.ToLocalTime().ToString("g") ?? "Earlier";
+            var gatekeeper = !string.IsNullOrWhiteSpace(refreshed?.CheckedInBy) ? refreshed.CheckedInBy : "Gatekeeper";
+            return new TicketValidationResultDto(
+                IsValid: false,
+                Status: "ALREADY_CHECKED_IN",
+                Message: $"DUPLICATE ENTRY DETECTED: This pass was already checked in on {alreadyCheckInTime} by {gatekeeper}.",
+                BookingId: booking.Id,
+                BookingRef: booking.BookingRef,
+                CustomerName: booking.CustomerName,
+                CustomerEmail: booking.CustomerEmail,
+                CustomerPhone: booking.CustomerPhone,
+                EventId: booking.EventId,
+                EventTitle: booking.Event?.Title,
+                TicketTierName: booking.TicketTier?.Name,
+                Quantity: booking.Quantity,
+                SeatLabels: seatLabels,
+                CheckedInAt: refreshed?.CheckedInAt,
+                CheckedInBy: refreshed?.CheckedInBy,
+                GateName: refreshed?.GateNotes,
+                ValidatedAt: validatedAt,
+                TicketState: TicketScanState.ScannedAndAdmitted,
+                DeviceId: refreshed?.CheckedInDeviceId
+            );
+        }
+
+        booking.CheckInAdmit(validatedAt, validatorEmail ?? "Gatekeeper", request.DeviceId, request.SequenceNumber, gateNotes);
+
+        _logger.LogInformation("Ticket {BookingRef} successfully checked in at gate {GateName} by {Validator}.",
+            booking.BookingRef, request.GateName, validatorEmail);
+
+        _telemetry?.RecordGateScan("APPROVED", request.DeviceId ?? "unknown");
+
         return new TicketValidationResultDto(
             IsValid: true,
-            Status: "VALID_NOT_CHECKED_IN",
-            Message: $"Ticket is valid for {booking.CustomerName} ({booking.Quantity} pass{(booking.Quantity > 1 ? "es" : "")}). Ready for check-in.",
+            Status: "APPROVED",
+            Message: $"ENTRY APPROVED! Welcome, {booking.CustomerName}.",
             BookingId: booking.Id,
             BookingRef: booking.BookingRef,
             CustomerName: booking.CustomerName,
@@ -661,7 +956,178 @@ public class BookingService : IBookingService
             TicketTierName: booking.TicketTier?.Name,
             Quantity: booking.Quantity,
             SeatLabels: seatLabels,
-            ValidatedAt: validatedAt
+            CheckedInAt: validatedAt,
+            CheckedInBy: validatorEmail ?? "Gatekeeper",
+            GateName: gateNotes,
+            ValidatedAt: validatedAt,
+            TicketState: TicketScanState.ScannedAndAdmitted,
+            DeviceId: request.DeviceId
+        );
+    }
+
+    public async Task<OfflineGateSyncBatchResponseDto> SyncOfflineGateScansAsync(
+        OfflineGateSyncBatchRequestDto batchRequest,
+        int? validatorUserId = null,
+        string? validatorEmail = null)
+    {
+        var now = _timeProvider.GetUtcNow();
+        var results = new List<OfflineGateSyncItemResultDto>();
+        int totalAdmitted = 0;
+        int totalRejected = 0;
+        int totalDuplicateAlerts = 0;
+
+        if (batchRequest.Scans == null || batchRequest.Scans.Count == 0)
+        {
+            return new OfflineGateSyncBatchResponseDto(
+                TotalProcessed: 0,
+                TotalAdmitted: 0,
+                TotalRejected: 0,
+                TotalDuplicateSecurityAlerts: 0,
+                Results: results
+            );
+        }
+
+        var sortedScans = batchRequest.Scans.OrderBy(s => s.ScannedAt).ToList();
+
+        foreach (var item in sortedScans)
+        {
+            var parsedRef = ExtractBookingRef(item.BookingRef);
+            int.TryParse(parsedRef, out var numericId);
+
+            var booking = await _context.Bookings
+                .Include(b => b.TicketTier)
+                .FirstOrDefaultAsync(b => (!string.IsNullOrEmpty(b.BookingRef) && b.BookingRef.ToLower() == parsedRef.ToLower())
+                                       || (numericId > 0 && b.Id == numericId));
+
+            if (booking is null || booking.IsDeleted)
+            {
+                totalRejected++;
+                results.Add(new OfflineGateSyncItemResultDto(
+                    BookingRef: item.BookingRef,
+                    Status: "NOT_FOUND",
+                    Message: $"Ticket pass '{item.BookingRef}' was not found in the system.",
+                    AdmittedAt: null
+                ));
+                continue;
+            }
+
+            // Verify HMAC signature if signature provided
+            if (_gateQrSignatureService != null && !string.IsNullOrWhiteSpace(item.Signature))
+            {
+                var isSigValid = _gateQrSignatureService.VerifySignature(
+                    booking.BookingRef,
+                    item.EventId ?? booking.EventId,
+                    item.EventShowId ?? booking.TicketTier?.EventShowId,
+                    item.Signature,
+                    item.SeatId);
+
+                if (!isSigValid)
+                {
+                    totalRejected++;
+                    results.Add(new OfflineGateSyncItemResultDto(
+                        BookingRef: booking.BookingRef,
+                        Status: "INVALID_SIGNATURE",
+                        Message: "Digital signature verification failed for offline scan.",
+                        AdmittedAt: null
+                    ));
+                    continue;
+                }
+            }
+
+            // Revocation / cancellation check
+            if (booking.State != BookingState.Confirmed || booking.PaymentStatus != PaymentStatus.Paid)
+            {
+                totalRejected++;
+                results.Add(new OfflineGateSyncItemResultDto(
+                    BookingRef: booking.BookingRef,
+                    Status: "TICKET_REVOKED",
+                    Message: $"Ticket status is {booking.State} and cannot be admitted.",
+                    AdmittedAt: null
+                ));
+                continue;
+            }
+
+            // Duplicate admission reconciliation
+            if (booking.IsCheckedIn)
+            {
+                if (booking.CheckedInDeviceId == item.DeviceId)
+                {
+                    totalRejected++;
+                    results.Add(new OfflineGateSyncItemResultDto(
+                        BookingRef: booking.BookingRef,
+                        Status: "ALREADY_CHECKED_IN",
+                        Message: $"Already checked in by this device at {booking.CheckedInAt:g}.",
+                        AdmittedAt: booking.CheckedInAt
+                    ));
+                }
+                else
+                {
+                    totalRejected++;
+                    totalDuplicateAlerts++;
+                    results.Add(new OfflineGateSyncItemResultDto(
+                        BookingRef: booking.BookingRef,
+                        Status: "SECURITY_ALERT_DUPLICATE_ENTRY",
+                        Message: $"SECURITY ALERT: Duplicate scan across devices! Previously admitted at {booking.CheckedInAt:g} on device '{booking.CheckedInDeviceId}'.",
+                        AdmittedAt: booking.CheckedInAt
+                    ));
+                }
+                continue;
+            }
+
+            // Compare-and-Set admission
+            var gateNotes = item.GateName ?? "Offline Sync";
+            var rowsUpdated = await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE Bookings SET IsCheckedIn = 1, ScanState = {(int)TicketScanState.ScannedAndAdmitted}, CheckedInAt = {item.ScannedAt}, CheckedInBy = {validatorEmail ?? "OfflineGate"}, CheckedInDeviceId = {item.DeviceId}, GateScanSequence = {item.SequenceNumber}, GateNotes = {gateNotes}, UpdatedAt = {now}, UpdatedBy = {validatorEmail} WHERE Id = {booking.Id} AND IsCheckedIn = 0 AND State = {(int)BookingState.Confirmed} AND IsDeleted = 0");
+
+            if (rowsUpdated == 1)
+            {
+                totalAdmitted++;
+                booking.IsCheckedIn = true;
+                booking.ScanState = TicketScanState.ScannedAndAdmitted;
+                booking.CheckedInAt = item.ScannedAt;
+                booking.CheckedInDeviceId = item.DeviceId;
+                booking.GateScanSequence = item.SequenceNumber;
+                booking.GateNotes = gateNotes;
+
+                results.Add(new OfflineGateSyncItemResultDto(
+                    BookingRef: booking.BookingRef,
+                    Status: "APPROVED",
+                    Message: "Offline scan successfully synced and admitted.",
+                    AdmittedAt: item.ScannedAt
+                ));
+            }
+            else
+            {
+                totalRejected++;
+                var refreshed = await _context.Bookings.AsNoTracking().FirstOrDefaultAsync(b => b.Id == booking.Id);
+                if (refreshed?.CheckedInDeviceId == item.DeviceId)
+                {
+                    results.Add(new OfflineGateSyncItemResultDto(
+                        BookingRef: booking.BookingRef,
+                        Status: "ALREADY_CHECKED_IN",
+                        Message: $"Already checked in by this device at {refreshed.CheckedInAt:g}.",
+                        AdmittedAt: refreshed.CheckedInAt
+                    ));
+                }
+                else
+                {
+                    totalDuplicateAlerts++;
+                    results.Add(new OfflineGateSyncItemResultDto(
+                        BookingRef: booking.BookingRef,
+                        Status: "SECURITY_ALERT_DUPLICATE_ENTRY",
+                        Message: $"SECURITY ALERT: Duplicate scan across devices! Previously admitted on device '{refreshed?.CheckedInDeviceId}'.",
+                        AdmittedAt: refreshed?.CheckedInAt
+                    ));
+                }
+            }
+        }
+
+        return new OfflineGateSyncBatchResponseDto(
+            TotalProcessed: sortedScans.Count,
+            TotalAdmitted: totalAdmitted,
+            TotalRejected: totalRejected,
+            TotalDuplicateSecurityAlerts: totalDuplicateAlerts,
+            Results: results
         );
     }
 
@@ -695,8 +1161,8 @@ public class BookingService : IBookingService
                 BookingRef: b.BookingRef,
                 CustomerName: b.CustomerName,
                 TierName: b.TicketTier?.Name ?? "General",
-                SeatSummary: b.BookingSeats.Count > 0 
-                    ? string.Join(", ", b.BookingSeats.Select(s => s.Seat?.Label ?? "")) 
+                SeatSummary: b.BookingSeats.Count > 0
+                    ? string.Join(", ", b.BookingSeats.Select(s => s.Seat?.Label ?? ""))
                     : $"{b.Quantity} Tickets",
                 Status: "APPROVED",
                 CheckedInAt: b.CheckedInAt ?? DateTimeOffset.UtcNow,
@@ -718,7 +1184,7 @@ public class BookingService : IBookingService
 
     public async Task<TicketValidationResultDto> ResetGateCheckInAsync(ResetGateCheckInRequestDto request, int? adminId = null, string? adminEmail = null)
     {
-        var validatedAt = DateTimeOffset.UtcNow;
+        var validatedAt = _timeProvider.GetUtcNow();
         var parsedRef = ExtractBookingRef(request.TicketCode);
         int.TryParse(parsedRef, out var numericId);
 
@@ -726,18 +1192,13 @@ public class BookingService : IBookingService
             .Include(b => b.Event)
             .Include(b => b.TicketTier)
             .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
-            .FirstOrDefaultAsync(b => (!string.IsNullOrEmpty(b.BookingRef) && b.BookingRef.ToLower() == parsedRef.ToLower()) 
+            .FirstOrDefaultAsync(b => (!string.IsNullOrEmpty(b.BookingRef) && b.BookingRef.ToLower() == parsedRef.ToLower())
                                    || (numericId > 0 && b.Id == numericId));
 
         if (booking is null || booking.IsDeleted)
             throw new KeyNotFoundException($"Booking '{parsedRef}' not found.");
 
-        booking.IsCheckedIn = false;
-        booking.CheckedInAt = null;
-        booking.CheckedInBy = null;
-        booking.GateNotes = !string.IsNullOrWhiteSpace(request.Reason) 
-            ? $"Reset: {request.Reason.Trim()}" 
-            : $"Reset by {adminEmail ?? "Admin"} at {validatedAt:g}";
+        booking.ResetCheckIn(validatedAt, adminEmail, request.Reason);
 
         await _context.SaveChangesAsync();
 
@@ -762,7 +1223,8 @@ public class BookingService : IBookingService
             TicketTierName: booking.TicketTier?.Name,
             Quantity: booking.Quantity,
             SeatLabels: seatLabels,
-            ValidatedAt: validatedAt
+            ValidatedAt: validatedAt,
+            TicketState: booking.ScanState
         );
     }
 
@@ -770,6 +1232,16 @@ public class BookingService : IBookingService
     {
         if (string.IsNullOrWhiteSpace(input)) return string.Empty;
         var trimmed = input.Trim();
+
+        // Handle EVL-QR signed payload
+        if (trimmed.StartsWith("EVL-QR:", StringComparison.OrdinalIgnoreCase))
+        {
+            var parts = trimmed.Split(':');
+            if (parts.Length >= 2 && !string.IsNullOrWhiteSpace(parts[1]))
+            {
+                return parts[1].Trim();
+            }
+        }
 
         // Handle raw QR text containing "ID: EVL-XXXX"
         var idMarker = "ID:";

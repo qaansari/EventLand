@@ -22,17 +22,20 @@ public sealed class PendingBookingExpiryService : BackgroundService
     private readonly ILogger<PendingBookingExpiryService> _logger;
     private readonly ISeatingNotificationService _seatingNotifications;
     private readonly TimeProvider _timeProvider;
+    private readonly EventLand.Application.Common.EventLandTelemetry? _telemetry;
 
     public PendingBookingExpiryService(
         IServiceScopeFactory scopeFactory,
         ILogger<PendingBookingExpiryService> logger,
         ISeatingNotificationService seatingNotifications,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        EventLand.Application.Common.EventLandTelemetry? telemetry = null)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
         _seatingNotifications = seatingNotifications;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _telemetry = telemetry;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -80,6 +83,7 @@ public sealed class PendingBookingExpiryService : BackgroundService
 
     public async Task<int> RunOnceAsync(CancellationToken cancellationToken = default)
     {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var cacheService = scope.ServiceProvider.GetService<ICacheService>();
@@ -200,6 +204,9 @@ public sealed class PendingBookingExpiryService : BackgroundService
 
             _logger.LogInformation("Expired {Count} pending bookings atomically exceeding hold window. Seats returned to pool.", successfullyExpiredCount);
         }
+
+        sw.Stop();
+        _telemetry?.RecordExpiryBatch(successfullyExpiredCount, sw.Elapsed.TotalMilliseconds);
 
         return successfullyExpiredCount;
     }

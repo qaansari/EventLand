@@ -13,10 +13,12 @@ using Microsoft.AspNetCore.RateLimiting;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly ICaptchaService _captchaService;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, ICaptchaService captchaService)
     {
         _authService = authService;
+        _captchaService = captchaService;
     }
 
     /// <summary>Authenticate a user and return JWT bearer token.</summary>
@@ -24,6 +26,10 @@ public class AuthController : ControllerBase
     [EnableRateLimiting("login")]
     public async Task<ActionResult<LoginResponseDto>> Login([FromBody] LoginRequestDto dto)
     {
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var captchaToken = dto.CaptchaToken ?? Request.Headers["X-Captcha-Token"].FirstOrDefault();
+        await _captchaService.ValidateActionTokenAsync(captchaToken, "login", clientIp);
+
         try
         {
             var response = await _authService.LoginAsync(dto);
@@ -40,6 +46,10 @@ public class AuthController : ControllerBase
     [EnableRateLimiting("login")]
     public async Task<ActionResult<LoginResponseDto>> Register([FromBody] RegisterRequestDto dto)
     {
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var captchaToken = dto.CaptchaToken ?? Request.Headers["X-Captcha-Token"].FirstOrDefault();
+        await _captchaService.ValidateActionTokenAsync(captchaToken, "register", clientIp);
+
         try
         {
             var response = await _authService.RegisterAsync(dto);
@@ -96,6 +106,10 @@ public class AuthController : ControllerBase
     [EnableRateLimiting("login")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDto dto)
     {
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var captchaToken = dto.CaptchaToken ?? Request.Headers["X-Captcha-Token"].FirstOrDefault();
+        await _captchaService.ValidateActionTokenAsync(captchaToken, "forgot-password", clientIp);
+
         try
         {
             var token = await _authService.ForgotPasswordAsync(dto.Email);

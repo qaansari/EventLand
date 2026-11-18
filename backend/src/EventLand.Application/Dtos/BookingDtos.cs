@@ -51,7 +51,8 @@ public record CreateBookingDto(
     int Quantity,
     string PaymentMethod,
     List<int>? SelectedSeatIds,
-    int? EventShowId = null
+    int? EventShowId = null,
+    string? CaptchaToken = null
 );
 
 public record SubmitBankPaymentProofDto(
@@ -72,4 +73,19 @@ public record RejectBankPaymentDto(
     int? BookingId = null,
     string? BookingRef = null,
     string? Reason = null
+);
+
+public record ProcessBankRefundRequestDto(
+    int BookingId,
+    decimal Amount = 0m,
+    string? Reason = null,
+    string? ProviderRefundRef = null
+);
+
+public record ProcessBankRefundResponseDto(
+    bool Success,
+    string Message,
+    int? RefundId = null,
+    decimal? Amount = null,
+    string? Status = null
 );

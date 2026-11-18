@@ -13,8 +13,8 @@ import { eventsApi, bookingsApi, tagsApi, locationsApi, adminApi, authApi, toEve
 import { getStoredUser, getStoredToken, setStoredSession, clearStoredSession, normalizeRole, isAdmin, isOrganizer } from './utils/auth';
 import { useToast } from './context/ToastContext';
 import { useConfirm } from './context/ConfirmContext';
-import { isCaptchaVerified, getStoredCaptchaToken } from './utils/captcha';
 import EventLandPreloader from './components/EventLandPreloader';
+import RequireAuth from './components/auth/RequireAuth';
 import './App.css';
 
 // Code-split heavy / role-gated views and on-demand modals into separate chunks
@@ -110,23 +110,7 @@ export default function App() {
   const [cities, setCities] = useState([]);
   const [venues, setVenues] = useState([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
-  const [homepageCaptchaToken, setHomepageCaptchaToken] = useState(() => getStoredCaptchaToken());
-
-  // Listen for global CAPTCHA verification across all app components
-  useEffect(() => {
-    const handleCaptchaVerified = (e) => {
-      setHomepageCaptchaToken(e.detail?.token || getStoredCaptchaToken());
-    };
-    const handleCaptchaReset = () => {
-      setHomepageCaptchaToken('');
-    };
-    window.addEventListener('eventland:captcha-verified', handleCaptchaVerified);
-    window.addEventListener('eventland:captcha-reset', handleCaptchaReset);
-    return () => {
-      window.removeEventListener('eventland:captcha-verified', handleCaptchaVerified);
-      window.removeEventListener('eventland:captcha-reset', handleCaptchaReset);
-    };
-  }, []);
+  const [homepageCaptchaToken, setHomepageCaptchaToken] = useState('');
 
   // Pagination state for the explore events grid
   const [pageNumber, setPageNumber] = useState(1);
@@ -1091,7 +1075,7 @@ export default function App() {
             />
 
             {/* Cloudflare CAPTCHA Verification Banner on Homepage (Hidden once verified) */}
-            {!homepageCaptchaToken && !isCaptchaVerified() && (
+            {!homepageCaptchaToken && (
               <div className="glass-card" style={{
                 margin: '1.5rem 0',
                 padding: '1rem 1.5rem',
@@ -1262,43 +1246,73 @@ export default function App() {
 
         {/* View: Attendee Dashboard & E-Tickets */}
         {activeView === 'my-tickets' && (
-          <Suspense fallback={LazyFallback}>
-            <AttendeeDashboard
-              currentUser={currentUser}
-              purchasedTickets={purchasedTickets}
-              savedEvents={savedEvents}
-              onViewTicket={(ticket) => setActiveTicketView(ticket)}
-              onRemoveTicket={handleRemoveTicket}
-              onLookupTickets={handleLookupTickets}
-              onBrowseEvents={() => setActiveView('explore')}
-              onSelectEvent={handleSelectEventForDetail}
-            />
-          </Suspense>
+          <RequireAuth
+            currentUser={currentUser}
+            onUnauthorized={() => {
+              showWarning('Sign In Required', 'Please sign in to view your tickets.');
+              setAuthModalRole('customer');
+              setIsAuthModalOpen(true);
+              setActiveView('explore');
+            }}
+          >
+            <Suspense fallback={LazyFallback}>
+              <AttendeeDashboard
+                currentUser={currentUser}
+                purchasedTickets={purchasedTickets}
+                savedEvents={savedEvents}
+                onViewTicket={(ticket) => setActiveTicketView(ticket)}
+                onRemoveTicket={handleRemoveTicket}
+                onLookupTickets={handleLookupTickets}
+                onBrowseEvents={() => setActiveView('explore')}
+                onSelectEvent={handleSelectEventForDetail}
+              />
+            </Suspense>
+          </RequireAuth>
         )}
         {/* View: Admin Console Dashboard */}
         {activeView === 'admin' && (
-          <Suspense fallback={LazyFallback}>
-            <AdminDashboard
-              currentUser={currentUser}
-              onUpdateCurrentUser={(updated) => setCurrentUser(prev => ({ ...prev, ...updated }))}
-              events={events}
-              onToggleFeature={handleToggleFeature}
-              onDeleteEvent={handleDeleteEvent}
-              onSelectEvent={handleSelectEventForDetail}
-            />
-          </Suspense>
+          <RequireAuth
+            currentUser={currentUser}
+            allowedRoles={['admin']}
+            onUnauthorized={() => {
+              showError('Access Denied', 'You do not have administrative privileges to access this area.');
+              setActiveView('explore');
+            }}
+          >
+            <Suspense fallback={LazyFallback}>
+              <AdminDashboard
+                currentUser={currentUser}
+                onUpdateCurrentUser={(updated) => setCurrentUser(prev => ({ ...prev, ...updated }))}
+                events={events}
+                onToggleFeature={handleToggleFeature}
+                onDeleteEvent={handleDeleteEvent}
+                onSelectEvent={handleSelectEventForDetail}
+              />
+            </Suspense>
+          </RequireAuth>
         )}
 
         {/* View: Organizer Command Center */}
         {activeView === 'organizer' && (
-          <Suspense fallback={LazyFallback}>
-            <OrganizerDashboard
-              currentUser={currentUser}
-              events={events}
-              onNavigateToCreate={() => setActiveView('organizer-wizard')}
-              onSelectEvent={handleSelectEventForDetail}
-            />
-          </Suspense>
+          <RequireAuth
+            currentUser={currentUser}
+            allowedRoles={['organizer', 'admin']}
+            onUnauthorized={() => {
+              showWarning('Sign In Required', 'Please sign in with an organizer account to access the Organizer Portal.');
+              setAuthModalRole('organizer');
+              setIsAuthModalOpen(true);
+              setActiveView('explore');
+            }}
+          >
+            <Suspense fallback={LazyFallback}>
+              <OrganizerDashboard
+                currentUser={currentUser}
+                events={events}
+                onNavigateToCreate={() => setActiveView('organizer-wizard')}
+                onSelectEvent={handleSelectEventForDetail}
+              />
+            </Suspense>
+          </RequireAuth>
         )}
 
         {/* View: Dedicated Event Details Page */}
@@ -1405,16 +1419,26 @@ export default function App() {
       )}
 
       {activeView === 'unpaid-invoices' && (
-        <Suspense fallback={LazyFallback}>
-          <UnpaidInvoicesModal
-            currentUser={currentUser}
-            onClose={() => setActiveView('explore')}
-            onPaymentSuccess={(ticket) => {
-              setPurchasedTickets(prev => [ticket, ...prev]);
-              setActiveTicketView(ticket);
-            }}
-          />
-        </Suspense>
+        <RequireAuth
+          currentUser={currentUser}
+          onUnauthorized={() => {
+            showWarning('Sign In Required', 'Please sign in to view unpaid invoices.');
+            setAuthModalRole('customer');
+            setIsAuthModalOpen(true);
+            setActiveView('explore');
+          }}
+        >
+          <Suspense fallback={LazyFallback}>
+            <UnpaidInvoicesModal
+              currentUser={currentUser}
+              onClose={() => setActiveView('explore')}
+              onPaymentSuccess={(ticket) => {
+                setPurchasedTickets(prev => [ticket, ...prev]);
+                setActiveTicketView(ticket);
+              }}
+            />
+          </Suspense>
+        </RequireAuth>
       )}
 
       {isAuthModalOpen && (

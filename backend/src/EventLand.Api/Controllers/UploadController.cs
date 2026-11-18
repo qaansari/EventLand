@@ -125,10 +125,23 @@ public class UploadController : ControllerBase
             Directory.CreateDirectory(targetFolder);
         }
 
-        // Use full entity id so ids sharing last-two-digits (e.g. 1 and 101) never collide.
-        // When no id is supplied, generate a Guid-based suffix for uniqueness.
+        // For sensitive documents (payment slips, transaction receipts), ALWAYS generate
+        // a cryptographically random, non-enumerable file name to prevent unauthorized enumeration.
+        bool isPaymentProof = normalizedType switch
+        {
+            "slip" or "slips" or "proof" or "proofs" or "transaction" or "transactions" or
+            "paymentproof" or "paymentproofs" or "receipt" or "receipts" => true,
+            _ => false
+        };
+
         string targetFileName;
-        if (id.HasValue)
+        if (isPaymentProof)
+        {
+            var randomToken = Guid.NewGuid().ToString("N");
+            var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            targetFileName = $"slip_{randomToken}_{timestamp}{extension}";
+        }
+        else if (id.HasValue)
         {
             targetFileName = FileUrlHelper.FormatEntityImageFileName(type ?? "events", name, id.Value, extension);
         }
@@ -138,7 +151,7 @@ public class UploadController : ControllerBase
             // Reuse the same prefix/cleanName logic but with a Guid suffix
             var tmpName = FileUrlHelper.FormatEntityImageFileName(type ?? "events", name, 0, extension);
             var tmpBase = Path.GetFileNameWithoutExtension(tmpName);
-            var baseWithoutId = tmpBase[..tmpBase.LastIndexOf('_')];
+            var baseWithoutId = tmpBase.Contains('_') ? tmpBase[..tmpBase.LastIndexOf('_')] : tmpBase;
             targetFileName = $"{baseWithoutId}_{guidSuffix}{extension}";
         }
 

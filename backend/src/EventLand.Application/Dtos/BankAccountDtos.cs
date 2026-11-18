@@ -22,6 +22,15 @@ public record BankAccountDto(
     DateTimeOffset? UpdatedAt
 );
 
+public record BankStatusDto(
+    bool IsOperational,
+    string Status,
+    string? MaintenanceType,
+    string? Notice,
+    DateTimeOffset? UntilUtc,
+    int? RetryAfterSeconds
+);
+
 public record CreateBankAccountDto(
     string BankName,
     string AccountTitle,

@@ -18,30 +18,30 @@ public class SecurityHeadersMiddleware
     {
         // Prevent MIME type sniffing
         context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
-        
+
         // Prevent clickjacking attacks
         context.Response.Headers.Append("X-Frame-Options", "DENY");
-        
+
         // XSS protection (legacy but still useful for older browsers)
         context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
-        
+
         // Control referrer information
         context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
-        
+
         // Restrict browser features/permissions
         context.Response.Headers.Append("Permissions-Policy", "geolocation=(), camera=(self), microphone=(), payment=(self)");
-        
+
         // Isolate browsing context from cross-origin windows while permitting safe popups (WhatsApp share, auth)
         context.Response.Headers.Append("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
 
         // Allow cross-origin static resource loading (images, QR codes, avatars) while protecting resources
         context.Response.Headers.Append("Cross-Origin-Resource-Policy", "cross-origin");
-        
+
         // Content Security Policy - restrict resource loading, prevent clickjacking & XSS
         var cspPolicy = _environment.IsDevelopment()
             ? "default-src 'self'; img-src 'self' data: https: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://www.google.com https://accounts.google.com https://www.gstatic.com; frame-src 'self' https://challenges.cloudflare.com https://www.google.com https://accounts.google.com; frame-ancestors 'none'; connect-src 'self' wss: https: http://localhost:* ws://localhost:* https://accounts.google.com;"
             : "default-src 'self'; img-src 'self' data: https: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' https://challenges.cloudflare.com https://www.google.com https://accounts.google.com https://www.gstatic.com; frame-src 'self' https://challenges.cloudflare.com https://www.google.com https://accounts.google.com; frame-ancestors 'none'; connect-src 'self' wss: https: https://accounts.google.com;";
-        
+
         context.Response.Headers.Append("Content-Security-Policy", cspPolicy);
 
         // HSTS - enforce HTTPS in production

@@ -1,9 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, Ticket, Calendar, Layers, ZoomIn, ZoomOut, RotateCcw, Maximize2, ShieldAlert, Download, RefreshCw } from 'lucide-react';
 import { seatHoldApi, eventsApi, auditoriumLayoutsApi, bankAccountsApi, BACKEND_URL } from '../services/api';
 import { parseAuditoriumLayout } from '../data/auditoriumLayouts';
 import { exportAuditoriumChartPdf } from '../utils/pdfChartExporter';
 import { useToast } from '../context/ToastContext';
+import { deriveSeatVisualState } from '../utils/deriveSeatVisualState';
+import { useSeatChannel } from '../hooks/useSeatChannel';
+import { SeatButton } from './seating/SeatButton';
 
 // Stable per-session guest identity so all seat holds from this browser share one owner
 // (a fresh random email per click fragmented the hold map and broke releases).
@@ -103,89 +106,31 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
     return null;
   }, [currentZone.layoutJson, event.auditoriumLayout, dbAuditoriums]);
 
-  // Load active seat locks from Redis whenever event or selected show changes
-  useEffect(() => {
-    if (!isPreviewMode && typeof event.id === 'number') {
-      seatHoldApi.getHeldSeats(event.id, selectedShowId)
-        .then(seatIds => setRedisHeldSeats(seatIds || []))
-        .catch(err => console.warn('Could not load Redis seat locks:', err));
-    }
-  }, [event.id, selectedShowId, isPreviewMode]);
+  // Authoritative real-time seating lock channel via useSeatChannel
+  const { heldSeatIds, resync } = useSeatChannel({
+    eventId: event?.id,
+    showId: selectedShowId,
+    enabled: !isPreviewMode
+  });
 
-  // Real-time SignalR updates: SeatsHeld / SeatsReleased -> merge into redisHeldSeats.
-  // Uses a dynamic import so the app still builds when @microsoft/signalr is not
-  // installed yet; the warning above will prompt the install.
-  useEffect(() => {
-    if (isPreviewMode || typeof event.id !== 'number') return undefined;
+  const selectedSeatIds = useMemo(() => new Set(selectedSeats.map(s => s.id)), [selectedSeats]);
+  const disabledLabelsSet = useMemo(() => new Set([
+    ...(resolvedBlueprint?.disabledSeats || []),
+    ...(resolvedBlueprint?.unavailableSeats || [])
+  ]), [resolvedBlueprint]);
 
-    let cancelled = false;
-    let conn = null;
-
-    const start = async () => {
-      try {
-        const sig = await import('@microsoft/signalr');
-        const token = localStorage.getItem('eventland_jwt_token') || '';
-        const builder = new sig.HubConnectionBuilder()
-          .withUrl(`${BACKEND_URL}/hubs/seating`, {
-            accessTokenFactory: () => token,
-            transport: sig.HttpTransportType.WebSockets | sig.HttpTransportType.LongPolling,
-          })
-          .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
-          .configureLogging(sig.LogLevel.Warning)
-          .build();
-
-        const apply = (payload) => {
-          let held = payload;
-          try {
-            if (typeof payload === 'string') held = JSON.parse(payload);
-          } catch { /* already an array/object */ }
-          const seats = Array.isArray(held) ? held : (held?.seatIds || held?.seats || []);
-          if (!Array.isArray(seats) || seats.length === 0) return;
-          const ids = seats.map(s => (typeof s === 'object' && s !== null ? (s.id ?? s.seatId ?? s.label) : s)).filter(Boolean);
-          setRedisHeldSeats(prev => [...new Set([...prev, ...ids])]);
-        };
-
-        const applyReleased = (payload) => {
-          let rel = payload;
-          try {
-            if (typeof payload === 'string') rel = JSON.parse(payload);
-          } catch { /* */ }
-          const seats = Array.isArray(rel) ? rel : (rel?.seatIds || rel?.seats || []);
-          const ids = seats.map(s => (typeof s === 'object' && s !== null ? (s.id ?? s.seatId ?? s.label) : s)).filter(Boolean);
-          if (ids.length === 0) return;
-          const idsSet = new Set(ids.map(String));
-          setRedisHeldSeats(prev => prev.filter(x => !idsSet.has(String(x))));
-        };
-
-        builder.on('SeatsHeld', apply);
-        builder.on('seatsHeld', apply);
-        builder.on('SeatsReleased', applyReleased);
-        builder.on('seatsReleased', applyReleased);
-
-        await builder.start();
-        if (cancelled) { await builder.stop().catch(() => {}); return; }
-        conn = builder;
-
-        // Rejoin event group (hub method: JoinEventGroup(int eventId)).
-        await conn.invoke('JoinEventGroup', event.id).catch(() => {});
-      } catch (err) {
-        // Expected when @microsoft/signalr is not installed; log once.
-        console.warn('SignalR seating client not active:', err?.message || err);
-      }
-    };
-
-    start();
-    return () => {
-      cancelled = true;
-      if (conn) {
-        conn.invoke('LeaveEventGroup', event.id).catch(() => {}).finally(() => conn.stop().catch(() => {}));
-      }
-    };
-  }, [event.id, isPreviewMode]);
+  const seatVisualContext = useMemo(() => ({
+    selectedIds: selectedSeatIds,
+    heldByOthersIds: heldSeatIds,
+    disabledLabels: disabledLabelsSet,
+    blockedIds: new Set(),
+    bookedIds: new Set(),
+    reservedIds: new Set()
+  }), [selectedSeatIds, heldSeatIds, disabledLabelsSet]);
 
   const isOccupied = (seatId) => {
     if (!seatId) return false;
-    return redisHeldSeats.includes(seatId);
+    return heldSeatIds.has(seatId);
   };
 
   const handleSeatClick = async (seatId, label, seatInfo) => {
@@ -291,61 +236,38 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
     };
   };
 
-  // Helper to render a seat button
+  // Helper to render a seat button using pure deriveSeatVisualState and memoized SeatButton
   const renderSeatBtn = (rowChar, seatNum, rSpec = null) => {
     const seatLabel = `${rowChar}${seatNum}`;
     const seatObj = currentZone.seats?.find(s => s.label === seatLabel);
     const seatId = seatObj?.id || seatLabel;
-    const occupied = isOccupied(seatId) || seatObj?.status === 'Booked' || seatObj?.status === 'Reserved';
-    const isDisabled = seatObj?.status === 'Blocked' || 
-                       rSpec?.disabled?.includes(seatNum) || 
-                       rSpec?.unavailable?.includes(seatNum) || 
-                       resolvedBlueprint?.disabledSeats?.includes(seatLabel) ||
-                       resolvedBlueprint?.unavailableSeats?.includes(seatLabel);
-    const isSelected = selectedSeats.some((s) => s.id === seatId);
     const seatInfo = getRowSeatInfo(rowChar, seatObj);
-    const seatPrice = seatInfo.price;
+
+    const isRowDisabled = rSpec?.disabled?.includes(seatNum) || 
+                          rSpec?.unavailable?.includes(seatNum);
+
+    const visualState = isRowDisabled
+      ? 'blocked'
+      : deriveSeatVisualState(
+          {
+            id: seatId,
+            label: seatLabel,
+            status: seatObj?.status,
+            state: seatObj?.state
+          },
+          seatVisualContext
+        );
 
     return (
-      <button
+      <SeatButton
         key={seatLabel}
-        disabled={occupied || isDisabled}
-        onClick={() => !isDisabled && handleSeatClick(seatId, seatLabel, seatInfo)}
-        style={{
-          minWidth: '22px',
-          height: '23px',
-          padding: '0 2px',
-          borderRadius: '4px',
-          fontSize: '0.62rem',
-          fontWeight: 700,
-          border: isDisabled ? '1px solid rgba(239, 68, 68, 0.6)' : 'none',
-          cursor: (occupied || isDisabled) ? 'not-allowed' : 'pointer',
-          background: isDisabled 
-            ? 'rgba(239, 68, 68, 0.35)' 
-            : occupied 
-              ? '#334155' 
-              : isSelected 
-                ? '#0d9488' 
-                : 'rgba(255, 255, 255, 0.1)',
-          color: isDisabled 
-            ? '#fca5a5' 
-            : occupied 
-              ? '#64748b' 
-              : isSelected 
-                ? '#ffffff' 
-                : '#e2e8f0',
-          boxShadow: isSelected ? '0 0 8px #0d9488' : isDisabled ? '0 0 4px rgba(239, 68, 68, 0.4)' : 'none',
-          transition: 'all 0.12s ease',
-          textDecoration: isDisabled ? 'line-through' : 'none',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          userSelect: 'none'
-        }}
-        title={isDisabled ? `Row ${rowChar} Seat ${seatNum} (Unavailable / Not in Hall)` : `Row ${rowChar} Seat ${seatNum} • PKR ${Number(seatPrice).toLocaleString()}${seatInfo.tierName ? ` (${seatInfo.tierName})` : ''}`}
-      >
-        {seatNum}
-      </button>
+        id={seatId}
+        label={seatNum}
+        state={visualState}
+        price={seatInfo.price}
+        tierName={seatInfo.tierName}
+        onClick={() => handleSeatClick(seatId, seatLabel, seatInfo)}
+      />
     );
   };
 

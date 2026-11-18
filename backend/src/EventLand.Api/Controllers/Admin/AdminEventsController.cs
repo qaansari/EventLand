@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/admin/events")]
-[Authorize(Roles = AppRoles.OrganizerOrAdmin)]
+[Authorize(Policy = AppPolicies.RequireOrganizerOrAdmin)]
 [Produces("application/json")]
 public class AdminEventsController : ControllerBase
 {

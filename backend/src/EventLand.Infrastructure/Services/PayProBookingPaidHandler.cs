@@ -23,17 +23,20 @@ public class PayProBookingPaidHandler : IPayProOrderPaidHandler
     private readonly IBookingService _bookingService;
     private readonly INotificationService _notificationService;
     private readonly ILogger<PayProBookingPaidHandler> _logger;
+    private readonly EventLand.Application.Common.EventLandTelemetry? _telemetry;
 
     public PayProBookingPaidHandler(
         IApplicationDbContext context,
         IBookingService bookingService,
         INotificationService notificationService,
-        ILogger<PayProBookingPaidHandler> logger)
+        ILogger<PayProBookingPaidHandler> logger,
+        EventLand.Application.Common.EventLandTelemetry? telemetry = null)
     {
         _context = context;
         _bookingService = bookingService;
         _notificationService = notificationService;
         _logger = logger;
+        _telemetry = telemetry;
     }
 
     public async Task OnOrderPaidAsync(Order order, CancellationToken cancellationToken = default)
@@ -60,12 +63,14 @@ public class PayProBookingPaidHandler : IPayProOrderPaidHandler
         if (booking.PaymentStatus == PaymentStatus.Paid)
         {
             _logger.LogInformation("Booking {BookingRef} is already marked as Paid. Skipping side effects.", booking.BookingRef);
+            _telemetry?.RecordWebhookDuplicate("PayPro", order.OrderNumber);
             return;
         }
 
         var now = DateTimeOffset.UtcNow;
 
         booking.PayProSuccess(now, "PayProWebhook", order.PayProId ?? order.OrderNumber);
+        _telemetry?.RecordBookingTransition("PaymentProcessing", "Confirmed", true);
         if (order.DatePaid.HasValue)
         {
             booking.PaidAt = new DateTimeOffset(order.DatePaid.Value, TimeSpan.Zero);

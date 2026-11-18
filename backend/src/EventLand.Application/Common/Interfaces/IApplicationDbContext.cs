@@ -6,25 +6,25 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 
 public interface IApplicationDbContext
 {
-    DbSet<User>        Users        { get; }
-    DbSet<Role>        Roles        { get; }
-    DbSet<Event>       Events       { get; }
-    DbSet<EventShow>   EventShows   { get; }
-    DbSet<Organizer>   Organizers   { get; }
-    DbSet<TicketTier>  TicketTiers  { get; }
+    DbSet<User> Users { get; }
+    DbSet<Role> Roles { get; }
+    DbSet<Event> Events { get; }
+    DbSet<EventShow> EventShows { get; }
+    DbSet<Organizer> Organizers { get; }
+    DbSet<TicketTier> TicketTiers { get; }
     DbSet<SeatingZone> SeatingZones { get; }
-    DbSet<Seat>        Seats        { get; }
-    DbSet<Booking>     Bookings     { get; }
+    DbSet<Seat> Seats { get; }
+    DbSet<Booking> Bookings { get; }
     DbSet<BookingSeat> BookingSeats { get; }
-    DbSet<Artist>      Artists      { get; }
-    DbSet<Tag>         Tags         { get; }
-    DbSet<EventTag>    EventTags    { get; }
-    DbSet<Country>     Countries    { get; }
-    DbSet<City>        Cities       { get; }
-    DbSet<Venue>       Venues       { get; }
-    DbSet<Auditorium>  Auditoriums  { get; }
-    DbSet<Faq>         Faqs         { get; }
-    DbSet<FooterInfo>  FooterInfo   { get; }
+    DbSet<Artist> Artists { get; }
+    DbSet<Tag> Tags { get; }
+    DbSet<EventTag> EventTags { get; }
+    DbSet<Country> Countries { get; }
+    DbSet<City> Cities { get; }
+    DbSet<Venue> Venues { get; }
+    DbSet<Auditorium> Auditoriums { get; }
+    DbSet<Faq> Faqs { get; }
+    DbSet<FooterInfo> FooterInfo { get; }
     DbSet<RefundRecord> RefundRecords { get; }
     DbSet<BankAccount> BankAccounts { get; }
     DbSet<PaymentConfig> PaymentConfigs { get; }
@@ -34,6 +34,9 @@ public interface IApplicationDbContext
     DbSet<OutboxMessage> OutboxMessages { get; }
 
     DatabaseFacade Database { get; }
+
+    Microsoft.EntityFrameworkCore.ChangeTracking.ChangeTracker ChangeTracker { get; }
+    Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<TEntity> Entry<TEntity>(TEntity entity) where TEntity : class;
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

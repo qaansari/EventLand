@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/admin/bank-accounts")]
-[Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
+[Authorize(Policy = AppPolicies.RequireAdmin)]
 public class AdminBankAccountsController : ControllerBase
 {
     private readonly IBankAccountService _bankAccountService;

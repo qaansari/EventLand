@@ -33,18 +33,19 @@ public class CaptchaController : ControllerBase
         }
 
         var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
-        var isValid = await _captchaService.VerifyTokenAsync(dto.Token, clientIp);
+        var isValid = await _captchaService.VerifyActionTokenAsync(dto.Token, dto.Action, clientIp);
 
         if (isValid)
         {
             return Ok(new { success = true, message = "Captcha token verified successfully." });
         }
 
-        return BadRequest(new { success = false, message = "Invalid or expired Captcha token challenge." });
+        return BadRequest(new { success = false, message = "Invalid, expired, or replayed Captcha token challenge." });
     }
 }
 
 public class CaptchaVerifyRequest
 {
     public string Token { get; set; } = string.Empty;
+    public string? Action { get; set; }
 }

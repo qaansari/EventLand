@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/admin/roles")]
-[Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
+[Authorize(Policy = AppPolicies.RequireAdmin)]
 [Produces("application/json")]
 public class AdminRolesController : ControllerBase
 {
@@ -27,7 +27,7 @@ public class AdminRolesController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
-    [Authorize(Roles = AppRoles.SuperAdminOnly)]
+    [Authorize(Policy = AppPolicies.RequireSuperAdmin)]
     public async Task<ActionResult<RoleDto>> GetRoleById(int id)
     {
         var role = await _adminService.GetRoleByIdAsync(id);
@@ -36,7 +36,7 @@ public class AdminRolesController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = AppRoles.SuperAdminOnly)]
+    [Authorize(Policy = AppPolicies.RequireSuperAdmin)]
     public async Task<ActionResult<RoleDto>> CreateRole([FromBody] CreateRoleDto dto)
     {
         var role = await _adminService.CreateRoleAsync(dto);
@@ -44,7 +44,7 @@ public class AdminRolesController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = AppRoles.SuperAdminOnly)]
+    [Authorize(Policy = AppPolicies.RequireSuperAdmin)]
     public async Task<ActionResult<RoleDto>> UpdateRole(int id, [FromBody] UpdateRoleDto dto)
     {
         var updated = await _adminService.UpdateRoleAsync(id, dto);
@@ -52,7 +52,7 @@ public class AdminRolesController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = AppRoles.SuperAdminOnly)]
+    [Authorize(Policy = AppPolicies.RequireSuperAdmin)]
     public async Task<ActionResult> DeleteRole(int id)
     {
         var success = await _adminService.DeleteRoleAsync(id);

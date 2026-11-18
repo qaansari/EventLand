@@ -68,6 +68,9 @@ public sealed class PaymentTransactionConfiguration : IEntityTypeConfiguration<P
         builder.HasIndex(t => t.ProviderTransactionId)
                .HasDatabaseName("IX_PaymentTransactions_ProviderTransactionId");
 
+        builder.HasIndex(t => t.ProviderReference)
+               .HasDatabaseName("IX_PaymentTransactions_ProviderReference");
+
         builder.HasIndex(t => t.ProviderOrderId)
                .HasDatabaseName("IX_PaymentTransactions_ProviderOrderId");
 

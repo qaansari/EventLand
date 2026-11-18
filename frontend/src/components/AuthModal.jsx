@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { User, Lock, Mail, X, LogIn, UserPlus, Eye, EyeOff, Phone, Globe, RefreshCw, KeyRound, ArrowLeft } from 'lucide-react';
 import { authApi, locationsApi, formatPhoneNumberOnSubmit } from '../services/api';
 import { useToast } from '../context/ToastContext';
-import { getStoredCaptchaToken } from '../utils/captcha';
+import { useCaptcha } from '../context/CaptchaContext';
 import CloudflareTurnstile from './CloudflareTurnstile';
+import { useAuthMachine } from '../hooks/useAuthMachine';
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
@@ -20,16 +21,26 @@ const FacebookIcon = () => (
   </svg>
 );
 
-// view modes: 'login' | 'signup' | 'forgot' | 'reset'
 export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'login' }) {
   const { showSuccess, showError } = useToast();
-  const [view, setView] = useState(initialMode === 'signup' ? 'signup' : 'login');
+  const {
+    state,
+    switchToLogin,
+    switchToSignup,
+    switchToForgot,
+    onForgotSent,
+    switchToReset,
+    onAuthSuccess,
+    setError,
+    clearError
+  } = useAuthMachine(initialMode === 'signup' ? 'signup' : 'login');
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [captchaToken, setCaptchaToken] = useState(() => getStoredCaptchaToken());
+  const { captchaToken, setCaptchaToken, consumeCaptchaToken, resetCaptcha } = useCaptcha();
   const [countries, setCountries] = useState([
     { id: 1, name: 'Pakistan', code: 'PK', dialingCode: '+92' },
     { id: 2, name: 'United Arab Emirates', code: 'AE', dialingCode: '+971' },
@@ -54,27 +65,16 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
-  const [forgotSent, setForgotSent] = useState(false);
 
   useEffect(() => {
     locationsApi.getCountries()
       .then(res => { if (Array.isArray(res) && res.length > 0) setCountries(res); })
-      .catch(() => {/* use defaults */});
-  }, []);
-
-  useEffect(() => {
-    const handleVerified = (e) => { if (e.detail?.token) setCaptchaToken(e.detail.token); };
-    const handleReset = () => setCaptchaToken('');
-    window.addEventListener('eventland:captcha-verified', handleVerified);
-    window.addEventListener('eventland:captcha-reset', handleReset);
-    return () => {
-      window.removeEventListener('eventland:captcha-verified', handleVerified);
-      window.removeEventListener('eventland:captcha-reset', handleReset);
-    };
+      .catch(() => {/* use defaults */ });
   }, []);
 
   // Unified authentication success dispatcher
   const handleAuthSuccess = (authData, isNewRegistration = false) => {
+    onAuthSuccess(authData);
     const rawRole = authData.user?.role || '';
     const backendRole = rawRole.toLowerCase();
     let userRole = 'customer';
@@ -109,6 +109,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
       if (!response?.credential) return;
       setSocialLoading('google');
       setErrorMsg('');
+      clearError();
       authApi.googleAuth(response.credential)
         .then((authData) => {
           handleAuthSuccess(authData);
@@ -116,6 +117,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
         .catch((err) => {
           const msg = err.message || 'Google sign-in failed. Please try again.';
           setErrorMsg(msg);
+          setError(msg);
           showError('Google Sign-In Failed', msg);
         })
         .finally(() => {
@@ -178,7 +180,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
     } else {
       initGsi();
     }
-  }, [googleClientId, view]);
+  }, [googleClientId, state]);
 
   // Facebook JS SDK loader & initialization
   useEffect(() => {
@@ -214,6 +216,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
     if (!googleClientId) {
       const msg = 'Google authentication is not configured on this environment. Set VITE_GOOGLE_CLIENT_ID in your environment variables.';
       setErrorMsg(msg);
+      setError(msg);
       showError('Google Auth Not Configured', msg);
       return;
     }
@@ -240,12 +243,14 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
     if (!facebookAppId) {
       const msg = 'Facebook authentication is not configured on this environment. Set VITE_FACEBOOK_APP_ID in your .env file.';
       setErrorMsg(msg);
+      setError(msg);
       showError('Facebook Auth Not Configured', msg);
       return;
     }
 
     setSocialLoading('facebook');
     setErrorMsg('');
+    clearError();
 
     // If running under HTTPS and FB SDK is available, use native FB.login()
     if (window.location.protocol === 'https:' && window.FB) {
@@ -258,6 +263,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
             } catch (err) {
               const msg = err.message || 'Facebook authentication failed. Please try again.';
               setErrorMsg(msg);
+              setError(msg);
               showError('Facebook Sign-In Failed', msg);
             } finally {
               setSocialLoading(null);
@@ -275,7 +281,6 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
     }
 
     // When on HTTP (e.g. http://localhost), Meta blocks FB.login() in sdk.js.
-    // Use the official Meta OAuth Dialog in a standard popup window.
     const redirectUri = window.location.origin;
     const fbOAuthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${encodeURIComponent(facebookAppId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=email,public_profile`;
 
@@ -304,7 +309,6 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
           return;
         }
 
-        // Check if redirected back to our origin with hash fragment containing access_token
         if (popup.location.origin === window.location.origin) {
           const hash = popup.location.hash;
           if (hash && hash.includes('access_token=')) {
@@ -320,6 +324,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
               } catch (err) {
                 const msg = err.message || 'Facebook authentication failed. Please try again.';
                 setErrorMsg(msg);
+                setError(msg);
                 showError('Facebook Sign-In Failed', msg);
               } finally {
                 setSocialLoading(null);
@@ -345,76 +350,89 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
 
   const switchView = (next) => {
     setErrorMsg('');
-    setView(next);
+    clearError();
+    if (next === 'login') switchToLogin();
+    else if (next === 'signup') switchToSignup();
+    else if (next === 'forgot') switchToForgot();
+    else if (next === 'reset') switchToReset();
   };
 
   // ── Login / Register ────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+    clearError();
 
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email.trim() || !emailPattern.test(email.trim())) {
       const msg = 'Please enter a valid email address (e.g. user@example.com).';
       setErrorMsg(msg);
+      setError(msg);
       showError('Validation Error', msg);
       return;
     }
 
-    if (view === 'signup') {
+    if (state === 'signup') {
       if (!password || password.length < 10) {
         const msg = 'Password must be at least 10 characters long.';
-        setErrorMsg(msg); showError('Validation Error', msg); return;
+        setErrorMsg(msg); setError(msg); showError('Validation Error', msg); return;
       }
       if (!/[A-Z]/.test(password)) {
         const msg = 'Password must contain at least one uppercase letter (A-Z).';
-        setErrorMsg(msg); showError('Validation Error', msg); return;
+        setErrorMsg(msg); setError(msg); showError('Validation Error', msg); return;
       }
       if (!/[a-z]/.test(password)) {
         const msg = 'Password must contain at least one lowercase letter (a-z).';
-        setErrorMsg(msg); showError('Validation Error', msg); return;
+        setErrorMsg(msg); setError(msg); showError('Validation Error', msg); return;
       }
       if (!/[0-9]/.test(password)) {
         const msg = 'Password must contain at least one number (0-9).';
-        setErrorMsg(msg); showError('Validation Error', msg); return;
+        setErrorMsg(msg); setError(msg); showError('Validation Error', msg); return;
       }
       if (!/[^a-zA-Z0-9]/.test(password)) {
         const msg = 'Password must contain at least one special character (!@#$%^&*).';
-        setErrorMsg(msg); showError('Validation Error', msg); return;
+        setErrorMsg(msg); setError(msg); showError('Validation Error', msg); return;
       }
     } else {
       if (!password.trim()) {
         const msg = 'Password is required.';
-        setErrorMsg(msg); showError('Validation Error', msg); return;
+        setErrorMsg(msg); setError(msg); showError('Validation Error', msg); return;
       }
     }
 
     setLoading(true);
     try {
-      if (view === 'signup') {
+      const activeToken = consumeCaptchaToken();
+
+      if (state === 'signup') {
         if (!name.trim()) {
           const msg = 'Please enter your full name to register.';
-          setErrorMsg(msg); showError('Registration Error', msg);
+          setErrorMsg(msg); setError(msg); showError('Registration Error', msg);
           setLoading(false); return;
         }
         if (phone && phone.trim()) {
           const digitsOnly = phone.replace(/\D/g, '');
           if (digitsOnly.length < 7 || digitsOnly.length > 15) {
             const msg = 'Please enter a valid phone number (7-15 digits).';
-            setErrorMsg(msg); showError('Registration Error', msg);
+            setErrorMsg(msg); setError(msg); showError('Registration Error', msg);
             setLoading(false); return;
           }
         }
         const formattedPhone = formatPhoneNumberOnSubmit(phone, activeDialingCode);
-        const authData = await authApi.register(name.trim(), email.trim(), password, formattedPhone, Number(selectedCountryId));
+        const authData = await authApi.register(name.trim(), email.trim(), password, formattedPhone, Number(selectedCountryId), activeToken);
         handleAuthSuccess(authData, true);
       } else {
-        const authData = await authApi.login(email.trim(), password);
+        const authData = await authApi.login(email.trim(), password, activeToken);
         handleAuthSuccess(authData, false);
       }
     } catch (err) {
-      const msg = err.message || 'Authentication failed. Check your credentials.';
+      resetCaptcha();
+      const isBotError = err.status === 403 || err.message?.includes('BOT_CHALLENGE_REQUIRED') || err.message?.includes('captcha');
+      const msg = isBotError
+        ? 'Security check required. Please complete the captcha challenge below.'
+        : (err.message || 'Authentication failed. Check your credentials.');
       setErrorMsg(msg);
+      setError(msg);
       showError('Authentication Failed', msg);
     } finally {
       setLoading(false);
@@ -425,21 +443,28 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
   const handleForgotPassword = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+    clearError();
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!forgotEmail.trim() || !emailPattern.test(forgotEmail.trim())) {
       const msg = 'Please enter a valid email address.';
-      setErrorMsg(msg); showError('Validation Error', msg); return;
+      setErrorMsg(msg); setError(msg); showError('Validation Error', msg); return;
     }
     setLoading(true);
     try {
-      const res = await authApi.forgotPassword(forgotEmail.trim());
-      // In development the API returns a resetToken for testing — pre-fill it
+      const activeToken = consumeCaptchaToken();
+      const res = await authApi.forgotPassword(forgotEmail.trim(), activeToken);
       if (res?.resetToken) setResetToken(res.resetToken);
-      setForgotSent(true);
-      showSuccess('Email Sent', 'If an account exists for that email, a reset code has been issued.');
+      onForgotSent(forgotEmail.trim());
+      showSuccess('Reset Link Sent', 'If an account exists, instructions have been dispatched.');
     } catch (err) {
-      const msg = err.message || 'Failed to send reset request.';
-      setErrorMsg(msg); showError('Request Failed', msg);
+      resetCaptcha();
+      const isBotError = err.status === 403 || err.message?.includes('BOT_CHALLENGE_REQUIRED') || err.message?.includes('captcha');
+      const msg = isBotError
+        ? 'Security check required. Please complete the captcha challenge below.'
+        : (err.message || 'Failed to request password reset.');
+      setErrorMsg(msg);
+      setError(msg);
+      showError('Reset Request Failed', msg);
     } finally {
       setLoading(false);
     }
@@ -449,30 +474,30 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+    clearError();
     if (!resetToken.trim()) {
       const msg = 'Please enter the reset token from your email.';
-      setErrorMsg(msg); showError('Validation Error', msg); return;
+      setErrorMsg(msg); setError(msg); showError('Validation Error', msg); return;
     }
     if (!newPassword || newPassword.length < 10) {
       const msg = 'New password must be at least 10 characters.';
-      setErrorMsg(msg); showError('Validation Error', msg); return;
+      setErrorMsg(msg); setError(msg); showError('Validation Error', msg); return;
     }
     if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^a-zA-Z0-9]/.test(newPassword)) {
       const msg = 'Password must include uppercase, lowercase, number, and special character.';
-      setErrorMsg(msg); showError('Validation Error', msg); return;
+      setErrorMsg(msg); setError(msg); showError('Validation Error', msg); return;
     }
     setLoading(true);
     try {
       await authApi.resetPassword(forgotEmail.trim(), resetToken.trim(), newPassword);
       showSuccess('Password Reset! ✓', 'Your password has been updated. Please sign in.');
-      setForgotSent(false);
       setResetToken('');
       setNewPassword('');
       setEmail(forgotEmail);
-      switchView('login');
+      switchToLogin();
     } catch (err) {
       const msg = err.message || 'Failed to reset password. Token may be invalid or expired.';
-      setErrorMsg(msg); showError('Reset Failed', msg);
+      setErrorMsg(msg); setError(msg); showError('Reset Failed', msg);
     } finally {
       setLoading(false);
     }
@@ -515,9 +540,9 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
         </button>
 
         {/* Back button for forgot/reset views */}
-        {(view === 'forgot' || view === 'reset') && (
+        {(state === 'forgot_request' || state === 'forgot_verify' || state === 'reset') && (
           <button
-            onClick={() => { setForgotSent(false); switchView('login'); }}
+            onClick={() => switchView('login')}
             style={{
               position: 'absolute', top: '1.25rem', left: '1.25rem',
               background: 'rgba(255, 255, 255, 0.08)', border: 'none',
@@ -539,16 +564,16 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 1rem', color: '#0d9488', boxShadow: '0 0 20px rgba(13, 148, 136, 0.25)'
           }}>
-            {view === 'signup' ? <UserPlus size={24} /> : view === 'forgot' || view === 'reset' ? <KeyRound size={24} /> : <LogIn size={24} />}
+            {state === 'signup' ? <UserPlus size={24} /> : (state === 'forgot_request' || state === 'forgot_verify' || state === 'reset') ? <KeyRound size={24} /> : <LogIn size={24} />}
           </div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.25rem' }}>
-            {view === 'signup' ? 'Create an Account' : view === 'forgot' ? 'Forgot Password' : view === 'reset' ? 'Reset Password' : 'Welcome Back'}
+            {state === 'signup' ? 'Create an Account' : (state === 'forgot_request' || state === 'forgot_verify') ? 'Forgot Password' : state === 'reset' ? 'Reset Password' : 'Welcome Back'}
           </h2>
           <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
-            {view === 'signup' ? 'Join EventLand to book tickets and manage events'
-              : view === 'forgot' ? 'Enter your email to receive a password reset token'
-              : view === 'reset' ? 'Enter the reset token and your new password'
-              : 'Sign in to access your dashboard and tickets'}
+            {state === 'signup' ? 'Join EventLand to book tickets and manage events'
+              : (state === 'forgot_request' || state === 'forgot_verify') ? 'Enter your email to receive a password reset token'
+                : state === 'reset' ? 'Enter the reset token and your new password'
+                  : 'Sign in to access your dashboard and tickets'}
           </p>
         </div>
 
@@ -563,7 +588,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
         )}
 
         {/* ── Forgot Password Form ── */}
-        {view === 'forgot' && (
+        {(state === 'forgot_request' || state === 'forgot_verify') && (
           <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div>
               <label style={labelStyle}>Email Address</label>
@@ -594,12 +619,12 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
               {loading ? <><RefreshCw size={16} className="animate-spin" /><span>Sending...</span></> : 'Send Reset Token'}
             </button>
 
-            {forgotSent && (
+            {state === 'forgot_verify' && (
               <p style={{ color: '#10b981', fontSize: '0.8125rem', textAlign: 'center' }}>
                 Reset token sent! Check your email or{' '}
                 <button
                   type="button"
-                  onClick={() => switchView('reset')}
+                  onClick={() => switchToReset(forgotEmail)}
                   style={{ background: 'none', border: 'none', color: '#2dd4bf', fontWeight: 600, cursor: 'pointer' }}
                 >
                   enter it here
@@ -616,7 +641,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
         )}
 
         {/* ── Reset Password Form ── */}
-        {view === 'reset' && (
+        {state === 'reset' && (
           <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div>
               <label style={labelStyle}>Email Address</label>
@@ -702,7 +727,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
         )}
 
         {/* ── Login / Signup Form ── */}
-        {(view === 'login' || view === 'signup') && (
+        {(state === 'login' || state === 'signup') && (
           <>
             {/* Social Authentication Buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginBottom: '1.25rem' }}>
@@ -750,8 +775,6 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
                 </button>
               </div>
 
-
-
               {/* Or Divider */}
               <div style={{ display: 'flex', alignItems: 'center', margin: '0.5rem 0', gap: '0.75rem' }}>
                 <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.1)' }} />
@@ -763,167 +786,167 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
             </div>
 
             <form onSubmit={handleSubmit} className="auth-form-group" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {view === 'signup' && (
-              <>
-                <div>
-                  <label style={labelStyle}>Full Name</label>
-                  <div style={{ position: 'relative' }}>
-                    <User size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                    <input
-                      type="text"
-                      placeholder="Qamar Ansari"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      style={inputStyle}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Country</label>
-                  <div style={{ position: 'relative' }}>
-                    <Globe size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b', zIndex: 1 }} />
-                    <select
-                      value={selectedCountryId}
-                      onChange={(e) => setSelectedCountryId(Number(e.target.value))}
-                      style={{ ...inputStyle, cursor: 'pointer' }}
-                    >
-                      {countries.map(c => (
-                        <option key={c.id} value={c.id} style={{ background: '#0b1328', color: '#fff' }}>
-                          {c.name} ({c.dialingCode || c.code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Mobile / WhatsApp Number</label>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <div style={{
-                      padding: '0.75rem 0.85rem',
-                      background: 'rgba(13, 148, 136, 0.15)', border: '1px solid rgba(13, 148, 136, 0.35)',
-                      borderRadius: '10px', color: '#2dd4bf', fontWeight: 700, fontSize: '0.875rem',
-                      display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap'
-                    }}>
-                      <Phone size={15} /> {activeDialingCode}
+              {state === 'signup' && (
+                <>
+                  <div>
+                    <label style={labelStyle}>Full Name</label>
+                    <div style={{ position: 'relative' }}>
+                      <User size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                      <input
+                        type="text"
+                        placeholder="Qamar Ansari"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        style={inputStyle}
+                      />
                     </div>
-                    <input
-                      type="tel"
-                      placeholder="331 2541767"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      style={{
-                        flex: 1, padding: '0.75rem 1rem',
-                        background: 'rgba(12, 23, 54, 0.6)', border: '1px solid rgba(13, 148, 136, 0.2)',
-                        borderRadius: '10px', color: '#f8fafc', fontSize: '0.875rem', outline: 'none'
-                      }}
-                    />
                   </div>
-                  <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem', display: 'block' }}>
-                    If typed with leading &apos;0&apos;, it will automatically be trimmed upon saving.
-                  </span>
+
+                  <div>
+                    <label style={labelStyle}>Country</label>
+                    <div style={{ position: 'relative' }}>
+                      <Globe size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b', zIndex: 1 }} />
+                      <select
+                        value={selectedCountryId}
+                        onChange={(e) => setSelectedCountryId(Number(e.target.value))}
+                        style={{ ...inputStyle, cursor: 'pointer' }}
+                      >
+                        {countries.map(c => (
+                          <option key={c.id} value={c.id} style={{ background: '#0b1328', color: '#fff' }}>
+                            {c.name} ({c.dialingCode || c.code})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={labelStyle}>Mobile / WhatsApp Number</label>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <div style={{
+                        padding: '0.75rem 0.85rem',
+                        background: 'rgba(13, 148, 136, 0.15)', border: '1px solid rgba(13, 148, 136, 0.35)',
+                        borderRadius: '10px', color: '#2dd4bf', fontWeight: 700, fontSize: '0.875rem',
+                        display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap'
+                      }}>
+                        <Phone size={15} /> {activeDialingCode}
+                      </div>
+                      <input
+                        type="tel"
+                        placeholder="331 2541767"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        style={{
+                          flex: 1, padding: '0.75rem 1rem',
+                          background: 'rgba(12, 23, 54, 0.6)', border: '1px solid rgba(13, 148, 136, 0.2)',
+                          borderRadius: '10px', color: '#f8fafc', fontSize: '0.875rem', outline: 'none'
+                        }}
+                      />
+                    </div>
+                    <span style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem', display: 'block' }}>
+                      If typed with leading &apos;0&apos;, it will automatically be trimmed upon saving.
+                    </span>
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label style={labelStyle}>Email Address</label>
+                <div style={{ position: 'relative' }}>
+                  <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                  <input
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    style={inputStyle}
+                  />
                 </div>
-              </>
-            )}
-
-            <div>
-              <label style={labelStyle}>Email Address</label>
-              <div style={{ position: 'relative' }}>
-                <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  style={inputStyle}
-                />
               </div>
-            </div>
 
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.375rem' }}>
-                <label style={{ ...labelStyle, marginBottom: 0 }}>Password</label>
-                {view === 'login' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.375rem' }}>
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>Password</label>
+                  {state === 'login' && (
+                    <button
+                      type="button"
+                      onClick={() => { setForgotEmail(email); switchView('forgot'); }}
+                      style={{ background: 'none', border: 'none', color: '#2dd4bf', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 500 }}
+                    >
+                      Forgot Password?
+                    </button>
+                  )}
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    style={{ ...inputStyle, paddingRight: '2.75rem' }}
+                  />
                   <button
                     type="button"
-                    onClick={() => { setForgotEmail(email); switchView('forgot'); }}
-                    style={{ background: 'none', border: 'none', color: '#2dd4bf', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 500 }}
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', color: '#64748b', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      padding: '0.25rem', borderRadius: '6px', transition: 'color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#94a3b8'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = '#64748b'}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    Forgot Password?
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
+                </div>
+                {state === 'signup' && (
+                  <div style={{ marginTop: '0.45rem', display: 'flex', flexWrap: 'wrap', gap: '0.35rem 0.65rem', fontSize: '0.72rem' }}>
+                    <span style={{ color: password.length >= 10 ? '#10b981' : '#64748b', transition: 'color 0.2s' }}>{password.length >= 10 ? '✓' : '○'} 10+ chars</span>
+                    <span style={{ color: /[A-Z]/.test(password) ? '#10b981' : '#64748b', transition: 'color 0.2s' }}>{/[A-Z]/.test(password) ? '✓' : '○'} Uppercase</span>
+                    <span style={{ color: /[a-z]/.test(password) ? '#10b981' : '#64748b', transition: 'color 0.2s' }}>{/[a-z]/.test(password) ? '✓' : '○'} Lowercase</span>
+                    <span style={{ color: /[0-9]/.test(password) ? '#10b981' : '#64748b', transition: 'color 0.2s' }}>{/[0-9]/.test(password) ? '✓' : '○'} Number</span>
+                    <span style={{ color: /[^a-zA-Z0-9]/.test(password) ? '#10b981' : '#64748b', transition: 'color 0.2s' }}>{/[^a-zA-Z0-9]/.test(password) ? '✓' : '○'} Symbol</span>
+                  </div>
                 )}
               </div>
-              <div style={{ position: 'relative' }}>
-                <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  style={{ ...inputStyle, paddingRight: '2.75rem' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)',
-                    background: 'none', border: 'none', color: '#64748b', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '0.25rem', borderRadius: '6px', transition: 'color 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = '#94a3b8'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = '#64748b'}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              {view === 'signup' && (
-                <div style={{ marginTop: '0.45rem', display: 'flex', flexWrap: 'wrap', gap: '0.35rem 0.65rem', fontSize: '0.72rem' }}>
-                  <span style={{ color: password.length >= 10 ? '#10b981' : '#64748b', transition: 'color 0.2s' }}>{password.length >= 10 ? '✓' : '○'} 10+ chars</span>
-                  <span style={{ color: /[A-Z]/.test(password) ? '#10b981' : '#64748b', transition: 'color 0.2s' }}>{/[A-Z]/.test(password) ? '✓' : '○'} Uppercase</span>
-                  <span style={{ color: /[a-z]/.test(password) ? '#10b981' : '#64748b', transition: 'color 0.2s' }}>{/[a-z]/.test(password) ? '✓' : '○'} Lowercase</span>
-                  <span style={{ color: /[0-9]/.test(password) ? '#10b981' : '#64748b', transition: 'color 0.2s' }}>{/[0-9]/.test(password) ? '✓' : '○'} Number</span>
-                  <span style={{ color: /[^a-zA-Z0-9]/.test(password) ? '#10b981' : '#64748b', transition: 'color 0.2s' }}>{/[^a-zA-Z0-9]/.test(password) ? '✓' : '○'} Symbol</span>
-                </div>
-              )}
-            </div>
 
-            <CloudflareTurnstile
-              onVerify={(token) => setCaptchaToken(token)}
-              onExpire={() => setCaptchaToken('')}
-              onError={() => setCaptchaToken('')}
-            />
+              <CloudflareTurnstile
+                onVerify={(token) => setCaptchaToken(token)}
+                onExpire={() => setCaptchaToken('')}
+                onError={() => setCaptchaToken('')}
+              />
 
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                marginTop: '0.5rem', padding: '0.875rem',
-                background: 'linear-gradient(135deg, #0d9488, #0f766e)',
-                border: 'none', borderRadius: '10px', color: '#ffffff', fontWeight: 600,
-                fontSize: '0.9375rem', cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.7 : 1, boxShadow: '0 4px 16px rgba(13, 148, 136, 0.4)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'
-              }}
-            >
-              {loading ? (
-                <><RefreshCw size={16} className="animate-spin" /><span>Authenticating...</span></>
-              ) : (
-                view === 'signup' ? 'Create Account' : 'Sign In'
-              )}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  marginTop: '0.5rem', padding: '0.875rem',
+                  background: 'linear-gradient(135deg, #0d9488, #0f766e)',
+                  border: 'none', borderRadius: '10px', color: '#ffffff', fontWeight: 600,
+                  fontSize: '0.9375rem', cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.7 : 1, boxShadow: '0 4px 16px rgba(13, 148, 136, 0.4)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'
+                }}
+              >
+                {loading ? (
+                  <><RefreshCw size={16} className="animate-spin" /><span>Authenticating...</span></>
+                ) : (
+                  state === 'signup' ? 'Create Account' : 'Sign In'
+                )}
+              </button>
+            </form>
           </>
         )}
 
         {/* Login / Signup switcher */}
-        {(view === 'login' || view === 'signup') && (
+        {(state === 'login' || state === 'signup') && (
           <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.8125rem', color: '#94a3b8' }}>
-            {view === 'signup' ? (
+            {state === 'signup' ? (
               <span>
                 Already have an account?{' '}
                 <button onClick={() => switchView('login')} style={{ background: 'none', border: 'none', color: '#2dd4bf', fontWeight: 600, cursor: 'pointer' }}>

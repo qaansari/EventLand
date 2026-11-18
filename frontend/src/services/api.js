@@ -136,20 +136,24 @@ async function request(endpoint, options = {}) {
 
 // --- Auth API ---
 export const authApi = {
-  login: async (email, password) => {
+  login: async (email, password, captchaToken = null) => {
+    const headers = captchaToken ? { 'X-Captcha-Token': captchaToken } : {};
     const data = await request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password })
+      headers,
+      body: JSON.stringify({ email, password, captchaToken })
     });
     if (data.token) {
       setStoredSession(data.token, data.user);
     }
     return data;
   },
-  register: async (fullName, email, password, phoneNumber = null, countryId = null) => {
+  register: async (fullName, email, password, phoneNumber = null, countryId = null, captchaToken = null) => {
+    const headers = captchaToken ? { 'X-Captcha-Token': captchaToken } : {};
     const data = await request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ fullName, email, password, phoneNumber, countryId })
+      headers,
+      body: JSON.stringify({ fullName, email, password, phoneNumber, countryId, captchaToken })
     });
     if (data.token) {
       setStoredSession(data.token, data.user);
@@ -161,10 +165,14 @@ export const authApi = {
     method: 'POST',
     body: JSON.stringify({ oldPassword, newPassword })
   }),
-  forgotPassword: async (email) => request('/auth/forgot-password', {
-    method: 'POST',
-    body: JSON.stringify({ email })
-  }),
+  forgotPassword: async (email, captchaToken = null) => {
+    const headers = captchaToken ? { 'X-Captcha-Token': captchaToken } : {};
+    return request('/auth/forgot-password', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email, captchaToken })
+    });
+  },
   resetPassword: async (email, resetToken, newPassword) => request('/auth/reset-password', {
     method: 'POST',
     body: JSON.stringify({ email, resetToken, newPassword })
@@ -243,10 +251,15 @@ export const artistsApi = {
 
 // --- Public Bookings API ---
 export const bookingsApi = {
-  createBooking: async (dto) => request('/bookings', {
-    method: 'POST',
-    body: JSON.stringify(dto)
-  }),
+  createBooking: async (dto, captchaToken = null) => {
+    const effectiveToken = dto?.captchaToken || captchaToken;
+    const headers = effectiveToken ? { 'X-Captcha-Token': effectiveToken } : {};
+    return request('/bookings', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...dto, captchaToken: effectiveToken })
+    });
+  },
   getBookingById: async (id) => request(`/bookings/${id}`),
   getBookingByRef: async (ref) => request(`/bookings/ref/${ref}`),
   getBookingsByEmail: async (email, pageNumber = 1, pageSize = 10) => request(`/bookings/user/${encodeURIComponent(email)}?pageNumber=${pageNumber}&pageSize=${pageSize}`),

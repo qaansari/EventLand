@@ -1,11 +1,15 @@
 namespace EventLand.Application.Dtos;
 
+using EventLand.Domain.Enums;
+
 public record ValidateGateTicketRequestDto(
     string TicketCode,
     int? EventId = null,
     int? EventShowId = null,
     bool CheckIn = true,
-    string? GateName = null
+    string? GateName = null,
+    string? DeviceId = null,
+    long? SequenceNumber = null
 );
 
 public record TicketValidationResultDto(
@@ -25,7 +29,41 @@ public record TicketValidationResultDto(
     DateTimeOffset? CheckedInAt = null,
     string? CheckedInBy = null,
     string? GateName = null,
-    DateTimeOffset ValidatedAt = default
+    DateTimeOffset ValidatedAt = default,
+    TicketScanState TicketState = TicketScanState.Issued,
+    string? DeviceId = null
+);
+
+public record OfflineGateScanItemDto(
+    string BookingRef,
+    DateTimeOffset ScannedAt,
+    string DeviceId,
+    string Signature,
+    long SequenceNumber,
+    int? EventId = null,
+    int? EventShowId = null,
+    int? SeatId = null,
+    string? GateName = null
+);
+
+public record OfflineGateSyncBatchRequestDto(
+    string DeviceId,
+    List<OfflineGateScanItemDto> Scans
+);
+
+public record OfflineGateSyncItemResultDto(
+    string BookingRef,
+    string Status, // "APPROVED", "ALREADY_CHECKED_IN", "SECURITY_ALERT_DUPLICATE_ENTRY", "INVALID_SIGNATURE", "TICKET_REVOKED", "NOT_FOUND"
+    string Message,
+    DateTimeOffset? AdmittedAt
+);
+
+public record OfflineGateSyncBatchResponseDto(
+    int TotalProcessed,
+    int TotalAdmitted,
+    int TotalRejected,
+    int TotalDuplicateSecurityAlerts,
+    List<OfflineGateSyncItemResultDto> Results
 );
 
 public record RecentGateScanDto(

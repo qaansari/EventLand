@@ -10,36 +10,36 @@ using EventLand.Domain.Enums;
 /// </summary>
 public class User : BaseEntity
 {
-    public string    Email         { get; set; } = string.Empty;
-    public string    PasswordHash  { get; set; } = string.Empty;
-    public string    FullName      { get; set; } = string.Empty;
-    public string?   PhoneNumber   { get; set; }
-    public string?   ImageUrl      { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public string PasswordHash { get; set; } = string.Empty;
+    public string FullName { get; set; } = string.Empty;
+    public string? PhoneNumber { get; set; }
+    public string? ImageUrl { get; set; }
 
     // Country Foreign Key & Navigation
-    public int?      CountryId     { get; set; }
-    public Country?  Country       { get; set; }
+    public int? CountryId { get; set; }
+    public Country? Country { get; set; }
 
     // Role Foreign Key & Navigation
-    public int       RoleId        { get; set; }
-    public Role      Role          { get; set; } = null!;
+    public int RoleId { get; set; }
+    public Role Role { get; set; } = null!;
 
     // Organizer Company Foreign Key & Navigation (allows multiple users per organizer)
-    public int?      OrganizerId   { get; set; }
-    public Organizer? Organizer    { get; set; }
+    public int? OrganizerId { get; set; }
+    public Organizer? Organizer { get; set; }
 
-    public bool      IsActive      { get; set; } = true;
+    public bool IsActive { get; set; } = true;
     public DateTimeOffset? LastLoginAt { get; set; }
 
     // Account lockout & brute-force defense
-    public int       AccessFailedCount { get; set; } = 0;
+    public int AccessFailedCount { get; set; } = 0;
     public DateTimeOffset? LockoutEndUtc { get; set; }
 
     // Social authentication provider IDs (nullable — local accounts leave these null)
-    public string?   GoogleId      { get; set; }   // Google Subject ID (immutable)
-    public string?   FacebookId    { get; set; }   // Facebook User ID (immutable)
+    public string? GoogleId { get; set; }   // Google Subject ID (immutable)
+    public string? FacebookId { get; set; }   // Facebook User ID (immutable)
 
     /// <summary>The channel through which this account was first created: "local", "google", or "facebook".</summary>
-    public string    AuthProvider  { get; set; } = "local";
+    public string AuthProvider { get; set; } = "local";
 }
 

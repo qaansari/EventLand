@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  X, 
-  Copy, 
-  Clock, 
-  CheckCircle, 
-  QrCode, 
-  ShieldCheck, 
+import {
+  X,
+  Copy,
+  Clock,
+  CheckCircle,
+  AlertTriangle,
+  QrCode,
+  ShieldCheck,
   CreditCard,
   ExternalLink,
   Zap,
@@ -14,16 +15,15 @@ import {
 import { bookingsApi, paymentsApi } from '../services/api';
 import PayProStatusTracker from './PayProStatusTracker';
 import { useToast } from '../context/ToastContext';
+import { useCheckoutMachine } from '../hooks/useCheckoutMachine';
 
 export default function CheckoutModal({ event, selectedSeats, onClose, onBookingSuccess, onInvoiceCreated }) {
   const { showSuccess, showError, showWarning } = useToast();
-  const [step, setStep] = useState(1); // 1: Buyer Info, 2: Payment Channel, 3: Invoice & Status, 4: Confirmed
+  const { state, context, dispatch, pollStatus } = useCheckoutMachine();
 
   const [selectedPayProMethod, setSelectedPayProMethod] = useState('easypaisa_jazzcash');
   const [payproResponse, setPayproResponse] = useState(null);
   const [isInitiatingPayPro, setIsInitiatingPayPro] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
-  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [createdBooking, setCreatedBooking] = useState(null);
 
   // Authorization / Verified User check
@@ -39,23 +39,6 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
 
   // Copy Feedback state
   const [copiedField, setCopiedField] = useState(null);
-
-  // 30-Minute Seat Reservation Hold Timer (30 mins = 1800s)
-  const [timerSeconds, setTimerSeconds] = useState(1800);
-
-  // 30-Minute Countdown Timer for seat reservation hold
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimerSeconds(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   const formatTimer = (secs) => {
     const m = Math.floor(secs / 60);
@@ -86,17 +69,18 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
       showError('Authorization Required', 'Only authorized and verified users can purchase tickets. Please log in first.');
       return;
     }
-    if (timerSeconds <= 0) {
+    if (context.secondsRemaining <= 0) {
       showError('Hold Expired', 'Seat hold timer has expired. Please select your seats again.');
       onClose();
       return;
     }
-    setStep(2);
+    dispatch({ type: 'PROCEED' });
   };
 
   // Helper to create a backend booking record if not already created
   const createBookingRecord = async (paymentMethod = 'PayPro') => {
     if (createdBooking) return createdBooking;
+    if (context.booking) return context.booking;
 
     const explicitTierId = selectedSeats.find(s => s.tierId)?.tierId;
     const selectedShowTiers = event.selectedShow?.ticketTiers || [];
@@ -142,7 +126,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
       showError('Authorization Required', 'Only authorized and verified users can purchase tickets. Please log in first.');
       return;
     }
-    if (timerSeconds <= 0) {
+    if (context.secondsRemaining <= 0) {
       showError('Hold Expired', 'Seat hold timer has expired. Please select your seats again.');
       onClose();
       return;
@@ -196,7 +180,10 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
 
       // Seamless hosted redirect matching ACPKHI (acpkhi.com/events)
       if (paymentUrl) {
-        setIsRedirecting(true);
+        dispatch({
+          type: 'START_REDIRECT',
+          payload: { booking, paymentUrl, voucher }
+        });
         showSuccess('Redirecting to PayPro 💳', 'Connecting to PayPro 1Link checkout portal...');
         setTimeout(() => {
           window.location.assign(paymentUrl);
@@ -204,39 +191,52 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         return;
       }
 
-      setStep(3); // Fallback: Show Voucher Code & Tracker
+      dispatch({
+        type: 'VOUCHER_ISSUED',
+        payload: {
+          booking,
+          voucher,
+          expiresAt: new Date(Date.now() + 1800000).toISOString()
+        }
+      });
       showSuccess('PayPro Invoice Ready 💳', `PayPro Voucher #: ${voucher}`);
     } catch (err) {
       console.error('PayPro Checkout error:', err);
+      dispatch({ type: 'FAIL', message: err.message || 'Failed to initiate PayPro Online Gateway session.' });
       showError('PayPro Gateway Error', err.message || 'Failed to initiate PayPro Online Gateway session.');
     } finally {
       setIsInitiatingPayPro(false);
     }
   };
 
-  const handleCheckPaymentStatus = async () => {
-    const bookingRef = createdBooking?.bookingRef || payproResponse?.bookingRef;
-    if (!bookingRef) return;
-
-    setIsCheckingStatus(true);
+  const handleManualStatusCheck = async () => {
     try {
-      const statusRes = await paymentsApi.getPaymentStatus(bookingRef);
-      if (statusRes && (statusRes.isPaid || statusRes.ticketReady || statusRes.paymentStatus === 'Paid')) {
+      await pollStatus();
+      if (state === 'confirmed') {
         showSuccess('Payment Confirmed! 🎉', 'Your payment was verified and tickets are confirmed!');
         if (onBookingSuccess) {
-          onBookingSuccess({ ...createdBooking, status: 'Confirmed', paymentStatus: 'Paid' });
+          onBookingSuccess({ ...(createdBooking || context.booking), status: 'Confirmed', paymentStatus: 'Paid' });
         }
-        setStep(4);
       } else {
         showWarning('Payment Pending ⏳', 'Payment has not been confirmed yet. If you have completed payment, please allow a moment and try again.');
       }
     } catch (err) {
-      console.error('Status check error:', err);
       showError('Status Check Failed', err.message || 'Could not verify payment status.');
-    } finally {
-      setIsCheckingStatus(false);
     }
   };
+
+  // Step tracker mapping
+  const stepNumber = useMemo(() => {
+    switch (state) {
+      case 'buyer_info': return 1;
+      case 'payment_method': return 2;
+      case 'redirecting': return 2;
+      case 'voucher_pending': return 3;
+      case 'confirmed': return 3;
+      case 'failed': return 3;
+      default: return 1;
+    }
+  }, [state]);
 
   return (
     <div style={{
@@ -273,21 +273,23 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                 gap: '0.35rem',
                 fontSize: '0.75rem',
                 fontWeight: 700,
-                color: timerSeconds > 300 ? '#2dd4bf' : '#f87171',
-                background: timerSeconds > 300 ? 'rgba(13, 148, 136, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                color: context.secondsRemaining > 300 ? '#2dd4bf' : '#f87171',
+                background: context.secondsRemaining > 300 ? 'rgba(13, 148, 136, 0.15)' : 'rgba(239, 68, 68, 0.15)',
                 padding: '0.2rem 0.6rem',
                 borderRadius: '9999px',
-                border: `1px solid ${timerSeconds > 300 ? 'rgba(13, 148, 136, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`
+                border: `1px solid ${context.secondsRemaining > 300 ? 'rgba(13, 148, 136, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`
               }}>
-                <Clock size={13} className={timerSeconds <= 300 ? 'animate-pulse' : ''} /> 
-                Held for: {formatTimer(timerSeconds)}
+                <Clock size={13} className={context.secondsRemaining <= 300 ? 'animate-pulse' : ''} />
+                Held for: {formatTimer(context.secondsRemaining)}
               </span>
             </div>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', margin: 0 }}>
-              {step === 1 && 'Buyer Details'}
-              {step === 2 && 'PayPro Online Payment'}
-              {step === 3 && 'PayPro Invoice & Status'}
-              {step === 4 && 'Payment Confirmed'}
+              {state === 'buyer_info' && 'Buyer Details'}
+              {state === 'payment_method' && 'PayPro Online Payment'}
+              {state === 'redirecting' && 'Connecting to Gateway...'}
+              {state === 'voucher_pending' && 'PayPro Invoice & Status'}
+              {state === 'confirmed' && 'Payment Confirmed'}
+              {state === 'failed' && 'Payment Unsuccessful'}
             </h2>
             <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.2rem' }}>
               {event.title} • {selectedSeats.length} {selectedSeats.length === 1 ? 'Seat' : 'Seats'}
@@ -325,10 +327,10 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               <div style={{
                 height: '4px',
                 borderRadius: '9999px',
-                background: step >= s.num ? 'linear-gradient(90deg, #0d9488, #2dd4bf)' : 'rgba(255, 255, 255, 0.1)',
+                background: stepNumber >= s.num ? 'linear-gradient(90deg, #0d9488, #2dd4bf)' : 'rgba(255, 255, 255, 0.1)',
                 transition: 'background 0.3s ease'
               }} />
-              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: step >= s.num ? '#2dd4bf' : '#64748b' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: stepNumber >= s.num ? '#2dd4bf' : '#64748b' }}>
                 {s.label}
               </span>
             </div>
@@ -336,7 +338,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         </div>
 
         {/* --- REDIRECTING STATE (ACPKHI Hosted Checkout Redirect) --- */}
-        {isRedirecting && (
+        {state === 'redirecting' && (
           <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem' }}>
             <div style={{
               width: '56px',
@@ -360,7 +362,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         )}
 
         {/* --- STEP 1: BUYER INFORMATION --- */}
-        {!isRedirecting && step === 1 && (
+        {state === 'buyer_info' && (
           <form onSubmit={handleProceedToPayment}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
               <div style={{ gridColumn: '1 / -1' }}>
@@ -443,152 +445,169 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         )}
 
         {/* --- STEP 2: PAYMENT METHOD SELECTION & DETAILS --- */}
-        {!isRedirecting && step === 2 && (
+        {state === 'payment_method' && (
           <div>
             {/* Amount Payable Banner */}
             <div style={{
               background: 'linear-gradient(135deg, rgba(13, 148, 136, 0.25), rgba(15, 23, 42, 0.7))',
-              border: '1px solid rgba(13, 148, 136, 0.4)',
+              border: '1px solid rgba(45, 212, 191, 0.35)',
               borderRadius: '16px',
               padding: '1.25rem',
               marginBottom: '1.5rem',
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'center'
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '0.75rem'
             }}>
               <div>
-                <span style={{ fontSize: '0.8rem', color: '#2dd4bf', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Total Amount Payable
+                <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+                  Total Amount Due (PayPro 1Link)
                 </span>
-                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#fff' }}>
+                <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#2dd4bf', letterSpacing: '-0.02em' }}>
                   PKR {totalPayable.toLocaleString()}
                 </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Payment Method</span>
-                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#2dd4bf' }}>
-                  PayPro Online Gateway ⚡
+              <div style={{ textAlign: 'right', fontSize: '0.8rem', color: '#94a3b8' }}>
+                <div>{selectedSeats.length} {selectedSeats.length === 1 ? 'ticket' : 'tickets'} reserved</div>
+                <div style={{ color: '#2dd4bf', fontWeight: 600 }}>⚡ Instant 1Pay Verification</div>
+              </div>
+            </div>
+
+            {/* Channels Selection */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 700, marginBottom: '0.75rem' }}>
+                Select Instant Payment Channel:
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '0.75rem' }}>
+                {/* Channel 1: Mobile Wallets */}
+                <div
+                  onClick={() => setSelectedPayProMethod('easypaisa_jazzcash')}
+                  style={{
+                    padding: '1rem',
+                    borderRadius: '12px',
+                    border: selectedPayProMethod === 'easypaisa_jazzcash' ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
+                    background: selectedPayProMethod === 'easypaisa_jazzcash' ? 'rgba(13, 148, 136, 0.15)' : 'rgba(15, 23, 42, 0.5)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: selectedPayProMethod === 'easypaisa_jazzcash' ? '#2dd4bf' : '#64748b' }} />
+                    <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>EasyPaisa & JazzCash</span>
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0, paddingLeft: '1rem' }}>
+                    Instant OTC / In-app voucher billing
+                  </p>
+                </div>
+
+                {/* Channel 2: Cards */}
+                <div
+                  onClick={() => setSelectedPayProMethod('credit_debit')}
+                  style={{
+                    padding: '1rem',
+                    borderRadius: '12px',
+                    border: selectedPayProMethod === 'credit_debit' ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
+                    background: selectedPayProMethod === 'credit_debit' ? 'rgba(13, 148, 136, 0.15)' : 'rgba(15, 23, 42, 0.5)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: selectedPayProMethod === 'credit_debit' ? '#2dd4bf' : '#64748b' }} />
+                    <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>Visa / Mastercard / UnionPay</span>
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0, paddingLeft: '1rem' }}>
+                    Hosted 3D Secure checkout portal
+                  </p>
+                </div>
+
+                {/* Channel 3: 1Link 1Bill */}
+                <div
+                  onClick={() => setSelectedPayProMethod('1link')}
+                  style={{
+                    padding: '1rem',
+                    borderRadius: '12px',
+                    border: selectedPayProMethod === '1link' ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
+                    background: selectedPayProMethod === '1link' ? 'rgba(13, 148, 136, 0.15)' : 'rgba(15, 23, 42, 0.5)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: selectedPayProMethod === '1link' ? '#2dd4bf' : '#64748b' }} />
+                    <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>1Link 1Bill & Bank Apps</span>
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0, paddingLeft: '1rem' }}>
+                    All 38+ Pakistani bank apps supported
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* PAYPRO ONLINE GATEWAY DETAILS CARD */}
+            {/* PayPro Security & Instructions Badge */}
             <div style={{
-              background: 'rgba(10, 18, 30, 0.7)',
-              border: '1px solid rgba(13, 148, 136, 0.35)',
-              borderRadius: '16px',
-              padding: '1.5rem',
-              marginBottom: '1.5rem'
+              background: 'rgba(15, 23, 42, 0.6)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '14px',
+              padding: '1rem',
+              marginBottom: '1.5rem',
+              fontSize: '0.8rem',
+              color: '#94a3b8',
+              lineHeight: 1.5
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
-                <CreditCard size={22} color="#2dd4bf" />
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff', margin: 0 }}>
-                  PayPro 1Pay Instant Online Gateway
-                </h3>
-                <span className="badge badge-primary" style={{ marginLeft: 'auto', fontSize: '0.7rem' }}>
-                  AUTOMATED & INSTANT
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#2dd4bf', fontWeight: 700, marginBottom: '0.4rem' }}>
+                <ShieldCheck size={16} /> 100% SBP Authorized 1Link Gateway Integration
               </div>
+              When you click proceed, you will connect to PayPro. Complete your payment online or use the generated 1Bill invoice code to pay via EasyPaisa/JazzCash or any banking app.
+            </div>
 
-              <p style={{ fontSize: '0.85rem', color: '#cbd5e1', lineHeight: 1.5, marginBottom: '1.25rem' }}>
-                Pay securely using <strong>EasyPaisa, JazzCash, Debit/Credit Card, 1Link ATMs, or Online Banking</strong> via PayPro's official 1Pay Gateway.
-              </p>
-
-              {/* PayPro Channel Selector */}
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600, marginBottom: '0.5rem' }}>
-                  Select Preferred PayPro Payment Channel:
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '0.75rem' }}>
-                  <div
-                    onClick={() => setSelectedPayProMethod('easypaisa_jazzcash')}
-                    style={{
-                      padding: '0.85rem',
-                      background: selectedPayProMethod === 'easypaisa_jazzcash' ? 'rgba(13, 148, 136, 0.2)' : 'rgba(15, 23, 42, 0.6)',
-                      border: selectedPayProMethod === 'easypaisa_jazzcash' ? '1px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.6rem',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <CreditCard size={18} color="#2dd4bf" />
-                    <div>
-                      <div style={{ color: '#fff', fontWeight: 700, fontSize: '0.85rem' }}>EasyPaisa / JazzCash / Cards</div>
-                      <div style={{ color: '#94a3b8', fontSize: '0.72rem' }}>1Pay Online Portal + 1Link</div>
-                    </div>
-                  </div>
-
-                  <div
-                    onClick={() => setSelectedPayProMethod('qr_code')}
-                    style={{
-                      padding: '0.85rem',
-                      background: selectedPayProMethod === 'qr_code' ? 'rgba(13, 148, 136, 0.2)' : 'rgba(15, 23, 42, 0.6)',
-                      border: selectedPayProMethod === 'qr_code' ? '1px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.6rem',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <QrCode size={18} color="#2dd4bf" />
-                    <div>
-                      <div style={{ color: '#fff', fontWeight: 700, fontSize: '0.85rem' }}>PayPro Instant QR Code</div>
-                      <div style={{ color: '#94a3b8', fontSize: '0.72rem' }}>Direct Banking App Scan</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="btn btn-outline-secondary"
-                  style={{ padding: '0.85rem 1.25rem', borderRadius: '10px' }}
-                >
-                  ← Back
-                </button>
-                <button
-                  type="button"
-                  onClick={handleInitiatePayProCheckout}
-                  disabled={isInitiatingPayPro}
-                  className="btn btn-primary"
-                  style={{
-                    flex: 1,
-                    padding: '0.85rem',
-                    fontSize: '0.98rem',
-                    fontWeight: 800,
-                    borderRadius: '10px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem',
-                    background: 'linear-gradient(135deg, #0d9488, #0f766e)',
-                    cursor: isInitiatingPayPro ? 'not-allowed' : 'pointer',
-                    opacity: isInitiatingPayPro ? 0.75 : 1
-                  }}
-                >
-                  {isInitiatingPayPro ? (
-                    <>
-                      <RefreshCw size={18} className="animate-spin" />
-                      <span>Connecting to PayPro Gateway...</span>
-                    </>
-                  ) : (
-                    'Proceed to PayPro Online Gateway →'
-                  )}
-                </button>
-              </div>
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={() => dispatch({ type: 'BACK' })}
+                className="btn btn-outline-secondary"
+                style={{ padding: '0.85rem 1.25rem', borderRadius: '10px' }}
+              >
+                ← Back
+              </button>
+              <button
+                type="button"
+                onClick={handleInitiatePayProCheckout}
+                disabled={isInitiatingPayPro}
+                className="btn btn-primary"
+                style={{
+                  flex: 1,
+                  padding: '0.85rem',
+                  fontSize: '0.98rem',
+                  fontWeight: 800,
+                  borderRadius: '10px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  background: 'linear-gradient(135deg, #0d9488, #0f766e)',
+                  cursor: isInitiatingPayPro ? 'not-allowed' : 'pointer',
+                  opacity: isInitiatingPayPro ? 0.75 : 1
+                }}
+              >
+                {isInitiatingPayPro ? (
+                  <>
+                    <RefreshCw size={18} className="animate-spin" />
+                    <span>Connecting to PayPro Gateway...</span>
+                  </>
+                ) : (
+                  'Proceed to PayPro Online Gateway →'
+                )}
+              </button>
             </div>
           </div>
         )}
 
         {/* --- STEP 3: PAYPRO INVOICE & STATUS TRACKER --- */}
-        {!isRedirecting && step === 3 && payproResponse && (
+        {state === 'voucher_pending' && (
           <div style={{ textAlign: 'center', padding: '1rem 0' }}>
             <div style={{
               width: '64px',
@@ -628,11 +647,11 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                 PayPro Consumer Voucher / OTC Number
               </div>
               <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#2dd4bf', letterSpacing: '0.08em', marginBottom: '0.75rem' }}>
-                {payproResponse.voucherCode || payproResponse.otcVoucherCode || payproResponse.invoiceId || createdBooking?.bookingRef || '1PAY-PAYPRO-01'}
+                {context.voucherCode || payproResponse?.voucherCode || payproResponse?.otcVoucherCode || payproResponse?.invoiceId || createdBooking?.bookingRef || '1PAY-PAYPRO-01'}
               </div>
               <button
                 type="button"
-                onClick={() => copyToClipboard(payproResponse.voucherCode || payproResponse.otcVoucherCode || payproResponse.invoiceId || createdBooking?.bookingRef, 'PayPro Consumer Voucher')}
+                onClick={() => copyToClipboard(context.voucherCode || payproResponse?.voucherCode || payproResponse?.otcVoucherCode || payproResponse?.invoiceId || createdBooking?.bookingRef, 'PayPro Consumer Voucher')}
                 style={{
                   background: 'rgba(13, 148, 136, 0.25)',
                   border: '1px solid rgba(45, 212, 191, 0.5)',
@@ -652,10 +671,10 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
             </div>
 
             {/* Direct PayPro 1Pay / Click2Pay Link */}
-            {(payproResponse.paymentUrl || payproResponse.connectUrl || payproResponse.click2PayUrl) && (
+            {(payproResponse?.paymentUrl || payproResponse?.connectUrl || payproResponse?.click2PayUrl || context.paymentUrl) && (
               <div style={{ marginBottom: '1.5rem' }}>
                 <a
-                  href={payproResponse.click2PayUrl || payproResponse.paymentUrl || payproResponse.connectUrl}
+                  href={payproResponse?.click2PayUrl || payproResponse?.paymentUrl || payproResponse?.connectUrl || context.paymentUrl}
                   target="_blank"
                   rel="noreferrer"
                   style={{
@@ -689,7 +708,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.85rem' }}>
                 <span style={{ color: '#64748b' }}>Booking Reference:</span>
-                <strong style={{ color: '#2dd4bf' }}>{createdBooking?.bookingRef || payproResponse?.bookingRef || 'EVL-100001'}</strong>
+                <strong style={{ color: '#2dd4bf' }}>{context.booking?.bookingRef || createdBooking?.bookingRef || payproResponse?.bookingRef || 'EVL-100001'}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.6rem', fontSize: '0.85rem' }}>
                 <span style={{ color: '#64748b' }}>Event:</span>
@@ -701,22 +720,22 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1rem', fontWeight: 800, borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '0.6rem' }}>
                 <span style={{ color: '#fff' }}>Amount Payable:</span>
-                <span style={{ color: '#2dd4bf' }}>PKR {(payproResponse.amount || totalPayable).toLocaleString()}</span>
+                <span style={{ color: '#2dd4bf' }}>PKR {(payproResponse?.amount || totalPayable).toLocaleString()}</span>
               </div>
             </div>
 
             {/* Live PayPro Status Tracker Widget */}
             <div style={{ marginBottom: '1.5rem', textAlign: 'left' }}>
               <PayProStatusTracker
-                orderNumber={payproResponse.voucherCode || payproResponse.invoiceId || createdBooking?.bookingRef || payproResponse.bookingRef}
-                click2PayUrl={payproResponse.click2PayUrl || payproResponse.paymentUrl || payproResponse.connectUrl}
+                orderNumber={context.voucherCode || payproResponse?.voucherCode || payproResponse?.invoiceId || createdBooking?.bookingRef || payproResponse?.bookingRef}
+                click2PayUrl={payproResponse?.click2PayUrl || payproResponse?.paymentUrl || payproResponse?.connectUrl || context.paymentUrl}
                 onStatusChange={(statusRes) => {
                   if (statusRes && (statusRes.isPaid || statusRes.orderStatus === 'Paid' || statusRes.orderStatus === 'PAID')) {
+                    dispatch({ type: 'STATUS_CHECKED', status: 'paid' });
                     showSuccess('Payment Confirmed! 🎉', 'Your payment was verified and tickets are confirmed!');
                     if (onBookingSuccess) {
-                      onBookingSuccess({ ...createdBooking, status: 'Confirmed', paymentStatus: 'Paid' });
+                      onBookingSuccess({ ...(createdBooking || context.booking), status: 'Confirmed', paymentStatus: 'Paid' });
                     }
-                    setStep(4);
                   }
                 }}
               />
@@ -724,8 +743,8 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <button
-                onClick={handleCheckPaymentStatus}
-                disabled={isCheckingStatus}
+                onClick={handleManualStatusCheck}
+                disabled={context.isCheckingStatus}
                 className="btn btn-primary"
                 style={{
                   padding: '0.85rem',
@@ -739,11 +758,11 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '0.5rem',
-                  cursor: isCheckingStatus ? 'not-allowed' : 'pointer',
-                  opacity: isCheckingStatus ? 0.75 : 1
+                  cursor: context.isCheckingStatus ? 'not-allowed' : 'pointer',
+                  opacity: context.isCheckingStatus ? 0.75 : 1
                 }}
               >
-                {isCheckingStatus ? (
+                {context.isCheckingStatus ? (
                   <>
                     <RefreshCw size={16} className="animate-spin" />
                     <span>Verifying with PayPro...</span>
@@ -764,7 +783,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         )}
 
         {/* --- STEP 4: PAYMENT CONFIRMED / E-TICKETS READY --- */}
-        {!isRedirecting && step === 4 && (
+        {state === 'confirmed' && (
           <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
             <div style={{
               width: '72px',
@@ -803,6 +822,62 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
             >
               View My E-Tickets 🎟️
             </button>
+          </div>
+        )}
+
+        {/* --- FAILED STATE --- */}
+        {state === 'failed' && (
+          <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+            <div style={{
+              width: '72px',
+              height: '72px',
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.2)',
+              border: '2px solid #ef4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1.25rem'
+            }}>
+              <AlertTriangle size={44} color="#ef4444" />
+            </div>
+
+            <span className="badge" style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', marginBottom: '0.75rem', fontSize: '0.8rem' }}>
+              PAYMENT UNSUCCESSFUL
+            </span>
+
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fff', marginBottom: '0.5rem' }}>
+              Checkout Expired or Declined
+            </h3>
+            <p style={{ fontSize: '0.9rem', color: '#94a3b8', maxWidth: '480px', margin: '0 auto 1.5rem', lineHeight: 1.5 }}>
+              {context.errorMessage || 'Your reservation window has elapsed or the transaction was declined. Your held seats have been released.'}
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+              <button
+                onClick={() => dispatch({ type: 'RESET' })}
+                className="btn btn-primary"
+                style={{
+                  padding: '0.85rem 1.75rem',
+                  borderRadius: '12px',
+                  fontWeight: 800,
+                  fontSize: '0.95rem'
+                }}
+              >
+                Try Again 🔄
+              </button>
+              <button
+                onClick={onClose}
+                className="btn btn-outline-secondary"
+                style={{
+                  padding: '0.85rem 1.5rem',
+                  borderRadius: '12px',
+                  fontSize: '0.95rem'
+                }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         )}
       </div>

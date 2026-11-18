@@ -4,6 +4,9 @@ using EventLand.Api.Extensions;
 using EventLand.Application.Common.Interfaces;
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
+using EventLand.Domain.Entities;
+using EventLand.Domain.Enums;
+using EventLand.Domain.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -18,21 +21,27 @@ public class SeatHoldController : ControllerBase
     private readonly ICacheService _cacheService;
     private readonly IHubContext<Hubs.SeatingHub, ISeatingHubClient> _hubContext;
     private readonly IApplicationDbContext _context;
+    private readonly IBankAccountService? _bankAccountService;
+    private readonly EventLand.Application.Common.EventLandTelemetry? _telemetry;
 
     public SeatHoldController(
         ICacheService cacheService,
         IHubContext<Hubs.SeatingHub, ISeatingHubClient> hubContext,
-        IApplicationDbContext context)
+        IApplicationDbContext context,
+        IBankAccountService? bankAccountService = null,
+        EventLand.Application.Common.EventLandTelemetry? telemetry = null)
     {
         _cacheService = cacheService;
         _hubContext = hubContext;
         _context = context;
+        _bankAccountService = bankAccountService;
+        _telemetry = telemetry;
     }
 
     /// <summary>Hold seats for 10 minutes in Redis for checkout. Requires authentication.</summary>
     [HttpPost("hold")]
     [Authorize]
-    [EnableRateLimiting("booking")]
+    [EnableRateLimiting("hold")]
     public async Task<ActionResult<HoldSeatsResponseDto>> HoldSeats([FromBody] HoldSeatsRequestDto dto)
     {
         if (dto.SeatIds == null || !dto.SeatIds.Any())
@@ -43,14 +52,31 @@ public class SeatHoldController : ControllerBase
         if (string.IsNullOrWhiteSpace(authenticatedEmail))
             return Unauthorized();
 
+        // Server-side Bank Maintenance Check: Reject seat hold if requested for direct bank transfer during maintenance
+        if (!string.IsNullOrWhiteSpace(dto.PaymentMethod) && string.Equals(dto.PaymentMethod, "BankTransfer", StringComparison.OrdinalIgnoreCase))
+        {
+            if (_bankAccountService != null)
+            {
+                var opStatus = await _bankAccountService.GetActiveBankOperationalStatusAsync();
+                if (!opStatus.IsOperational && opStatus.State == BankOperationalState.UnderMaintenance)
+                {
+                    throw new BankMaintenanceException(
+                        opStatus.Reason ?? "Direct bank transfers are currently paused for maintenance.",
+                        opStatus.UntilUtc);
+                }
+            }
+        }
+
         var holdDuration = TimeSpan.FromMinutes(10);
         var holdResult = await _cacheService.TryHoldSeatsGranularAsync(dto.EventId, dto.SeatIds, authenticatedEmail, holdDuration, dto.EventShowId);
 
         if (!holdResult.Success)
         {
+            _telemetry?.RecordSeatHoldConflict(dto.EventId, dto.SeatIds.Count);
+
             return Conflict(new HoldSeatsResponseDto(
                 false,
-                holdResult.ConflictingSeatIds.Count > 0 
+                holdResult.ConflictingSeatIds.Count > 0
                     ? $"The following seat(s) are currently locked by another customer: {string.Join(", ", holdResult.ConflictingSeatIds)}"
                     : "One or more selected seats are currently locked by another customer.",
                 holdResult.ConflictingSeatIds,

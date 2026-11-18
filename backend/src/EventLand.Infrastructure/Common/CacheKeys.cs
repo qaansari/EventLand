@@ -6,12 +6,12 @@ namespace EventLand.Infrastructure.Common;
 [Obsolete("Use EventLand.Application.Common.CacheKeys instead.")]
 public static class CacheKeys
 {
-    public const string EventsPrefix   = EventLand.Application.Common.CacheKeys.EventsPrefix;
-    public const string EventDetail    = EventLand.Application.Common.CacheKeys.EventDetail;
-    public const string PublicEvents   = EventLand.Application.Common.CacheKeys.PublicEvents;
-    public const string PublicArtists  = EventLand.Application.Common.CacheKeys.PublicArtists;
-    public const string ArtistDetail   = EventLand.Application.Common.CacheKeys.ArtistDetail;
-    public const string TagsList       = EventLand.Application.Common.CacheKeys.TagsList;
+    public const string EventsPrefix = EventLand.Application.Common.CacheKeys.EventsPrefix;
+    public const string EventDetail = EventLand.Application.Common.CacheKeys.EventDetail;
+    public const string PublicEvents = EventLand.Application.Common.CacheKeys.PublicEvents;
+    public const string PublicArtists = EventLand.Application.Common.CacheKeys.PublicArtists;
+    public const string ArtistDetail = EventLand.Application.Common.CacheKeys.ArtistDetail;
+    public const string TagsList = EventLand.Application.Common.CacheKeys.TagsList;
     public const string OrganizersList = EventLand.Application.Common.CacheKeys.OrganizersList;
-    public const string SeatLocks      = "seatlock:event:{0}"; // legacy key, kept only so old entries can still be evicted
+    public const string SeatLocks = "seatlock:event:{0}"; // legacy key, kept only so old entries can still be evicted
 }

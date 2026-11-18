@@ -120,10 +120,15 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
     ];
   }, [isSuperAdmin, rolesList]);
 
-  // Form Modal States
-  const [showEventModal, setShowEventModal] = useState(false);
-  const [showShowModal, setShowShowModal] = useState(false);
-  const [isSavingShow, setIsSavingShow] = useState(false);
+  // Form Modal States - Unified via single Discriminated Union activeModal (Audit #14)
+  const [activeModal, setActiveModal] = useState(null); // { type: string, id?: number, data?: any } | null
+  const showEventModal = activeModal?.type === 'event';
+  const setShowEventModal = (v) => setActiveModal(v ? { type: 'event' } : null);
+  const showShowModal = activeModal?.type === 'show';
+  const setShowShowModal = (v) => setActiveModal(v ? { type: 'show' } : null);
+  const isSavingShowState = useState(false);
+  const isSavingShow = isSavingShowState[0];
+  const setIsSavingShow = isSavingShowState[1];
 
   // Gate Scanner States
   const [gateEventFilter, setGateEventFilter] = useState('');
@@ -135,17 +140,28 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   const [gateName, setGateName] = useState('Main Gate - Entrance A');
   const [isResettingGateTicket, setIsResettingGateTicket] = useState(false);
 
-  const [showOrgModal, setShowOrgModal] = useState(false);
-  const [showArtistModal, setShowArtistModal] = useState(false);
-  const [showTierModal, setShowTierModal] = useState(false);
-  const [showUserModal, setShowUserModal] = useState(false);
-  const [showRoleModal, setShowRoleModal] = useState(false);
-  const [showTagModal, setShowTagModal] = useState(false);
-  const [showAuditoriumModal, setShowAuditoriumModal] = useState(false);
-  const [showFaqModal, setShowFaqModal] = useState(false);
-  const [showFooterModal, setShowFooterModal] = useState(false);
-  const [showFeeConfigModal, setShowFeeConfigModal] = useState(false);
-  const [showBankAccountModal, setShowBankAccountModal] = useState(false);
+  const showOrgModal = activeModal?.type === 'org';
+  const setShowOrgModal = (v) => setActiveModal(v ? { type: 'org' } : null);
+  const showArtistModal = activeModal?.type === 'artist';
+  const setShowArtistModal = (v) => setActiveModal(v ? { type: 'artist' } : null);
+  const showTierModal = activeModal?.type === 'tier';
+  const setShowTierModal = (v) => setActiveModal(v ? { type: 'tier' } : null);
+  const showUserModal = activeModal?.type === 'user';
+  const setShowUserModal = (v) => setActiveModal(v ? { type: 'user' } : null);
+  const showRoleModal = activeModal?.type === 'role';
+  const setShowRoleModal = (v) => setActiveModal(v ? { type: 'role' } : null);
+  const showTagModal = activeModal?.type === 'tag';
+  const setShowTagModal = (v) => setActiveModal(v ? { type: 'tag' } : null);
+  const showAuditoriumModal = activeModal?.type === 'auditorium';
+  const setShowAuditoriumModal = (v) => setActiveModal(v ? { type: 'auditorium' } : null);
+  const showFaqModal = activeModal?.type === 'faq';
+  const setShowFaqModal = (v) => setActiveModal(v ? { type: 'faq' } : null);
+  const showFooterModal = activeModal?.type === 'footer';
+  const setShowFooterModal = (v) => setActiveModal(v ? { type: 'footer' } : null);
+  const showFeeConfigModal = activeModal?.type === 'feeConfig';
+  const setShowFeeConfigModal = (v) => setActiveModal(v ? { type: 'feeConfig' } : null);
+  const showBankAccountModal = activeModal?.type === 'bankAccount';
+  const setShowBankAccountModal = (v) => setActiveModal(v ? { type: 'bankAccount' } : null);
   const [editingFeeConfig, setEditingFeeConfig] = useState(null);
   const [previewAuditorium, setPreviewAuditorium] = useState(null);
   const [adminPreviewTicket, setAdminPreviewTicket] = useState(null);

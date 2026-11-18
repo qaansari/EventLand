@@ -6,8 +6,8 @@ namespace EventLand.Modules.PayPro.Entities;
 public enum OrderStatus
 {
     Pending = 0,
-    Unpaid  = 1,
-    Paid    = 2,
+    Unpaid = 1,
+    Paid = 2,
     Blocked = 3,
-    Failed  = 4
+    Failed = 4
 }

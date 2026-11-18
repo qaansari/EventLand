@@ -8,9 +8,9 @@ public record FeeCalculationResult(
     decimal PlatformFee,
     decimal ProcessingFee,
     decimal TotalAmount,
-    string  Currency,
-    string  PaymentMethod,
-    string  DisplayName,
+    string Currency,
+    string PaymentMethod,
+    string DisplayName,
     decimal FeePercentageAtPurchase
 );
 

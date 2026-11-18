@@ -157,7 +157,7 @@ public class AuthService : IAuthService
             throw new InvalidOperationException("Full name is required.");
         if (string.IsNullOrWhiteSpace(email) || !IsValidEmail(email))
             throw new InvalidOperationException("A valid email address is required.");
-        
+
         // Enhanced password validation
         ValidatePassword(dto.Password);
 
@@ -205,7 +205,7 @@ public class AuthService : IAuthService
     {
         if (string.IsNullOrWhiteSpace(password))
             throw new InvalidOperationException("Password is required.");
-        
+
         if (password.Length < _passwordMinLength)
             throw new InvalidOperationException($"Password must be at least {_passwordMinLength} characters long.");
 

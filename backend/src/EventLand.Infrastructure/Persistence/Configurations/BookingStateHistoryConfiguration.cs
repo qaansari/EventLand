@@ -29,8 +29,7 @@ public sealed class BookingStateHistoryConfiguration : IEntityTypeConfiguration<
         builder.Property(h => h.Reason)
                .HasMaxLength(500);
 
-        builder.Property(h => h.MetadataJson)
-               .HasColumnType("nvarchar(max)");
+        builder.Property(h => h.MetadataJson);
 
         builder.HasIndex(h => h.BookingId)
                .HasDatabaseName("IX_BookingStateHistories_BookingId");

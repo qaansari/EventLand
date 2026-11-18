@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/admin/bookings")]
-[Authorize(Roles = AppRoles.OrganizerOrAdmin)]
+[Authorize(Policy = AppPolicies.RequireOrganizerOrAdmin)]
 [Produces("application/json")]
 public class AdminBookingsController : ControllerBase
 {
@@ -62,7 +62,7 @@ public class AdminBookingsController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
+    [Authorize(Policy = AppPolicies.RequireAdmin)]
     public async Task<ActionResult> DeleteBooking(int id)
     {
         var success = await _adminService.DeleteBookingAsync(id);

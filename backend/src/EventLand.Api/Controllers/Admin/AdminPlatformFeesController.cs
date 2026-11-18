@@ -15,7 +15,7 @@ using Microsoft.EntityFrameworkCore;
 
 [ApiController]
 [Route("api/admin/platform-fees")]
-[Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
+[Authorize(Policy = AppPolicies.RequireAdmin)]
 public class AdminPlatformFeesController : ControllerBase
 {
     private readonly IApplicationDbContext _context;

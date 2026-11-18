@@ -17,17 +17,6 @@ using Microsoft.EntityFrameworkCore;
 using EventLand.Application.Dtos;
 using EventLand.Application.Services;
 
-public record ProcessBankRefundRequestDto(
-    int BookingId,
-    decimal Amount,
-    string? Reason = null
-);
-
-public record ProcessBankRefundResponseDto(
-    bool Success,
-    string Message
-);
-
 [ApiController]
 [Route("api/payments")]
 public class PaymentController : ControllerBase
@@ -35,17 +24,20 @@ public class PaymentController : ControllerBase
     private readonly IApplicationDbContext _context;
     private readonly IPaymentFeeService _paymentFeeService;
     private readonly IPayProService _payProService;
+    private readonly IBookingService _bookingService;
     private readonly ICacheService? _cacheService;
 
     public PaymentController(
         IApplicationDbContext context,
         IPaymentFeeService paymentFeeService,
         IPayProService payProService,
+        IBookingService bookingService,
         ICacheService? cacheService = null)
     {
         _context = context;
         _paymentFeeService = paymentFeeService;
         _payProService = payProService;
+        _bookingService = bookingService;
         _cacheService = cacheService;
     }
 
@@ -220,6 +212,7 @@ public class PaymentController : ControllerBase
 
     /// <summary>
     /// Administrative Refund Route for Bank Transfer bookings.
+    /// Executes full transactional refund, releases seats, restores tier inventory, voids tickets and logs audit history.
     /// </summary>
     [HttpPost("refund")]
     [Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
@@ -228,58 +221,8 @@ public class PaymentController : ControllerBase
         var adminId = User.GetUserId();
         var adminEmail = User.GetEmail() ?? "admin@eventland.pk";
 
-        var booking = await _context.Bookings
-            .Include(b => b.TicketTier)
-            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
-            .FirstOrDefaultAsync(b => b.Id == dto.BookingId && !b.IsDeleted);
-
-        if (booking is null)
-            return NotFound(new { message = $"Booking ID '{dto.BookingId}' not found." });
-
-        if (booking.PaymentStatus == PaymentStatus.Refunded)
-            return BadRequest(new { message = $"Booking '{booking.BookingRef}' is already refunded." });
-
-        booking.ProcessRefund(DateTimeOffset.UtcNow, dto.Reason ?? "Direct Bank Transfer Refund", "Admin");
-
-        if (booking.TicketTier != null)
-        {
-            booking.TicketTier.SoldCount = Math.Max(0, booking.TicketTier.SoldCount - booking.Quantity);
-        }
-
-        foreach (var bs in booking.BookingSeats)
-        {
-            if (bs.Seat != null)
-            {
-                bs.Seat.Status = SeatStatus.Available;
-            }
-        }
-
-        var refundAmount = dto.Amount > 0 ? dto.Amount : booking.TotalAmount;
-        var refundRecord = new RefundRecord
-        {
-            BookingId = booking.Id,
-            Amount = refundAmount,
-            Reason = dto.Reason ?? "Direct Bank Transfer Refund",
-            Status = "Processed",
-            ProcessedByUserId = adminId,
-            ProcessedByEmail = adminEmail,
-            ProcessedAt = DateTimeOffset.UtcNow
-        };
-
-        _context.RefundRecords.Add(refundRecord);
-        await _context.SaveChangesAsync();
-
-        var seatIds = booking.BookingSeats.Select(bs => bs.SeatId).ToList();
-        if (seatIds.Any() && _cacheService != null)
-        {
-            await _cacheService.ReleaseSeatsAsync(booking.EventId, seatIds, null);
-            await _cacheService.ClearEventCacheAsync(booking.EventId);
-        }
-
-        return Ok(new ProcessBankRefundResponseDto(
-            Success: true,
-            Message: $"Direct bank refund of PKR {refundAmount:N0} recorded successfully. Booking cancelled and seats returned to available pool."
-        ));
+        var result = await _bookingService.ProcessBankRefundAsync(dto, adminId, adminEmail);
+        return Ok(result);
     }
 
     /// <summary>

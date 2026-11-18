@@ -5,6 +5,8 @@ using EventLand.Application.Common.Models;
 public interface ICaptchaService
 {
     Task<bool> VerifyTokenAsync(string token, string? remoteIp = null);
+    Task<bool> VerifyActionTokenAsync(string token, string? expectedAction = null, string? remoteIp = null);
+    Task ValidateActionTokenAsync(string? token, string? expectedAction = null, string? remoteIp = null);
     CaptchaConfigDto GetConfig();
 }
 

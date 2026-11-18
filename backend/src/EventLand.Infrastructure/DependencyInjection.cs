@@ -62,6 +62,8 @@ public static class DependencyInjection
 
         services.AddSingleton<ICacheService, RedisCacheService>();
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<EventLand.Application.Common.EventLandTelemetry>();
+        services.AddSingleton<IGateQrSignatureService, GateQrSignatureService>();
 
         // Background job: expire pending bookings whose 30-minute direct bank transfer hold window has elapsed (every 60s)
         services.AddHostedService<PendingBookingExpiryService>();

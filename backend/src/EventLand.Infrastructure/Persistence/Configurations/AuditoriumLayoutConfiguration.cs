@@ -35,8 +35,7 @@ public sealed class AuditoriumLayoutConfiguration : IEntityTypeConfiguration<Aud
         builder.Property(al => al.Description)
                .HasMaxLength(1000);
 
-        builder.Property(al => al.LayoutJson)
-               .HasColumnType("nvarchar(max)");
+        builder.Property(al => al.LayoutJson);
 
         builder.Property(al => al.IsActive)
                .HasDefaultValue(true);

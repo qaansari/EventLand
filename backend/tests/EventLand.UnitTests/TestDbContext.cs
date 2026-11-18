@@ -53,10 +53,38 @@ public class TestDbContext : DbContext, IApplicationDbContext, IPayProDbContext
         modelBuilder.Entity<BookingSeat>().HasKey(bs => new { bs.BookingId, bs.SeatId });
         modelBuilder.Entity<EventTag>().HasKey(et => new { et.EventId, et.TagId });
         modelBuilder.Entity<TicketTier>().Property(t => t.Status).HasConversion<string>();
+        modelBuilder.Entity<RefundRecord>().Property(r => r.Status).HasConversion<string>();
+
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (typeof(EventLand.Domain.Common.BaseEntity).IsAssignableFrom(entityType.ClrType))
+            {
+                var parameter = System.Linq.Expressions.Expression.Parameter(entityType.ClrType, "e");
+                var property = System.Linq.Expressions.Expression.Property(parameter, nameof(EventLand.Domain.Common.BaseEntity.IsDeleted));
+                var falseConstant = System.Linq.Expressions.Expression.Constant(false);
+                var comparison = System.Linq.Expressions.Expression.Equal(property, falseConstant);
+                var lambda = System.Linq.Expressions.Expression.Lambda(comparison, parameter);
+
+                modelBuilder.Entity(entityType.ClrType).HasQueryFilter(lambda);
+            }
+        }
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        var now = System.DateTimeOffset.UtcNow;
+        foreach (var entry in ChangeTracker.Entries<EventLand.Domain.Common.BaseEntity>())
+        {
+            switch (entry.State)
+            {
+                case EntityState.Deleted:
+                    entry.State = EntityState.Modified;
+                    entry.Entity.IsDeleted = true;
+                    entry.Entity.DeletedAt = now;
+                    entry.Entity.UpdatedAt = now;
+                    break;
+            }
+        }
         return base.SaveChangesAsync(cancellationToken);
     }
 }

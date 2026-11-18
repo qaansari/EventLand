@@ -397,11 +397,11 @@ public class AdminServiceEventAndTierTests : IDisposable
 
         Assert.True(deleted);
 
-        var dbShow = await _context.EventShows.FirstOrDefaultAsync(s => s.Id == show.Id);
+        var dbShow = await _context.EventShows.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.Id == show.Id);
         Assert.NotNull(dbShow);
         Assert.True(dbShow.IsDeleted);
 
-        var dbTier = await _context.TicketTiers.FirstOrDefaultAsync(t => t.Id == tier.Id);
+        var dbTier = await _context.TicketTiers.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.Id == tier.Id);
         Assert.NotNull(dbTier);
         Assert.True(dbTier.IsDeleted);
     }

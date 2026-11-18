@@ -43,6 +43,11 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
     serverOptions.Limits.MaxRequestBodySize = 30 * 1024 * 1024; // 30 MB
 });
 
+// Register Phase 10 Rollout Feature Flags
+builder.Services.Configure<EventLand.Application.Common.FeatureFlags>(
+    builder.Configuration.GetSection(EventLand.Application.Common.FeatureFlags.SectionName));
+builder.Services.AddSingleton<EventLand.Application.Common.IFeatureFlagService, EventLand.Application.Common.FeatureFlagService>();
+
 // Configure multipart form body length limit
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
 {
@@ -63,22 +68,12 @@ if (!string.IsNullOrWhiteSpace(redisConn))
     });
 }
 
-// Health checks: database connectivity and Redis/distributed cache reachability
+// Health checks: liveness and comprehensive readiness dependencies (database, Redis, PayPro)
 builder.Services.AddHealthChecks()
-    .AddCheck("database", () =>
-    {
-        // Lightweight synchronous check placeholder; detailed DB check happens via
-        // CanConnect at request time. Returning Healthy here avoids requiring
-        // Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore package.
-        // A scoped check is also registered below for readiness.
-        return HealthCheckResult.Healthy();
-    }, tags: new[] { "ready" })
-    .AddCheck("redis", () =>
-    {
-        // Redis is optional (fallback to IMemoryCache). Report Healthy if the
-        // distributed cache can be resolved; degraded is handled internally.
-        return HealthCheckResult.Healthy();
-    });
+    .AddCheck<EventLand.Api.Health.LiveHealthCheck>("liveness", tags: new[] { "live" })
+    .AddCheck<EventLand.Api.Health.DatabaseHealthCheck>("database", tags: new[] { "ready" })
+    .AddCheck<EventLand.Api.Health.RedisHealthCheck>("redis", tags: new[] { "ready" })
+    .AddCheck<EventLand.Api.Health.PayProHealthCheck>("paypro", tags: new[] { "ready" });
 
 // Production-Grade Per-Client-IP Rate Limiting (Partitioned by CF-Connecting-IP / X-Forwarded-For / RemoteIp)
 builder.Services.AddRateLimiter(options =>
@@ -87,7 +82,7 @@ builder.Services.AddRateLimiter(options =>
     options.OnRejected = async (context, _) =>
     {
         context.HttpContext.Response.Headers.Append("Retry-After", "60");
-        
+
         await context.HttpContext.Response.WriteAsJsonAsync(new
         {
             statusCode = 429,
@@ -129,6 +124,17 @@ builder.Services.AddRateLimiter(options =>
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
+    // Per-IP/User rate limiting for seat holds (60 holds/min per IP — prevents seat hoarding)
+    options.AddPolicy("hold", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"hold_{ResolveClientIp(httpContext)}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));
@@ -224,6 +230,22 @@ builder.Services.AddSwaggerGen(c =>
 // Register Infrastructure & Application Services (Includes DbContext, Auth, Redis/MemoryCache)
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
+// Centralized Authorization Policies — eliminates ad-hoc role string comparisons
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(EventLand.Application.Common.AppPolicies.RequireAdmin, policy =>
+        policy.RequireRole("SuperAdmin", "Admin", "superadmin", "admin"));
+
+    options.AddPolicy(EventLand.Application.Common.AppPolicies.RequireSuperAdmin, policy =>
+        policy.RequireRole("SuperAdmin", "superadmin"));
+
+    options.AddPolicy(EventLand.Application.Common.AppPolicies.RequireOrganizerOrAdmin, policy =>
+        policy.RequireRole("SuperAdmin", "Admin", "Organizer", "superadmin", "admin", "organizer"));
+
+    options.AddPolicy(EventLand.Application.Common.AppPolicies.RequireGatekeeper, policy =>
+        policy.RequireRole("SuperAdmin", "Admin", "Organizer", "Gatekeeper", "superadmin", "admin", "organizer", "gatekeeper"));
+});
+
 // Register Api-layer notification service so Infrastructure background services can
 // push SignalR seat-release events without referencing the Api project directly.
 builder.Services.AddSingleton<EventLand.Application.Interfaces.ISeatingNotificationService,
@@ -292,6 +314,7 @@ var app = builder.Build();
 
 // Forwarded headers must run before any middleware relying on remote IP (rate limiting, logging)
 app.UseForwardedHeaders();
+app.UseMiddleware<CorrelationIdMiddleware>();
 
 // Enable CORS immediately after forwarded headers so ALL requests (including preflights,
 // early 404s, and unhandled errors) receive Access-Control headers before hitting downstream pipeline
@@ -341,9 +364,23 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 
-// Health endpoints — must be mapped before auth so probes work without credentials
-app.MapHealthChecks("/health");
-app.MapHealthChecks("/health/ready");
+// Health endpoints — mapped before auth so probes work without credentials
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("live")
+});
+
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = EventLand.Api.Health.HealthCheckResponseWriter.WriteDetailedJsonResponse
+});
+
+app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = EventLand.Api.Health.HealthCheckResponseWriter.WriteDetailedJsonResponse
+});
 
 app.UseRateLimiter();
 

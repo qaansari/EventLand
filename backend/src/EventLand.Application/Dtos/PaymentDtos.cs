@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 public record CalculatePaymentQuoteRequestDto(
     decimal Subtotal,
-    string  PaymentMethod
+    string PaymentMethod
 );
 
 public record PaymentFeeQuoteDto(
@@ -13,17 +13,17 @@ public record PaymentFeeQuoteDto(
     decimal PlatformFee,
     decimal PaymentProcessingFee,
     decimal TotalAmount,
-    string  Currency,
-    string  PaymentMethod,
-    string  DisplayName
+    string Currency,
+    string PaymentMethod,
+    string DisplayName
 );
 
 public record AvailablePaymentMethodDto(
-    int     Id,
-    string  Provider,
-    string  PaymentMethod,
-    string  DisplayName,
-    string  Currency,
+    int Id,
+    string Provider,
+    string PaymentMethod,
+    string DisplayName,
+    string Currency,
     decimal PlatformFee,
     decimal PaymentProcessingFee,
     decimal TotalAmount
@@ -71,17 +71,17 @@ public record PaymentStatusResponseDto(
 );
 
 public record PayProCheckoutResponseDto(
-    bool    Success,
-    string  BookingRef,
-    string  PaymentMethod,
+    bool Success,
+    string BookingRef,
+    string PaymentMethod,
     decimal TotalAmount,
-    string  Currency,
+    string Currency,
     string? InvoiceId,
     string? ConnectUrl,
     string? OtcVoucherCode,
     DateTimeOffset? ExpiresAt,
     string? Message = null,
-    int?    PaymentId = null
+    int? PaymentId = null
 );
 
 public record PayProIpnRequestDto(
@@ -96,7 +96,7 @@ public record PayProIpnRequestDto(
 );
 
 public record PayProIpnResponseDto(
-    bool   Success,
+    bool Success,
     string Status,
     string Message
 );

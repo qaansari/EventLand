@@ -2,6 +2,7 @@ namespace EventLand.Api.Middleware;
 
 using System.Net;
 using System.Text.Json;
+using EventLand.Domain.Exceptions;
 using Microsoft.EntityFrameworkCore;
 
 public class GlobalExceptionHandlerMiddleware
@@ -54,8 +55,28 @@ public class GlobalExceptionHandlerMiddleware
 
         context.Response.ContentType = "application/json";
 
+        if (exception is BankMaintenanceException bankEx)
+        {
+            if (bankEx.RetryAfterSeconds.HasValue)
+            {
+                context.Response.Headers["Retry-After"] = bankEx.RetryAfterSeconds.Value.ToString();
+            }
+
+            context.Response.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+            var bankResponse = new
+            {
+                statusCode = 503,
+                code = bankEx.Code,
+                message = bankEx.Message,
+                retryAfterUtc = bankEx.RetryAfterUtc,
+                retryAfterSeconds = bankEx.RetryAfterSeconds
+            };
+            return context.Response.WriteAsync(JsonSerializer.Serialize(bankResponse));
+        }
+
         var statusCode = exception switch
         {
+            CaptchaVerificationException => HttpStatusCode.Forbidden,
             KeyNotFoundException => HttpStatusCode.NotFound,
             InvalidOperationException => HttpStatusCode.BadRequest,
             // Authenticated users who lack privileges get 403 Forbidden (not 401 which triggers logout)
@@ -70,14 +91,21 @@ public class GlobalExceptionHandlerMiddleware
 
         context.Response.StatusCode = (int)statusCode;
 
-        // Client-facing errors (4xx) carry the exception message; 500s return a generic
-        // message so stack details and internal exceptions never reach the caller.
-        var response = new
+        object response = exception switch
         {
-            statusCode = context.Response.StatusCode,
-            message = statusCode == HttpStatusCode.InternalServerError
-                ? "An unexpected error occurred processing your request. Please try again later."
-                : exception.Message
+            CaptchaVerificationException capEx => new
+            {
+                statusCode = 403,
+                code = capEx.Code,
+                message = capEx.Message
+            },
+            _ => new
+            {
+                statusCode = context.Response.StatusCode,
+                message = statusCode == HttpStatusCode.InternalServerError
+                    ? "An unexpected error occurred processing your request. Please try again later."
+                    : exception.Message
+            }
         };
 
         return context.Response.WriteAsync(JsonSerializer.Serialize(response));

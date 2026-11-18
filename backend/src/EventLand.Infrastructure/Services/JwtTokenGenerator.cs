@@ -28,11 +28,11 @@ public class JwtTokenGenerator : IJwtTokenGenerator
         var issuer = _configuration["Jwt:Issuer"] ?? "EventLandApi";
         var audience = _configuration["Jwt:Audience"] ?? "EventLandClients";
         var expirationHours = _configuration.GetValue<int>("Jwt:ExpirationHours", 8);
-        
+
         // Ensure minimum key length for security (256 bits / 32 bytes for HS256)
         if (secretKey.Length < 32)
             throw new InvalidOperationException("JWT SecretKey must be at least 32 characters long for security.");
-        
+
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 

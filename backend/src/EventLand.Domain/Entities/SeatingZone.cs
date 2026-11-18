@@ -8,21 +8,21 @@ using EventLand.Domain.Common;
 /// </summary>
 public class SeatingZone : BaseEntity
 {
-    public int   EventId        { get; set; }
-    public Event Event          { get; set; } = null!;
+    public int EventId { get; set; }
+    public Event Event { get; set; } = null!;
 
-    public string Zone          { get; set; } = string.Empty;
-    public int    Rows          { get; set; }
-    public int    Cols          { get; set; }
-    public decimal Price        { get; set; }
+    public string Zone { get; set; } = string.Empty;
+    public int Rows { get; set; }
+    public int Cols { get; set; }
+    public decimal Price { get; set; }
 
-    public int TotalCapacity    { get; set; }
-    public int SortOrder        { get; set; } = 0;
+    public int TotalCapacity { get; set; }
+    public int SortOrder { get; set; } = 0;
 
     /// <summary>
     /// Optional JSON template defining custom venue layout, row splits, and aisle gaps.
     /// </summary>
-    public string? LayoutJson   { get; set; }
+    public string? LayoutJson { get; set; }
 
     // Navigation — one seat per cell in the grid
     public ICollection<Seat> Seats { get; set; } = new List<Seat>();

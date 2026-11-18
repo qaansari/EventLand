@@ -11,32 +11,32 @@ using EventLand.Domain.StateMachines;
 public class Booking : BaseEntity
 {
     // Event + Tier references
-    public int          EventId         { get; set; }
-    public Event        Event           { get; set; } = null!;
+    public int EventId { get; set; }
+    public Event Event { get; set; } = null!;
 
-    public int          TicketTierId    { get; set; }
-    public TicketTier   TicketTier      { get; set; } = null!;
+    public int TicketTierId { get; set; }
+    public TicketTier TicketTier { get; set; } = null!;
 
     // Owning user account (nullable: preserves guest-checkout capability at the DB level)
-    public int?         UserId          { get; set; }
-    public User?        User            { get; set; }
+    public int? UserId { get; set; }
+    public User? User { get; set; }
 
     // Human-readable booking reference
-    public string       BookingRef      { get; set; } = string.Empty;
+    public string BookingRef { get; set; } = string.Empty;
 
     // Customer info
-    public string       CustomerName    { get; set; } = string.Empty;
-    public string       CustomerEmail   { get; set; } = string.Empty;
-    public string       CustomerPhone   { get; set; } = string.Empty;
+    public string CustomerName { get; set; } = string.Empty;
+    public string CustomerEmail { get; set; } = string.Empty;
+    public string CustomerPhone { get; set; } = string.Empty;
 
     // Ticket details & Authoritative Pricing Snapshot
-    public int          Quantity                 { get; set; } = 1;
-    public decimal      UnitPrice                { get; set; }
-    public decimal      SubtotalAmount           { get; set; } // Raw ticket price before fees (Quantity * UnitPrice or Sum of seats)
-    public decimal      PlatformFee              { get; set; } // EventLand platform tier fee (49/99/149/199 PKR)
-    public decimal      PaymentProcessingFee     { get; set; } // Payment gateway processing fee
-    public decimal      FeePercentageAtPurchase  { get; set; } // Snapshot of % fee at checkout (e.g. 2.80% or 0.80%)
-    public decimal      TotalAmount              { get; set; } // Final total payable: Subtotal + PlatformFee + ProcessingFee
+    public int Quantity { get; set; } = 1;
+    public decimal UnitPrice { get; set; }
+    public decimal SubtotalAmount { get; set; } // Raw ticket price before fees (Quantity * UnitPrice or Sum of seats)
+    public decimal PlatformFee { get; set; } // EventLand platform tier fee (49/99/149/199 PKR)
+    public decimal PaymentProcessingFee { get; set; } // Payment gateway processing fee
+    public decimal FeePercentageAtPurchase { get; set; } // Snapshot of % fee at checkout (e.g. 2.80% or 0.80%)
+    public decimal TotalAmount { get; set; } // Final total payable: Subtotal + PlatformFee + ProcessingFee
 
     // Explicit State Machine Lifecycle (Single Source of Truth)
     public BookingState State { get; set; } = BookingState.PendingHold;
@@ -80,31 +80,34 @@ public class Booking : BaseEntity
             State = BookingState.PendingHold;
     }
 
-    public PaymentMethod  PaymentMethod   { get; set; } = PaymentMethod.None;
-    public DateTimeOffset? PaidAt         { get; set; }
+    public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.None;
+    public DateTimeOffset? PaidAt { get; set; }
 
     // Direct Bank Transfer & Verification fields
-    public string?        BankTransactionRef   { get; set; }
-    public string?        PaymentProofUrl      { get; set; }
-    public string?        SenderAccountTitle   { get; set; }
-    public string?        SenderBankName       { get; set; }
-    public string?        SenderAccountLast4   { get; set; }
-    public int?           VerifiedByAdminId    { get; set; }
-    public string?        VerifiedByAdminEmail { get; set; }
-    public DateTimeOffset? VerifiedAt          { get; set; }
+    public string? BankTransactionRef { get; set; }
+    public string? PaymentProofUrl { get; set; }
+    public string? SenderAccountTitle { get; set; }
+    public string? SenderBankName { get; set; }
+    public string? SenderAccountLast4 { get; set; }
+    public int? VerifiedByAdminId { get; set; }
+    public string? VerifiedByAdminEmail { get; set; }
+    public DateTimeOffset? VerifiedAt { get; set; }
 
     // 30-Minute hold expiry window
-    public DateTimeOffset? PaymentExpiresAt    { get; set; }
+    public DateTimeOffset? PaymentExpiresAt { get; set; }
 
     // Refund tracking
-    public DateTimeOffset? RefundedAt          { get; set; }
-    public string?        RefundReason         { get; set; }
+    public DateTimeOffset? RefundedAt { get; set; }
+    public string? RefundReason { get; set; }
 
-    // Gate validation & check-in tracking
-    public bool           IsCheckedIn          { get; set; } = false;
-    public DateTimeOffset? CheckedInAt          { get; set; }
-    public string?        CheckedInBy          { get; set; }
-    public string?        GateNotes            { get; set; }
+    // Gate validation & check-in tracking (Audit #7)
+    public bool IsCheckedIn { get; set; } = false;
+    public TicketScanState ScanState { get; set; } = TicketScanState.Issued;
+    public DateTimeOffset? CheckedInAt { get; set; }
+    public string? CheckedInBy { get; set; }
+    public string? CheckedInDeviceId { get; set; }
+    public long? GateScanSequence { get; set; }
+    public string? GateNotes { get; set; }
 
     // Optimistic Concurrency Token
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
@@ -113,7 +116,7 @@ public class Booking : BaseEntity
     public ICollection<BookingStateHistory> StateHistories { get; set; } = new List<BookingStateHistory>();
 
     // Navigation
-    public ICollection<BookingSeat>        BookingSeats        { get; set; } = new List<BookingSeat>();
+    public ICollection<BookingSeat> BookingSeats { get; set; } = new List<BookingSeat>();
     public ICollection<PaymentTransaction> PaymentTransactions { get; set; } = new List<PaymentTransaction>();
 
     // ── Rich Aggregate Behavior Methods ───────────────────────────────────────
@@ -174,6 +177,7 @@ public class Booking : BaseEntity
 
         var fromState = State;
         State = BookingState.Confirmed;
+        ScanState = TicketScanState.Issued;
         _status = BookingStatus.Confirmed;
         _paymentStatus = PaymentStatus.Paid;
         PaidAt = now;
@@ -211,6 +215,7 @@ public class Booking : BaseEntity
 
         var fromState = State;
         State = BookingState.Confirmed;
+        ScanState = TicketScanState.Issued;
         _status = BookingStatus.Confirmed;
         _paymentStatus = PaymentStatus.Paid;
         VerifiedByAdminId = adminId;
@@ -232,6 +237,7 @@ public class Booking : BaseEntity
 
         var fromState = State;
         State = BookingState.Rejected;
+        ScanState = TicketScanState.Revoked;
         _status = BookingStatus.Cancelled;
         _paymentStatus = PaymentStatus.Failed;
         VerifiedByAdminId = adminId;
@@ -269,6 +275,7 @@ public class Booking : BaseEntity
 
         var fromState = State;
         State = BookingState.Cancelled;
+        ScanState = TicketScanState.Revoked;
         _status = BookingStatus.Cancelled;
         _paymentStatus = PaymentStatus.Failed;
         UpdatedAt = now;
@@ -286,6 +293,7 @@ public class Booking : BaseEntity
 
         var fromState = State;
         State = BookingState.Refunded;
+        ScanState = TicketScanState.Revoked;
         _status = BookingStatus.Cancelled;
         _paymentStatus = PaymentStatus.Refunded;
         RefundedAt = now;
@@ -294,6 +302,37 @@ public class Booking : BaseEntity
         UpdatedBy = actor;
 
         RecordTransition(fromState, State, BookingStateMachine.TriggerProcessRefund, actor, reason);
+    }
+
+    public void CheckInAdmit(DateTimeOffset now, string? actor, string? deviceId = null, long? sequence = null, string? gateName = null)
+    {
+        if (IsCheckedIn)
+            return; // Idempotent check-in
+
+        IsCheckedIn = true;
+        ScanState = TicketScanState.ScannedAndAdmitted;
+        CheckedInAt = now;
+        CheckedInBy = actor;
+        CheckedInDeviceId = deviceId;
+        GateScanSequence = sequence;
+        if (!string.IsNullOrWhiteSpace(gateName))
+            GateNotes = gateName;
+        UpdatedAt = now;
+        UpdatedBy = actor;
+    }
+
+    public void ResetCheckIn(DateTimeOffset now, string? actor, string? reason = null)
+    {
+        IsCheckedIn = false;
+        ScanState = State == BookingState.Confirmed ? TicketScanState.Issued : TicketScanState.Revoked;
+        CheckedInAt = null;
+        CheckedInBy = null;
+        CheckedInDeviceId = null;
+        GateScanSequence = null;
+        if (!string.IsNullOrWhiteSpace(reason))
+            GateNotes = $"Reset: {reason}";
+        UpdatedAt = now;
+        UpdatedBy = actor;
     }
 
     private void RecordTransition(BookingState from, BookingState to, string trigger, string? changedBy, string? reason)

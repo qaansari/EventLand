@@ -8,15 +8,26 @@ using EventLand.Domain.Common;
 /// </summary>
 public class EventShow : BaseEntity
 {
-    public int EventId                  { get; set; }
-    public Event Event                  { get; set; } = null!;
+    public int EventId { get; set; }
+    public Event Event { get; set; } = null!;
 
-    public string ShowTitle             { get; set; } = string.Empty;
-    public DateTimeOffset StartTimeUtc  { get; set; }
-    public DateTimeOffset EndTimeUtc    { get; set; }
+    public string ShowTitle { get; set; } = string.Empty;
+    public DateTimeOffset StartTimeUtc { get; set; }
+    public DateTimeOffset EndTimeUtc { get; set; }
 
-    public bool IsClosed                { get; set; } = false;
+    public bool IsClosed { get; set; } = false;
 
     // Navigation — Ticket Tiers available for this specific show
     public ICollection<TicketTier> TicketTiers { get; set; } = new List<TicketTier>();
+
+    // Behavior Methods
+    public void CloseShow()
+    {
+        IsClosed = true;
+    }
+
+    public void ReopenShow()
+    {
+        IsClosed = false;
+    }
 }

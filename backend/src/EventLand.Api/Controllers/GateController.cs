@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.RateLimiting;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
-[Authorize(Roles = AppRoles.AdminOrSuperAdmin)]
+[Authorize(Policy = AppPolicies.RequireAdmin)]
 public class GateController : ControllerBase
 {
     private readonly IBookingService _bookingService;
@@ -58,6 +58,21 @@ public class GateController : ControllerBase
         var adminEmail = User.GetEmail() ?? User.Identity?.Name ?? "Admin";
 
         var result = await _bookingService.ResetGateCheckInAsync(request, adminId, adminEmail);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Synchronizes a batch of scans captured offline by mobile gate scanners.
+    /// Strictly restricted to Admin and SuperAdmin roles.
+    /// </summary>
+    [HttpPost("sync")]
+    [EnableRateLimiting("gate")]
+    public async Task<ActionResult<OfflineGateSyncBatchResponseDto>> SyncOfflineScans([FromBody] OfflineGateSyncBatchRequestDto request)
+    {
+        var adminId = User.GetUserId();
+        var adminEmail = User.GetEmail() ?? User.Identity?.Name ?? "Admin";
+
+        var result = await _bookingService.SyncOfflineGateScansAsync(request, adminId, adminEmail);
         return Ok(result);
     }
 }

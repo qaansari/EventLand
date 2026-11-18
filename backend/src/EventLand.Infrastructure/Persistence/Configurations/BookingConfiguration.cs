@@ -64,8 +64,14 @@ public sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         builder.Property(b => b.CheckedInBy)
                .HasMaxLength(150);
 
+        builder.Property(b => b.CheckedInDeviceId)
+               .HasMaxLength(100);
+
         builder.Property(b => b.GateNotes)
                .HasMaxLength(500);
+
+        builder.Property(b => b.ScanState)
+               .HasDefaultValue(EventLand.Domain.Enums.TicketScanState.Issued);
 
         builder.Property(b => b.Status)
                .HasConversion<int>();
@@ -134,6 +140,9 @@ public sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         // High-speed index for gate check-in & event attendance queries
         builder.HasIndex(b => new { b.EventId, b.IsCheckedIn })
                .HasDatabaseName("IX_Bookings_EventId_IsCheckedIn");
+
+        builder.HasIndex(b => new { b.EventId, b.IsCheckedIn, b.ScanState })
+               .HasDatabaseName("IX_Bookings_EventId_IsCheckedIn_ScanState");
 
         // Note: Global soft-delete query filter (!IsDeleted) is applied in OnModelCreating.
         // Do NOT add a duplicate HasQueryFilter here — EF Core only supports one per entity.

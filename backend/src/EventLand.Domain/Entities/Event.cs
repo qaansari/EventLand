@@ -74,4 +74,58 @@ public class Event : BaseEntity
     public ICollection<SeatingZone> SeatingZones { get; set; } = new List<SeatingZone>();
     public ICollection<Booking> Bookings { get; set; } = new List<Booking>();
     public ICollection<EventTag> EventTags { get; set; } = new List<EventTag>();
+
+    // Behavior & State Management Methods
+    public void CloseEvent()
+    {
+        Status = EventStatus.Closed;
+    }
+
+    public void ReopenEvent()
+    {
+        Status = EventStatus.Live;
+    }
+
+    public void Publish()
+    {
+        IsPublished = true;
+    }
+
+    public void Unpublish()
+    {
+        IsPublished = false;
+    }
+
+    public void RecomputeDynamicStatus(double sellingFastThreshold = 0.8)
+    {
+        RecomputeDynamicStatus(TicketTiers, sellingFastThreshold);
+    }
+
+    public void RecomputeDynamicStatus(IEnumerable<TicketTier>? tiers, double sellingFastThreshold = 0.8)
+    {
+        // Preserve intentional administrative or pre-launch statuses
+        if (Status == EventStatus.Closed || Status == EventStatus.Upcoming)
+            return;
+
+        var candidateTiers = (tiers ?? TicketTiers)?.Where(t => !t.IsDeleted).ToList();
+        if (candidateTiers == null || candidateTiers.Count == 0)
+            return;
+
+        var totalAvailable = candidateTiers.Sum(t => t.AvailableQuantity);
+        var totalSold = candidateTiers.Sum(t => t.SoldCount);
+
+        if (totalAvailable <= 0 || totalSold >= totalAvailable || candidateTiers.All(t => t.EffectiveStatus == TicketTierStatus.SoldOut))
+        {
+            Status = EventStatus.SoldOut;
+            return;
+        }
+
+        if (totalAvailable > 0 && ((double)totalSold / totalAvailable) >= sellingFastThreshold)
+        {
+            Status = EventStatus.SellingFast;
+            return;
+        }
+
+        Status = EventStatus.Live;
+    }
 }

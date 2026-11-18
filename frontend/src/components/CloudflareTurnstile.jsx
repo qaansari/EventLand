@@ -1,10 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
-import { captchaApi } from '../services/api';
-import { isCaptchaVerified, getStoredCaptchaToken, setCaptchaVerified, clearCaptchaVerified } from '../utils/captcha';
+import { ShieldCheck, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { useCaptcha } from '../context/CaptchaContext';
 
 const TURNSTILE_SCRIPT_URL = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-const TEST_SITEKEY = '1x00000000000000000000AA'; // Cloudflare's official test sitekey
 
 export default function CloudflareTurnstile({
   onVerify,
@@ -12,11 +10,13 @@ export default function CloudflareTurnstile({
   onError,
   theme = 'dark',
   size = 'normal',
+  action = 'general',
   style = {}
 }) {
+  const { siteKey, isCaptchaEnabled, setCaptchaToken, resetSignal } = useCaptcha();
   const containerRef = useRef(null);
   const widgetIdRef = useRef(null);
-  // Stable refs for callbacks — avoids re-triggering effects when parent creates new inline functions
+
   const onVerifyRef = useRef(onVerify);
   const onExpireRef = useRef(onExpire);
   const onErrorRef = useRef(onError);
@@ -24,67 +24,32 @@ export default function CloudflareTurnstile({
   useEffect(() => { onExpireRef.current = onExpire; }, [onExpire]);
   useEffect(() => { onErrorRef.current = onError; }, [onError]);
 
-  const [siteKey, setSiteKey] = useState(TEST_SITEKEY);
-  const [enabled, setEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
-  const [verified, setVerified] = useState(() => isCaptchaVerified());
+  const [verifiedToken, setVerifiedToken] = useState(null);
 
-  // Listen for global captcha verification across the application
+  // Watch for external reset requests (from 403 errors or post-action consumption)
   useEffect(() => {
-    const handleGlobalVerified = (e) => {
-      setVerified(true);
-      if (onVerifyRef.current && e.detail?.token) {
-        onVerifyRef.current(e.detail.token);
+    if (resetSignal > 0) {
+      setVerifiedToken(null);
+      setErrorMsg(null);
+      if (widgetIdRef.current !== null && window.turnstile) {
+        try {
+          window.turnstile.reset(widgetIdRef.current);
+        } catch (e) {
+          console.warn('[Turnstile] Error resetting widget:', e);
+        }
       }
-    };
-    const handleGlobalReset = () => {
-      setVerified(false);
-    };
-
-    window.addEventListener('eventland:captcha-verified', handleGlobalVerified);
-    window.addEventListener('eventland:captcha-reset', handleGlobalReset);
-
-    if (isCaptchaVerified() && onVerifyRef.current) {
-      onVerifyRef.current(getStoredCaptchaToken());
     }
+  }, [resetSignal]);
 
-    return () => {
-      window.removeEventListener('eventland:captcha-verified', handleGlobalVerified);
-      window.removeEventListener('eventland:captcha-reset', handleGlobalReset);
-    };
-  }, []);
-
-  // Fetch SiteKey & Enabled state from backend API
+  // Dynamically load Turnstile JS API & Render Widget
   useEffect(() => {
-    if (verified) return; // Don't fetch if already verified
-
-    let isMounted = true;
-    captchaApi.getConfig()
-      .then((config) => {
-        if (!isMounted) return;
-        if (config?.siteKey) setSiteKey(config.siteKey);
-        if (typeof config?.enabled === 'boolean') setEnabled(config.enabled);
-      })
-      .catch((err) => {
-        console.warn('[Turnstile] Could not load backend captcha config, using default test key:', err);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [verified]);
-
-  // Dynamically load Cloudflare Turnstile Script & Render Widget
-  useEffect(() => {
-    if (verified) {
-      return; // Do not initialize widget if already verified anywhere in the app
-    }
-
-    if (!enabled) {
+    if (!isCaptchaEnabled) {
       setLoading(false);
-      // If captcha is disabled in configuration, notify parent as auto-verified
-      if (onVerifyRef.current) onVerifyRef.current('CAPTCHA_DISABLED_PASSTHROUGH');
+      setVerifiedToken('CAPTCHA_DISABLED');
+      setCaptchaToken('CAPTCHA_DISABLED');
+      if (onVerifyRef.current) onVerifyRef.current('CAPTCHA_DISABLED');
       return;
     }
 
@@ -103,26 +68,27 @@ export default function CloudflareTurnstile({
           sitekey: siteKey,
           theme: theme,
           size: size,
+          action: action,
           callback: (token) => {
             if (!isMounted) return;
-            setCaptchaVerified(token);
-            setVerified(true);
+            setVerifiedToken(token);
+            setCaptchaToken(token);
             setErrorMsg(null);
             if (onVerifyRef.current) onVerifyRef.current(token);
           },
           'expired-callback': () => {
             if (!isMounted) return;
-            clearCaptchaVerified();
-            setVerified(false);
+            setVerifiedToken(null);
+            setCaptchaToken(null);
             if (onExpireRef.current) onExpireRef.current();
           },
           'error-callback': (err) => {
             if (!isMounted) return;
-            console.warn('[Turnstile] Render error encountered:', err);
-            // Fall back gracefully for local dev environments if domain is not registered
+            console.warn('[Turnstile] Render challenge error:', err);
+            // Fall back for local development if domain is not configured on Cloudflare
             const fallbackToken = `test-pass-${Date.now()}`;
-            setCaptchaVerified(fallbackToken);
-            setVerified(true);
+            setVerifiedToken(fallbackToken);
+            setCaptchaToken(fallbackToken);
             if (onVerifyRef.current) onVerifyRef.current(fallbackToken);
             if (onErrorRef.current) onErrorRef.current(err);
           }
@@ -131,18 +97,16 @@ export default function CloudflareTurnstile({
         widgetIdRef.current = id;
         setLoading(false);
       } catch (err) {
-        console.error('[Turnstile] Failed to render Cloudflare Turnstile widget:', err);
+        console.error('[Turnstile] Failed to render Turnstile widget:', err);
         setLoading(false);
-        setErrorMsg('Failed to load Turnstile widget');
-        // Provide test pass-through fallback for dev
+        setErrorMsg('Failed to load Turnstile challenge');
         const fallbackToken = `test-pass-${Date.now()}`;
-        setCaptchaVerified(fallbackToken);
-        setVerified(true);
+        setVerifiedToken(fallbackToken);
+        setCaptchaToken(fallbackToken);
         if (onVerifyRef.current) onVerifyRef.current(fallbackToken);
       }
     };
 
-    // Load Turnstile JS API script if not present
     if (typeof window !== 'undefined') {
       if (window.turnstile) {
         renderWidget();
@@ -153,16 +117,14 @@ export default function CloudflareTurnstile({
           script.src = TURNSTILE_SCRIPT_URL;
           script.async = true;
           script.defer = true;
-          script.onload = () => {
-            if (isMounted) renderWidget();
-          };
+          script.onload = () => { if (isMounted) renderWidget(); };
           script.onerror = () => {
             if (isMounted) {
               setLoading(false);
               setErrorMsg('Security challenge unavailable');
               const fallbackToken = `test-pass-offline-${Date.now()}`;
-              setCaptchaVerified(fallbackToken);
-              setVerified(true);
+              setVerifiedToken(fallbackToken);
+              setCaptchaToken(fallbackToken);
               if (onVerifyRef.current) onVerifyRef.current(fallbackToken);
             }
           };
@@ -181,10 +143,9 @@ export default function CloudflareTurnstile({
         } catch (e) {}
       }
     };
-  }, [siteKey, enabled, theme, size, verified]);
+  }, [siteKey, isCaptchaEnabled, theme, size, action, setCaptchaToken]);
 
-  // Permanently hide captcha across the entire application once verified
-  if (!enabled || verified) {
+  if (!isCaptchaEnabled) {
     return null;
   }
 
@@ -196,20 +157,20 @@ export default function CloudflareTurnstile({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        margin: '1rem 0',
-        padding: '0.85rem 1rem',
+        margin: '0.85rem 0',
+        padding: '0.75rem 1rem',
         backgroundColor: '#0c1427',
-        border: verified ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(13, 148, 136, 0.25)',
+        border: verifiedToken ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(13, 148, 136, 0.25)',
         borderRadius: '12px',
-        boxShadow: verified ? '0 0 15px rgba(16, 185, 129, 0.15)' : 'none',
+        boxShadow: verifiedToken ? '0 0 15px rgba(16, 185, 129, 0.15)' : 'none',
         transition: 'all 0.3s ease',
         ...style
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem', width: '100%', justifyContent: 'flex-start' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#38bdf8', fontSize: '0.78rem', fontWeight: 600 }}>
-          <ShieldCheck size={16} color="#38bdf8" />
-          <span>Cloudflare Turnstile Security Challenge</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', width: '100%', justifyContent: 'flex-start' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: verifiedToken ? '#34d399' : '#38bdf8', fontSize: '0.78rem', fontWeight: 600 }}>
+          {verifiedToken ? <CheckCircle2 size={16} color="#34d399" /> : <ShieldCheck size={16} color="#38bdf8" />}
+          <span>{verifiedToken ? 'Security Verification Complete' : 'Cloudflare Turnstile Security Challenge'}</span>
         </div>
       </div>
 
@@ -220,7 +181,13 @@ export default function CloudflareTurnstile({
         </div>
       )}
 
-      <div ref={containerRef} style={{ minHeight: '65px', display: loading ? 'none' : 'block' }}></div>
+      <div ref={containerRef} style={{ minHeight: '65px', display: loading || verifiedToken ? 'none' : 'block' }}></div>
+
+      {verifiedToken && (
+        <div style={{ color: '#94a3b8', fontSize: '0.75rem', textAlign: 'center', margin: '0.2rem 0' }}>
+          Challenge token acquired for this request.
+        </div>
+      )}
 
       {errorMsg && (
         <div style={{ color: '#f87171', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.4rem' }}>
