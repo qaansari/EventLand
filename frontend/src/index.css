@@ -1844,7 +1844,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 /* ── 2. Filter Controls Grid ───────────────────────────────────────────── */
 .discovery-filters-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.85rem;
 }
 

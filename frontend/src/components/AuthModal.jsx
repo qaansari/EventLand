@@ -435,7 +435,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
       resetCaptcha();
       const isBotError = err.status === 403 || err.message?.includes('BOT_CHALLENGE_REQUIRED') || err.message?.includes('captcha');
       const msg = isBotError
-        ? 'Security check required. Please complete the captcha challenge below.'
+        ? (err.data?.message || err.message || 'Security check required. Please complete the captcha challenge below.')
         : (err.message || 'Authentication failed. Check your credentials.');
       setErrorMsg(msg);
       setError(msg);
@@ -622,7 +622,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
               action="forgot-password"
               onVerify={(token) => setCaptchaToken(token)}
               onExpire={() => setCaptchaToken('')}
-              onError={() => setCaptchaToken('')}
+              onError={(err) => console.warn('[AuthModal] Turnstile error:', err)}
             />
 
             <button
@@ -939,7 +939,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
                 action={state === 'signup' ? 'register' : 'login'}
                 onVerify={(token) => setCaptchaToken(token)}
                 onExpire={() => setCaptchaToken('')}
-                onError={() => setCaptchaToken('')}
+                onError={(err) => console.warn('[AuthModal] Turnstile error:', err)}
               />
 
               <button

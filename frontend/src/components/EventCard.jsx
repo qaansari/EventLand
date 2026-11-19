@@ -154,7 +154,7 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
               {!isClosed && !isSoldOut && <span className="pulse-dot"></span>} {rawStatus}
             </span>
 
-            {/* Tags / Categories (show top 2) */}
+            {/* Tags / Categories */}
             {tagsList.slice(0, 2).map((tag, idx) => (
               <span
                 key={idx}
@@ -166,7 +166,10 @@ export default function EventCard({ event, onSelect, isSaved, onToggleSave }) {
                   fontSize: '0.74rem',
                   fontWeight: 700,
                   border: '1px solid rgba(13, 148, 136, 0.35)',
-                  letterSpacing: '0.02em'
+                  letterSpacing: '0.02em',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.25rem'
                 }}
               >
                 {tag}

@@ -226,13 +226,14 @@ export function toEventSlug(event) {
     .trim()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 
   if (!cleanTitle) {
-    return `event-${rawId}`;
+    return rawId ? `event-${rawId}` : '';
   }
 
-  return rawId ? `${cleanTitle}-${rawId}` : cleanTitle;
+  return cleanTitle;
 }
 
 // --- Public Artists API ---

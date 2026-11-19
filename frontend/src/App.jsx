@@ -912,11 +912,12 @@ export default function App() {
 
     const filtered = events.filter((ev) => {
       // 1. City Match
-      const matchCity = selectedCity === 'All Cities' || (ev.city && ev.city.toLowerCase() === citySel);
+      const evCity = (ev.cityName || ev.city || '').toLowerCase();
+      const matchCity = selectedCity === 'All Cities' || (evCity && evCity === citySel);
 
       // 2. Venue Match
-      const evVenue = (ev.venue || ev.venueName || '').toLowerCase();
-      const matchVenue = selectedVenue === 'All Venues' || (evVenue && evVenue.includes(venueSel));
+      const evVenue = (ev.venueName || ev.venue || ev.auditoriumName || '').toLowerCase();
+      const matchVenue = selectedVenue === 'All Venues' || (evVenue && (evVenue.includes(venueSel) || venueSel.includes(evVenue)));
 
       // 3. Category / Tag Match
       let matchTag = true;
@@ -1020,7 +1021,7 @@ export default function App() {
       if (needle) {
         const titleMatch = ev.title && ev.title.toLowerCase().includes(needle);
         const venueMatch = evVenue && evVenue.includes(needle);
-        const cityMatch = ev.city && ev.city.toLowerCase().includes(needle);
+        const cityMatch = evCity && evCity.includes(needle);
         const descMatch = ev.description && ev.description.toLowerCase().includes(needle);
         const artistMatch = (ev.artist || ev.artistName || (Array.isArray(ev.artists) ? ev.artists.map(a => a.name || a).join(' ') : ''))
           .toLowerCase().includes(needle);
@@ -1138,7 +1139,7 @@ export default function App() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
                 <h2 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#fff' }}>
-                  {selectedTag === 'All' ? 'Upcoming Events' : `${selectedTag} Events`}
+                  {selectedTag === 'All' ? 'Upcoming Events' : `${tags.find(t => t.slug === selectedTag || t.name === selectedTag)?.name || selectedTag} Events`}
                   {selectedCity !== 'All Cities' && ` in ${selectedCity}`}
                 </h2>
                 <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>

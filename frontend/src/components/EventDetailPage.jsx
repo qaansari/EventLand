@@ -21,7 +21,7 @@ const FacebookIcon = () => (
 );
 import { useToast } from '../context/ToastContext';
 import { formatEventDateRange, formatEventStartTime } from '../utils/dateUtils';
-import { getEventImageUrl, getOrganizerImageUrl, eventsApi } from '../services/api';
+import { getEventImageUrl, getOrganizerImageUrl, eventsApi, toEventSlug } from '../services/api';
 import InteractiveSeatPicker from './InteractiveSeatPicker';
 import EventLandPreloader from './EventLandPreloader';
 
@@ -164,7 +164,8 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
   }, [event]);
 
   const handleCopyLink = () => {
-    const shareableUrl = `${window.location.origin}/event/${event?.id || eventId}`;
+    const slug = toEventSlug(eventDetail || event);
+    const shareableUrl = `${window.location.origin}/event/${slug || event?.id || eventId}`;
     navigator.clipboard.writeText(shareableUrl)
       .then(() => {
         setCopied(true);
@@ -905,9 +906,35 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
                 
                 {/* Key Spec Badges */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1rem' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', background: 'rgba(13, 148, 136, 0.15)', border: '1px solid rgba(13, 148, 136, 0.35)', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 600, color: '#2dd4bf' }}>
-                    <Tag size={13} /> {event.eventType || 'Event'}
-                  </span>
+                  {/* Event Tags */}
+                  {(Array.isArray(event.tags) && event.tags.length > 0) ? (
+                    event.tags.map((t, idx) => {
+                      const tagName = typeof t === 'object' && t !== null ? (t.name || t.slug) : t;
+                      return (
+                        <span
+                          key={idx}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.35rem 0.75rem',
+                            background: 'rgba(13, 148, 136, 0.15)',
+                            border: '1px solid rgba(13, 148, 136, 0.35)',
+                            borderRadius: '9999px',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            color: '#2dd4bf'
+                          }}
+                        >
+                          <Tag size={13} /> {tagName}
+                        </span>
+                      );
+                    })
+                  ) : (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', background: 'rgba(13, 148, 136, 0.15)', border: '1px solid rgba(13, 148, 136, 0.35)', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 600, color: '#2dd4bf' }}>
+                      <Tag size={13} /> {event.eventType || 'Event'}
+                    </span>
+                  )}
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.75rem', background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.35)', borderRadius: '9999px', fontSize: '0.8rem', fontWeight: 600, color: '#60a5fa' }}>
                     <Compass size={13} /> {event.venueEnvironment || 'Indoor'}
                   </span>

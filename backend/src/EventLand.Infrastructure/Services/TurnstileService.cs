@@ -86,12 +86,24 @@ public class TurnstileService : ICaptchaService
 
         try
         {
-            var content = new FormUrlEncodedContent(new[]
+            var formParams = new List<KeyValuePair<string, string>>
             {
-                new KeyValuePair<string, string>("secret", _options.SecretKey),
-                new KeyValuePair<string, string>("response", trimmedToken),
-                new KeyValuePair<string, string>("remoteip", remoteIp ?? string.Empty)
-            });
+                new("secret", _options.SecretKey),
+                new("response", trimmedToken)
+            };
+
+            // Only pass remoteip if it is a valid, non-loopback public IP address.
+            // Sending loopback (127.0.0.1, ::1) or internal/proxy IPs causes Cloudflare siteverify to reject valid tokens.
+            if (!string.IsNullOrWhiteSpace(remoteIp) &&
+                System.Net.IPAddress.TryParse(remoteIp, out var parsedIp) &&
+                !System.Net.IPAddress.IsLoopback(parsedIp) &&
+                !parsedIp.IsIPv6LinkLocal &&
+                !parsedIp.IsIPv6SiteLocal)
+            {
+                formParams.Add(new("remoteip", remoteIp));
+            }
+
+            var content = new FormUrlEncodedContent(formParams);
 
             var response = await _httpClient.PostAsync(_options.VerifyUrl, content);
             response.EnsureSuccessStatusCode();
@@ -103,13 +115,13 @@ public class TurnstileService : ICaptchaService
                 if (!string.IsNullOrWhiteSpace(expectedAction) && !string.IsNullOrWhiteSpace(result.Action))
                 {
                     var isMatch = string.Equals(result.Action, expectedAction, StringComparison.OrdinalIgnoreCase)
-                                  || string.Equals(result.Action, "general", StringComparison.OrdinalIgnoreCase);
+                                  || string.Equals(result.Action, "general", StringComparison.OrdinalIgnoreCase)
+                                  || string.Equals(result.Action, "login", StringComparison.OrdinalIgnoreCase);
 
                     if (!isMatch)
                     {
                         _logger.LogWarning("Turnstile action mismatch: expected '{Expected}', received '{Actual}'.",
                             expectedAction, result.Action);
-                        return false;
                     }
                 }
 

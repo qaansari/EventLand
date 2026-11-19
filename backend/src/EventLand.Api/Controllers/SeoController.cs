@@ -83,7 +83,8 @@ public class SeoController : ControllerBase
                     .ToArray())
                     .Replace(' ', '-');
 
-                var slug = string.IsNullOrWhiteSpace(cleanTitle) ? $"event-{ev.Id}" : $"{cleanTitle}-{ev.Id}";
+                var trimmedClean = cleanTitle.Trim('-');
+                var slug = string.IsNullOrWhiteSpace(trimmedClean) ? $"event-{ev.Id}" : trimmedClean;
                 var lastModDate = ev.UpdatedAt.ToString("yyyy-MM-dd");
 
                 writer.WriteStartElement("url");

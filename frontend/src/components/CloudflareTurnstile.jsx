@@ -182,7 +182,16 @@ export default function CloudflareTurnstile({
         </div>
       )}
 
-      <div ref={containerRef} style={{ minHeight: '65px', display: loading || verifiedToken ? 'none' : 'block' }}></div>
+      <div
+        ref={containerRef}
+        style={{
+          minHeight: '65px',
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}
+      />
 
       {verifiedToken && (
         <div style={{ color: '#94a3b8', fontSize: '0.75rem', textAlign: 'center', margin: '0.2rem 0' }}>

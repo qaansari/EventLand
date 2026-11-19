@@ -1062,5 +1062,38 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
   - `dotnet build` succeeded; all **176/176 backend unit tests pass (100% green)**.
   - `npm run build` completed cleanly in 5.47s with 0 errors.
 
+#### Post-Phase 10: Event Management CRUD Normalization, Clean SEO Slugs & Filter Reliability
+
+1. **Event Updates, Timings, Publication Status & Organizer Binding**:
+   - **Backend DTO & Mapping Enrichment**: Added `bool IsPublished` and `int OrganizerId` to `EventDetailDto` and `EventSummaryDto` in [`backend/src/EventLand.Application/Dtos/EventDtos.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Application/Dtos/EventDtos.cs). Mapped both properties across `AdminService.cs` and `EventService.cs`.
+   - **Date & Timezone Precision ([`dateUtils.js`](file:///d:/Projects/EventLand/frontend/src/utils/dateUtils.js))**: Created `toDateTimeLocalValue`, `fromDateTimeLocalValue`, and `normalizeEventStatus` ensuring exact bi-directional translation between UTC ISO strings and PKT local time (`+05:00`). Completely eliminated 5-hour date drift during edit cycles.
+   - **Show Slot & Timing Preservation**: Updated `handleEditEvent`, `handleSaveEvent`, `handleEditShow`, and `handleSaveShow` in [`AdminDashboard.jsx`](file:///d:/Projects/EventLand/frontend/src/components/AdminDashboard.jsx), [`AdminEventModal.jsx`](file:///d:/Projects/EventLand/frontend/src/components/admin/modals/AdminEventModal.jsx), and [`AdminShowSlotModal.jsx`](file:///d:/Projects/EventLand/frontend/src/components/admin/modals/AdminShowSlotModal.jsx), ensuring publication state, organizer assignments, and show slot timings are preserved and editable with zero data loss.
+
+2. **Clean SEO Slugs (Zero Exposed IDs in URLs)**:
+   - **Frontend Slug Generation ([`api.js`](file:///d:/Projects/EventLand/frontend/src/services/api.js))**: Updated `toEventSlug` to produce clean semantic slugs (e.g., `pacc-theatre-festival-2026`) without appending numeric IDs (`-ID`).
+   - **Event Detail & Share Links ([`EventDetailPage.jsx`](file:///d:/Projects/EventLand/frontend/src/components/EventDetailPage.jsx))**: Updated `handleCopyLink` to share clean URLs without ID suffixes.
+   - **Sitemap SEO Indexing ([`SeoController.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Api/Controllers/SeoController.cs))**: Updated XML sitemap generation to output clean event URLs.
+   - **Backward-Compatible Backend Slug Resolution ([`EventService.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Application/Services/EventService.cs))**: Updated `GetEventByIdentifierAsync` to resolve events by exact clean slug, while preserving fallback resolution for legacy links containing `-ID`.
+
+3. **Cloudflare Turnstile Stability & Authentication Error Clarity**:
+   - **Unblocked Container Layout ([`CloudflareTurnstile.jsx`](file:///d:/Projects/EventLand/frontend/src/components/CloudflareTurnstile.jsx))**: Removed `display: none` from the Turnstile widget container, allowing the Cloudflare iframe to calculate dimensions and display interactive verification challenges properly.
+   - **Token Preservation on Fallback ([`AuthModal.jsx`](file:///d:/Projects/EventLand/frontend/src/components/AuthModal.jsx))**: Fixed `onError` callbacks so fallback development tokens (`test-pass-...`) are not cleared.
+   - **Backend Remote IP Handling ([`TurnstileService.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Services/TurnstileService.cs))**: Updated `VerifyActionTokenAsync` to omit `remoteip` when loopback (`127.0.0.1`, `::1`), empty, or non-public, per Cloudflare Turnstile requirements.
+   - **Error Message Distinction ([`AuthModal.jsx`](file:///d:/Projects/EventLand/frontend/src/components/AuthModal.jsx))**: Differentiated HTTP 401 credential mismatches (displaying the exact server message, e.g. "Invalid email or password. X attempts remaining") from HTTP 403 bot challenges.
+
+4. **Event Discovery Filtering & Category Dropdown Architecture**:
+   - **Category Dropdown Conversion ([`EventFilterBar.jsx`](file:///d:/Projects/EventLand/frontend/src/components/EventFilterBar.jsx))**: Converted horizontal category pill buttons into a `<SearchableSelect>` dropdown placed inside `.discovery-filters-grid`.
+   - **Dynamic Population**: Formatted `categoryOptions` using key-value pairs (`value: t.slug || t.name`, `label: t.name || t.slug`) dynamically derived from API tags and loaded events.
+   - **Responsive Filter Grid ([`index.css`](file:///d:/Projects/EventLand/frontend/src/index.css))**: Configured `.discovery-filters-grid` to 6 columns on desktop, 3 on large tablet, 2 on tablet, and 1 on mobile.
+   - **City Property Fix ([`App.jsx`](file:///d:/Projects/EventLand/frontend/src/App.jsx))**: Fixed property mismatch where client-side filter checked `ev.city` instead of `ev.cityName || ev.city`, resolving the bug where selecting any city caused all events to disappear.
+   - **Comma-Separated Category Matching ([`EventService.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Application/Services/EventService.cs))**: Fixed `category.Split(',')` bug where category names containing commas (such as `"Theatre, Arts & Culture"`) were broken into non-matching fragments. Retained full unsplit values in `tagFilters` and added case-insensitive matching against both `Tag.Name` and `Tag.Slug`.
+   - **Restored Event Tags on UI**: Added event tag badges back onto [`EventCard.jsx`](file:///d:/Projects/EventLand/frontend/src/components/EventCard.jsx) beside the status badge, and restored event tags in the key spec badges section of [`EventDetailPage.jsx`](file:///d:/Projects/EventLand/frontend/src/components/EventDetailPage.jsx).
+
+- **Verification Status**:
+  - Backend Unit Tests: **176/176 tests passing (100% green)**.
+  - Frontend Unit Tests: **12/12 tests passing (100% green)**.
+  - Frontend Production Build: **0 errors, clean in 7.22s**.
+  - Backend Solution: **0 errors, compiled cleanly**.
+
 ---
-*Last Updated: November 2026 (Explicit State Machine Refactoring Phases 0-10 COMPLETE: All 14 Implicit State Machines Refactored, ADR-0001, BookingState, BookingStateMachine, OutboxMessages, Atomic CAS ExpiryService, SeatState, Redis Distributed Holds, SignalR 250ms Delta Batching, TicketScanState, HMAC-SHA256 Gate Signatures, Offline Sync Reconciliation, CaptchaTokenState, Turnstile Replay Protection & Production Action Alignment, AvailabilityStatus, AvailabilityPolicy, BankOperationalStatus, BankMaintenanceException, RefundStatus, RefundStateMachine, IX_RefundRecords_BookingId_Active, OpenTelemetry Metrics & CorrelationId, /health/live & /health/ready, Provider-Agnostic EF Core, Compiled Hot-Path Queries, Pure State Derivation deriveSeatVisualState, useCheckoutMachine Reducer, useAuthMachine Reducer, PayProReturnPage Discriminated Union, RequireAuth Route Guards, AdminDashboard activeModal Unification, CrudModal with react-hook-form + zod, FeatureFlags Rollout, k6 Load Tests, Verification Pack SQL, 176 Backend Tests Green, 8 Frontend Tests Green)*
+*Last Updated: November 2026 (Explicit State Machine Refactoring Phases 0-10 COMPLETE; Event CRUD Normalization, Timezone Precision, Clean SEO Slugs, Cloudflare Turnstile Ingress Hardening, Explore Category Dropdown Conversion, City/Category Filter Fixes & Event Tag UI Restoration Verified; 176 Backend Tests Green, 12 Frontend Tests Green)*

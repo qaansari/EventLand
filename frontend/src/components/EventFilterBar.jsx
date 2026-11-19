@@ -112,6 +112,48 @@ export default function EventFilterBar({
     return ['All', ...Array.from(set).filter(Boolean)];
   }, [tags, events]);
 
+  const categoryOptions = useMemo(() => {
+    const map = new Map();
+    map.set('All', 'All Categories');
+
+    if (tags && tags.length > 0) {
+      tags.forEach(t => {
+        if (typeof t === 'object' && t !== null) {
+          const val = t.slug || t.name;
+          const label = t.name || t.slug;
+          if (val && label && val.toLowerCase() !== 'all') {
+            map.set(val, label);
+          }
+        } else if (typeof t === 'string' && t.trim() !== '' && t.toLowerCase() !== 'all') {
+          map.set(t.trim(), t.trim());
+        }
+      });
+    }
+
+    if (events && events.length > 0) {
+      events.forEach(ev => {
+        if (ev.tag && typeof ev.tag === 'string' && !map.has(ev.tag.trim())) {
+          map.set(ev.tag.trim(), ev.tag.trim());
+        }
+        if (Array.isArray(ev.tags)) {
+          ev.tags.forEach(t => {
+            if (typeof t === 'object' && t !== null) {
+              const val = t.slug || t.name;
+              const label = t.name || t.slug;
+              if (val && label && !map.has(val)) {
+                map.set(val, label);
+              }
+            } else if (typeof t === 'string' && !map.has(t.trim())) {
+              map.set(t.trim(), t.trim());
+            }
+          });
+        }
+      });
+    }
+
+    return Array.from(map.entries()).map(([value, label]) => ({ value, label }));
+  }, [tags, events]);
+
   const cityList = useMemo(() => {
     if (cities && cities.length > 0) {
       return ['All Cities', ...cities.map(c => typeof c === 'string' ? c : c.name).filter(Boolean)];
@@ -202,10 +244,11 @@ export default function EventFilterBar({
       list.push({ type: 'price', label: `Price: ${opt?.label || selectedPriceFilter}`, clear: () => onSelectPriceFilter && onSelectPriceFilter('all') });
     }
     if (selectedTag && selectedTag !== 'All') {
-      list.push({ type: 'tag', label: `Category: ${selectedTag}`, clear: () => onSelectTag && onSelectTag('All') });
+      const opt = categoryOptions.find(o => o.value === selectedTag || o.label === selectedTag);
+      list.push({ type: 'tag', label: `Category: ${opt?.label || selectedTag}`, clear: () => onSelectTag && onSelectTag('All') });
     }
     return list;
-  }, [searchQuery, selectedCity, selectedVenue, isCityChosen, selectedDateFilter, customDate, dateOptions, selectedPriceFilter, selectedTag, onSearchChange, onSelectCity, onSelectVenue, onSelectDateFilter, onCustomDateChange, onSelectPriceFilter, onSelectTag]);
+  }, [searchQuery, selectedCity, selectedVenue, isCityChosen, selectedDateFilter, customDate, dateOptions, selectedPriceFilter, selectedTag, categoryOptions, onSearchChange, onSelectCity, onSelectVenue, onSelectDateFilter, onCustomDateChange, onSelectPriceFilter, onSelectTag]);
 
   const hasActiveFilters = activeFilters.length > 0;
 
@@ -281,6 +324,22 @@ export default function EventFilterBar({
             icon={Building2}
             placeholder={venuePlaceholder}
             disabled={isVenueDisabled || loadingVenues}
+            className="discovery-select"
+          />
+        </div>
+
+        {/* Category Filter */}
+        <div className="discovery-filter-item">
+          <label className="discovery-filter-label">
+            <TagIcon size={13} className="discovery-label-icon" />
+            <span>Category</span>
+          </label>
+          <SearchableSelect
+            value={selectedTag || 'All'}
+            onChange={(e) => onSelectTag && onSelectTag(e.target.value)}
+            options={categoryOptions}
+            icon={TagIcon}
+            placeholder="Select Category..."
             className="discovery-select"
           />
         </div>
@@ -435,27 +494,7 @@ export default function EventFilterBar({
         </div>
       </div>
 
-      {/* ── 3. Category Tag Pills Row ──────────────────────────────────── */}
-      <div className="discovery-categories-wrapper">
-        <div className="filter-tags-row hide-scrollbar discovery-tags-scroll">
-          {allTags.map((tagName) => {
-            const isActive = selectedTag === tagName;
-            return (
-              <button
-                key={tagName}
-                type="button"
-                onClick={() => onSelectTag && onSelectTag(tagName)}
-                className={`discovery-tag-pill ${isActive ? 'active' : ''}`}
-              >
-                {getCategoryIcon(tagName)}
-                <span>{tagName === 'All' ? 'All Events' : tagName}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── 4. Active Filter Chips & Reset Row ─────────────────────────── */}
+      {/* ── 3. Active Filter Chips & Reset Row ─────────────────────────── */}
       {hasActiveFilters && (
         <div className="discovery-active-filters-row">
           <div className="discovery-active-chips-list">

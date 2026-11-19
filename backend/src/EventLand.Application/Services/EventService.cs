@@ -54,19 +54,30 @@ public class EventService : IEventService
 
         // "category" and "tag" both filter by attached tags (slug/name/id). They are kept as
         // separate query parameters for backwards compatibility with the frontend.
+        var rawCategory = category?.Trim();
+        var rawTag = tag?.Trim();
+
         var tagFilters = new List<string>();
-        if (!string.IsNullOrWhiteSpace(tag))
-            tagFilters.AddRange(tag.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(t => t.ToLower()));
-        if (!string.IsNullOrWhiteSpace(category))
-            tagFilters.AddRange(category.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(c => c.ToLower()));
+        if (!string.IsNullOrWhiteSpace(rawTag))
+        {
+            tagFilters.Add(rawTag.ToLower());
+            tagFilters.AddRange(rawTag.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(t => t.ToLower()));
+        }
+        if (!string.IsNullOrWhiteSpace(rawCategory))
+        {
+            tagFilters.Add(rawCategory.ToLower());
+            tagFilters.AddRange(rawCategory.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(c => c.ToLower()));
+        }
         tagFilters = tagFilters.Distinct().ToList();
 
         if (tagFilters.Count > 0)
         {
             query = query.Where(e => e.EventTags.Any(et =>
-                tagFilters.Contains(et.Tag.Slug) ||
-                tagFilters.Contains(et.Tag.Name) ||
-                tagFilters.Contains(et.Tag.Id.ToString())
+                tagFilters.Contains(et.Tag.Slug.ToLower()) ||
+                tagFilters.Contains(et.Tag.Name.ToLower()) ||
+                tagFilters.Contains(et.Tag.Id.ToString()) ||
+                (rawCategory != null && (et.Tag.Name.ToLower() == rawCategory.ToLower() || et.Tag.Slug.ToLower() == rawCategory.ToLower())) ||
+                (rawTag != null && (et.Tag.Name.ToLower() == rawTag.ToLower() || et.Tag.Slug.ToLower() == rawTag.ToLower()))
             ));
         }
 
@@ -173,7 +184,43 @@ public class EventService : IEventService
             return res;
         }
 
-        // 2. Trailing ID extraction from slug (e.g. "atif-aslam-live-in-concert-12")
+        // 2. Exact Title / Clean Slug lookup (e.g. "pacc-theatre-festival-2026")
+        var normalizedSlug = clean.ToLowerInvariant().Replace("-", " ");
+        var evByTitle = await _context.Events
+            .AsNoTracking()
+            .Where(e => !e.IsDeleted && e.IsPublished && EF.Functions.Like(e.Title, normalizedSlug))
+            .Select(e => e.Id)
+            .FirstOrDefaultAsync();
+
+        if (evByTitle > 0)
+        {
+            var res = await GetEventByIdAsync(evByTitle);
+            if (res is not null)
+            {
+                await _cacheService.SetAsync(identifierCacheKey, res, TimeSpan.FromMinutes(10));
+                return res;
+            }
+        }
+
+        // 2b. In-memory Slugify matching for titles with punctuation/symbols (e.g. "PACC Theatre Festival (2026)")
+        var candidateEvents = await _context.Events
+            .AsNoTracking()
+            .Where(e => !e.IsDeleted && e.IsPublished)
+            .Select(e => new { e.Id, e.Title })
+            .ToListAsync();
+
+        var matchedCandidate = candidateEvents.FirstOrDefault(c => Slugify(c.Title).Equals(clean, StringComparison.OrdinalIgnoreCase));
+        if (matchedCandidate != null)
+        {
+            var res = await GetEventByIdAsync(matchedCandidate.Id);
+            if (res is not null)
+            {
+                await _cacheService.SetAsync(identifierCacheKey, res, TimeSpan.FromMinutes(10));
+                return res;
+            }
+        }
+
+        // 3. Legacy trailing ID extraction (e.g. "pacc-theatre-festival-2026-1000")
         var lastDashIndex = clean.LastIndexOf('-');
         if (lastDashIndex > 0 && lastDashIndex < clean.Length - 1)
         {
@@ -189,25 +236,20 @@ public class EventService : IEventService
             }
         }
 
-        // 3. Fallback matching by normalized Title (e.g. "Atif Aslam Live in Concert")
-        var normalizedSlug = clean.ToLower().Replace("-", " ");
-        var evByTitle = await _context.Events
-            .AsNoTracking()
-            .Where(e => !e.IsDeleted && e.IsPublished && EF.Functions.Like(e.Title, normalizedSlug))
-            .Select(e => e.Id)
-            .FirstOrDefaultAsync();
-
-        if (evByTitle > 0)
-        {
-            var res = await GetEventByIdAsync(evByTitle);
-            if (res is not null)
-            {
-                await _cacheService.SetAsync(identifierCacheKey, res, TimeSpan.FromMinutes(10));
-            }
-            return res;
-        }
 
         return null;
+    }
+
+    private static string Slugify(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return string.Empty;
+        var clean = new string(title
+            .ToLowerInvariant()
+            .Trim()
+            .Where(c => char.IsLetterOrDigit(c) || char.IsWhiteSpace(c) || c == '-')
+            .ToArray());
+        var words = clean.Split(new[] { ' ', '-' }, StringSplitOptions.RemoveEmptyEntries);
+        return string.Join("-", words);
     }
 
     private static EventDetailDto MapToDetailDto(Event e) => new(
