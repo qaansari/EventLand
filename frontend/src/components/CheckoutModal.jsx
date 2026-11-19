@@ -10,16 +10,22 @@ import {
   CreditCard,
   ExternalLink,
   Zap,
-  RefreshCw
+  RefreshCw,
+  Sparkles,
+  Smartphone,
+  Building2,
+  MessageCircle
 } from 'lucide-react';
 import { bookingsApi, paymentsApi } from '../services/api';
 import PayProStatusTracker from './PayProStatusTracker';
 import { useToast } from '../context/ToastContext';
 import { useCheckoutMachine } from '../hooks/useCheckoutMachine';
+import { useCheckoutStatus } from '../services/checkoutSettings';
 
 export default function CheckoutModal({ event, selectedSeats, onClose, onBookingSuccess, onInvoiceCreated }) {
   const { showSuccess, showError, showWarning } = useToast();
   const { state, context, dispatch, pollStatus } = useCheckoutMachine();
+  const { isCheckoutEnabled, toggleCheckout } = useCheckoutStatus();
 
   const [selectedPayProMethod, setSelectedPayProMethod] = useState('easypaisa_jazzcash');
   const [payproResponse, setPayproResponse] = useState(null);
@@ -29,6 +35,8 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
   // Authorization / Verified User check
   const loggedUserRaw = localStorage.getItem('eventland_logged_user');
   const loggedUser = loggedUserRaw ? JSON.parse(loggedUserRaw) : null;
+  const rawRole = (loggedUser?.rawRole || loggedUser?.roleName || loggedUser?.role || '').trim().toLowerCase();
+  const isAdmin = rawRole === 'admin' || rawRole === 'superadmin' || loggedUser?.roleId === 1 || loggedUser?.roleId === 2;
 
   const [formData, setFormData] = useState({
     name: loggedUser?.name || loggedUser?.fullName || '',
@@ -260,12 +268,55 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         boxShadow: '0 12px 36px rgba(0, 0, 0, 0.5)',
         padding: 'clamp(1rem, 3.5vw, 2rem)'
       }}>
+        {/* --- ADMIN TOOLBAR (ONLY FOR ADMINS) --- */}
+        {isAdmin && (
+          <div style={{
+            background: 'rgba(13, 148, 136, 0.12)',
+            border: '1px solid rgba(45, 212, 191, 0.35)',
+            borderRadius: '12px',
+            padding: '0.65rem 1rem',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '0.75rem',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: '#e2e8f0' }}>
+              <ShieldCheck size={16} color="#2dd4bf" />
+              <span>
+                <strong>Admin Mode:</strong> Checkout is currently <strong>{isCheckoutEnabled ? '🟢 LIVE' : '🟠 COMING SOON'}</strong>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                toggleCheckout();
+                showSuccess('Status Updated', !isCheckoutEnabled ? 'Live PayPro checkout enabled' : 'Coming Soon mode activated');
+              }}
+              style={{
+                background: isCheckoutEnabled ? 'linear-gradient(135deg, #d97706, #b45309)' : 'linear-gradient(135deg, #059669, #047857)',
+                border: 'none',
+                borderRadius: '8px',
+                color: '#fff',
+                padding: '0.35rem 0.85rem',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+              }}
+            >
+              {isCheckoutEnabled ? 'Switch to Coming Soon' : 'Enable Live Checkout'}
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
               <span className="badge badge-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem' }}>
-                <Zap size={14} /> PAYPRO ONLINE GATEWAY
+                <Zap size={14} /> {isCheckoutEnabled ? 'PAYPRO ONLINE GATEWAY' : 'PAYPRO GATEWAY (IN PROCESS)'}
               </span>
               <span className="checkout-timer" style={{
                 display: 'flex',
@@ -284,12 +335,14 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               </span>
             </div>
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', margin: 0 }}>
-              {state === 'buyer_info' && 'Buyer Details'}
-              {state === 'payment_method' && 'PayPro Online Payment'}
-              {state === 'redirecting' && 'Connecting to Gateway...'}
-              {state === 'voucher_pending' && 'PayPro Invoice & Status'}
-              {state === 'confirmed' && 'Payment Confirmed'}
-              {state === 'failed' && 'Payment Unsuccessful'}
+              {!isCheckoutEnabled ? 'Online Checkout (Coming Soon)' : (
+                state === 'buyer_info' ? 'Buyer Details' :
+                state === 'payment_method' ? 'PayPro Online Payment' :
+                state === 'redirecting' ? 'Connecting to Gateway...' :
+                state === 'voucher_pending' ? 'PayPro Invoice & Status' :
+                state === 'confirmed' ? 'Payment Confirmed' :
+                'Payment Unsuccessful'
+              )}
             </h2>
             <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.2rem' }}>
               {event.title} • {selectedSeats.length} {selectedSeats.length === 1 ? 'Seat' : 'Seats'}
@@ -316,26 +369,224 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
           </button>
         </div>
 
-        {/* Step Progress Tracker */}
-        <div className="checkout-steps-bar" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.75rem' }}>
-          {[
-            { num: 1, label: '1. Buyer Info' },
-            { num: 2, label: '2. Online Payment' },
-            { num: 3, label: '3. Confirmation' }
-          ].map(s => (
-            <div key={s.num} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+        {!isCheckoutEnabled ? (
+          /* ========================================================================= */
+          /* --- COMING SOON VIEW (ACTIVE WHEN CHECKOUT IS DISABLED) --- */
+          /* ========================================================================= */
+          <div className="checkout-coming-soon-container" style={{ padding: '0.5rem 0' }}>
+            {/* Hero / Notification */}
+            <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
               <div style={{
-                height: '4px',
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(13, 148, 136, 0.2))',
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1rem',
+                boxShadow: '0 0 25px rgba(245, 158, 11, 0.25)'
+              }}>
+                <Clock size={32} color="#fbbf24" className="animate-pulse" />
+              </div>
+
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                padding: '0.3rem 0.85rem',
                 borderRadius: '9999px',
-                background: stepNumber >= s.num ? 'linear-gradient(90deg, #0d9488, #2dd4bf)' : 'rgba(255, 255, 255, 0.1)',
-                transition: 'background 0.3s ease'
-              }} />
-              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: stepNumber >= s.num ? '#2dd4bf' : '#64748b' }}>
-                {s.label}
-              </span>
+                background: 'rgba(245, 158, 11, 0.15)',
+                border: '1px solid rgba(245, 158, 11, 0.35)',
+                color: '#fbbf24',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                marginBottom: '0.6rem'
+              }}>
+                <Sparkles size={14} /> PAYPRO LIVE GATEWAY ONBOARDING IN PROCESS
+              </div>
+
+              <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#ffffff', margin: '0 0 0.5rem', letterSpacing: '-0.02em' }}>
+                Online Checkout Coming Soon
+              </h3>
+              <p style={{ fontSize: '0.88rem', color: '#94a3b8', maxWidth: '520px', margin: '0 auto', lineHeight: 1.6 }}>
+                Our automated 1Link & PayPro payment gateway is currently completing final banking integration & regulatory certification. Direct card, mobile wallet, and 1Bill payments will launch shortly.
+              </p>
             </div>
-          ))}
-        </div>
+
+            {/* Selected Tickets Summary Card */}
+            <div style={{
+              background: 'rgba(15, 23, 42, 0.65)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '16px',
+              padding: '1.25rem',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, color: '#fff' }}>
+                    {event.title}
+                  </h4>
+                  <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                    {event.eventDate || event.date || 'Upcoming'} • {event.venueName || event.venue || event.auditoriumName || 'Main Hall'}, {event.cityName || event.city || 'Pakistan'}
+                  </span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block' }}>Total Amount</span>
+                  <span style={{ fontSize: '1.35rem', fontWeight: 800, color: '#2dd4bf' }}>
+                    PKR {totalPayable.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.5rem' }}>
+                  Reserved Tickets ({selectedSeats.length})
+                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {selectedSeats.map((s, idx) => (
+                    <span
+                      key={idx}
+                      style={{
+                        padding: '0.35rem 0.65rem',
+                        background: 'rgba(13, 148, 136, 0.15)',
+                        border: '1px solid rgba(45, 212, 191, 0.25)',
+                        borderRadius: '8px',
+                        fontSize: '0.78rem',
+                        color: '#e2e8f0',
+                        fontWeight: 500
+                      }}
+                    >
+                      {s.tierName || s.tier || 'Ticket'}: {s.label || s.name || `Seat #${s.id}`} (PKR {Number(s.price || 0).toLocaleString()})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Upcoming Channels Grid */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.75rem' }}>
+                Upcoming Instant Payment Channels
+              </span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem' }}>
+                <div style={{ padding: '0.85rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Smartphone size={18} color="#38bdf8" />
+                    <span style={{ fontSize: '0.65rem', fontWeight: 700, background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>Coming Soon</span>
+                  </div>
+                  <strong style={{ fontSize: '0.82rem', color: '#fff' }}>EasyPaisa & JazzCash</strong>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Instant Mobile Wallets</span>
+                </div>
+
+                <div style={{ padding: '0.85rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <CreditCard size={18} color="#34d399" />
+                    <span style={{ fontSize: '0.65rem', fontWeight: 700, background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>Coming Soon</span>
+                  </div>
+                  <strong style={{ fontSize: '0.82rem', color: '#fff' }}>Debit & Credit Cards</strong>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Visa, MasterCard & UnionPay</span>
+                </div>
+
+                <div style={{ padding: '0.85rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Building2 size={18} color="#a78bfa" />
+                    <span style={{ fontSize: '0.65rem', fontWeight: 700, background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>Coming Soon</span>
+                  </div>
+                  <strong style={{ fontSize: '0.82rem', color: '#fff' }}>1Bill & Bank Apps</strong>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Direct 1Link Online Transfer</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Direct WhatsApp Concierge Reservation Alternative */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(37, 211, 102, 0.12), rgba(15, 23, 42, 0.8))',
+              border: '1px solid rgba(37, 211, 102, 0.35)',
+              borderRadius: '16px',
+              padding: '1.25rem',
+              marginBottom: '1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '1rem'
+            }}>
+              <div style={{ flex: '1 1 300px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                  <MessageCircle size={18} color="#25D366" />
+                  <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 800, color: '#ffffff' }}>
+                    Need Your Tickets Confirmed Immediately?
+                  </h4>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                  Our EventLand ticketing desk is available on WhatsApp to reserve and confirm your tickets directly.
+                </p>
+              </div>
+
+              <a
+                href={`https://wa.me/923079353185?text=${encodeURIComponent(
+                  `Hello EventLand Support! I would like to reserve tickets for "${event.title}".\nSeats: ${selectedSeats.map(s => s.label || s.name || s.id).join(', ')}\nTotal: PKR ${totalPayable.toLocaleString()}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.75rem 1.4rem',
+                  borderRadius: '12px',
+                  background: '#25D366',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: '0.875rem',
+                  textDecoration: 'none',
+                  boxShadow: '0 4px 14px rgba(37, 211, 102, 0.35)',
+                  transition: 'transform 0.15s ease'
+                }}
+              >
+                <MessageCircle size={16} /> Book via WhatsApp (+92 307 9353185)
+              </a>
+            </div>
+
+            {/* Bottom Modal Actions */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                onClick={onClose}
+                className="btn btn-outline-secondary"
+                style={{ padding: '0.75rem 1.75rem', borderRadius: '12px', fontWeight: 700 }}
+              >
+                Back to Event
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* ========================================================================= */
+          /* --- LIVE PAYPRO CHECKOUT FLOW (ACTIVE WHEN CHECKOUT IS ENABLED) --- */
+          /* ========================================================================= */
+          <>
+            {/* Step Progress Tracker */}
+            <div className="checkout-steps-bar" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.75rem' }}>
+              {[
+                { num: 1, label: '1. Buyer Info' },
+                { num: 2, label: '2. Online Payment' },
+                { num: 3, label: '3. Confirmation' }
+              ].map(s => (
+                <div key={s.num} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <div style={{
+                    height: '4px',
+                    borderRadius: '9999px',
+                    background: stepNumber >= s.num ? 'linear-gradient(90deg, #0d9488, #2dd4bf)' : 'rgba(255, 255, 255, 0.1)',
+                    transition: 'background 0.3s ease'
+                  }} />
+                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: stepNumber >= s.num ? '#2dd4bf' : '#64748b' }}>
+                    {s.label}
+                  </span>
+                </div>
+              ))}
+            </div>
 
         {/* --- REDIRECTING STATE (ACPKHI Hosted Checkout Redirect) --- */}
         {state === 'redirecting' && (
@@ -880,6 +1131,8 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
             </div>
           </div>
         )}
+      </>
+    )}
       </div>
     </div>
   );

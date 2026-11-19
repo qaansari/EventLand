@@ -2,16 +2,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShieldCheck, Users, FileText, RefreshCw, Plus, Upload, CheckCircle2,
   AlertTriangle, Search, ChevronLeft, ChevronRight, Ban, Check, DollarSign,
-  Clock, ArrowUpRight, Filter
+  Clock, ArrowUpRight, Filter, Power, Sparkles
 } from 'lucide-react';
 import { payProApi } from '../services/paypro.api';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import EventLandPreloader from './EventLandPreloader';
+import { useCheckoutStatus } from '../services/checkoutSettings';
 
 export default function PayProAdminPanel() {
   const { showSuccess, showError, showWarning, showInfo } = useToast();
   const confirm = useConfirm();
+  const { isCheckoutEnabled, toggleCheckout } = useCheckoutStatus();
   const [activeTab, setActiveTab] = useState('reports'); // 'reports', 'consumers', 'ops'
 
   // --- TAB 1: PAID ORDERS REPORT (GPO) STATE ---
@@ -275,6 +277,99 @@ export default function PayProAdminPanel() {
             style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.6rem 1.1rem' }}
           >
             <RefreshCw size={16} /> Reconciliation & Ops
+          </button>
+        </div>
+      </div>
+
+      {/* --- CUSTOMER CHECKOUT GATEWAY SETTING (ADMIN ONLY) --- */}
+      <div
+        className="glass-card"
+        style={{
+          padding: '1.35rem 1.75rem',
+          borderRadius: '16px',
+          marginBottom: '2rem',
+          background: isCheckoutEnabled
+            ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(15, 23, 42, 0.9))'
+            : 'linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(15, 23, 42, 0.9))',
+          border: isCheckoutEnabled
+            ? '1px solid rgba(16, 185, 129, 0.35)'
+            : '1px solid rgba(245, 158, 11, 0.35)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '1.25rem',
+          boxShadow: isCheckoutEnabled
+            ? '0 8px 24px rgba(16, 185, 129, 0.1)'
+            : '0 8px 24px rgba(245, 158, 11, 0.1)'
+        }}
+      >
+        <div style={{ flex: '1 1 420px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '9999px',
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              background: isCheckoutEnabled ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+              color: isCheckoutEnabled ? '#34d399' : '#fbbf24',
+              border: `1px solid ${isCheckoutEnabled ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`
+            }}>
+              {isCheckoutEnabled ? <CheckCircle2 size={13} /> : <Clock size={13} />}
+              {isCheckoutEnabled ? 'LIVE CHECKOUT ENABLED' : 'COMING SOON MODE (CHECKOUT DISABLED)'}
+            </span>
+            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+              • Admin Feature Control
+            </span>
+          </div>
+
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#ffffff', margin: '0.25rem 0 0.35rem' }}>
+            Customer Checkout & PayPro Gateway Availability
+          </h3>
+          <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0, lineHeight: 1.55 }}>
+            {isCheckoutEnabled
+              ? 'Active: Attendees on eventland.pk can proceed directly to the automated PayPro 1Link payment portal.'
+              : 'Disabled: Attendees attempting to checkout see the dedicated "Coming Soon" holding view displaying their tickets and direct WhatsApp concierge reservation while live PayPro merchant onboarding completes.'}
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => {
+              toggleCheckout();
+              const nextState = !isCheckoutEnabled;
+              if (nextState) {
+                showSuccess('Live Checkout Enabled', 'Customers can now proceed to PayPro 1Link payment gateway.');
+              } else {
+                showWarning('Coming Soon Mode Activated', 'Checkout is now disabled. Customers will see the Coming Soon holding page.');
+              }
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.7rem 1.4rem',
+              borderRadius: '12px',
+              fontWeight: 800,
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              border: 'none',
+              background: isCheckoutEnabled
+                ? 'linear-gradient(135deg, #d97706, #b45309)'
+                : 'linear-gradient(135deg, #059669, #047857)',
+              color: '#ffffff',
+              boxShadow: isCheckoutEnabled
+                ? '0 4px 14px rgba(217, 119, 6, 0.35)'
+                : '0 4px 14px rgba(5, 150, 105, 0.35)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Power size={16} />
+            {isCheckoutEnabled ? 'Disable Checkout (Switch to Coming Soon)' : 'Enable Live PayPro Checkout'}
           </button>
         </div>
       </div>

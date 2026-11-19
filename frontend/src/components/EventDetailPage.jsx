@@ -24,6 +24,7 @@ import { formatEventDateRange, formatEventStartTime } from '../utils/dateUtils';
 import { getEventImageUrl, getOrganizerImageUrl, eventsApi, toEventSlug } from '../services/api';
 import InteractiveSeatPicker from './InteractiveSeatPicker';
 import EventLandPreloader from './EventLandPreloader';
+import { useCheckoutStatus } from '../services/checkoutSettings';
 
 const formatLocationString = (ev) => {
   if (!ev) return '';
@@ -49,6 +50,7 @@ const formatLocationString = (ev) => {
 
 export default function EventDetailPage({ event: initialEvent, eventId, onBack, onProceedToBooking }) {
   const { showSuccess, showWarning, showError } = useToast();
+  const { isCheckoutEnabled } = useCheckoutStatus();
   const [eventDetail, setEventDetail] = useState(initialEvent);
   const [loading, setLoading] = useState(!initialEvent && !!eventId);
   const [copied, setCopied] = useState(false);
@@ -842,7 +844,7 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
                         boxShadow: selectedCategorizedCount > 0 ? '0 0 25px rgba(13, 148, 136, 0.45)' : 'none'
                       }}
                     >
-                      <Ticket size={20} /> Book Tickets Now
+                      <Ticket size={20} /> {isCheckoutEnabled ? 'Book Tickets Now' : 'Book Tickets (Coming Soon)'}
                     </button>
                   </div>
                 </div>
@@ -1378,7 +1380,7 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
                 boxShadow: '0 0 25px rgba(13, 148, 136, 0.5)'
               }}
             >
-              <Ticket size={18} /> Proceed to Checkout
+              <Ticket size={18} /> {isCheckoutEnabled ? 'Proceed to Checkout' : 'Proceed to Checkout (Coming Soon)'}
             </button>
           </div>
         </div>

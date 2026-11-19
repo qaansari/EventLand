@@ -1091,9 +1091,36 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
 
 - **Verification Status**:
   - Backend Unit Tests: **176/176 tests passing (100% green)**.
-  - Frontend Unit Tests: **12/12 tests passing (100% green)**.
-  - Frontend Production Build: **0 errors, clean in 7.22s**.
+  - Frontend Unit Tests: **15/15 tests passing (100% green)**.
+  - Frontend Production Build: **0 errors, clean in 9.32s**.
+  - Backend Solution: **0 errors, compiled cleanly**.
+
+#### Post-Phase 11: Checkout "Coming Soon" Mode & Admin Gate Control Switch
+
+1. **Centralized Checkout Feature Flag Service ([`checkoutSettings.js`](file:///d:/Projects/EventLand/frontend/src/services/checkoutSettings.js))**:
+   - Built a dedicated client-side feature flag service with `isCheckoutEnabled()`, `setCheckoutEnabled(boolean)`, and a reactive hook `useCheckoutStatus()`.
+   - **Default State**: Evaluates to `false` (disabled) by default while live PayPro API onboarding and certification are completed.
+   - Synchronizes changes across open browser tabs using `CustomEvent('eventland_checkout_status_change')` and `window.addEventListener('storage')`.
+
+2. **Dedicated "Coming Soon" Checkout Page ([`CheckoutModal.jsx`](file:///d:/Projects/EventLand/frontend/src/components/CheckoutModal.jsx))**:
+   - When checkout is disabled, visitors attempting to checkout are presented with a dedicated, glassmorphic **Coming Soon** holding view:
+     - **Hero Section**: Glowing clock icon, animated status badge (`PAYPRO LIVE GATEWAY ONBOARDING IN PROCESS`), and clear explanation of pending bank certification.
+     - **Preserved Ticket Details**: Reassures attendees by displaying their selected event title, date/time, venue/city, seat identifiers (e.g. `VIP - Row B, Seat 12`), and exact total payable in PKR.
+     - **Upcoming Channels Preview**: Badges for EasyPaisa/JazzCash, Credit/Debit cards (Visa/MasterCard/UnionPay), and 1Link 1Bill banking apps marked as "Coming Soon".
+     - **Urgent Booking Concierge (WhatsApp Support)**: Prominent WhatsApp support card linking to `https://wa.me/923079353185` with prefilled event title, seat labels, and total amount for immediate manual reservation.
+     - **Admin In-Modal Switcher**: If an authenticated Admin or SuperAdmin opens checkout while disabled, an administrative banner allows toggling between "Coming Soon" and "Live PayPro Checkout" with one click.
+
+3. **Admin Dashboard Control Switch ([`PayProAdminPanel.jsx`](file:///d:/Projects/EventLand/frontend/src/components/PayProAdminPanel.jsx) & [`AdminDashboard.jsx`](file:///d:/Projects/EventLand/frontend/src/components/AdminDashboard.jsx))**:
+   - Added a **Customer Checkout & PayPro Gateway Availability** control card at the top of the PayPro Admin Panel.
+   - Allows SuperAdmin / Admin to toggle checkout mode on/off instantly with toast confirmations.
+   - Added a live status badge (`Live` or `Coming Soon`) directly on the PayPro Gateway tab button in the Admin Dashboard.
+   - Updated ticket booking action buttons in [`EventDetailPage.jsx`](file:///d:/Projects/EventLand/frontend/src/components/EventDetailPage.jsx) and [`InteractiveSeatPicker.jsx`](file:///d:/Projects/EventLand/frontend/src/components/InteractiveSeatPicker.jsx) to indicate Coming Soon status when checkout is disabled.
+
+- **Verification Status**:
+  - Backend Unit Tests: **176/176 tests passing (100% green)**.
+  - Frontend Unit Tests: **15/15 tests passing (100% green)** (`checkoutSettings.test.js`, `dateUtils.test.js`, `stateMachines.test.js`).
+  - Frontend Production Build: **0 errors, clean in 9.32s**.
   - Backend Solution: **0 errors, compiled cleanly**.
 
 ---
-*Last Updated: November 2026 (Explicit State Machine Refactoring Phases 0-10 COMPLETE; Event CRUD Normalization, Timezone Precision, Clean SEO Slugs, Cloudflare Turnstile Ingress Hardening, Explore Category Dropdown Conversion, City/Category Filter Fixes & Event Tag UI Restoration Verified; 176 Backend Tests Green, 12 Frontend Tests Green)*
+*Last Updated: November 2026 (Checkout Coming Soon Holding Page & Admin Enable/Disable Gateway Switch Implemented; 176 Backend Tests Green, 15 Frontend Tests Green, Clean Production Vite Build)*

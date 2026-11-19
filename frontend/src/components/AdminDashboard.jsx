@@ -51,10 +51,12 @@ import AdminAuditoriumModal from './admin/modals/AdminAuditoriumModal';
 import { parseAuditoriumLayout, createBlankLayoutJson } from '../data/auditoriumLayouts';
 import { exportAuditoriumChartPdf } from '../utils/pdfChartExporter';
 import { toDateTimeLocalValue, fromDateTimeLocalValue, normalizeEventStatus } from '../utils/dateUtils';
+import { useCheckoutStatus } from '../services/checkoutSettings';
 
 export default function AdminDashboard({ onSelectEvent, currentUser = null, onUpdateCurrentUser = null }) {
   const { showSuccess, showError, showWarning } = useToast();
   const confirm = useConfirm();
+  const { isCheckoutEnabled } = useCheckoutStatus();
   const [activeAdminTab, setActiveAdminTab] = useState('events'); // 'events', 'organizers', 'artists', 'bookings', 'users', 'roles', 'ticket-tiers', 'tags'
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -2788,6 +2790,17 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
               }}
             >
               <ShieldCheck size={18} /> PayPro Gateway
+              <span style={{
+                fontSize: '0.65rem',
+                padding: '0.15rem 0.45rem',
+                borderRadius: '4px',
+                fontWeight: 700,
+                background: isCheckoutEnabled ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.25)',
+                color: isCheckoutEnabled ? '#34d399' : '#fbbf24',
+                border: `1px solid ${isCheckoutEnabled ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`
+              }}>
+                {isCheckoutEnabled ? 'Live' : 'Coming Soon'}
+              </span>
             </button>
           )}
 

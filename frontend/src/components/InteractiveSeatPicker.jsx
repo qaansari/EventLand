@@ -7,6 +7,7 @@ import { useToast } from '../context/ToastContext';
 import { deriveSeatVisualState } from '../utils/deriveSeatVisualState';
 import { useSeatChannel } from '../hooks/useSeatChannel';
 import { SeatButton } from './seating/SeatButton';
+import { useCheckoutStatus } from '../services/checkoutSettings';
 
 // Stable per-session guest identity so all seat holds from this browser share one owner
 // (a fresh random email per click fragmented the hold map and broke releases).
@@ -22,6 +23,7 @@ const getGuestEmail = () => {
 
 export default function InteractiveSeatPicker({ event: initialEvent, onClose, onProceedToCheckout, isPreview = false }) {
   const { showSuccess, showError } = useToast();
+  const { isCheckoutEnabled } = useCheckoutStatus();
   const isPreviewMode = isPreview || !onProceedToCheckout || String(initialEvent?.id || '').startsWith('preview-');
   const [eventData, setEventData] = useState(initialEvent);
   const [dbAuditoriums, setDbAuditoriums] = useState([]);
@@ -875,7 +877,7 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
                 {activeBank?.isUnderMaintenance ? (
                   <>⚠️ Booking Paused (Bank Maintenance)</>
                 ) : (
-                  <><Ticket size={18} /> Confirm & Pay</>
+                  <><Ticket size={18} /> {isCheckoutEnabled ? 'Confirm & Pay' : 'Proceed to Checkout (Coming Soon)'}</>
                 )}
               </button>
             </div>
