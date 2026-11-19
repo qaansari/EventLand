@@ -291,6 +291,8 @@ export default function Footer({ onSelectCity, onNavigatePrivacyPolicy }) {
                 </button>
               </div>
               <CloudflareTurnstile
+                action="newsletter"
+                isolateState={true}
                 onVerify={(token) => setNewsletterCaptcha(token)}
                 onExpire={() => setNewsletterCaptcha('')}
                 size="compact"

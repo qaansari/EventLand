@@ -1097,6 +1097,8 @@ export default function App() {
                   </p>
                 </div>
                 <CloudflareTurnstile
+                  action="homepage"
+                  isolateState={true}
                   onVerify={(token) => setHomepageCaptchaToken(token)}
                   onExpire={() => setHomepageCaptchaToken('')}
                   style={{ margin: 0 }}

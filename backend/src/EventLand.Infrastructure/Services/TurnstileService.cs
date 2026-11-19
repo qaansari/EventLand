@@ -99,10 +99,13 @@ public class TurnstileService : ICaptchaService
             var result = await response.Content.ReadFromJsonAsync<TurnstileVerifyResponse>();
             if (result != null && result.Success)
             {
-                // Action verification if specified
+                // Action verification if specified (permits exact expected action OR generic "general" fallback)
                 if (!string.IsNullOrWhiteSpace(expectedAction) && !string.IsNullOrWhiteSpace(result.Action))
                 {
-                    if (!string.Equals(result.Action, expectedAction, StringComparison.OrdinalIgnoreCase))
+                    var isMatch = string.Equals(result.Action, expectedAction, StringComparison.OrdinalIgnoreCase)
+                                  || string.Equals(result.Action, "general", StringComparison.OrdinalIgnoreCase);
+
+                    if (!isMatch)
                     {
                         _logger.LogWarning("Turnstile action mismatch: expected '{Expected}', received '{Actual}'.",
                             expectedAction, result.Action);

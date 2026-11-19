@@ -11,6 +11,7 @@ export default function CloudflareTurnstile({
   theme = 'dark',
   size = 'normal',
   action = 'general',
+  isolateState = false,
   style = {}
 }) {
   const { siteKey, isCaptchaEnabled, setCaptchaToken, resetSignal } = useCaptcha();
@@ -48,7 +49,7 @@ export default function CloudflareTurnstile({
     if (!isCaptchaEnabled) {
       setLoading(false);
       setVerifiedToken('CAPTCHA_DISABLED');
-      setCaptchaToken('CAPTCHA_DISABLED');
+      if (!isolateState) setCaptchaToken('CAPTCHA_DISABLED');
       if (onVerifyRef.current) onVerifyRef.current('CAPTCHA_DISABLED');
       return;
     }
@@ -72,14 +73,14 @@ export default function CloudflareTurnstile({
           callback: (token) => {
             if (!isMounted) return;
             setVerifiedToken(token);
-            setCaptchaToken(token);
+            if (!isolateState) setCaptchaToken(token);
             setErrorMsg(null);
             if (onVerifyRef.current) onVerifyRef.current(token);
           },
           'expired-callback': () => {
             if (!isMounted) return;
             setVerifiedToken(null);
-            setCaptchaToken(null);
+            if (!isolateState) setCaptchaToken(null);
             if (onExpireRef.current) onExpireRef.current();
           },
           'error-callback': (err) => {
@@ -88,7 +89,7 @@ export default function CloudflareTurnstile({
             // Fall back for local development if domain is not configured on Cloudflare
             const fallbackToken = `test-pass-${Date.now()}`;
             setVerifiedToken(fallbackToken);
-            setCaptchaToken(fallbackToken);
+            if (!isolateState) setCaptchaToken(fallbackToken);
             if (onVerifyRef.current) onVerifyRef.current(fallbackToken);
             if (onErrorRef.current) onErrorRef.current(err);
           }

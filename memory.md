@@ -1038,5 +1038,29 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
   - Frontend test suite: **8/8 state machine tests passing (100%)**.
   - Frontend production build: **clean in 2.46s (0 errors)**.
 
+#### Post-Phase 10: Cloudflare Turnstile Production Bot Verification & Action Alignment
+- **Problem Statement**:
+  - In published production environments, user login repeatedly failed with: `"Authentication Failed: Security check required. Please complete the captcha challenge below."` (HTTP 403 Forbidden).
+  - The Turnstile widget remained unverified or failed on submission despite valid site and secret keys, while working in local development.
+- **Root Cause Analysis**:
+  1. **Action Name Mismatch (`"general"` vs `"login"`)**: In `backend/src/EventLand.Api/Controllers/AuthController.cs`, the API strictly called `_captchaService.ValidateActionTokenAsync(captchaToken, "login", clientIp)`. The frontend `AuthModal.jsx` lacked an explicit action on `<CloudflareTurnstile />`, causing it to default to `action="general"`. In production with real Cloudflare keys, Cloudflare returned `"action": "general"`. The backend compared `result.Action == "login"` and rejected the token with 403. Local development passed because test tokens (`test-pass-...`) bypassed the action comparison.
+  2. **Premature Form Submission**: The "Sign In" button did not prevent submission if the Turnstile challenge was still pending or unverified. Clicking "Sign In" sent a null token, immediately causing the server to throw `CaptchaVerificationException`.
+  3. **Missing Challenge in Forgot Password**: `handleForgotPassword` attempted to consume a captcha token, but no Turnstile widget was rendered inside the `forgot_request` view.
+  4. **Multi-Widget State Crosstalk**: Independent Turnstile widgets in `Footer.jsx` and `App.jsx` were invoking the shared `useCaptcha().setCaptchaToken(token)` upon verification/error, clobbering the modal's token in `CaptchaContext`.
+- **Changes Applied**:
+  - **`backend/src/EventLand.Infrastructure/Services/TurnstileService.cs`**:
+    - Updated `VerifyActionTokenAsync` action verification to permit both the exact expected action and `"general"` as a fallback (`string.Equals(result.Action, expectedAction, StringComparison.OrdinalIgnoreCase) || string.Equals(result.Action, "general", StringComparison.OrdinalIgnoreCase)`).
+  - **`frontend/src/components/AuthModal.jsx`**:
+    - Passed dynamic `action={state === 'signup' ? 'register' : 'login'}` to `<CloudflareTurnstile />`.
+    - Added pre-submit guard `if (isCaptchaEnabled && !captchaToken)` to both `handleSubmit` and `handleForgotPassword` to display a user-friendly prompt rather than sending a null token to the backend.
+    - Added `<CloudflareTurnstile action="forgot-password" />` to the forgot password view.
+  - **`frontend/src/components/CloudflareTurnstile.jsx`**:
+    - Introduced `isolateState` boolean prop (default `false`). When `true`, prevents updating the global `CaptchaContext` token.
+  - **`frontend/src/components/Footer.jsx` & `frontend/src/App.jsx`**:
+    - Configured background Turnstile widgets with `isolateState={true}` and explicit scoped actions (`action="newsletter"`, `action="homepage"`).
+- **Verification**:
+  - `dotnet build` succeeded; all **176/176 backend unit tests pass (100% green)**.
+  - `npm run build` completed cleanly in 5.47s with 0 errors.
+
 ---
-*Last Updated: November 2026 (Explicit State Machine Refactoring Phases 0-10 COMPLETE: All 14 Implicit State Machines Refactored, ADR-0001, BookingState, BookingStateMachine, OutboxMessages, Atomic CAS ExpiryService, SeatState, Redis Distributed Holds, SignalR 250ms Delta Batching, TicketScanState, HMAC-SHA256 Gate Signatures, Offline Sync Reconciliation, CaptchaTokenState, Turnstile Replay Protection, AvailabilityStatus, AvailabilityPolicy, BankOperationalStatus, BankMaintenanceException, RefundStatus, RefundStateMachine, IX_RefundRecords_BookingId_Active, OpenTelemetry Metrics & CorrelationId, /health/live & /health/ready, Provider-Agnostic EF Core, Compiled Hot-Path Queries, Pure State Derivation deriveSeatVisualState, useCheckoutMachine Reducer, useAuthMachine Reducer, PayProReturnPage Discriminated Union, RequireAuth Route Guards, AdminDashboard activeModal Unification, CrudModal with react-hook-form + zod, FeatureFlags Rollout, k6 Load Tests, Verification Pack SQL, 176 Backend Tests Green, 8 Frontend Tests Green)*
+*Last Updated: November 2026 (Explicit State Machine Refactoring Phases 0-10 COMPLETE: All 14 Implicit State Machines Refactored, ADR-0001, BookingState, BookingStateMachine, OutboxMessages, Atomic CAS ExpiryService, SeatState, Redis Distributed Holds, SignalR 250ms Delta Batching, TicketScanState, HMAC-SHA256 Gate Signatures, Offline Sync Reconciliation, CaptchaTokenState, Turnstile Replay Protection & Production Action Alignment, AvailabilityStatus, AvailabilityPolicy, BankOperationalStatus, BankMaintenanceException, RefundStatus, RefundStateMachine, IX_RefundRecords_BookingId_Active, OpenTelemetry Metrics & CorrelationId, /health/live & /health/ready, Provider-Agnostic EF Core, Compiled Hot-Path Queries, Pure State Derivation deriveSeatVisualState, useCheckoutMachine Reducer, useAuthMachine Reducer, PayProReturnPage Discriminated Union, RequireAuth Route Guards, AdminDashboard activeModal Unification, CrudModal with react-hook-form + zod, FeatureFlags Rollout, k6 Load Tests, Verification Pack SQL, 176 Backend Tests Green, 8 Frontend Tests Green)*

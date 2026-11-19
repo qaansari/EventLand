@@ -40,7 +40,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const { captchaToken, setCaptchaToken, consumeCaptchaToken, resetCaptcha } = useCaptcha();
+  const { captchaToken, setCaptchaToken, consumeCaptchaToken, resetCaptcha, isCaptchaEnabled } = useCaptcha();
   const [countries, setCountries] = useState([
     { id: 1, name: 'Pakistan', code: 'PK', dialingCode: '+92' },
     { id: 2, name: 'United Arab Emirates', code: 'AE', dialingCode: '+971' },
@@ -400,6 +400,12 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
       }
     }
 
+    if (isCaptchaEnabled && !captchaToken) {
+      const msg = 'Please wait for the security challenge to verify before submitting.';
+      setErrorMsg(msg); setError(msg); showError('Security Check', msg);
+      return;
+    }
+
     setLoading(true);
     try {
       const activeToken = consumeCaptchaToken();
@@ -449,6 +455,13 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
       const msg = 'Please enter a valid email address.';
       setErrorMsg(msg); setError(msg); showError('Validation Error', msg); return;
     }
+
+    if (isCaptchaEnabled && !captchaToken) {
+      const msg = 'Please wait for the security challenge to verify before submitting.';
+      setErrorMsg(msg); setError(msg); showError('Security Check', msg);
+      return;
+    }
+
     setLoading(true);
     try {
       const activeToken = consumeCaptchaToken();
@@ -604,6 +617,13 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
                 />
               </div>
             </div>
+
+            <CloudflareTurnstile
+              action="forgot-password"
+              onVerify={(token) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken('')}
+              onError={() => setCaptchaToken('')}
+            />
 
             <button
               type="submit"
@@ -916,6 +936,7 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
               </div>
 
               <CloudflareTurnstile
+                action={state === 'signup' ? 'register' : 'login'}
                 onVerify={(token) => setCaptchaToken(token)}
                 onExpire={() => setCaptchaToken('')}
                 onError={() => setCaptchaToken('')}
