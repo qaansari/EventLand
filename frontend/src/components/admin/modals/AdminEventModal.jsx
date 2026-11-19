@@ -22,6 +22,7 @@ import SearchableSelect from '../../SearchableSelect';
 import MultiSearchableSelect from '../../MultiSearchableSelect';
 import EventCard from '../../EventCard';
 import FileUploadField from '../FileUploadField';
+import { normalizeEventStatus } from '../../../utils/dateUtils';
 
 export default function AdminEventModal({
   isOpen,
@@ -167,19 +168,38 @@ export default function AdminEventModal({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Organizer</label>
-                    <SearchableSelect
-                      value={eventForm.organizerId || ''}
-                      placeholder="Select Organizer (Optional)..."
-                      onChange={e => setEventForm({ ...eventForm, organizerId: e.target.value })}
-                      options={organizersList.map(o => ({ value: o.id, label: o.name }))}
-                    />
+                    {(() => {
+                      const orgOptions = organizersList.map(o => ({ value: String(o.id), label: o.name }));
+                      if (eventForm.organizerId && !orgOptions.some(o => o.value === String(eventForm.organizerId))) {
+                        orgOptions.unshift({
+                          value: String(eventForm.organizerId),
+                          label: eventForm.organizerName || `Organizer #${eventForm.organizerId}`
+                        });
+                      }
+                      return (
+                        <SearchableSelect
+                          value={String(eventForm.organizerId || '')}
+                          placeholder="Select Organizer (Optional)..."
+                          onChange={e => setEventForm({ ...eventForm, organizerId: e.target.value })}
+                          options={orgOptions}
+                        />
+                      );
+                    })()}
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Publication Status</label>
                     <SearchableSelect
-                      value={eventForm.status || 'Live'}
+                      value={normalizeEventStatus(eventForm.status)}
                       onChange={e => setEventForm({ ...eventForm, status: e.target.value })}
-                      options={['Live', 'SellingFast', 'SoldOut', 'Upcoming', 'Closed', 'Draft', 'Cancelled']}
+                      options={[
+                        { value: 'Live', label: 'Live' },
+                        { value: 'SellingFast', label: 'Selling Fast' },
+                        { value: 'SoldOut', label: 'Sold Out' },
+                        { value: 'Upcoming', label: 'Upcoming' },
+                        { value: 'Closed', label: 'Closed' },
+                        { value: 'Draft', label: 'Draft' },
+                        { value: 'Cancelled', label: 'Cancelled' }
+                      ]}
                     />
                   </div>
                 </div>
@@ -285,11 +305,11 @@ export default function AdminEventModal({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Primary Start Date & Time *</label>
-                    <input type="datetime-local" value={eventForm.startDateUtc} onChange={e => setEventForm({ ...eventForm, startDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }} />
+                    <input type="datetime-local" value={eventForm.startDateUtc || ''} onChange={e => setEventForm({ ...eventForm, startDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }} />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, color: '#cbd5e1', marginBottom: '0.35rem' }}>Primary End Date & Time *</label>
-                    <input type="datetime-local" value={eventForm.endDateUtc} onChange={e => setEventForm({ ...eventForm, endDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }} />
+                    <input type="datetime-local" value={eventForm.endDateUtc || ''} onChange={e => setEventForm({ ...eventForm, endDateUtc: e.target.value })} style={{ width: '100%', padding: '0.75rem 0.9rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }} />
                   </div>
                 </div>
 

@@ -70,7 +70,7 @@ export default function AdminShowSlotModal({
               <input
                 type="datetime-local"
                 required
-                value={showForm.startTimeUtc}
+                value={showForm.startTimeUtc || ''}
                 onChange={e => setShowForm({ ...showForm, startTimeUtc: e.target.value })}
                 style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
               />
@@ -80,7 +80,7 @@ export default function AdminShowSlotModal({
               <input
                 type="datetime-local"
                 required
-                value={showForm.endTimeUtc}
+                value={showForm.endTimeUtc || ''}
                 onChange={e => setShowForm({ ...showForm, endTimeUtc: e.target.value })}
                 style={{ width: '100%', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', color: '#fff' }}
               />

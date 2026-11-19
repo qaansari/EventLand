@@ -107,7 +107,10 @@ public class EventService : IEventService
                     s.EndTimeUtc,
                     s.TicketTiers.Where(t => !t.IsDeleted).Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.Status == TicketTierStatus.Closed ? "Closed" : (t.Status == TicketTierStatus.SoldOut || t.AvailableQuantity <= t.SoldCount || t.AvailableQuantity <= 0 ? "SoldOut" : "Available"))).ToList(),
                     s.IsClosed
-                )).ToList()
+                )).ToList(),
+                e.EventType,
+                e.VenueEnvironment,
+                e.IsPublished
             ))
             .ToListAsync();
 
@@ -273,7 +276,9 @@ public class EventService : IEventService
         e.SmokingRestrictions,
         e.TicketNameChangeAllowed,
         e.TicketNamePolicy,
-        e.TicketDaysInterchangeable
+        e.TicketDaysInterchangeable,
+        e.IsPublished,
+        e.OrganizerId
     );
 
     private static string StatusLabel(EventStatus s) => s switch

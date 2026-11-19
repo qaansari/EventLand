@@ -50,6 +50,7 @@ import AdminUserModal from './admin/modals/AdminUserModal';
 import AdminAuditoriumModal from './admin/modals/AdminAuditoriumModal';
 import { parseAuditoriumLayout, createBlankLayoutJson } from '../data/auditoriumLayouts';
 import { exportAuditoriumChartPdf } from '../utils/pdfChartExporter';
+import { toDateTimeLocalValue, fromDateTimeLocalValue, normalizeEventStatus } from '../utils/dateUtils';
 
 export default function AdminDashboard({ onSelectEvent, currentUser = null, onUpdateCurrentUser = null }) {
   const { showSuccess, showError, showWarning } = useToast();
@@ -205,8 +206,8 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
     cityId: '',
     venueId: '',
     auditoriumId: '',
-    startDateUtc: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
-    endDateUtc: new Date(Date.now() + 172800000).toISOString().slice(0, 16),
+    startDateUtc: toDateTimeLocalValue(new Date(Date.now() + 86400000)),
+    endDateUtc: toDateTimeLocalValue(new Date(Date.now() + 172800000)),
     priceRange: 'PKR 1,500 - PKR 5,000',
     startingPrice: 1500,
     ticketingType: 'categorized',
@@ -550,26 +551,16 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
         ? eventForm.tagIds.map(id => parseInt(id, 10))
         : [];
 
-      const startInputStr = eventForm.startDateUtc && !eventForm.startDateUtc.includes('+') && !eventForm.startDateUtc.includes('Z')
-        ? `${eventForm.startDateUtc}:00+05:00`
-        : eventForm.startDateUtc;
-
-      const endInputStr = eventForm.endDateUtc && !eventForm.endDateUtc.includes('+') && !eventForm.endDateUtc.includes('Z')
-        ? `${eventForm.endDateUtc}:00+05:00`
-        : eventForm.endDateUtc;
-
-      const startDate = new Date(startInputStr);
-      const endDate = new Date(endInputStr);
-      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      const startUtcIso = fromDateTimeLocalValue(eventForm.startDateUtc);
+      const endUtcIso = fromDateTimeLocalValue(eventForm.endDateUtc);
+      if (!startUtcIso || !endUtcIso) {
         setErrorMsg('Invalid start or end date format.');
         showError('Invalid Date', 'Please select valid start and end dates.');
         setIsSaving(false);
         return;
       }
 
-      const statusStr = typeof eventForm.status === 'number'
-        ? (eventForm.status === 1 ? 'Live' : (eventForm.status === 2 ? 'Completed' : (eventForm.status === 3 ? 'Cancelled' : 'Draft')))
-        : (eventForm.status || 'Live');
+      const statusStr = normalizeEventStatus(eventForm.status);
 
       const countryId = eventForm.countryId ? parseInt(eventForm.countryId, 10) : (countriesList[0]?.id || null);
       const cityId = eventForm.cityId ? parseInt(eventForm.cityId, 10) : (citiesList[0]?.id || null);
@@ -585,8 +576,8 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
         cityId: cityId,
         venueId: venueId,
         auditoriumId: auditoriumId,
-        startDateUtc: startDate.toISOString(),
-        endDateUtc: endDate.toISOString(),
+        startDateUtc: startUtcIso,
+        endDateUtc: endUtcIso,
         startingPrice: parseFloat(eventForm.startingPrice) || 0,
         priceRange: eventForm.priceRange || '',
         ticketingType: eventForm.ticketingType || 'categorized',
@@ -653,33 +644,36 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
         }
         if (!fetched || (!fetched.ticketTiers?.length && !fetched.shows?.some(s => s.ticketTiers?.length))) {
           const publicDetail = await eventsApi.getEventById(ev.id).catch(() => null);
-          if (publicDetail) fetched = publicDetail;
+          if (publicDetail) fetched = { ...fetched, ...publicDetail };
         }
-        if (fetched) fullEv = fetched;
+        if (fetched) fullEv = { ...ev, ...fetched };
       }
     } catch (err) {
       console.warn('Could not fetch full event detail for edit, using list item:', err);
     }
 
     // Pre-select the tags already attached to this event (eventTags may carry {tagId} or nested {tag:{id}}).
-    const existingTagIds = (fullEv.eventTags || [])
+    const existingTagIds = (fullEv.eventTags || fullEv.tags || [])
       .map(et => et?.tagId ?? et?.tag?.id ?? et?.id)
       .filter(id => id != null)
       .map(id => String(id));
+
+    const resolvedOrgId = fullEv.organizerId || fullEv.organizer?.id || ev.organizerId || (organizersList[0]?.id ? String(organizersList[0].id) : '');
+    const resolvedOrgName = fullEv.organizer?.name || fullEv.organizerName || ev.organizerName || ev.organizer || '';
 
     setEventForm({
       id: fullEv.id,
       title: fullEv.title || '',
       tagIds: existingTagIds,
-      status: fullEv.status || 'Live',
+      status: normalizeEventStatus(fullEv.status),
       isFeatured: Boolean(fullEv.isFeatured),
       isPublished: fullEv.isPublished !== false,
       countryId: fullEv.countryId || (countriesList[0]?.id || ''),
       cityId: fullEv.cityId || (citiesList[0]?.id || ''),
       venueId: fullEv.venueId || (venuesList[0]?.id || ''),
       auditoriumId: fullEv.auditoriumId || '',
-      startDateUtc: fullEv.startDateUtc ? fullEv.startDateUtc.slice(0, 16) : new Date().toISOString().slice(0, 16),
-      endDateUtc: fullEv.endDateUtc ? fullEv.endDateUtc.slice(0, 16) : new Date().toISOString().slice(0, 16),
+      startDateUtc: toDateTimeLocalValue(fullEv.startDateUtc),
+      endDateUtc: toDateTimeLocalValue(fullEv.endDateUtc),
       priceRange: fullEv.priceRange || '',
       startingPrice: fullEv.startingPrice || 1500,
       ticketingType: (fullEv.ticketingType || 'categorized').toLowerCase(),
@@ -687,7 +681,8 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       banner: fullEv.banner || '',
       description: fullEv.description || '',
       scarcityText: fullEv.scarcityText || 'Selling Fast',
-      organizerId: fullEv.organizerId || fullEv.organizer?.id || (organizersList[0]?.id || ''),
+      organizerId: String(resolvedOrgId || ''),
+      organizerName: resolvedOrgName,
       seatChartUrl: fullEv.seatChartUrl || '',
       eventType: fullEv.eventType || 'Event',
       attractionsOrActivities: fullEv.attractionsOrActivities || 'X',
@@ -981,20 +976,16 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       return;
     }
 
-    const startInputStr = showForm.startTimeUtc && !showForm.startTimeUtc.includes('+') && !showForm.startTimeUtc.includes('Z')
-      ? `${showForm.startTimeUtc}:00+05:00`
-      : showForm.startTimeUtc;
-    const endInputStr = showForm.endTimeUtc && !showForm.endTimeUtc.includes('+') && !showForm.endTimeUtc.includes('Z')
-      ? `${showForm.endTimeUtc}:00+05:00`
-      : showForm.endTimeUtc;
+    const startUtcIso = fromDateTimeLocalValue(showForm.startTimeUtc);
+    const endUtcIso = fromDateTimeLocalValue(showForm.endTimeUtc);
 
-    const startDate = new Date(startInputStr);
-    const endDate = new Date(endInputStr);
-
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    if (!startUtcIso || !endUtcIso) {
       showError('Invalid Date', 'Please select valid start and end dates.');
       return;
     }
+
+    const startDate = new Date(startUtcIso);
+    const endDate = new Date(endUtcIso);
 
     if (startDate.getTime() >= endDate.getTime()) {
       showError('Invalid Timing', 'Show start time must be before show end time.');
@@ -1008,8 +999,8 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       const evEnd = new Date(parentEvent.endDateUtc);
       if (!isNaN(evStart.getTime()) && !isNaN(evEnd.getTime())) {
         if (startDate.getTime() < evStart.getTime() || endDate.getTime() > evEnd.getTime()) {
-          const evStartFmt = evStart.toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' });
-          const evEndFmt = evEnd.toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short' });
+          const evStartFmt = evStart.toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Karachi' });
+          const evEndFmt = evEnd.toLocaleString('en-PK', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Karachi' });
           showError(
             'Date Range Violation',
             `Show slot timing must be scheduled within the event date range (${evStartFmt} to ${evEndFmt}).`
@@ -1024,8 +1015,8 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       if (showForm.id) {
         await adminApi.eventShows.update(showForm.id, {
           showTitle: title,
-          startTimeUtc: startDate.toISOString(),
-          endTimeUtc: endDate.toISOString(),
+          startTimeUtc: startUtcIso,
+          endTimeUtc: endUtcIso,
           isClosed: !!showForm.isClosed
         });
         showSuccess('Show Updated', `Show slot "${title}" updated successfully.`);
@@ -1033,8 +1024,8 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
         await adminApi.eventShows.create({
           eventId: parseInt(showForm.eventId, 10),
           showTitle: title,
-          startTimeUtc: startDate.toISOString(),
-          endTimeUtc: endDate.toISOString(),
+          startTimeUtc: startUtcIso,
+          endTimeUtc: endUtcIso,
           isClosed: !!showForm.isClosed
         });
         showSuccess('Show Created', `Show slot "${title}" created successfully.`);
@@ -1056,8 +1047,8 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       id: show.id,
       eventId: String(show.eventId),
       showTitle: show.showTitle || '',
-      startTimeUtc: show.startTimeUtc ? show.startTimeUtc.slice(0, 16) : '',
-      endTimeUtc: show.endTimeUtc ? show.endTimeUtc.slice(0, 16) : '',
+      startTimeUtc: toDateTimeLocalValue(show.startTimeUtc),
+      endTimeUtc: toDateTimeLocalValue(show.endTimeUtc),
       isClosed: !!show.isClosed
     });
     setShowShowModal(true);

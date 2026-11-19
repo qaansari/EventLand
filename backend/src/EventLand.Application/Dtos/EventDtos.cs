@@ -25,7 +25,8 @@ public record EventSummaryDto(
     List<TagDto> Tags,
     List<EventShowDto>? Shows = null,
     string EventType = "Event",
-    string VenueEnvironment = "Indoor"
+    string VenueEnvironment = "Indoor",
+    bool IsPublished = true
 );
 
 public record EventShowDto(
@@ -81,7 +82,9 @@ public record EventDetailDto(
     string SmokingRestrictions = "[]",
     string TicketNameChangeAllowed = "Yes",
     string TicketNamePolicy = "Only the person whose name is on the ticket can use the ticket",
-    string TicketDaysInterchangeable = "No"
+    string TicketDaysInterchangeable = "No",
+    bool IsPublished = true,
+    int OrganizerId = 0
 );
 
 public record TicketTierDto(

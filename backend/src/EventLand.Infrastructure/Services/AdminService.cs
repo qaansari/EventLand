@@ -652,7 +652,8 @@ public class AdminService : IAdminService
                     s.TicketTiers.Where(t => !t.IsDeleted).OrderBy(t => t.SortOrder).ThenBy(t => t.Price).Select(t => new TicketTierDto(t.Id, t.EventId, t.EventShowId, t.Name, t.Description, t.Price, t.AvailableQuantity, t.SoldCount, t.MaxPerOrder, t.SortOrder, t.RowRange, t.EffectiveStatus.ToString())).ToList()
                 )).ToList(),
                 e.EventType,
-                e.VenueEnvironment
+                e.VenueEnvironment,
+                e.IsPublished
             ))
             .ToListAsync();
 
@@ -2170,7 +2171,9 @@ public class AdminService : IAdminService
             ev.SmokingRestrictions,
             ev.TicketNameChangeAllowed,
             ev.TicketNamePolicy,
-            ev.TicketDaysInterchangeable
+            ev.TicketDaysInterchangeable,
+            ev.IsPublished,
+            ev.OrganizerId
         );
     }
 
