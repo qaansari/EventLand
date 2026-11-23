@@ -7,13 +7,11 @@ import {
   AlertTriangle,
   QrCode,
   ShieldCheck,
-  CreditCard,
   ExternalLink,
   Zap,
   RefreshCw,
   Sparkles,
   Smartphone,
-  Building2,
   MessageCircle
 } from 'lucide-react';
 import { bookingsApi, paymentsApi } from '../services/api';
@@ -192,7 +190,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
           type: 'START_REDIRECT',
           payload: { booking, paymentUrl, voucher }
         });
-        showSuccess('Redirecting to PayPro 💳', 'Connecting to PayPro 1Link checkout portal...');
+        showSuccess('Redirecting to PayPro 💳', 'Connecting to PayPro checkout portal...');
         setTimeout(() => {
           window.location.assign(paymentUrl);
         }, 350);
@@ -411,7 +409,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                 Online Checkout Coming Soon
               </h3>
               <p style={{ fontSize: '0.88rem', color: '#94a3b8', maxWidth: '520px', margin: '0 auto', lineHeight: 1.6 }}>
-                Our automated 1Link & PayPro payment gateway is currently completing final banking integration & regulatory certification. Direct card, mobile wallet, and 1Bill payments will launch shortly.
+                Our automated PayPro payment gateway is currently completing final banking integration & regulatory certification. EasyPaisa/JazzCash and Zindagi QR Code payments will launch shortly.
               </p>
             </div>
 
@@ -470,32 +468,23 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.75rem' }}>
                 Upcoming Instant Payment Channels
               </span>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '0.75rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
                 <div style={{ padding: '0.85rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Smartphone size={18} color="#38bdf8" />
                     <span style={{ fontSize: '0.65rem', fontWeight: 700, background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>Coming Soon</span>
                   </div>
-                  <strong style={{ fontSize: '0.82rem', color: '#fff' }}>EasyPaisa & JazzCash</strong>
+                  <strong style={{ fontSize: '0.85rem', color: '#fff' }}>EasyPaisa & JazzCash</strong>
                   <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Instant Mobile Wallets</span>
                 </div>
 
                 <div style={{ padding: '0.85rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <CreditCard size={18} color="#34d399" />
+                    <QrCode size={18} color="#a78bfa" />
                     <span style={{ fontSize: '0.65rem', fontWeight: 700, background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>Coming Soon</span>
                   </div>
-                  <strong style={{ fontSize: '0.82rem', color: '#fff' }}>Debit & Credit Cards</strong>
-                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Visa, MasterCard & UnionPay</span>
-                </div>
-
-                <div style={{ padding: '0.85rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Building2 size={18} color="#a78bfa" />
-                    <span style={{ fontSize: '0.65rem', fontWeight: 700, background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>Coming Soon</span>
-                  </div>
-                  <strong style={{ fontSize: '0.82rem', color: '#fff' }}>1Bill & Bank Apps</strong>
-                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Direct 1Link Online Transfer</span>
+                  <strong style={{ fontSize: '0.85rem', color: '#fff' }}>Zindagi QR Code</strong>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b' }}>Scan & Pay via Zindagi App</span>
                 </div>
               </div>
             </div>
@@ -601,10 +590,10 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               animation: 'spin 0.8s linear infinite'
             }} />
             <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#fff', marginBottom: '0.6rem' }}>
-              Redirecting to PayPro 1Link Portal...
+              Redirecting to PayPro Portal...
             </h3>
             <p style={{ color: '#94a3b8', fontSize: '0.9rem', maxWidth: '440px', margin: '0 auto 1.25rem', lineHeight: 1.5 }}>
-              Securing your reservation for <strong>{event.title}</strong>. Taking you directly to PayPro's official checkout page for cards, 1Link, and mobile wallets.
+              Securing your reservation for <strong>{event.title}</strong>. Taking you directly to PayPro's official payment portal to complete payment via EasyPaisa/JazzCash or Zindagi QR Code.
             </p>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: '#64748b', fontSize: '0.8rem' }}>
               <ShieldCheck size={14} color="#2dd4bf" /> 256-bit Bank Grade Encrypted Session
@@ -713,7 +702,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
             }}>
               <div>
                 <span style={{ fontSize: '0.78rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
-                  Total Amount Due (PayPro 1Link)
+                  Total Amount Due (PayPro)
                 </span>
                 <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#2dd4bf', letterSpacing: '-0.02em' }}>
                   PKR {totalPayable.toLocaleString()}
@@ -731,8 +720,8 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                 Select Instant Payment Channel:
               </label>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: '0.75rem' }}>
-                {/* Channel 1: Mobile Wallets */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '0.75rem' }}>
+                {/* Channel 1: EasyPaisa & JazzCash */}
                 <div
                   onClick={() => setSelectedPayProMethod('easypaisa_jazzcash')}
                   style={{
@@ -746,52 +735,33 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
                     <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: selectedPayProMethod === 'easypaisa_jazzcash' ? '#2dd4bf' : '#64748b' }} />
-                    <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>EasyPaisa & JazzCash</span>
+                    <Smartphone size={18} color="#38bdf8" />
+                    <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>EasyPaisa / JazzCash</span>
                   </div>
-                  <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0, paddingLeft: '1rem' }}>
-                    Instant OTC / In-app voucher billing
+                  <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0, paddingLeft: '1.6rem' }}>
+                    Instant mobile wallet & OTC voucher payment
                   </p>
                 </div>
 
-                {/* Channel 2: Cards */}
+                {/* Channel 2: Zindagi QR Code */}
                 <div
-                  onClick={() => setSelectedPayProMethod('credit_debit')}
+                  onClick={() => setSelectedPayProMethod('zindagi_qr')}
                   style={{
                     padding: '1rem',
                     borderRadius: '12px',
-                    border: selectedPayProMethod === 'credit_debit' ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
-                    background: selectedPayProMethod === 'credit_debit' ? 'rgba(13, 148, 136, 0.15)' : 'rgba(15, 23, 42, 0.5)',
+                    border: selectedPayProMethod === 'zindagi_qr' ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
+                    background: selectedPayProMethod === 'zindagi_qr' ? 'rgba(13, 148, 136, 0.15)' : 'rgba(15, 23, 42, 0.5)',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: selectedPayProMethod === 'credit_debit' ? '#2dd4bf' : '#64748b' }} />
-                    <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>Visa / Mastercard / UnionPay</span>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: selectedPayProMethod === 'zindagi_qr' ? '#2dd4bf' : '#64748b' }} />
+                    <QrCode size={18} color="#a78bfa" />
+                    <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>Zindagi QR Code</span>
                   </div>
-                  <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0, paddingLeft: '1rem' }}>
-                    Hosted 3D Secure checkout portal
-                  </p>
-                </div>
-
-                {/* Channel 3: 1Link 1Bill */}
-                <div
-                  onClick={() => setSelectedPayProMethod('1link')}
-                  style={{
-                    padding: '1rem',
-                    borderRadius: '12px',
-                    border: selectedPayProMethod === '1link' ? '2px solid #2dd4bf' : '1px solid rgba(255, 255, 255, 0.1)',
-                    background: selectedPayProMethod === '1link' ? 'rgba(13, 148, 136, 0.15)' : 'rgba(15, 23, 42, 0.5)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
-                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: selectedPayProMethod === '1link' ? '#2dd4bf' : '#64748b' }} />
-                    <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>1Link 1Bill & Bank Apps</span>
-                  </div>
-                  <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0, paddingLeft: '1rem' }}>
-                    All 38+ Pakistani bank apps supported
+                  <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0, paddingLeft: '1.6rem' }}>
+                    Scan & Pay instantly via Zindagi App
                   </p>
                 </div>
               </div>
@@ -809,9 +779,9 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               lineHeight: 1.5
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#2dd4bf', fontWeight: 700, marginBottom: '0.4rem' }}>
-                <ShieldCheck size={16} /> 100% SBP Authorized 1Link Gateway Integration
+                <ShieldCheck size={16} /> 100% SBP Authorized PayPro Gateway Integration
               </div>
-              When you click proceed, you will connect to PayPro. Complete your payment online or use the generated 1Bill invoice code to pay via EasyPaisa/JazzCash or any banking app.
+              When you click proceed, you will connect to PayPro to complete your payment via EasyPaisa/JazzCash or scan the Zindagi QR Code.
             </div>
 
             {/* Actions */}
@@ -882,7 +852,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               PayPro 1Pay Invoice Ready!
             </h3>
             <p style={{ fontSize: '0.88rem', color: '#94a3b8', maxWidth: '500px', margin: '0 auto 1.5rem', lineHeight: 1.5 }}>
-              Use your PayPro Consumer Voucher Number or click the direct payment link below to complete payment instantly via EasyPaisa, JazzCash, 1Link, or Credit Card.
+              Use your PayPro Consumer Voucher Number or click the direct payment link below to complete payment instantly via EasyPaisa, JazzCash, or Zindagi QR Code.
             </p>
 
             {/* PayPro Voucher Box */}

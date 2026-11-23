@@ -23,6 +23,7 @@ import MultiSearchableSelect from '../../MultiSearchableSelect';
 import EventCard from '../../EventCard';
 import FileUploadField from '../FileUploadField';
 import { normalizeEventStatus } from '../../../utils/dateUtils';
+import { resolveEventPreview } from '../../../utils/eventUtils';
 
 export default function AdminEventModal({
   isOpen,
@@ -107,19 +108,13 @@ export default function AdminEventModal({
     setEventForm(prev => ({ ...prev, [key]: JSON.stringify(arr.filter(x => x !== item)) }));
   };
 
-  const previewEvent = {
-    id: eventForm.id || 'preview',
-    title: eventForm.title || 'Your Event Title Preview',
-    category: eventForm.category || 'Concerts',
-    city: eventForm.city || 'Karachi',
-    venue: eventForm.venue || 'Venue Location Name',
-    banner: eventForm.banner || 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=1200&h=500&fit=crop',
-    startingPrice: parseFloat(eventForm.startingPrice) || 1500,
-    ticketingType: eventForm.ticketingType || 'categorized',
-    status: (eventForm.status || 'Live').toUpperCase(),
-    startDateUtc: eventForm.startDateUtc,
-    endDateUtc: eventForm.endDateUtc
-  };
+  const previewEvent = resolveEventPreview({
+    eventForm,
+    venuesList,
+    citiesList,
+    auditoriumsList,
+    tagsList
+  });
 
   return (
     <div className="modal-overlay" style={{ background: 'rgba(7, 11, 20, 0.82)', backdropFilter: 'blur(10px)', zIndex: 1000 }}>
@@ -230,7 +225,21 @@ export default function AdminEventModal({
                         const countryId = e.target.value;
                         const filteredCities = citiesList.filter(c => String(c.countryId) === String(countryId));
                         const defaultCity = filteredCities[0]?.id || '';
-                        setEventForm(prev => ({ ...prev, countryId, cityId: defaultCity, venueId: '', auditoriumId: '' }));
+                        const selCity = filteredCities[0];
+                        const filteredVenues = venuesList.filter(v => String(v.cityId) === String(defaultCity));
+                        const defaultVenue = filteredVenues[0]?.id || '';
+                        const selVenue = filteredVenues[0];
+                        setEventForm(prev => ({
+                          ...prev,
+                          countryId,
+                          cityId: defaultCity,
+                          cityName: selCity?.name || prev.cityName || '',
+                          city: selCity?.name || prev.city || '',
+                          venueId: defaultVenue,
+                          venueName: selVenue?.name || '',
+                          venue: selVenue?.name || '',
+                          auditoriumId: ''
+                        }));
                       }}
                       options={countriesList.map(c => ({ value: c.id, label: `${c.name} (${c.code})` }))}
                       placeholder="Select Country..."
@@ -242,9 +251,20 @@ export default function AdminEventModal({
                       value={eventForm.cityId || ''}
                       onChange={e => {
                         const cityId = e.target.value;
+                        const selCity = citiesList.find(c => String(c.id) === String(cityId));
                         const filteredVenues = venuesList.filter(v => String(v.cityId) === String(cityId));
                         const defaultVenue = filteredVenues[0]?.id || '';
-                        setEventForm(prev => ({ ...prev, cityId, venueId: defaultVenue, auditoriumId: '' }));
+                        const selVenue = filteredVenues[0];
+                        setEventForm(prev => ({
+                          ...prev,
+                          cityId,
+                          cityName: selCity?.name || '',
+                          city: selCity?.name || '',
+                          venueId: defaultVenue,
+                          venueName: selVenue?.name || '',
+                          venue: selVenue?.name || '',
+                          auditoriumId: ''
+                        }));
                       }}
                       options={citiesList
                         .filter(c => !eventForm.countryId || String(c.countryId) === String(eventForm.countryId))
@@ -261,10 +281,13 @@ export default function AdminEventModal({
                       value={eventForm.venueId || ''}
                       onChange={e => {
                         const venueId = e.target.value;
+                        const selVenue = venuesList.find(v => String(v.id) === String(venueId));
                         const filteredAuds = auditoriumsList.filter(a => String(a.venueId) === String(venueId));
                         setEventForm(prev => ({
                           ...prev,
                           venueId,
+                          venueName: selVenue?.name || '',
+                          venue: selVenue?.name || '',
                           auditoriumId: filteredAuds[0]?.id || ''
                         }));
                       }}
@@ -284,6 +307,7 @@ export default function AdminEventModal({
                         setEventForm(prev => ({
                           ...prev,
                           auditoriumId,
+                          auditoriumName: selAud?.name || '',
                           auditoriumLayout: selAud?.layoutCode || prev.auditoriumLayout
                         }));
                       }}

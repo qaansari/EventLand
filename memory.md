@@ -1122,5 +1122,49 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
   - Frontend Production Build: **0 errors, clean in 9.32s**.
   - Backend Solution: **0 errors, compiled cleanly**.
 
+#### Post-Phase 12: PayPro Payment Methods Restricted to EasyPaisa/JazzCash and Zindagi QR Code
+
+1. **Checkout Modal Channel Alignment ([`CheckoutModal.jsx`](file:///d:/Projects/EventLand/frontend/src/components/CheckoutModal.jsx))**:
+   - Aligned the PayPro payment channels strictly to the two active options provided by PayPro:
+     - **Option 1: EasyPaisa / JazzCash** (`easypaisa_jazzcash`) with `Smartphone` icon.
+     - **Option 2: Zindagi QR Code** (`zindagi_qr`) with `QrCode` icon.
+   - Removed Debit/Credit Cards (Visa/Mastercard/UnionPay) and 1Link 1Bill from both Step 2 (Live Checkout) and the Coming Soon holding page preview grid.
+   - Cleaned up unused Lucide icon imports (`CreditCard`, `Building2`).
+   - Aligned descriptive copy across session redirecting, security instructions, and voucher-pending notices to reference only EasyPaisa/JazzCash and Zindagi QR Code.
+
+- **Verification Status**:
+  - Backend Unit Tests: **176/176 tests passing (100% green)**.
+  - Frontend Unit Tests: **15/15 tests passing (100% green)** (`checkoutSettings.test.js`, `dateUtils.test.js`, `stateMachines.test.js`).
+  - Frontend Production Build: **0 errors, clean in 15.18s**.
+  - Backend Solution: **0 errors, compiled cleanly**.
+
+#### Post-Phase 12: Live Event Card Preview Venue and Category Tag Dynamic Resolution
+
+1. **Root Cause Analysis**:
+   - In [`AdminEventModal.jsx`](file:///d:/Projects/EventLand/frontend/src/components/admin/modals/AdminEventModal.jsx), the form state stores relational foreign keys (`venueId`, `cityId`, `countryId`, `auditoriumId`, `tagIds`).
+   - The right-hand column's `previewEvent` used literal fallback `venue: eventForm.venue || 'Venue Location Name'`, but neither `eventForm.venue` nor `eventForm.venueName` was resolved from `venuesList`, causing the preview card to display `📍 Karachi • Venue Location Name` instead of the selected venue (e.g. `Arts Council of Pakistan`).
+   - Similarly, `previewEvent.tags` was not populated from `eventForm.tagIds`, causing the card preview to show generic fallback badge `Event` instead of the selected category tag (e.g. `Theatre, Arts & Culture`).
+
+2. **Centralized Resolution Helper ([`eventUtils.js`](file:///d:/Projects/EventLand/frontend/src/utils/eventUtils.js))**:
+   - Authored `resolveEventPreview({ eventForm, venuesList, citiesList, auditoriumsList, tagsList })`:
+     - Dynamically resolves `venue` and `venueName` from `venuesList` via `venueId` (with fallback to auditorium venue/name).
+     - Dynamically resolves `city` and `cityName` from `citiesList` via `cityId`.
+     - Dynamically resolves category tags from `tagsList` via `tagIds`.
+     - Formats complete preview event object compatible with both [`EventCard.jsx`](file:///d:/Projects/EventLand/frontend/src/components/EventCard.jsx) and modal views.
+
+3. **Component Synchronization**:
+   - **[`AdminEventModal.jsx`](file:///d:/Projects/EventLand/frontend/src/components/admin/modals/AdminEventModal.jsx)**:
+     - Wired `resolveEventPreview` to construct `previewEvent`.
+     - Updated Country, City, Venue, and Auditorium select `onChange` handlers to maintain `venue`, `venueName`, `city`, and `cityName` synchronization in state.
+   - **[`AdminDashboard.jsx`](file:///d:/Projects/EventLand/frontend/src/components/AdminDashboard.jsx)**:
+     - Updated `defaultEventForm` and `handleEditEvent` to preload and populate `venue`, `venueName`, `city`, and `cityName` from `venuesList` and `citiesList` when opening an event.
+   - **[`EventOrganizerWizard.jsx`](file:///d:/Projects/EventLand/frontend/src/components/EventOrganizerWizard.jsx)**:
+     - Updated `previewEventObject` to dynamically resolve `venue` / `venueName` and `city` / `cityName`.
+
+- **Verification Status**:
+  - Frontend Unit Tests: **18/18 tests passing (100% green)**, including new tests in [`eventUtils.test.js`](file:///d:/Projects/EventLand/frontend/src/tests/eventUtils.test.js).
+  - Frontend Production Build: **0 errors, clean in 1.86s** via Vite.
+  - Backend Unit Tests: **176/176 tests passing (100% green)**.
+
 ---
-*Last Updated: November 2026 (Checkout Coming Soon Holding Page & Admin Enable/Disable Gateway Switch Implemented; 176 Backend Tests Green, 15 Frontend Tests Green, Clean Production Vite Build)*
+*Last Updated: November 2026 (Live Event Card Preview Venue and Category Tags Resolved Dynamically; 176 Backend Tests Green, 18 Frontend Tests Green, Clean Production Vite Build)*

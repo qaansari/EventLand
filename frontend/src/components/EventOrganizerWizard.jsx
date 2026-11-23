@@ -160,6 +160,11 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
     a => a.layoutCode === eventForm.auditoriumLayout || a.name === eventForm.auditoriumLayout
   ) || auditoriumsList[0];
 
+  const selectedVenue = venuesList.find(v => String(v.id) === String(eventForm.venueId));
+  const selectedCity = citiesList.find(c => String(c.id) === String(eventForm.cityId));
+  const resolvedVenue = eventForm.venue?.trim() || selectedVenue?.name || selectedAuditorium?.venue || selectedAuditorium?.name || 'Arts Council of Pakistan';
+  const resolvedCity = eventForm.city?.trim() || selectedCity?.name || selectedAuditorium?.city || 'Karachi';
+
   const previewEventObject = {
     id: makePreviewId(),
     title: eventForm.title || 'Your Event Title Here',
@@ -167,8 +172,10 @@ export default function EventOrganizerWizard({ onPublishEvent, onCancel, cities 
     status: 'Live', // 'Draft', 'Live', 'Completed', 'Cancelled'
     isFeatured: true,
     isPublished: true,
-    city: eventForm.city,
-    venue: eventForm.venue || 'Venue Address, City',
+    city: resolvedCity,
+    cityName: resolvedCity,
+    venue: resolvedVenue,
+    venueName: resolvedVenue,
     date: eventForm.date || 'TBD 2026',
     startDateUtc: eventForm.date,
     endDateUtc: eventForm.date,

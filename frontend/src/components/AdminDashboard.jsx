@@ -208,6 +208,11 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
     cityId: '',
     venueId: '',
     auditoriumId: '',
+    city: 'Karachi',
+    cityName: 'Karachi',
+    venue: '',
+    venueName: '',
+    auditoriumName: '',
     startDateUtc: toDateTimeLocalValue(new Date(Date.now() + 86400000)),
     endDateUtc: toDateTimeLocalValue(new Date(Date.now() + 172800000)),
     priceRange: 'PKR 1,500 - PKR 5,000',
@@ -663,6 +668,14 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
     const resolvedOrgId = fullEv.organizerId || fullEv.organizer?.id || ev.organizerId || (organizersList[0]?.id ? String(organizersList[0].id) : '');
     const resolvedOrgName = fullEv.organizer?.name || fullEv.organizerName || ev.organizerName || ev.organizer || '';
 
+    const resolvedVenueId = fullEv.venueId || (venuesList[0]?.id || '');
+    const matchedVenue = venuesList.find(v => String(v.id) === String(resolvedVenueId));
+    const resolvedVenueName = fullEv.venueName || fullEv.venue || matchedVenue?.name || '';
+
+    const resolvedCityId = fullEv.cityId || (citiesList[0]?.id || '');
+    const matchedCity = citiesList.find(c => String(c.id) === String(resolvedCityId));
+    const resolvedCityName = fullEv.cityName || fullEv.city || matchedCity?.name || 'Karachi';
+
     setEventForm({
       id: fullEv.id,
       title: fullEv.title || '',
@@ -672,8 +685,13 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       isPublished: fullEv.isPublished !== false,
       countryId: fullEv.countryId || (countriesList[0]?.id || ''),
       cityId: fullEv.cityId || (citiesList[0]?.id || ''),
+      city: resolvedCityName,
+      cityName: resolvedCityName,
       venueId: fullEv.venueId || (venuesList[0]?.id || ''),
+      venue: resolvedVenueName,
+      venueName: resolvedVenueName,
       auditoriumId: fullEv.auditoriumId || '',
+      auditoriumName: fullEv.auditoriumName || '',
       startDateUtc: toDateTimeLocalValue(fullEv.startDateUtc),
       endDateUtc: toDateTimeLocalValue(fullEv.endDateUtc),
       priceRange: fullEv.priceRange || '',
