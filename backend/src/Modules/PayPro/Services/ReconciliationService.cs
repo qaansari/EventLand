@@ -89,8 +89,7 @@ public class ReconciliationService : IReconciliationService
                 else if (queryResult.IsBlocked)
                 {
                     _logger.LogInformation("Reconciliation: Order {OrderNumber} confirmed BLOCKED.", order.OrderNumber);
-                    order.Status = OrderStatus.Blocked;
-                    order.UpdatedAtUtc = DateTime.UtcNow;
+                    order.MarkBlocked(DateTime.UtcNow);
                     await _dbContext.SaveChangesAsync(cancellationToken);
                     blockedCount++;
                 }

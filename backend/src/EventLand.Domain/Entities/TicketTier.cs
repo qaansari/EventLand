@@ -2,6 +2,7 @@ namespace EventLand.Domain.Entities;
 
 using EventLand.Domain.Common;
 using EventLand.Domain.Enums;
+using EventLand.Domain.Exceptions;
 using EventLand.Domain.Services;
 
 /// <summary>
@@ -52,7 +53,33 @@ public class TicketTier : BaseEntity
 
     public void ReopenTier()
     {
-        Status = TicketTierStatus.Available;
+        Status = SoldCount >= AvailableQuantity
+            ? TicketTierStatus.SoldOut
+            : TicketTierStatus.Available;
+    }
+
+    public void SetStatus(TicketTierStatus targetStatus)
+    {
+        if (targetStatus == TicketTierStatus.Available && SoldCount >= AvailableQuantity)
+        {
+            throw new InvalidStateTransitionException(
+                entityName: "TicketTier",
+                fromState: Status.ToString(),
+                toState: targetStatus.ToString(),
+                trigger: "SetStatus");
+        }
+
+        Status = targetStatus;
+    }
+
+    public void RecomputeAvailability()
+    {
+        if (Status == TicketTierStatus.Closed)
+            return;
+
+        Status = SoldCount >= AvailableQuantity
+            ? TicketTierStatus.SoldOut
+            : TicketTierStatus.Available;
     }
 
     // Purchase limits

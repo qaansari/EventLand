@@ -4,6 +4,7 @@ using EventLand.Api.Extensions;
 using EventLand.Application.Common;
 using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
+using EventLand.Domain.Exceptions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -58,6 +59,14 @@ public class AdminBookingsController : ControllerBase
         catch (KeyNotFoundException ex)
         {
             return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidStateTransitionException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
         }
     }
 

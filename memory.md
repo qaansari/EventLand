@@ -1166,5 +1166,82 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
   - Frontend Production Build: **0 errors, clean in 1.86s** via Vite.
   - Backend Unit Tests: **176/176 tests passing (100% green)**.
 
+#### Phase 13 (State Machine Audit Remediation — Phase 1 P0 Fixes)
+
+1. **Closed `BookingStateMachine` Bypass in Admin Status Updates**:
+   - Refactored [`AdminService.UpdateBookingStatusAsync`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Services/AdminService.cs#L1982-L2090) to route all status changes through `IBookingService` (`ConfirmBankPaymentAsync`, `RejectBankPaymentAsync`, `ProcessBankRefundAsync`) and `Booking` aggregate methods (`ConfirmPayment`, `RejectPayment`, `CancelBooking`, `ProcessRefund`, `ExpireHold`), eliminating direct `Booking.Status`/`PaymentStatus` mutations.
+   - Updated [`AdminBookingsController.UpdateBookingStatus`](file:///d:/Projects/EventLand/backend/src/EventLand.Api/Controllers/Admin/AdminBookingsController.cs#L48-L70) to return `409 Conflict` on `InvalidStateTransitionException` and `400 Bad Request` on invalid enum inputs.
+
+2. **Formalized `SeatStateMachine` & Fixed `Seat.State` Desync**:
+   - Authored [`SeatStateMachine.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Domain/StateMachines/SeatStateMachine.cs) governing transitions across `Available`, `TemporarilyHeld`, `Booked`, `Blocked`, and `Maintenance`.
+   - Encapsulated transitions on [`Seat.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Domain/Entities/Seat.cs) (`Reserve`, `Book`, `Release`, `Block`, `Unblock`, `EnterMaintenance`, `ExitMaintenance`) with bidirectional `State`/`Status` synchronization.
+   - Fixed [`PendingBookingExpiryService.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Services/PendingBookingExpiryService.cs) `ExecuteUpdateAsync` to reset both `Seat.Status` and `Seat.State` to `Available` on expiry, and updated [`BookingService.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Application/Services/BookingService.cs) to use `Seat.Book(...)` and `Seat.Release(...)`.
+
+3. **Eliminated Captcha Replay TOCTOU Race**:
+   - Added atomic `TrySetOnceAsync(string key, TimeSpan expiration)` to [`ICacheService.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Application/Interfaces/ICacheService.cs) and implemented it in [`RedisCacheService.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Services/RedisCacheService.cs) using .NET 10 `System.Threading.Lock` (`_onceSyncLock`) + distributed cache mirroring.
+   - Updated [`TurnstileService.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Services/TurnstileService.cs) to acquire the single-use lock atomically before verification, blocking concurrent replay attacks.
+
+- **Verification Status**:
+  - Added [`Phase1StateSafetyTests.cs`](file:///d:/Projects/EventLand/backend/tests/EventLand.UnitTests/Phase1StateSafetyTests.cs) and concurrent 50-thread replay test in [`TurnstileTokenLifecycleTests.cs`](file:///d:/Projects/EventLand/backend/tests/EventLand.UnitTests/TurnstileTokenLifecycleTests.cs).
+  - Backend Unit Tests: **182/182 tests passing (100% green)** on .NET 10.
+
+#### Phase 14 (State Machine Audit Remediation — Phase 2 P1 Backend Domain State Machines)
+
+1. **Explicit `TicketScanStateMachine` for Gate Admission & Reset**:
+   - Authored [`TicketScanStateMachine.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Domain/StateMachines/TicketScanStateMachine.cs) guarding `Issued -> ScannedAndAdmitted`, `ScannedAndAdmitted -> Issued` (supervisor reset), and `* -> Revoked`.
+   - Updated [`Booking.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Domain/Entities/Booking.cs#L307-L348) `CheckInAdmit` and `ResetCheckIn` to validate transitions and record `GateResetCheckIn` entries in `StateHistories`.
+
+2. **Explicit `OrderStateMachine` & `PaymentTransaction` Guards**:
+   - Authored [`OrderStateMachine.cs`](file:///d:/Projects/EventLand/backend/src/Modules/PayPro/StateMachines/OrderStateMachine.cs) and encapsulated transitions on [`Order.cs`](file:///d:/Projects/EventLand/backend/src/Modules/PayPro/Entities/Order.cs) (`MarkUnpaid`, `MarkPaid`, `MarkBlocked`, `MarkFailed`) so terminal states (`Paid`, `Blocked`, `Failed`) cannot regress.
+   - Refactored [`OrderService.cs`](file:///d:/Projects/EventLand/backend/src/Modules/PayPro/Services/OrderService.cs) and [`ReconciliationService.cs`](file:///d:/Projects/EventLand/backend/src/Modules/PayPro/Services/ReconciliationService.cs) to use `Order` domain methods.
+   - Added `MarkPaid`, `MarkFailed`, and `MarkExpired` guards on [`PaymentTransaction.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Domain/Entities/PaymentTransaction.cs) and wired them into [`PayProBookingPaidHandler.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Services/PayProBookingPaidHandler.cs) and [`PayProService.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Services/PayProService.cs) (alongside `Seat.Book`).
+
+3. **Event, EventShow, TicketTier, BankAccount & OutboxMessage Guards**:
+   - [`TicketTier.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Domain/Entities/TicketTier.cs): Added `SetStatus` and `RecomputeAvailability` preventing `Available` when `SoldCount >= AvailableQuantity`.
+   - [`EventShow.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Domain/Entities/EventShow.cs): Guarded `ReopenShow` against reopening shows whose `EndTimeUtc` has elapsed.
+   - [`AdminService.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Services/AdminService.cs): Routed `ToggleCloseEventShowAsync`, `UpdateTicketTierStatusAsync`, and `ToggleCloseEventAsync` through domain methods.
+   - [`BankAccountService.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Services/BankAccountService.cs): Wrapped `ToggleActiveAsync` in a transaction using atomic `ExecuteUpdateAsync` to deactivate other active accounts.
+   - [`OutboxMessage.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Domain/Entities/OutboxMessage.cs): Added `OutboxStatus` (`Pending`, `Processed`, `Failed`, `DeadLettered`), `GetStatus`, `MarkProcessed`, and `RecordFailure`.
+
+- **Verification Status**:
+  - Added [`Phase2StateMachineTests.cs`](file:///d:/Projects/EventLand/backend/tests/EventLand.UnitTests/Phase2StateMachineTests.cs) (6 tests).
+  - Backend Unit Tests: **188/188 tests passing (100% green)** on .NET 10.
+
+#### Phase 15 (State Machine Audit Remediation — Phase 3 P2 Frontend State Machines & Hook Consolidation)
+
+1. **Consolidated Existing Explicit Machines (Zero Duplicate State)**:
+   - **[`authReducer.ts`](file:///d:/Projects/EventLand/frontend/src/machines/authReducer.ts), [`useAuthMachine.ts`](file:///d:/Projects/EventLand/frontend/src/hooks/useAuthMachine.ts), [`AuthModal.jsx`](file:///d:/Projects/EventLand/frontend/src/components/AuthModal.jsx)**: Moved `isSubmitting`, `socialProvider`, and `error` fully into `authReducer` (`START_SUBMIT`, `START_SOCIAL_SUBMIT`, `STOP_SUBMIT`), removing duplicate `useState` calls from `AuthModal.jsx`.
+   - **[`checkoutReducer.ts`](file:///d:/Projects/EventLand/frontend/src/machines/checkoutReducer.ts), [`useCheckoutMachine.ts`](file:///d:/Projects/EventLand/frontend/src/hooks/useCheckoutMachine.ts), [`CheckoutModal.jsx`](file:///d:/Projects/EventLand/frontend/src/components/CheckoutModal.jsx)**: Moved `payproResponse`, `isInitiating`, and `booking` creation into `checkoutReducer` (`BOOKING_CREATED`, `INITIATE_START`, `INITIATE_DONE`, `SYNC_EXPIRY`), replacing direct `context.secondsRemaining` mutation in `useCheckoutMachine.ts` and removing duplicate `useState` flags in `CheckoutModal.jsx`.
+   - **[`useSeatChannel.ts`](file:///d:/Projects/EventLand/frontend/src/hooks/useSeatChannel.ts) & [`InteractiveSeatPicker.jsx`](file:///d:/Projects/EventLand/frontend/src/components/InteractiveSeatPicker.jsx)**: Upgraded `isConnected` to `connectionState: 'connecting' | 'connected' | 'reconnecting' | 'disconnected'` (with derived `isConnected`) and removed unused `redisHeldSeats` state.
+
+2. **Converted High-Risk Implicit Frontend Workflows to Typed Reducers**:
+   - **[`gateScannerReducer.ts`](file:///d:/Projects/EventLand/frontend/src/machines/gateScannerReducer.ts) & [`GatePassVerification.jsx`](file:///d:/Projects/EventLand/frontend/src/components/GatePassVerification.jsx)**: Discriminated union (`idle | validating | verified | resetting | error`) preventing simultaneous `result` and `error`.
+   - **[`payproTrackerReducer.ts`](file:///d:/Projects/EventLand/frontend/src/machines/payproTrackerReducer.ts) & [`PayProStatusTracker.jsx`](file:///d:/Projects/EventLand/frontend/src/components/PayProStatusTracker.jsx)**: Reducer (`idle | loading | polling | terminal_paid | terminal_blocked | error`) that automatically halts auto-polling on terminal statuses.
+   - **[`unpaidInvoicesReducer.ts`](file:///d:/Projects/EventLand/frontend/src/machines/unpaidInvoicesReducer.ts) & [`UnpaidInvoicesModal.jsx`](file:///d:/Projects/EventLand/frontend/src/components/UnpaidInvoicesModal.jsx)**: Reducer tracking `listStatus` and `activeAction` (`paypro | upload | submit_proof`), preventing concurrent mutations on the same invoice.
+   - **[`overlayReducer.ts`](file:///d:/Projects/EventLand/frontend/src/machines/overlayReducer.ts) & [`App.jsx`](file:///d:/Projects/EventLand/frontend/src/App.jsx)**: Unified global modal/overlay state (`seat_picker | checkout | ticket | auth | null`) with automatic `AUTH_EXPIRED` cleanup on logout and session expiration.
+
+- **Verification Status**:
+  - Frontend Unit Tests: **22/22 tests passing (100% green)** in [`stateMachines.test.js`](file:///d:/Projects/EventLand/frontend/src/tests/stateMachines.test.js) and sibling suites.
+  - Frontend Production Build: **0 errors, clean in 7.86s** via Vite.
+  - Backend Unit Tests: **188/188 tests passing (100% green)** on .NET 10.
+
+#### Phase 16 (State Machine Audit Remediation — Phase 4 P3 AdminDashboard & Secondary UI Polish)
+
+1. **`AdminDashboard.jsx` State Consolidation**:
+   - Authored [`adminFeedbackReducer.ts`](file:///d:/Projects/EventLand/frontend/src/machines/adminFeedbackReducer.ts) unifying `loading`, `isSaving`, `errorMsg`, and `successMsg` in [`AdminDashboard.jsx`](file:///d:/Projects/EventLand/frontend/src/components/AdminDashboard.jsx) so error and success feedback can never coexist.
+   - Folded `showCountryModal`, `showCityModal`, `showVenueModal`, `previewAuditorium`, and `adminPreviewTicket` into the single `activeModal` discriminated union.
+   - Wired `gateScannerReducer` into the Admin Gate Scanner flow (`isScanningTicket`, `isResettingGateTicket`, `gateScanResult`), preventing concurrent scan/reset operations.
+
+2. **Secondary UI Component State Machines**:
+   - **[`PayProAdminPanel.jsx`](file:///d:/Projects/EventLand/frontend/src/components/PayProAdminPanel.jsx)**: Unified `showCreateConsumerModal` + `showBatchModal` into `activeConsumerModal` (`null | 'create' | 'batch'`) and cleared `reconcileResult` before new sweeps.
+   - **[`EventDetailPage.jsx`](file:///d:/Projects/EventLand/frontend/src/components/EventDetailPage.jsx)**: Unified `showLayoutPreview` + `showSeatChartModal` into `previewModal` (`'none' | 'layout' | 'seat_chart'`).
+   - **[`DigitalTicketModal.jsx`](file:///d:/Projects/EventLand/frontend/src/components/DigitalTicketModal.jsx)**: Unified `isScannerOpen` + `scannerStatus` into `scannerState` (`'closed' | 'scanning' | 'verified'`).
+   - **[`AttendeeDashboard.jsx`](file:///d:/Projects/EventLand/frontend/src/components/AttendeeDashboard.jsx)**: Unified `profileSaved` + `isSavingProfile` into `profileStatus` (`'idle' | 'saving' | 'saved'`).
+
+- **Verification Status**:
+  - Frontend Unit Tests: **23/23 tests passing (100% green)**.
+  - Frontend Production Build: **0 errors** via Vite.
+  - Backend Unit Tests: **188/188 tests passing (100% green)** on .NET 10.
+
 ---
-*Last Updated: November 2026 (Live Event Card Preview Venue and Category Tags Resolved Dynamically; 176 Backend Tests Green, 18 Frontend Tests Green, Clean Production Vite Build)*
+*Last Updated: November 2026 (Phase 16 / P3 Complete — All 4 State Machine Audit Phases Verified: 188 Backend Tests Green on .NET 10, 23 Frontend Tests Green, Clean Vite Build)*

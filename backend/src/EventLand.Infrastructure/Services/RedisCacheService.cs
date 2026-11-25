@@ -14,6 +14,8 @@ public class RedisCacheService : ICacheService
     private readonly IMemoryCache _memoryCache;
     private readonly ILogger<RedisCacheService> _logger;
     private static readonly ConcurrentDictionary<string, DateTimeOffset> _knownKeys = new();
+    private static readonly ConcurrentDictionary<string, DateTimeOffset> _onceKeys = new();
+    private static readonly Lock _onceSyncLock = new();
     private static DateTimeOffset _redisDisabledUntil = DateTimeOffset.MinValue;
 
     public RedisCacheService(
@@ -122,7 +124,55 @@ public class RedisCacheService : ICacheService
             }
         }
 
+        _onceKeys.TryRemove(key, out _);
         _memoryCache.Remove(key);
+    }
+
+    public async Task<bool> TrySetOnceAsync(string key, TimeSpan expiration)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var expiresAt = now.Add(expiration);
+
+        lock (_onceSyncLock)
+        {
+            if (_onceKeys.TryGetValue(key, out var existingExpiry) && existingExpiry > now)
+            {
+                return false;
+            }
+
+            _onceKeys[key] = expiresAt;
+
+            if (_onceKeys.Count > 2000)
+            {
+                foreach (var entry in _onceKeys)
+                {
+                    if (entry.Value <= now)
+                        _onceKeys.TryRemove(entry.Key, out _);
+                }
+            }
+        }
+
+        if (IsRedisAvailable())
+        {
+            try
+            {
+                var existing = await _distributedCache.GetStringAsync(key);
+                if (!string.IsNullOrEmpty(existing))
+                    return false;
+
+                await _distributedCache.SetStringAsync(key, "1", new DistributedCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = expiration
+                });
+            }
+            catch (Exception ex)
+            {
+                DisableRedisTemporarily();
+                _logger.LogWarning(ex, "Redis TrySetOnceAsync error for key '{Key}'. Enforcing in-memory atomic lock.", key);
+            }
+        }
+
+        return true;
     }
 
     public async Task RemoveByPrefixAsync(string prefixKey)

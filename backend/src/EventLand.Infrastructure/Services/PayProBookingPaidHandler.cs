@@ -82,7 +82,7 @@ public class PayProBookingPaidHandler : IPayProOrderPaidHandler
         {
             if (bs.Seat != null && bs.Seat.Status != SeatStatus.Booked)
             {
-                bs.Seat.Status = SeatStatus.Booked;
+                bs.Seat.Book(now);
             }
         }
 
@@ -90,12 +90,7 @@ public class PayProBookingPaidHandler : IPayProOrderPaidHandler
         var existingTx = booking.PaymentTransactions.FirstOrDefault(pt => pt.Status == PaymentStatus.Pending);
         if (existingTx != null)
         {
-            existingTx.Status = PaymentStatus.Paid;
-            existingTx.PaidAt = now;
-            existingTx.ProviderTransactionId = order.PayProId;
-            existingTx.ProviderOrderId = order.OrderNumber;
-            existingTx.PaymentMethod = order.PaymentMode ?? "PayPro";
-            existingTx.RawProviderResponse = order.RawCreateResponse;
+            existingTx.MarkPaid(now, order.PayProId, order.OrderNumber, order.PaymentMode ?? "PayPro", order.RawCreateResponse);
         }
         else
         {

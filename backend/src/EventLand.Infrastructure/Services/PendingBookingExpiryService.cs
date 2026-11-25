@@ -1,5 +1,6 @@
 namespace EventLand.Infrastructure.Services;
 
+using EventLand.Application.Common.Interfaces;
 using EventLand.Application.Interfaces;
 using EventLand.Domain.Entities;
 using EventLand.Domain.Enums;
@@ -85,31 +86,49 @@ public sealed class PendingBookingExpiryService : BackgroundService
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         using var scope = _scopeFactory.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
         var cacheService = scope.ServiceProvider.GetService<ICacheService>();
 
         var cutoff = _timeProvider.GetUtcNow();
 
-        var allowedHoldStates = new[] { BookingState.PendingHold, BookingState.PaymentProcessing };
-
         // Find candidate bookings where hold window has elapsed
-        var candidates = await context.Bookings
+        var baseQuery = context.Bookings
             .AsNoTracking()
-            .Where(b => allowedHoldStates.Contains(b.State)
+            .Where(b => (b.State == BookingState.PendingHold || b.State == BookingState.PaymentProcessing)
                      && b.PaymentExpiresAt != null
-                     && b.PaymentExpiresAt <= cutoff
-                     && !b.IsDeleted)
-            .OrderBy(b => b.PaymentExpiresAt)
-            .Take(200)
-            .Select(b => new
-            {
-                b.Id,
-                b.EventId,
-                b.TicketTierId,
-                b.Quantity,
-                b.State
-            })
-            .ToListAsync(cancellationToken);
+                     && !b.IsDeleted);
+
+        var isSqlite = context.Database.ProviderName?.Contains("Sqlite", StringComparison.OrdinalIgnoreCase) == true;
+        var candidates = isSqlite
+            ? (await baseQuery
+                .Select(b => new
+                {
+                    b.Id,
+                    b.EventId,
+                    b.TicketTierId,
+                    b.Quantity,
+                    b.State,
+                    b.PaymentExpiresAt
+                })
+                .ToListAsync(cancellationToken))
+                .Where(b => b.PaymentExpiresAt <= cutoff)
+                .OrderBy(b => b.PaymentExpiresAt)
+                .Take(200)
+                .ToList()
+            : await baseQuery
+                .Where(b => b.PaymentExpiresAt <= cutoff)
+                .OrderBy(b => b.PaymentExpiresAt)
+                .Take(200)
+                .Select(b => new
+                {
+                    b.Id,
+                    b.EventId,
+                    b.TicketTierId,
+                    b.Quantity,
+                    b.State,
+                    b.PaymentExpiresAt
+                })
+                .ToListAsync(cancellationToken);
 
         if (candidates.Count == 0) return 0;
 
@@ -168,6 +187,7 @@ public sealed class PendingBookingExpiryService : BackgroundService
                     .Where(s => seatIds.Contains(s.Id))
                     .ExecuteUpdateAsync(s => s
                         .SetProperty(seat => seat.Status, SeatStatus.Available)
+                        .SetProperty(seat => seat.State, SeatState.Available)
                         .SetProperty(seat => seat.UpdatedAt, cutoff),
                         cancellationToken);
 

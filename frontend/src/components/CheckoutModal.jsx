@@ -26,9 +26,9 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
   const { isCheckoutEnabled, toggleCheckout } = useCheckoutStatus();
 
   const [selectedPayProMethod, setSelectedPayProMethod] = useState('easypaisa_jazzcash');
-  const [payproResponse, setPayproResponse] = useState(null);
-  const [isInitiatingPayPro, setIsInitiatingPayPro] = useState(false);
-  const [createdBooking, setCreatedBooking] = useState(null);
+  const payproResponse = context.payproResponse;
+  const isInitiatingPayPro = Boolean(context.isInitiating);
+  const createdBooking = context.booking;
 
   // Authorization / Verified User check
   const loggedUserRaw = localStorage.getItem('eventland_logged_user');
@@ -85,7 +85,6 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
 
   // Helper to create a backend booking record if not already created
   const createBookingRecord = async (paymentMethod = 'PayPro') => {
-    if (createdBooking) return createdBooking;
     if (context.booking) return context.booking;
 
     const explicitTierId = selectedSeats.find(s => s.tierId)?.tierId;
@@ -116,7 +115,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         eventShowId: showId
       };
       const booking = await bookingsApi.createBooking(dto);
-      setCreatedBooking(booking);
+      dispatch({ type: 'BOOKING_CREATED', booking });
       return booking;
     }
     return null;
@@ -138,7 +137,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
       return;
     }
 
-    setIsInitiatingPayPro(true);
+    dispatch({ type: 'INITIATE_START' });
     try {
       const booking = await createBookingRecord('PayPro');
       const bookingRefToUse = booking?.bookingRef;
@@ -153,7 +152,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         returnUrl
       );
 
-      setPayproResponse(response);
+      dispatch({ type: 'INITIATE_DONE', response });
       const paymentUrl = response?.paymentUrl || response?.click2PayUrl || response?.connectUrl;
       const voucher = response?.voucherCode || response?.otcVoucherCode || response?.invoiceId || bookingRefToUse;
 
@@ -210,8 +209,6 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
       console.error('PayPro Checkout error:', err);
       dispatch({ type: 'FAIL', message: err.message || 'Failed to initiate PayPro Online Gateway session.' });
       showError('PayPro Gateway Error', err.message || 'Failed to initiate PayPro Online Gateway session.');
-    } finally {
-      setIsInitiatingPayPro(false);
     }
   };
 

@@ -6,6 +6,8 @@ using EventLand.Application.Dtos;
 using EventLand.Application.Interfaces;
 using EventLand.Domain.Entities;
 using EventLand.Domain.Enums;
+using EventLand.Domain.Exceptions;
+using EventLand.Domain.StateMachines;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -23,12 +25,18 @@ public class AdminService : IAdminService
     private readonly IApplicationDbContext _context;
     private readonly ICacheService _cacheService;
     private readonly Microsoft.Extensions.Logging.ILogger<AdminService> _logger;
+    private readonly IBookingService? _bookingService;
 
-    public AdminService(IApplicationDbContext context, ICacheService cacheService, Microsoft.Extensions.Logging.ILogger<AdminService> logger)
+    public AdminService(
+        IApplicationDbContext context,
+        ICacheService cacheService,
+        Microsoft.Extensions.Logging.ILogger<AdminService> logger,
+        IBookingService? bookingService = null)
     {
         _context = context;
         _cacheService = cacheService;
         _logger = logger;
+        _bookingService = bookingService;
     }
 
     // --- Location & Venue Hierarchy ---
@@ -1820,7 +1828,10 @@ public class AdminService : IAdminService
         if (organizerId.HasValue && show.Event.OrganizerId != organizerId.Value)
             throw new UnauthorizedAccessException("Access denied to this event.");
 
-        show.IsClosed = isClosed;
+        if (isClosed)
+            show.CloseShow();
+        else
+            show.ReopenShow();
         await _context.SaveChangesAsync();
         await _cacheService.ClearEventCacheAsync(show.EventId);
 
@@ -1846,7 +1857,7 @@ public class AdminService : IAdminService
         if (!Enum.TryParse<TicketTierStatus>(cleanStatus, true, out var parsedStatus))
             throw new InvalidOperationException($"Invalid tier status '{status}'. Valid statuses are: Available, SoldOut, Closed.");
 
-        tier.Status = parsedStatus;
+        tier.SetStatus(parsedStatus);
         await _context.SaveChangesAsync();
         await _cacheService.ClearEventCacheAsync(tier.EventId);
 
@@ -1862,7 +1873,10 @@ public class AdminService : IAdminService
         if (organizerId.HasValue && ev.OrganizerId != organizerId.Value)
             throw new UnauthorizedAccessException("Access denied to this event.");
 
-        ev.Status = isClosed ? EventStatus.Closed : EventStatus.Live;
+        if (isClosed)
+            ev.CloseEvent();
+        else
+            ev.ReopenEvent();
         await _context.SaveChangesAsync();
         await _cacheService.ClearEventCacheAsync(id);
 
@@ -1981,11 +1995,144 @@ public class AdminService : IAdminService
 
         if (booking is null) throw new KeyNotFoundException($"Booking '{id}' not found or access denied.");
 
-        if (Enum.TryParse<BookingStatus>(dto.Status, true, out var status)) booking.Status = status;
-        if (Enum.TryParse<PaymentStatus>(dto.PaymentStatus, true, out var payStatus)) booking.PaymentStatus = payStatus;
+        if (!Enum.TryParse<BookingStatus>(dto.Status, true, out var targetStatus))
+            throw new ArgumentException($"Invalid booking status '{dto.Status}'.", nameof(dto));
 
-        await _context.SaveChangesAsync();
-        return MapBookingToDto(booking);
+        if (!Enum.TryParse<PaymentStatus>(dto.PaymentStatus, true, out var targetPayStatus))
+            throw new ArgumentException($"Invalid payment status '{dto.PaymentStatus}'.", nameof(dto));
+
+        var now = DateTimeOffset.UtcNow;
+
+        // Route every admin status update through BookingService / BookingStateMachine
+        if (targetStatus == BookingStatus.Confirmed && targetPayStatus == PaymentStatus.Paid)
+        {
+            if (_bookingService != null)
+            {
+                return await _bookingService.ConfirmBankPaymentAsync(
+                    id,
+                    new ConfirmBankPaymentDto(id, booking.BookingRef, "Confirmed via Admin status update"),
+                    null,
+                    "Admin");
+            }
+
+            booking.ConfirmPayment(null, "Admin", now, "Admin");
+            foreach (var bs in booking.BookingSeats)
+            {
+                bs.Seat?.Book(now);
+            }
+            await _context.SaveChangesAsync();
+            await _cacheService.ClearEventCacheAsync(booking.EventId);
+            return MapBookingToDto(booking);
+        }
+
+        if (targetStatus == BookingStatus.Cancelled && targetPayStatus == PaymentStatus.Refunded)
+        {
+            if (_bookingService != null)
+            {
+                await _bookingService.ProcessBankRefundAsync(
+                    new ProcessBankRefundRequestDto(id, booking.TotalAmount, "Refunded via Admin status update", null),
+                    null,
+                    "Admin");
+                var refreshed = await GetBookingByIdAsync(id, organizerId);
+                return refreshed ?? MapBookingToDto(booking);
+            }
+
+            booking.ProcessRefund(now, "Refunded via Admin status update", "Admin");
+            await ReleaseBookingInventoryAndSeatsAsync(booking, now);
+            await _context.SaveChangesAsync();
+            await _cacheService.ClearEventCacheAsync(booking.EventId);
+            return MapBookingToDto(booking);
+        }
+
+        if (targetStatus == BookingStatus.Cancelled && targetPayStatus == PaymentStatus.Failed &&
+            booking.State is BookingState.PendingHold or BookingState.AwaitingBankVerification or BookingState.Rejected)
+        {
+            if (_bookingService != null)
+            {
+                return await _bookingService.RejectBankPaymentAsync(
+                    id,
+                    new RejectBankPaymentDto(id, booking.BookingRef, "Rejected via Admin status update"),
+                    null,
+                    "Admin");
+            }
+
+            var wasActiveHold = booking.State is BookingState.PendingHold or BookingState.AwaitingBankVerification;
+            booking.RejectPayment(null, "Admin", "Rejected via Admin status update", now, "Admin");
+            if (wasActiveHold)
+            {
+                await ReleaseBookingInventoryAndSeatsAsync(booking, now);
+            }
+            await _context.SaveChangesAsync();
+            await _cacheService.ClearEventCacheAsync(booking.EventId);
+            return MapBookingToDto(booking);
+        }
+
+        if (targetStatus == BookingStatus.Cancelled && targetPayStatus == PaymentStatus.Failed)
+        {
+            var wasActive = booking.State is BookingState.PendingHold or BookingState.AwaitingBankVerification or BookingState.PaymentProcessing or BookingState.Confirmed;
+            booking.CancelBooking(now, "Admin", "Cancelled via Admin status update");
+            if (wasActive)
+            {
+                await ReleaseBookingInventoryAndSeatsAsync(booking, now);
+            }
+            await _context.SaveChangesAsync();
+            await _cacheService.ClearEventCacheAsync(booking.EventId);
+            return MapBookingToDto(booking);
+        }
+
+        if (targetStatus == BookingStatus.Cancelled && targetPayStatus == PaymentStatus.Expired)
+        {
+            var wasActiveHold = booking.State is BookingState.PendingHold or BookingState.PaymentProcessing;
+            booking.ExpireHold(now, "Admin", "Expired via Admin status update");
+            if (wasActiveHold)
+            {
+                await ReleaseBookingInventoryAndSeatsAsync(booking, now);
+            }
+            await _context.SaveChangesAsync();
+            await _cacheService.ClearEventCacheAsync(booking.EventId);
+            return MapBookingToDto(booking);
+        }
+
+        throw new InvalidStateTransitionException(
+            entityName: "Booking",
+            fromState: booking.State.ToString(),
+            toState: $"{targetStatus}/{targetPayStatus}",
+            trigger: "AdminUpdateBookingStatus");
+    }
+
+    private async Task ReleaseBookingInventoryAndSeatsAsync(Booking booking, DateTimeOffset now)
+    {
+        if (booking.TicketTierId > 0)
+        {
+            await _context.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE TicketTiers SET SoldCount = CASE WHEN SoldCount >= {booking.Quantity} THEN SoldCount - {booking.Quantity} ELSE 0 END WHERE Id = {booking.TicketTierId}");
+        }
+
+        if (booking.TicketTier != null)
+        {
+            booking.TicketTier.SoldCount = Math.Max(0, booking.TicketTier.SoldCount - booking.Quantity);
+            _context.Entry(booking.TicketTier).Property(t => t.SoldCount).IsModified = false;
+        }
+
+        var seatIds = booking.BookingSeats.Select(bs => bs.SeatId).ToList();
+        if (seatIds.Count > 0)
+        {
+            foreach (var bs in booking.BookingSeats)
+            {
+                bs.Seat?.Release(now);
+            }
+            await _cacheService.ReleaseSeatsAsync(booking.EventId, seatIds, null);
+        }
+
+        var eventForStatus = await _context.Events.FirstOrDefaultAsync(e => e.Id == booking.EventId);
+        if (eventForStatus != null)
+        {
+            var activeTiers = await _context.TicketTiers
+                .AsNoTracking()
+                .Where(t => t.EventId == booking.EventId && !t.IsDeleted)
+                .ToListAsync();
+            eventForStatus.RecomputeDynamicStatus(activeTiers);
+        }
     }
 
     private static BookingDto MapBookingToDto(Booking b) => new(

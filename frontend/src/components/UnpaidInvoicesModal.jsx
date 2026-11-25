@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useReducer, useEffect } from 'react';
 import { 
   X, 
   Clock, 
@@ -19,14 +19,20 @@ import {
 import { bookingsApi, bankAccountsApi, uploadApi, getEventImageUrl, getPaymentSlipUrl } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
+import {
+  unpaidInvoicesReducer,
+  initialUnpaidInvoicesState
+} from '../machines/unpaidInvoicesReducer';
 
 export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuccess, onInvoicePaid }) {
   const { showSuccess, showError, showWarning } = useToast();
   const confirm = useConfirm();
   const [invoices, setInvoices] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [modalState, dispatchModal] = useReducer(unpaidInvoicesReducer, initialUnpaidInvoicesState);
+  const loading = modalState.listStatus === 'loading';
+  const processingId = modalState.activeAction?.type === 'submit_proof' ? modalState.activeAction.invoiceKey : null;
+  const uploadingSlipKey = modalState.activeAction?.type === 'upload' ? modalState.activeAction.invoiceKey : null;
   const [searchQuery, setSearchQuery] = useState('');
-  const [processingId, setProcessingId] = useState(null);
   const [timers, setTimers] = useState({});
 
   // Active Bank Account from DB
@@ -34,7 +40,6 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
   const [copiedField, setCopiedField] = useState(null);
   const [tidInputs, setTidInputs] = useState({});
   const [proofUrls, setProofUrls] = useState({});
-  const [uploadingSlipKey, setUploadingSlipKey] = useState(null);
 
   useEffect(() => {
     async function loadBank() {
@@ -64,11 +69,11 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
   const loadUnpaidInvoices = async () => {
     if (!currentUser?.email) {
       setInvoices([]);
-      setLoading(false);
+      dispatchModal({ type: 'LOAD_SUCCESS' });
       return;
     }
 
-    setLoading(true);
+    dispatchModal({ type: 'LOAD_START' });
     const userEmail = currentUser.email.toLowerCase();
     const storageKey = `eventland_unpaid_invoices_${userEmail}`;
 
@@ -157,9 +162,10 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
 
     } catch (err) {
       console.error('Error loading unpaid invoices:', err);
+      dispatchModal({ type: 'LOAD_ERROR', message: err.message || 'Failed to load unpaid invoices.' });
       showError('Error', 'Failed to load unpaid invoices.');
     } finally {
-      setLoading(false);
+      dispatchModal({ type: 'LOAD_SUCCESS' });
     }
   };
 
@@ -206,7 +212,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
       return;
     }
 
-    setUploadingSlipKey(refKey);
+    dispatchModal({ type: 'ACTION_START', action: { type: 'upload', invoiceKey: refKey } });
     try {
       const res = await uploadApi.uploadFile(file, 'slips');
       setProofUrls(prev => ({ ...prev, [refKey]: res.url }));
@@ -214,7 +220,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
     } catch (err) {
       showError('Upload Failed', err.message || 'Could not upload payment slip.');
     } finally {
-      setUploadingSlipKey(null);
+      dispatchModal({ type: 'ACTION_DONE' });
     }
   };
 
@@ -228,7 +234,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
       return;
     }
 
-    setProcessingId(refKey);
+    dispatchModal({ type: 'ACTION_START', action: { type: 'submit_proof', invoiceKey: refKey } });
     try {
       if (invoice.bookingId) {
         await bookingsApi.submitPaymentProof(invoice.bookingId, {
@@ -242,7 +248,7 @@ export default function UnpaidInvoicesModal({ currentUser, onClose, onPaymentSuc
     } catch (err) {
       showError('Submission Failed', err.message || 'Could not submit payment proof.');
     } finally {
-      setProcessingId(null);
+      dispatchModal({ type: 'ACTION_DONE' });
     }
   };
 

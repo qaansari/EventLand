@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { seatHoldApi, BACKEND_URL } from '../services/api';
 
+export type SeatChannelConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
+
 export interface UseSeatChannelOptions {
   eventId?: number | string | null;
   showId?: number | string | null;
@@ -9,7 +11,7 @@ export interface UseSeatChannelOptions {
 
 export function useSeatChannel({ eventId, showId, enabled = true }: UseSeatChannelOptions) {
   const [heldSeatIds, setHeldSeatIds] = useState<Set<number | string>>(new Set());
-  const [isConnected, setIsConnected] = useState(false);
+  const [connectionState, setConnectionState] = useState<SeatChannelConnectionState>('disconnected');
   const connectionRef = useRef<any>(null);
 
   // Authoritative snapshot sync
@@ -32,6 +34,7 @@ export function useSeatChannel({ eventId, showId, enabled = true }: UseSeatChann
     syncSnapshot();
 
     async function initSignalR() {
+      if (isMounted) setConnectionState('connecting');
       try {
         const signalR = await import('@microsoft/signalr');
         const hubUrl = `${BACKEND_URL}/hubs/seating`;
@@ -67,26 +70,27 @@ export function useSeatChannel({ eventId, showId, enabled = true }: UseSeatChann
 
         conn.onreconnected(() => {
           if (!isMounted) return;
-          setIsConnected(true);
+          setConnectionState('connected');
           // Resync authoritative snapshot after reconnect
           syncSnapshot();
           conn.invoke('JoinEventGroup', eventId).catch(() => {});
         });
 
         conn.onreconnecting(() => {
-          if (isMounted) setIsConnected(false);
+          if (isMounted) setConnectionState('reconnecting');
         });
 
         conn.onclose(() => {
-          if (isMounted) setIsConnected(false);
+          if (isMounted) setConnectionState('disconnected');
         });
 
         await conn.start();
         if (isMounted) {
-          setIsConnected(true);
+          setConnectionState('connected');
           await conn.invoke('JoinEventGroup', eventId).catch(() => {});
         }
       } catch (err) {
+        if (isMounted) setConnectionState('disconnected');
         console.warn('[useSeatChannel] SignalR connection failed, falling back to polling:', err);
       }
     }
@@ -95,6 +99,7 @@ export function useSeatChannel({ eventId, showId, enabled = true }: UseSeatChann
 
     return () => {
       isMounted = false;
+      setConnectionState('disconnected');
       if (connectionRef.current) {
         connectionRef.current.invoke('LeaveEventGroup', eventId).catch(() => {});
         connectionRef.current.stop().catch(() => {});
@@ -105,7 +110,8 @@ export function useSeatChannel({ eventId, showId, enabled = true }: UseSeatChann
 
   return {
     heldSeatIds,
-    isConnected,
+    connectionState,
+    isConnected: connectionState === 'connected',
     resync: syncSnapshot
   };
 }

@@ -1,5 +1,7 @@
 namespace EventLand.Modules.PayPro.Entities;
 
+using EventLand.Modules.PayPro.StateMachines;
+
 /// <summary>
 /// Represents a PayPro order / invoice created for online payment processing.
 /// </summary>
@@ -80,4 +82,48 @@ public class Order
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    public void MarkUnpaid(string? payProId, string? rawCreateResponse, DateTime utcNow)
+    {
+        OrderStateMachine.ValidateTransition(Status, OrderStatus.Unpaid, OrderStateMachine.TriggerMarkUnpaid);
+        if (!string.IsNullOrWhiteSpace(payProId))
+            PayProId = payProId;
+        if (!string.IsNullOrWhiteSpace(rawCreateResponse))
+            RawCreateResponse = rawCreateResponse;
+        Status = OrderStatus.Unpaid;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void MarkPaid(decimal? amountPaid, string? paymentMode, DateTime? datePaid, DateTime utcNow)
+    {
+        if (Status == OrderStatus.Paid)
+            return;
+
+        OrderStateMachine.ValidateTransition(Status, OrderStatus.Paid, OrderStateMachine.TriggerMarkPaid);
+        Status = OrderStatus.Paid;
+        AmountPaid = amountPaid is > 0 ? amountPaid : Amount;
+        PaymentMode = !string.IsNullOrWhiteSpace(paymentMode) ? paymentMode : (PaymentMode ?? "PayPro");
+        DatePaid = datePaid ?? utcNow;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void MarkBlocked(DateTime utcNow)
+    {
+        if (Status == OrderStatus.Blocked)
+            return;
+
+        OrderStateMachine.ValidateTransition(Status, OrderStatus.Blocked, OrderStateMachine.TriggerMarkBlocked);
+        Status = OrderStatus.Blocked;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void MarkFailed(DateTime utcNow)
+    {
+        if (Status == OrderStatus.Failed)
+            return;
+
+        OrderStateMachine.ValidateTransition(Status, OrderStatus.Failed, OrderStateMachine.TriggerMarkFailed);
+        Status = OrderStatus.Failed;
+        UpdatedAtUtc = utcNow;
+    }
 }

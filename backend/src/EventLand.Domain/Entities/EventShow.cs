@@ -1,6 +1,7 @@
 namespace EventLand.Domain.Entities;
 
 using EventLand.Domain.Common;
+using EventLand.Domain.Exceptions;
 
 /// <summary>
 /// Represents a specific show slot/timing for an event (e.g. Matinee, Evening Show, Day 1, Day 2).
@@ -26,8 +27,18 @@ public class EventShow : BaseEntity
         IsClosed = true;
     }
 
-    public void ReopenShow()
+    public void ReopenShow(DateTimeOffset? now = null)
     {
+        var currentTime = now ?? DateTimeOffset.UtcNow;
+        if (EndTimeUtc != default && EndTimeUtc < currentTime)
+        {
+            throw new InvalidStateTransitionException(
+                entityName: "EventShow",
+                fromState: IsClosed ? "Closed" : "Concluded",
+                toState: "Open",
+                trigger: "ReopenShow");
+        }
+
         IsClosed = false;
     }
 }

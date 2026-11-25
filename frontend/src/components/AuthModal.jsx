@@ -25,11 +25,15 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
   const { showSuccess, showError } = useToast();
   const {
     state,
+    context,
     switchToLogin,
     switchToSignup,
     switchToForgot,
     onForgotSent,
     switchToReset,
+    startSubmit,
+    startSocialSubmit,
+    stopSubmit,
     onAuthSuccess,
     setError,
     clearError
@@ -49,9 +53,13 @@ export default function AuthModal({ onClose, onLoginSuccess, initialMode = 'logi
     { id: 5, name: 'United States', code: 'US', dialingCode: '+1' }
   ]);
   const [selectedCountryId, setSelectedCountryId] = useState(1);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [socialLoading, setSocialLoading] = useState(null); // 'google' | 'facebook' | null
+  const errorMsg = context.error || '';
+  const loading = Boolean(context.isSubmitting);
+  const socialLoading = context.socialProvider || null;
+
+  const setErrorMsg = (msg) => (msg ? setError(msg) : clearError());
+  const setLoading = (val) => (val ? startSubmit() : stopSubmit());
+  const setSocialLoading = (provider) => (provider ? startSocialSubmit(provider) : stopSubmit());
 
   // Social Auth Environment Configuration with standard project fallbacks
   const DEFAULT_GOOGLE_CLIENT_ID = '338547104727-9rrd9g4dj1074cpafca6u81h71igj8o9.apps.googleusercontent.com';

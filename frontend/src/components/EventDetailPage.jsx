@@ -58,8 +58,11 @@ export default function EventDetailPage({ event: initialEvent, eventId, onBack, 
 
   const [selectedShowId, setSelectedShowId] = useState(initialEvent?.shows?.[0]?.id || null);
   const [selectedTiers, setSelectedTiers] = useState({});
-  const [showLayoutPreview, setShowLayoutPreview] = useState(false);
-  const [showSeatChartModal, setShowSeatChartModal] = useState(false);
+  const [previewModal, setPreviewModal] = useState('none'); // 'none' | 'layout' | 'seat_chart'
+  const showLayoutPreview = previewModal === 'layout';
+  const setShowLayoutPreview = (v) => setPreviewModal(v ? 'layout' : 'none');
+  const showSeatChartModal = previewModal === 'seat_chart';
+  const setShowSeatChartModal = (v) => setPreviewModal(v ? 'seat_chart' : 'none');
 
   // Fetch full details if eventId passed or to ensure fresh data
   useEffect(() => {

@@ -72,8 +72,9 @@ export default function AttendeeDashboard({
     preferredCity: 'Karachi',
     notifications: true
   });
-  const [profileSaved, setProfileSaved] = useState(false);
-  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileStatus, setProfileStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
+  const profileSaved = profileStatus === 'saved';
+  const isSavingProfile = profileStatus === 'saving';
 
   // Filtered tickets logic — uses real timestamp comparison instead of hardcoded year strings
   const filteredTickets = purchasedTickets.filter((t) => {
@@ -149,14 +150,14 @@ export default function AttendeeDashboard({
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
-    setIsSavingProfile(true);
+    setProfileStatus('saving');
     try {
       await new Promise((res) => setTimeout(res, 600));
-      setProfileSaved(true);
-      setTimeout(() => setProfileSaved(false), 2500);
+      setProfileStatus('saved');
+      setTimeout(() => setProfileStatus(prev => prev === 'saved' ? 'idle' : prev), 2500);
       showSuccess('Profile Updated 👤', 'Your Govt CNIC and attendee contact preferences have been updated.');
-    } finally {
-      setIsSavingProfile(false);
+    } catch {
+      setProfileStatus('idle');
     }
   };
 

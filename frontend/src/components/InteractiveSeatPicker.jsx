@@ -68,7 +68,6 @@ export default function InteractiveSeatPicker({ event: initialEvent, onClose, on
 
   const [selectedZoneIndex, setSelectedZoneIndex] = useState(0);
   const [selectedSeats, setSelectedSeats] = useState([]);
-  const [redisHeldSeats, setRedisHeldSeats] = useState([]);
 
   const currentZone = event.seatingZones?.[selectedZoneIndex] || defaultZone;
 

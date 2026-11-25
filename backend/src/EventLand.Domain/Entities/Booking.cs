@@ -1,7 +1,9 @@
+
 namespace EventLand.Domain.Entities;
 
 using EventLand.Domain.Common;
 using EventLand.Domain.Enums;
+using EventLand.Domain.Exceptions;
 using EventLand.Domain.StateMachines;
 
 /// <summary>
@@ -306,8 +308,19 @@ public class Booking : BaseEntity
 
     public void CheckInAdmit(DateTimeOffset now, string? actor, string? deviceId = null, long? sequence = null, string? gateName = null)
     {
-        if (IsCheckedIn)
+        if (IsCheckedIn && ScanState == TicketScanState.ScannedAndAdmitted)
             return; // Idempotent check-in
+
+        if (State != BookingState.Confirmed)
+        {
+            throw new InvalidStateTransitionException(
+                entityName: "TicketScan",
+                fromState: State.ToString(),
+                toState: TicketScanState.ScannedAndAdmitted.ToString(),
+                trigger: TicketScanStateMachine.TriggerAdmit);
+        }
+
+        TicketScanStateMachine.ValidateTransition(ScanState, TicketScanState.ScannedAndAdmitted, TicketScanStateMachine.TriggerAdmit);
 
         IsCheckedIn = true;
         ScanState = TicketScanState.ScannedAndAdmitted;
@@ -323,8 +336,13 @@ public class Booking : BaseEntity
 
     public void ResetCheckIn(DateTimeOffset now, string? actor, string? reason = null)
     {
+        var targetScanState = State == BookingState.Confirmed ? TicketScanState.Issued : TicketScanState.Revoked;
+        var trigger = State == BookingState.Confirmed ? TicketScanStateMachine.TriggerReset : TicketScanStateMachine.TriggerRevoke;
+
+        TicketScanStateMachine.ValidateTransition(ScanState, targetScanState, trigger);
+
         IsCheckedIn = false;
-        ScanState = State == BookingState.Confirmed ? TicketScanState.Issued : TicketScanState.Revoked;
+        ScanState = targetScanState;
         CheckedInAt = null;
         CheckedInBy = null;
         CheckedInDeviceId = null;
@@ -333,6 +351,8 @@ public class Booking : BaseEntity
             GateNotes = $"Reset: {reason}";
         UpdatedAt = now;
         UpdatedBy = actor;
+
+        RecordTransition(State, State, "GateResetCheckIn", actor, reason ?? "Supervisor gate check-in reset");
     }
 
     private void RecordTransition(BookingState from, BookingState to, string trigger, string? changedBy, string? reason)

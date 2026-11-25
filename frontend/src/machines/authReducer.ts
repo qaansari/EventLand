@@ -11,6 +11,8 @@ export interface AuthContext {
   email: string;
   error: string | null;
   authData: any | null;
+  isSubmitting?: boolean;
+  socialProvider?: 'google' | 'facebook' | null;
 }
 
 export type AuthEvent =
@@ -19,6 +21,9 @@ export type AuthEvent =
   | { type: 'SWITCH_TO_FORGOT' }
   | { type: 'FORGOT_SENT'; email: string }
   | { type: 'SWITCH_TO_RESET'; email?: string }
+  | { type: 'START_SUBMIT' }
+  | { type: 'START_SOCIAL_SUBMIT'; provider: 'google' | 'facebook' }
+  | { type: 'STOP_SUBMIT' }
   | { type: 'AUTH_SUCCESS'; authData: any }
   | { type: 'SET_ERROR'; message: string }
   | { type: 'CLEAR_ERROR' };
@@ -26,16 +31,16 @@ export type AuthEvent =
 export function authReducer(context: AuthContext, event: AuthEvent): AuthContext {
   switch (event.type) {
     case 'SWITCH_TO_LOGIN':
-      return { ...context, state: 'login', error: null };
+      return { ...context, state: 'login', error: null, isSubmitting: false, socialProvider: null };
 
     case 'SWITCH_TO_SIGNUP':
-      return { ...context, state: 'signup', error: null };
+      return { ...context, state: 'signup', error: null, isSubmitting: false, socialProvider: null };
 
     case 'SWITCH_TO_FORGOT':
-      return { ...context, state: 'forgot_request', error: null };
+      return { ...context, state: 'forgot_request', error: null, isSubmitting: false, socialProvider: null };
 
     case 'FORGOT_SENT':
-      return { ...context, state: 'forgot_verify', email: event.email, error: null };
+      return { ...context, state: 'forgot_verify', email: event.email, error: null, isSubmitting: false, socialProvider: null };
 
     case 'SWITCH_TO_RESET':
       return {
@@ -43,13 +48,24 @@ export function authReducer(context: AuthContext, event: AuthEvent): AuthContext
         state: 'reset',
         email: event.email ?? context.email,
         error: null,
+        isSubmitting: false,
+        socialProvider: null,
       };
 
+    case 'START_SUBMIT':
+      return { ...context, isSubmitting: true, socialProvider: null, error: null };
+
+    case 'START_SOCIAL_SUBMIT':
+      return { ...context, isSubmitting: false, socialProvider: event.provider, error: null };
+
+    case 'STOP_SUBMIT':
+      return { ...context, isSubmitting: false, socialProvider: null };
+
     case 'AUTH_SUCCESS':
-      return { ...context, state: 'authenticated', authData: event.authData, error: null };
+      return { ...context, state: 'authenticated', authData: event.authData, error: null, isSubmitting: false, socialProvider: null };
 
     case 'SET_ERROR':
-      return { ...context, error: event.message };
+      return { ...context, error: event.message, isSubmitting: false, socialProvider: null };
 
     case 'CLEAR_ERROR':
       return { ...context, error: null };

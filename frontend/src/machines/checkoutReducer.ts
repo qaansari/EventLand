@@ -11,6 +11,8 @@ export interface CheckoutContext {
   booking: any | null;
   voucherCode: string | null;
   paymentUrl: string | null;
+  payproResponse?: any | null;
+  isInitiating?: boolean;
   errorMessage: string | null;
   expiresAt: string | null;
   secondsRemaining: number;
@@ -20,8 +22,12 @@ export interface CheckoutContext {
 export type CheckoutEvent =
   | { type: 'PROCEED' }
   | { type: 'BACK' }
-  | { type: 'START_REDIRECT'; payload: { booking: any; paymentUrl: string; voucher?: string } }
-  | { type: 'VOUCHER_ISSUED'; payload: { booking: any; voucher: string; expiresAt?: string } }
+  | { type: 'BOOKING_CREATED'; booking: any }
+  | { type: 'INITIATE_START' }
+  | { type: 'INITIATE_DONE'; response?: any }
+  | { type: 'SYNC_EXPIRY'; secondsRemaining: number }
+  | { type: 'START_REDIRECT'; payload: { booking: any; paymentUrl: string; voucher?: string; payproResponse?: any } }
+  | { type: 'VOUCHER_ISSUED'; payload: { booking: any; voucher: string; expiresAt?: string; payproResponse?: any } }
   | { type: 'STATUS_CHECK_START' }
   | { type: 'STATUS_CHECKED'; status: 'paid' | 'pending' | 'failed'; message?: string }
   | { type: 'TICK' }
@@ -34,6 +40,8 @@ export function getInitialContext(): CheckoutContext {
     booking: null,
     voucherCode: null,
     paymentUrl: null,
+    payproResponse: null,
+    isInitiating: false,
     errorMessage: null,
     expiresAt: null,
     secondsRemaining: 1800, // 30 minutes
@@ -55,6 +63,22 @@ export function checkoutReducer(state: CheckoutContext, event: CheckoutEvent): C
       }
       return state;
 
+    case 'BOOKING_CREATED':
+      return { ...state, booking: event.booking };
+
+    case 'INITIATE_START':
+      return { ...state, isInitiating: true, errorMessage: null };
+
+    case 'INITIATE_DONE':
+      return {
+        ...state,
+        isInitiating: false,
+        payproResponse: event.response !== undefined ? event.response : state.payproResponse,
+      };
+
+    case 'SYNC_EXPIRY':
+      return { ...state, secondsRemaining: Math.max(0, event.secondsRemaining) };
+
     case 'START_REDIRECT':
       if (state.state === 'payment_method') {
         return {
@@ -63,6 +87,8 @@ export function checkoutReducer(state: CheckoutContext, event: CheckoutEvent): C
           booking: event.payload.booking,
           paymentUrl: event.payload.paymentUrl,
           voucherCode: event.payload.voucher ?? state.voucherCode,
+          payproResponse: event.payload.payproResponse ?? state.payproResponse,
+          isInitiating: false,
           errorMessage: null,
         };
       }
@@ -76,6 +102,8 @@ export function checkoutReducer(state: CheckoutContext, event: CheckoutEvent): C
           state: 'voucher_pending',
           booking: event.payload.booking,
           voucherCode: event.payload.voucher,
+          payproResponse: event.payload.payproResponse ?? state.payproResponse,
+          isInitiating: false,
           expiresAt: exp,
           errorMessage: null,
         };

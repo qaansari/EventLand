@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useReducer, useEffect, useMemo, lazy, Suspense } from 'react';
+import { overlayReducer } from './machines/overlayReducer';
 import Navbar from './components/Navbar';
 import HeroSlider from './components/HeroSlider';
 import EventCard from './components/EventCard';
@@ -252,9 +253,30 @@ export default function App() {
 
   // Active Modals & Dedicated Detail View
   const [activeDetailEvent, setActiveDetailEvent] = useState(null);
-  const [activeSeatPickerEvent, setActiveSeatPickerEvent] = useState(null);
-  const [checkoutData, setCheckoutData] = useState(null); // { event, seats }
-  const [activeTicketView, setActiveTicketView] = useState(null);
+  const [activeOverlay, dispatchOverlay] = useReducer(overlayReducer, null);
+
+  const activeSeatPickerEvent = activeOverlay?.type === 'seat_picker' ? activeOverlay.event : null;
+  const checkoutData = activeOverlay?.type === 'checkout' ? activeOverlay.data : null;
+  const activeTicketView = activeOverlay?.type === 'ticket' ? activeOverlay.booking : null;
+  const isAuthModalOpen = activeOverlay?.type === 'auth';
+  const authModalRole = activeOverlay?.type === 'auth' ? activeOverlay.role : 'customer';
+  const pendingBookingData = activeOverlay?.type === 'auth' ? activeOverlay.pendingBooking : null;
+
+  const setActiveSeatPickerEvent = (event) =>
+    event ? dispatchOverlay({ type: 'OPEN_SEAT_PICKER', event }) : dispatchOverlay({ type: 'CLOSE_OVERLAY' });
+  const setCheckoutData = (data) =>
+    data ? dispatchOverlay({ type: 'OPEN_CHECKOUT', data }) : dispatchOverlay({ type: 'CLOSE_OVERLAY' });
+  const setActiveTicketView = (booking) =>
+    booking ? dispatchOverlay({ type: 'OPEN_TICKET', booking }) : dispatchOverlay({ type: 'CLOSE_OVERLAY' });
+  const setAuthModalRole = (role) =>
+    dispatchOverlay({ type: 'OPEN_AUTH', role, pendingBooking: pendingBookingData });
+  const setIsAuthModalOpen = (open) =>
+    open ? dispatchOverlay({ type: 'OPEN_AUTH', role: authModalRole, pendingBooking: pendingBookingData }) : dispatchOverlay({ type: 'CLOSE_OVERLAY' });
+  const setPendingBookingData = (pending) => {
+    if (pending) {
+      dispatchOverlay({ type: 'OPEN_AUTH', role: 'customer', pendingBooking: pending });
+    }
+  };
 
   // Synchronize browser history (back/forward navigation) with activeView
   useEffect(() => {
@@ -278,10 +300,6 @@ export default function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
-
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authModalRole, setAuthModalRole] = useState('customer');
-  const [pendingBookingData, setPendingBookingData] = useState(null); // { event, targetFlow, seats }
 
   useEffect(() => {
     if (currentUser) {
@@ -341,6 +359,7 @@ export default function App() {
   useEffect(() => {
     const handleAuthExpired = () => {
       setCurrentUser(null);
+      dispatchOverlay({ type: 'AUTH_EXPIRED' });
       showWarning('Session Expired', 'Your session has expired. Please sign in again.');
       setActiveView(prev =>
         ['admin', 'organizer', 'organizer-wizard'].includes(prev) ? 'explore' : prev
@@ -406,6 +425,7 @@ export default function App() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    dispatchOverlay({ type: 'AUTH_EXPIRED' });
     setPurchasedTickets([]);
     setActiveView(prev =>
       ['my-tickets', 'unpaid-invoices', 'admin', 'organizer', 'organizer-wizard'].includes(prev)

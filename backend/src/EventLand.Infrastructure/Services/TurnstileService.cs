@@ -62,11 +62,11 @@ public class TurnstileService : ICaptchaService
         var tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(trimmedToken))).ToLowerInvariant();
         var cacheKey = $"captcha:consumed:{tokenHash}";
 
-        // Replay Protection: ensure token has not already been consumed
+        // Atomic Replay Protection: acquire single-use lock before verification (eliminates TOCTOU race)
         if (_cacheService != null)
         {
-            var isConsumed = await _cacheService.GetAsync<bool>(cacheKey);
-            if (isConsumed)
+            var acquired = await _cacheService.TrySetOnceAsync(cacheKey, TimeSpan.FromMinutes(5));
+            if (!acquired)
             {
                 _logger.LogWarning("Turnstile token replay attempt blocked for token hash {Hash}.", tokenHash);
                 return false;
@@ -77,10 +77,6 @@ public class TurnstileService : ICaptchaService
         if (trimmedToken == "XXXX.DUMMY.TOKEN.XXXX" || trimmedToken.StartsWith("test-pass-", StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogInformation("Test captcha token accepted.");
-            if (_cacheService != null)
-            {
-                await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromMinutes(5));
-            }
             return true;
         }
 
@@ -126,13 +122,6 @@ public class TurnstileService : ICaptchaService
                 }
 
                 _logger.LogInformation("Cloudflare Turnstile token successfully verified for hostname {Hostname}.", result.Hostname);
-
-                // Consume token into single-use cache for 5 minutes
-                if (_cacheService != null)
-                {
-                    await _cacheService.SetAsync(cacheKey, true, TimeSpan.FromMinutes(5));
-                }
-
                 return true;
             }
 
@@ -142,6 +131,10 @@ public class TurnstileService : ICaptchaService
         }
         catch (Exception ex)
         {
+            if (_cacheService != null)
+            {
+                await _cacheService.RemoveAsync(cacheKey);
+            }
             _logger.LogError(ex, "Exception encountered while verifying Cloudflare Turnstile token.");
             return false;
         }

@@ -1,32 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useReducer, useEffect } from 'react';
 import { ShieldCheck, ShieldAlert, CheckCircle2, AlertTriangle, XCircle, ArrowLeft, RefreshCw, LogIn, Lock } from 'lucide-react';
 import { gateApi } from '../services/api';
 import { isAdmin } from '../utils/auth';
+import { gateScannerReducer, initialGateScannerState } from '../machines/gateScannerReducer';
 
 export default function GatePassVerification({ ticketId, currentUser, onNavigateHome, onOpenLogin }) {
   const isAuthorized = isAdmin(currentUser);
-  const [isValidating, setIsValidating] = useState(false);
-  const [result, setResult] = useState(null);
-  const [errorMsg, setErrorMsg] = useState(null);
-  const [isResetting, setIsResetting] = useState(false);
+  const [scanState, dispatch] = useReducer(gateScannerReducer, initialGateScannerState);
+  const isValidating = scanState.status === 'validating';
+  const isResetting = scanState.status === 'resetting';
+  const result = scanState.result;
+  const errorMsg = scanState.error;
 
   useEffect(() => {
     if (!isAuthorized) return;
     if (!ticketId) return;
 
     let isMounted = true;
-    setIsValidating(true);
-    setErrorMsg(null);
+    dispatch({ type: 'VALIDATE_START' });
 
     gateApi.validate({ ticketCode: ticketId, checkIn: true, gateName: 'Mobile QR Gate' })
       .then(res => {
-        if (isMounted) setResult(res);
+        if (isMounted) dispatch({ type: 'VALIDATE_SUCCESS', result: res });
       })
       .catch(err => {
-        if (isMounted) setErrorMsg(err.message || 'Validation request failed.');
-      })
-      .finally(() => {
-        if (isMounted) setIsValidating(false);
+        if (isMounted) dispatch({ type: 'VALIDATE_ERROR', error: err.message || 'Validation request failed.' });
       });
 
     return () => {
@@ -36,14 +34,12 @@ export default function GatePassVerification({ ticketId, currentUser, onNavigate
 
   const handleResetCheckIn = async () => {
     if (!ticketId || isResetting) return;
-    setIsResetting(true);
+    dispatch({ type: 'RESET_START' });
     try {
       const res = await gateApi.reset({ ticketCode: ticketId, reason: 'Re-entry / supervisor reset' });
-      setResult(res);
+      dispatch({ type: 'RESET_SUCCESS', result: res });
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to reset check-in status.');
-    } finally {
-      setIsResetting(false);
+      dispatch({ type: 'RESET_ERROR', error: err.message || 'Failed to reset check-in status.' });
     }
   };
 

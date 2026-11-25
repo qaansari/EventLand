@@ -8,8 +8,9 @@ export default function DigitalTicketModal({ ticket, onClose }) {
   const { showSuccess, showError } = useToast();
   const ticketCardRef = useRef(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [scannerStatus, setScannerStatus] = useState('idle'); // idle, scanning, verified
+  const [scannerState, setScannerState] = useState('closed'); // 'closed' | 'scanning' | 'verified'
+  const isScannerOpen = scannerState !== 'closed';
+  const scannerStatus = scannerState === 'closed' ? 'idle' : scannerState;
   const [qrDataUrl, setQrDataUrl] = useState('');
 
   useEffect(() => {
@@ -46,10 +47,9 @@ export default function DigitalTicketModal({ ticket, onClose }) {
   };
 
   const handleSimulateScan = () => {
-    setIsScannerOpen(true);
-    setScannerStatus('scanning');
+    setScannerState('scanning');
     setTimeout(() => {
-      setScannerStatus('verified');
+      setScannerState('verified');
     }, 1500);
   };
 

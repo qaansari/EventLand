@@ -1030,6 +1030,7 @@ public class FakeCacheService : ICacheService
 {
     public Task<T?> GetAsync<T>(string key) => Task.FromResult<T?>(default);
     public Task SetAsync<T>(string key, T value, TimeSpan? absoluteExpiration = null) => Task.CompletedTask;
+    public Task<bool> TrySetOnceAsync(string key, TimeSpan expiration) => Task.FromResult(true);
     public Task RemoveAsync(string key) => Task.CompletedTask;
     public Task RemoveByPrefixAsync(string prefixKey) => Task.CompletedTask;
     public Task ClearEventCacheAsync(int? eventId = null) => Task.CompletedTask;

@@ -59,7 +59,7 @@ export function useCheckoutMachine(initialExpiresAt?: string | null) {
     if (context.expiresAt) {
       const expTime = new Date(context.expiresAt).getTime();
       const diffSecs = Math.max(0, Math.floor((expTime - Date.now()) / 1000));
-      context.secondsRemaining = diffSecs;
+      dispatch({ type: 'SYNC_EXPIRY', secondsRemaining: diffSecs });
     }
   }, [context.expiresAt]);
 

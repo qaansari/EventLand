@@ -96,8 +96,10 @@ public class OrderService : IOrderService
             if (statusCheck.IsSuccess && !string.IsNullOrWhiteSpace(statusCheck.PayProId))
             {
                 existingOrder.PayProId = statusCheck.PayProId;
-                existingOrder.Status = statusCheck.IsPaid ? OrderStatus.Paid : OrderStatus.Unpaid;
-                existingOrder.UpdatedAtUtc = DateTime.UtcNow;
+                if (statusCheck.IsPaid)
+                    existingOrder.MarkPaid(statusCheck.AmountPaid, statusCheck.PaymentVia, statusCheck.DatePaid, DateTime.UtcNow);
+                else
+                    existingOrder.MarkUnpaid(statusCheck.PayProId, null, DateTime.UtcNow);
                 await _dbContext.SaveChangesAsync(cancellationToken);
 
                 return new CreatePayProOrderResponseDto(
@@ -178,12 +180,9 @@ public class OrderService : IOrderService
         }
         else
         {
-            existingOrder.PayProId = createResult.PayProId;
             existingOrder.Click2PayUrl = finalClick2Pay;
             existingOrder.BillUrl = createResult.BillUrl;
-            existingOrder.RawCreateResponse = createResult.RawResponseJson;
-            existingOrder.Status = OrderStatus.Unpaid;
-            existingOrder.UpdatedAtUtc = DateTime.UtcNow;
+            existingOrder.MarkUnpaid(createResult.PayProId, createResult.RawResponseJson, DateTime.UtcNow);
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -218,19 +217,14 @@ public class OrderService : IOrderService
 
             if (queryResult.IsPaid && order.Status != OrderStatus.Paid)
             {
-                order.Status = OrderStatus.Paid;
-                order.AmountPaid = queryResult.AmountPaid > 0 ? queryResult.AmountPaid : order.Amount;
-                order.PaymentMode = queryResult.PaymentVia;
-                order.DatePaid = queryResult.DatePaid ?? DateTime.UtcNow;
-                order.UpdatedAtUtc = DateTime.UtcNow;
+                order.MarkPaid(queryResult.AmountPaid, queryResult.PaymentVia, queryResult.DatePaid, DateTime.UtcNow);
                 changed = true;
 
                 await _paidHandler.OnOrderPaidAsync(order, cancellationToken);
             }
             else if (queryResult.IsBlocked && order.Status != OrderStatus.Blocked)
             {
-                order.Status = OrderStatus.Blocked;
-                order.UpdatedAtUtc = DateTime.UtcNow;
+                order.MarkBlocked(DateTime.UtcNow);
                 changed = true;
             }
 
@@ -272,11 +266,7 @@ public class OrderService : IOrderService
             return true;
         }
 
-        order.Status = OrderStatus.Paid;
-        order.AmountPaid = amountPaid ?? order.Amount;
-        order.PaymentMode = paymentMode ?? order.PaymentMode ?? "PayPro";
-        order.DatePaid = datePaid ?? DateTime.UtcNow;
-        order.UpdatedAtUtc = DateTime.UtcNow;
+        order.MarkPaid(amountPaid, paymentMode, datePaid, DateTime.UtcNow);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

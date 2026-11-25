@@ -227,21 +227,23 @@ public class BankAccountService : IBankAccountService
             throw new KeyNotFoundException($"Bank account with ID '{id}' not found.");
 
         var newActiveState = !entity.IsActive;
-
-        if (newActiveState)
+        var strategy = _context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            var existingActive = await _context.BankAccounts
-                .Where(b => b.Id != id && b.IsActive && !b.IsDeleted)
-                .ToListAsync();
+            await using var transaction = await _context.Database.BeginTransactionAsync();
 
-            foreach (var a in existingActive)
+            if (newActiveState)
             {
-                a.IsActive = false;
+                await _context.BankAccounts
+                    .Where(b => b.Id != id && b.IsActive && !b.IsDeleted)
+                    .ExecuteUpdateAsync(s => s.SetProperty(b => b.IsActive, false));
             }
-        }
 
-        entity.IsActive = newActiveState;
-        await _context.SaveChangesAsync();
+            entity.IsActive = newActiveState;
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        });
+
         await _cacheService.RemoveAsync(StatusCacheKey);
 
         return MapToDto(entity);

@@ -31,8 +31,11 @@ export default function PayProAdminPanel() {
   const [consumers, setConsumers] = useState([]);
   const [consumerSearch, setConsumerSearch] = useState('');
   const [consumersLoading, setConsumersLoading] = useState(false);
-  const [showCreateConsumerModal, setShowCreateConsumerModal] = useState(false);
-  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [activeConsumerModal, setActiveConsumerModal] = useState(null); // null | 'create' | 'batch'
+  const showCreateConsumerModal = activeConsumerModal === 'create';
+  const setShowCreateConsumerModal = (v) => setActiveConsumerModal(v ? 'create' : null);
+  const showBatchModal = activeConsumerModal === 'batch';
+  const setShowBatchModal = (v) => setActiveConsumerModal(v ? 'batch' : null);
   const [consumerForm, setConsumerForm] = useState({
     consumerId: '',
     name: '',
@@ -158,6 +161,7 @@ export default function PayProAdminPanel() {
   // Handle Reconciliation Sweep
   const handleTriggerReconcile = async () => {
     setReconcileLoading(true);
+    setReconcileResult(null);
     try {
       const res = await payProApi.reconcile(reconcileOlderThan);
       setReconcileResult(res);

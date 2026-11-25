@@ -1,6 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useReducer, useEffect, useCallback } from 'react';
 import { RefreshCw, CheckCircle2, Clock, AlertTriangle, XCircle, ExternalLink, ShieldCheck, Copy, Check } from 'lucide-react';
 import { payProApi } from '../services/paypro.api';
+import {
+  payproTrackerReducer,
+  createInitialPayProTrackerState,
+  isPayProTerminalStatus
+} from '../machines/payproTrackerReducer';
 
 /**
  * PayProStatusTracker
@@ -16,37 +21,34 @@ export default function PayProStatusTracker({
   onStatusChange = null,
   className = ''
 }) {
-  const [statusData, setStatusData] = useState(initialStatus);
-  const [loading, setLoading] = useState(false);
+  const [trackerState, dispatch] = useReducer(
+    payproTrackerReducer,
+    initialStatus,
+    createInitialPayProTrackerState
+  );
   const [copied, setCopied] = useState(false);
-  const [pollCount, setPollCount] = useState(0);
-  const [isAutoPolling, setIsAutoPolling] = useState(true);
-  const [errorMessage, setErrorMessage] = useState('');
+
+  const { statusData, pollCount, isAutoPolling, errorMessage } = trackerState;
+  const loading = trackerState.status === 'loading';
 
   const fetchStatus = useCallback(async (isBackground = false) => {
     if (!orderNumber) return;
-    if (!isBackground) setLoading(true);
-    setErrorMessage('');
+    dispatch({ type: 'FETCH_START', isBackground });
 
     try {
       const res = await payProApi.getOrderStatus(orderNumber);
-      setStatusData(res);
+      dispatch({ type: 'FETCH_SUCCESS', data: res });
 
       if (onStatusChange) {
         onStatusChange(res);
       }
-
-      // If terminal status reached, stop auto-polling
-      if (res && (res.isPaid || res.orderStatus === 'Paid' || res.orderStatus === 'PAID' || res.orderStatus === 'Blocked')) {
-        setIsAutoPolling(false);
-      }
     } catch (err) {
       console.error('[PayProStatusTracker] Status fetch error:', err);
-      if (!isBackground) {
-        setErrorMessage(err.message || 'Unable to fetch status.');
-      }
-    } finally {
-      if (!isBackground) setLoading(false);
+      dispatch({
+        type: 'FETCH_ERROR',
+        message: err.message || 'Unable to fetch status.',
+        isBackground
+      });
     }
   }, [orderNumber, onStatusChange]);
 
@@ -61,16 +63,15 @@ export default function PayProStatusTracker({
   useEffect(() => {
     if (!isAutoPolling || !orderNumber) return;
 
-    const isFinished = statusData?.isPaid || statusData?.orderStatus === 'Paid' || statusData?.orderStatus === 'PAID' || statusData?.orderStatus === 'Blocked';
-    if (isFinished) return;
+    if (isPayProTerminalStatus(statusData) !== null) return;
 
     if (pollCount >= maxPollAttempts) {
-      setIsAutoPolling(false);
+      dispatch({ type: 'STOP_POLLING' });
       return;
     }
 
     const timer = setTimeout(() => {
-      setPollCount(prev => prev + 1);
+      dispatch({ type: 'POLL_TICK' });
       fetchStatus(true);
     }, pollIntervalMs);
 

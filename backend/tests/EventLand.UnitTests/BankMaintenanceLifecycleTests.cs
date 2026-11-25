@@ -335,6 +335,13 @@ public class BankMaintenanceLifecycleTests : IAsyncLifetime
             return Task.CompletedTask;
         }
 
+        public Task<bool> TrySetOnceAsync(string key, TimeSpan expiration)
+        {
+            if (_store.ContainsKey(key)) return Task.FromResult(false);
+            _store[key] = true;
+            return Task.FromResult(true);
+        }
+
         public Task RemoveAsync(string key)
         {
             _store.Remove(key);

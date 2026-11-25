@@ -335,11 +335,7 @@ public class BookingService : IBookingService
 
             foreach (var bs in booking.BookingSeats)
             {
-                if (bs.Seat != null)
-                {
-                    bs.Seat.Status = SeatStatus.Booked;
-                    bs.Seat.State = SeatState.Booked;
-                }
+                bs.Seat?.Book(now);
             }
 
             await _cacheService.ReleaseSeatsAsync(booking.EventId, seatIds, null);
@@ -393,10 +389,7 @@ public class BookingService : IBookingService
 
         foreach (var bs in booking.BookingSeats)
         {
-            if (bs.Seat != null)
-            {
-                bs.Seat.Status = SeatStatus.Available;
-            }
+            bs.Seat?.Release(now);
         }
 
         var seatIds = booking.BookingSeats.Select(bs => bs.SeatId).ToList();
@@ -530,11 +523,7 @@ public class BookingService : IBookingService
 
                 foreach (var bs in booking.BookingSeats)
                 {
-                    if (bs.Seat != null)
-                    {
-                        bs.Seat.Status = SeatStatus.Available;
-                        bs.Seat.State = SeatState.Available;
-                    }
+                    bs.Seat?.Release(now);
                 }
             }
 

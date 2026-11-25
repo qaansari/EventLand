@@ -6,6 +6,7 @@ public interface ICacheService
 {
     Task<T?> GetAsync<T>(string key);
     Task SetAsync<T>(string key, T value, TimeSpan? absoluteExpiration = null);
+    Task<bool> TrySetOnceAsync(string key, TimeSpan expiration);
     Task RemoveAsync(string key);
     Task RemoveByPrefixAsync(string prefixKey);
     Task ClearEventCacheAsync(int? eventId = null);

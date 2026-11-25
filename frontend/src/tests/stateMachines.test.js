@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import { deriveSeatVisualState } from '../utils/deriveSeatVisualState.ts';
 import { checkoutReducer, getInitialContext } from '../machines/checkoutReducer.ts';
 import { authReducer } from '../machines/authReducer.ts';
+import { gateScannerReducer, initialGateScannerState } from '../machines/gateScannerReducer.ts';
+import { payproTrackerReducer, createInitialPayProTrackerState } from '../machines/payproTrackerReducer.ts';
+import { unpaidInvoicesReducer, initialUnpaidInvoicesState } from '../machines/unpaidInvoicesReducer.ts';
+import { overlayReducer } from '../machines/overlayReducer.ts';
+import { adminFeedbackReducer, initialAdminFeedbackState } from '../machines/adminFeedbackReducer.ts';
 
 // ── 1. Pure Seat Visual Calculation Tests (Audit #9) ──────────────────────────
 test('deriveSeatVisualState: blocked takes top precedence', () => {
@@ -159,7 +164,93 @@ test('authReducer: transitions between login, signup, forgot, and reset', () => 
   assert.equal(ctx.email, 'test@eventland.pk');
 
   // Successful authentication
+  ctx = authReducer(ctx, { type: 'START_SUBMIT' });
+  assert.equal(ctx.isSubmitting, true);
+  assert.equal(ctx.socialProvider, null);
+
   ctx = authReducer(ctx, { type: 'AUTH_SUCCESS', authData: { token: 'jwt-xyz', user: { fullName: 'Ali' } } });
   assert.equal(ctx.state, 'authenticated');
+  assert.equal(ctx.isSubmitting, false);
   assert.equal(ctx.authData.token, 'jwt-xyz');
+});
+
+// ── 4. Gate Scanner State Machine Tests ─────────────────────────────────────
+test('gateScannerReducer: prevents simultaneous result and error states', () => {
+  let s = initialGateScannerState;
+  s = gateScannerReducer(s, { type: 'VALIDATE_START' });
+  assert.equal(s.status, 'validating');
+  assert.equal(s.result, null);
+  assert.equal(s.error, null);
+
+  s = gateScannerReducer(s, { type: 'VALIDATE_SUCCESS', result: { valid: true } });
+  assert.equal(s.status, 'verified');
+  assert.equal(s.result.valid, true);
+
+  s = gateScannerReducer(s, { type: 'RESET_START' });
+  assert.equal(s.status, 'resetting');
+
+  s = gateScannerReducer(s, { type: 'RESET_ERROR', error: 'Supervisor required' });
+  assert.equal(s.status, 'error');
+  assert.equal(s.result, null);
+  assert.equal(s.error, 'Supervisor required');
+});
+
+// ── 5. PayPro Tracker State Machine Tests ───────────────────────────────────
+test('payproTrackerReducer: halts auto-polling on terminal Paid or Blocked status', () => {
+  let s = createInitialPayProTrackerState(null);
+  assert.equal(s.isAutoPolling, true);
+
+  s = payproTrackerReducer(s, { type: 'FETCH_START', isBackground: false });
+  assert.equal(s.status, 'loading');
+
+  s = payproTrackerReducer(s, { type: 'FETCH_SUCCESS', data: { orderStatus: 'Paid', isPaid: true } });
+  assert.equal(s.status, 'terminal_paid');
+  assert.equal(s.isAutoPolling, false);
+});
+
+// ── 6. Unpaid Invoices Modal State Machine Tests ────────────────────────────
+test('unpaidInvoicesReducer: blocks concurrent invoice mutations', () => {
+  let s = initialUnpaidInvoicesState;
+  s = unpaidInvoicesReducer(s, { type: 'LOAD_SUCCESS' });
+  assert.equal(s.listStatus, 'idle');
+
+  s = unpaidInvoicesReducer(s, { type: 'ACTION_START', action: { type: 'upload', invoiceKey: 'INV-1' } });
+  assert.equal(s.activeAction?.type, 'upload');
+
+  // Second concurrent action is ignored while upload is active
+  s = unpaidInvoicesReducer(s, { type: 'ACTION_START', action: { type: 'submit_proof', invoiceKey: 'INV-1' } });
+  assert.equal(s.activeAction?.type, 'upload');
+
+  s = unpaidInvoicesReducer(s, { type: 'ACTION_DONE' });
+  assert.equal(s.activeAction, null);
+});
+
+// ── 7. Global Overlay State Machine Tests ───────────────────────────────────
+test('overlayReducer: enforces single active overlay and clears on auth expiry', () => {
+  let o = overlayReducer(null, { type: 'OPEN_SEAT_PICKER', event: { id: 1 } });
+  assert.equal(o?.type, 'seat_picker');
+
+  o = overlayReducer(o, { type: 'OPEN_AUTH', role: 'customer', pendingBooking: { event: { id: 1 } } });
+  assert.equal(o?.type, 'auth');
+  assert.equal(o?.role, 'customer');
+
+  o = overlayReducer(o, { type: 'AUTH_EXPIRED' });
+  assert.equal(o, null);
+});
+
+// ── 8. Admin Feedback State Machine Tests ───────────────────────────────────
+test('adminFeedbackReducer: keeps error and success mutually exclusive', () => {
+  let s = initialAdminFeedbackState;
+  assert.equal(s.asyncStatus, 'loading');
+
+  s = adminFeedbackReducer(s, { type: 'SET_LOADING', active: false });
+  assert.equal(s.asyncStatus, 'idle');
+
+  s = adminFeedbackReducer(s, { type: 'SET_ERROR', message: 'Save failed' });
+  assert.equal(s.feedback?.type, 'error');
+  assert.equal(s.feedback?.message, 'Save failed');
+
+  s = adminFeedbackReducer(s, { type: 'SET_SUCCESS', message: 'Event saved' });
+  assert.equal(s.feedback?.type, 'success');
+  assert.equal(s.feedback?.message, 'Event saved');
 });

@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useReducer, useEffect, useMemo } from 'react';
+import { adminFeedbackReducer, initialAdminFeedbackState } from '../machines/adminFeedbackReducer';
+import { gateScannerReducer, initialGateScannerState } from '../machines/gateScannerReducer';
 import {
   ShieldCheck,
   Ticket,
@@ -58,10 +60,15 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   const confirm = useConfirm();
   const { isCheckoutEnabled } = useCheckoutStatus();
   const [activeAdminTab, setActiveAdminTab] = useState('events'); // 'events', 'organizers', 'artists', 'bookings', 'users', 'roles', 'ticket-tiers', 'tags'
-  const [loading, setLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const [feedbackState, dispatchFeedback] = useReducer(adminFeedbackReducer, initialAdminFeedbackState);
+  const loading = feedbackState.asyncStatus === 'loading';
+  const isSaving = feedbackState.asyncStatus === 'saving';
+  const errorMsg = feedbackState.feedback?.type === 'error' ? feedbackState.feedback.message : '';
+  const successMsg = feedbackState.feedback?.type === 'success' ? feedbackState.feedback.message : '';
+  const setLoading = (active) => dispatchFeedback({ type: 'SET_LOADING', active: Boolean(active) });
+  const setIsSaving = (active) => dispatchFeedback({ type: 'SET_SAVING', active: Boolean(active) });
+  const setErrorMsg = (message) => dispatchFeedback({ type: 'SET_ERROR', message: message || '' });
+  const setSuccessMsg = (message) => dispatchFeedback({ type: 'SET_SUCCESS', message: message || '' });
 
   // Loaded Data States
   const [eventsList, setEventsList] = useState([]);
@@ -133,15 +140,16 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   const isSavingShow = isSavingShowState[0];
   const setIsSavingShow = isSavingShowState[1];
 
-  // Gate Scanner States
+  // Gate Scanner States (explicit reducer preventing concurrent scan/reset or stale result+error)
   const [gateEventFilter, setGateEventFilter] = useState('');
   const [gateTicketInput, setGateTicketInput] = useState('');
-  const [gateScanResult, setGateScanResult] = useState(null);
-  const [isScanningTicket, setIsScanningTicket] = useState(false);
+  const [gateScanState, dispatchGateScan] = useReducer(gateScannerReducer, initialGateScannerState);
+  const gateScanResult = gateScanState.result;
+  const isScanningTicket = gateScanState.status === 'validating';
+  const isResettingGateTicket = gateScanState.status === 'resetting';
   const [gateStats, setGateStats] = useState(null);
   const [gateActivityLog, setGateActivityLog] = useState([]);
   const [gateName, setGateName] = useState('Main Gate - Entrance A');
-  const [isResettingGateTicket, setIsResettingGateTicket] = useState(false);
 
   const showOrgModal = activeModal?.type === 'org';
   const setShowOrgModal = (v) => setActiveModal(v ? { type: 'org' } : null);
@@ -165,9 +173,11 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   const setShowFeeConfigModal = (v) => setActiveModal(v ? { type: 'feeConfig' } : null);
   const showBankAccountModal = activeModal?.type === 'bankAccount';
   const setShowBankAccountModal = (v) => setActiveModal(v ? { type: 'bankAccount' } : null);
+  const previewAuditorium = activeModal?.type === 'previewAuditorium' ? activeModal.data : null;
+  const setPreviewAuditorium = (aud) => setActiveModal(aud ? { type: 'previewAuditorium', data: aud } : null);
+  const adminPreviewTicket = activeModal?.type === 'previewTicket' ? activeModal.data : null;
+  const setAdminPreviewTicket = (ticket) => setActiveModal(ticket ? { type: 'previewTicket', data: ticket } : null);
   const [editingFeeConfig, setEditingFeeConfig] = useState(null);
-  const [previewAuditorium, setPreviewAuditorium] = useState(null);
-  const [adminPreviewTicket, setAdminPreviewTicket] = useState(null);
   const [exportingAudId, setExportingAudId] = useState(null);
 
   const defaultFooterForm = {
@@ -369,9 +379,12 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
   const [venueForm, setVenueForm] = useState(defaultVenueForm);
   const [bankAccountForm, setBankAccountForm] = useState(defaultBankAccountForm);
 
-  const [showCountryModal, setShowCountryModal] = useState(false);
-  const [showCityModal, setShowCityModal] = useState(false);
-  const [showVenueModal, setShowVenueModal] = useState(false);
+  const showCountryModal = activeModal?.type === 'country';
+  const setShowCountryModal = (v) => setActiveModal(v ? { type: 'country' } : null);
+  const showCityModal = activeModal?.type === 'city';
+  const setShowCityModal = (v) => setActiveModal(v ? { type: 'city' } : null);
+  const showVenueModal = activeModal?.type === 'venue';
+  const setShowVenueModal = (v) => setActiveModal(v ? { type: 'venue' } : null);
 
   const [countrySearch, setCountrySearch] = useState('');
   const [citySearch, setCitySearch] = useState('');
@@ -1303,7 +1316,7 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       const cleanCode = gateTicketInput.trim();
       if (!cleanCode) return;
 
-      setIsScanningTicket(true);
+      dispatchGateScan({ type: 'VALIDATE_START' });
       try {
         const res = await gateApi.validate({
           ticketCode: cleanCode,
@@ -1311,7 +1324,7 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
           checkIn: true,
           gateName: gateName || 'Main Gate'
         });
-        setGateScanResult(res);
+        dispatchGateScan({ type: 'VALIDATE_SUCCESS', result: res });
 
         if (res.isValid) {
           showSuccess('Entry Approved ✅', `Welcome ${res.customerName} (${res.ticketTierName || 'Pass'})`);
@@ -1347,9 +1360,7 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
         }
       } catch (err) {
         showError('Validation Error', err.message || 'Failed to validate ticket.');
-        setGateScanResult({ isValid: false, status: 'ERROR', message: err.message || 'Validation request failed.' });
-      } finally {
-        setIsScanningTicket(false);
+        dispatchGateScan({ type: 'VALIDATE_SUCCESS', result: { isValid: false, status: 'ERROR', message: err.message || 'Validation request failed.' } });
       }
     };
 
@@ -1365,18 +1376,17 @@ export default function AdminDashboard({ onSelectEvent, currentUser = null, onUp
       });
       if (!confirmed) return;
 
-      setIsResettingGateTicket(true);
+      dispatchGateScan({ type: 'RESET_START' });
       try {
         const res = await gateApi.reset({ ticketCode: ref, reason: 'Admin console supervisor reset' });
         showSuccess('Check-in Reset', `Ticket ${ref} is now valid for admission again.`);
-        setGateScanResult(res);
+        dispatchGateScan({ type: 'RESET_SUCCESS', result: res });
         if (gateEventFilter) {
           gateApi.getStats(Number(gateEventFilter)).then(setGateStats).catch(() => { });
         }
       } catch (err) {
         showError('Reset Failed', err.message || 'Could not reset ticket check-in.');
-      } finally {
-        setIsResettingGateTicket(false);
+        dispatchGateScan({ type: 'RESET_ERROR', error: err.message || 'Could not reset ticket check-in.' });
       }
     };
 

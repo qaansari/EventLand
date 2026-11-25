@@ -59,6 +59,21 @@ public class TurnstileTokenLifecycleTests
     }
 
     [Fact]
+    public async Task VerifyActionToken_50ConcurrentRequestsSameToken_ExactlyOneSucceeds()
+    {
+        var service = CreateTurnstileService(enabled: true);
+        var testToken = $"test-pass-concurrent-{Guid.NewGuid():N}";
+
+        var tasks = Enumerable.Range(0, 50)
+            .Select(_ => service.VerifyActionTokenAsync(testToken, "login"));
+
+        var results = await Task.WhenAll(tasks);
+
+        results.Count(r => r).Should().Be(1, "Exactly one concurrent request may consume a single-use token");
+        results.Count(r => !r).Should().Be(49, "All 49 concurrent replay attempts must be rejected");
+    }
+
+    [Fact]
     public async Task ValidateActionToken_WhenCaptchaDisabled_BypassesSuccessfully()
     {
         var service = CreateTurnstileService(enabled: false);

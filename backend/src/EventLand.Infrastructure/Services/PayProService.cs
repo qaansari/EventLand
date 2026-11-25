@@ -423,16 +423,12 @@ public class PayProService : IPayProService
         // Permanently lock seats to Booked
         foreach (var bs in booking.BookingSeats)
         {
-            if (bs.Seat != null)
-            {
-                bs.Seat.Status = SeatStatus.Booked;
-            }
+            bs.Seat?.Book(paidAt);
         }
 
         if (tx != null)
         {
-            tx.Status = PaymentStatus.Paid;
-            tx.PaidAt = paidAt;
+            tx.MarkPaid(paidAt);
         }
         else
         {
