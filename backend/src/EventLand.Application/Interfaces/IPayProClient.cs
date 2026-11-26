@@ -25,6 +25,7 @@ public interface IPayProClient
         string customerEmail,
         string customerPhone,
         DateTimeOffset? dueDate,
+        string? returnUrl = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -132,6 +132,7 @@ public class PayProClient : IPayProClient
         string customerEmail,
         string customerPhone,
         DateTimeOffset? dueDate,
+        string? returnUrl = null,
         CancellationToken cancellationToken = default)
     {
         var token = await GetAuthTokenAsync(cancellationToken);
@@ -178,7 +179,7 @@ public class PayProClient : IPayProClient
                 CustomerMobile = cleanPhone,
                 CustomerEmail = customerEmail ?? "",
                 CustomerAddress = "",
-                Ecommerce_return_url = _options.ReturnUrl ?? ""
+                Ecommerce_return_url = !string.IsNullOrWhiteSpace(returnUrl) ? returnUrl : (_options.ReturnUrl ?? "")
             }
         };
 

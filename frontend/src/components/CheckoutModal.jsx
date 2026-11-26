@@ -17,11 +17,14 @@ import {
 import { bookingsApi, paymentsApi } from '../services/api';
 import PayProStatusTracker from './PayProStatusTracker';
 import { useToast } from '../context/ToastContext';
+import { useCaptcha } from '../context/CaptchaContext';
+import CloudflareTurnstile from './CloudflareTurnstile';
 import { useCheckoutMachine } from '../hooks/useCheckoutMachine';
 import { useCheckoutStatus } from '../services/checkoutSettings';
 
 export default function CheckoutModal({ event, selectedSeats, onClose, onBookingSuccess, onInvoiceCreated }) {
   const { showSuccess, showError, showWarning } = useToast();
+  const { captchaToken, setCaptchaToken, consumeCaptchaToken, resetCaptcha, isCaptchaEnabled } = useCaptcha();
   const { state, context, dispatch, pollStatus } = useCheckoutMachine();
   const { isCheckoutEnabled, toggleCheckout } = useCheckoutStatus();
 
@@ -80,6 +83,10 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
       onClose();
       return;
     }
+    if (isCaptchaEnabled && !captchaToken) {
+      showError('Security Check', 'Please complete the security verification challenge before continuing.');
+      return;
+    }
     dispatch({ type: 'PROCEED' });
   };
 
@@ -103,6 +110,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
     const showId = event.selectedShow?.id || selectedSeats?.[0]?.showId || null;
 
     if (isNumericEventId && ticketTierId) {
+      const activeCaptchaToken = consumeCaptchaToken() || captchaToken;
       const dto = {
         eventId: typeof event.id === 'number' ? event.id : parseInt(event.id, 10),
         ticketTierId: ticketTierId,
@@ -112,9 +120,10 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
         quantity: selectedSeats.length || 1,
         paymentMethod: paymentMethod,
         selectedSeatIds: seatIds.length > 0 ? seatIds : null,
-        eventShowId: showId
+        eventShowId: showId,
+        captchaToken: activeCaptchaToken || undefined
       };
-      const booking = await bookingsApi.createBooking(dto);
+      const booking = await bookingsApi.createBooking(dto, activeCaptchaToken);
       dispatch({ type: 'BOOKING_CREATED', booking });
       return booking;
     }
@@ -207,6 +216,7 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
       showSuccess('PayPro Invoice Ready 💳', `PayPro Voucher #: ${voucher}`);
     } catch (err) {
       console.error('PayPro Checkout error:', err);
+      resetCaptcha();
       dispatch({ type: 'FAIL', message: err.message || 'Failed to initiate PayPro Online Gateway session.' });
       showError('PayPro Gateway Error', err.message || 'Failed to initiate PayPro Online Gateway session.');
     }
@@ -671,6 +681,14 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
               </div>
             </div>
 
+            <div style={{ marginBottom: '1.25rem' }}>
+              <CloudflareTurnstile
+                action="booking_create"
+                onVerify={(token) => setCaptchaToken(token)}
+                onExpire={() => setCaptchaToken('')}
+              />
+            </div>
+
             <button
               type="submit"
               className="btn btn-primary"
@@ -1073,7 +1091,10 @@ export default function CheckoutModal({ event, selectedSeats, onClose, onBooking
 
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
               <button
-                onClick={() => dispatch({ type: 'RESET' })}
+                onClick={() => {
+                  resetCaptcha();
+                  dispatch({ type: 'RESET' });
+                }}
                 className="btn btn-primary"
                 style={{
                   padding: '0.85rem 1.75rem',

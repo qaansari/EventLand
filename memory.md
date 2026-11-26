@@ -1243,5 +1243,16 @@ dotnet ef database update --project backend/src/EventLand.Infrastructure --start
   - Frontend Production Build: **0 errors** via Vite.
   - Backend Unit Tests: **188/188 tests passing (100% green)** on .NET 10.
 
+#### Post-Phase 16: PayPro Demo Checkout Captcha & ReturnUrl Completion
+
+1. **Added Turnstile Security Verification to Checkout ([`CheckoutModal.jsx`](file:///d:/Projects/EventLand/frontend/src/components/CheckoutModal.jsx))**:
+   - Wired `useCaptcha` and `<CloudflareTurnstile action="booking_create" />` into Step 1 (`buyer_info`) of `CheckoutModal.jsx`.
+   - Passed `captchaToken` in `bookingsApi.createBooking(dto, activeCaptchaToken)`, resolving the `Security verification failed: Captcha challenge token is required.` block from `BookingsController.CreateBooking`.
+   - Added `resetCaptcha()` on checkout failures and on `Try Again` so users get a fresh challenge token.
+
+2. **Completed PayPro Demo Order & ReturnUrl Wiring ([`IPayProClient.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Application/Interfaces/IPayProClient.cs), [`PayProClient.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Services/PayProClient.cs), [`PayProService.cs`](file:///d:/Projects/EventLand/backend/src/EventLand.Infrastructure/Services/PayProService.cs))**:
+   - Forwarded caller `returnUrl` (e.g. `http://localhost:5173/payments/return`) into `PayProClient.CreateOrderAsync` (`Ecommerce_return_url`), falling back to `PayProOptions.ReturnUrl`.
+   - Allowed voucher-only PayPro Demo responses (`ConnectPayId` / `PayProId`) even when `Click2PayUrl` is omitted, enabling both Click2Pay redirect and OTC/QR voucher flows.
+
 ---
-*Last Updated: November 2026 (Phase 16 / P3 Complete — All 4 State Machine Audit Phases Verified: 188 Backend Tests Green on .NET 10, 23 Frontend Tests Green, Clean Vite Build)*
+*Last Updated: November 2026 (PayPro Demo Checkout Captcha & ReturnUrl Setup Complete; 188 Backend Tests Green on .NET 10, 23 Frontend Tests Green, Clean Vite Build)*

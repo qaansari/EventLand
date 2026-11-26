@@ -140,12 +140,13 @@ public class PayProService : IPayProService
             customerEmail: booking.CustomerEmail,
             customerPhone: booking.CustomerPhone,
             dueDate: booking.PaymentExpiresAt,
+            returnUrl: returnUrl,
             cancellationToken: cancellationToken);
 
         string paymentUrl = orderResult.Click2PayUrl ?? string.Empty;
         string voucherCode = orderResult.ConnectPayId ?? orderResult.PayProId ?? string.Empty;
 
-        if (!orderResult.IsSuccess || string.IsNullOrWhiteSpace(paymentUrl))
+        if (!orderResult.IsSuccess || (string.IsNullOrWhiteSpace(paymentUrl) && string.IsNullOrWhiteSpace(voucherCode)))
         {
             _logger.LogError("PayPro V2 order creation failed for Booking {BookingRef}: {Description}", booking.BookingRef, orderResult.Description);
             throw new InvalidOperationException($"Unable to initiate PayPro payment: {orderResult.Description}");
